@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "assistant-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenant_id", "platform", "store_id", "conversation_id", "customer_message", "client_mode"],
+  "properties": {
+    "tenant_id": {"type": "string", "minLength": 1},
+    "platform": {"type": "string", "minLength": 1},
+    "store_id": {"type": "string", "minLength": 1},
+    "conversation_id": {"type": "string", "minLength": 1},
+    "customer_message": {"type": "string", "minLength": 1},
+    "recent_messages": {"type": "array", "items": {"type": "object"}},
+    "product": {"type": "object"},
+    "order_context": {"type": "object"},
+    "client_mode": {"type": "string", "enum": ["CUSTOMER", "AGENT", "ADMIN"]}
+  }
+}

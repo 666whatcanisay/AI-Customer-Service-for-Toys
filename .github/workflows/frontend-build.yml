@@ -1,0 +1,18 @@
+name: Frontend build
+on:
+  pull_request:
+    paths: ['frontend/**']
+  push:
+    paths: ['frontend/**']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Build only an imported frontend
+        run: |
+          if [ ! -f frontend/package.json ]; then echo 'No frontend package imported yet; passing baseline check.'; exit 0; fi
+          cd frontend
+          if [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile && pnpm run build; elif [ -f yarn.lock ]; then corepack enable && yarn install --frozen-lockfile && yarn build; elif [ -f package-lock.json ]; then npm ci && npm run build; else echo 'No lock file; dependency installation intentionally skipped.'; exit 0; fi

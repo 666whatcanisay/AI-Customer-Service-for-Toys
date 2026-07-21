@@ -1,0 +1,17 @@
+name: Backend tests
+on:
+  pull_request:
+    paths: ['backend/**']
+  push:
+    paths: ['backend/**']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Run available backend tests
+        run: |
+          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
+          if [ -d backend/tests ]; then pytest backend/tests; else echo 'No backend tests imported yet; passing baseline check.'; fi

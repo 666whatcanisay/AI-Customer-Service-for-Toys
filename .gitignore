@@ -1,0 +1,58 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets/
+credentials/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Private data and databases
+backend/vector_db/
+vector_db/
+backend/knowledge_base/*
+!backend/knowledge_base/README.md
+!backend/knowledge_base/.gitkeep
+data/raw/
+data/private/
+data/uploads/
+uploads/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+
+# Models, logs, IDE, OS
+*.gguf
+*.safetensors
+*.bin
+*.onnx
+models/
+logs/
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

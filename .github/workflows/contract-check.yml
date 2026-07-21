@@ -1,0 +1,23 @@
+name: Contract check
+on:
+  pull_request:
+    paths: ['contracts/**']
+  push:
+    paths: ['contracts/**']
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install jsonschema
+      - name: Validate JSON schema syntax
+        run: |
+          python -c "import glob,json; from jsonschema.validators import validator_for; [validator_for(json.load(open(p))).check_schema(json.load(open(p))) for p in glob.glob('contracts/schemas/*.json')]"
+          python -c "import json; d=json.load(open('contracts/version.json')); assert d.get('contract_version')"
+      - name: Require changelog with contract changes
+        run: |
+          git diff --name-only HEAD^ HEAD | grep '^contracts/' | grep -v '^contracts/CHANGELOG.md' > changed.txt || true
+          test ! -s changed.txt || git diff --name-only HEAD^ HEAD | grep -q '^contracts/CHANGELOG.md'

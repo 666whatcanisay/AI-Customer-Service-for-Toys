@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "knowledge-publish.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenant_id", "store_id", "knowledge_id", "version_id", "title", "content", "risk_level", "response_action"],
+  "properties": {
+    "tenant_id": {"type": "string", "minLength": 1}, "store_id": {"type": "string", "minLength": 1},
+    "knowledge_id": {"type": "string", "minLength": 1}, "version_id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1}, "content": {"type": "string", "minLength": 1},
+    "risk_level": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+    "response_action": {"type": "string", "enum": ["DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY", "REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"]},
+    "product_ids": {"type": "array", "items": {"type": "string"}}, "sku_ids": {"type": "array", "items": {"type": "string"}},
+    "effective_from": {"type": "string", "format": "date-time"}, "effective_to": {"type": "string", "format": "date-time"},
+    "source_reference": {"type": "string"}
+  }
+}

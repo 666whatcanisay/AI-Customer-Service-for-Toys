@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "assistant-response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "answer", "action", "risk_level", "citations", "warnings", "required_fields", "latency_ms"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 1},
+    "answer": {"type": "string"},
+    "action": {"type": "string", "enum": ["DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY", "REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"]},
+    "risk_level": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+    "citations": {"type": "array", "items": {"type": "object"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "required_fields": {"type": "array", "items": {"type": "string"}},
+    "latency_ms": {"type": "number", "minimum": 0}
+  }
+}

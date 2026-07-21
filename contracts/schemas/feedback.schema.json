@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "feedback.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "feedback_type"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 1},
+    "feedback_type": {"type": "string", "enum": ["DIRECT_ACCEPT", "EDITED_ACCEPT", "REJECTED", "GOOD_CASE", "BADCASE"]},
+    "original_answer": {"type": "string"},
+    "final_answer": {"type": "string"},
+    "comment": {"type": "string"}
+  }
+}
