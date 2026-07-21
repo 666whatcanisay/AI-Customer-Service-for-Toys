@@ -1,60 +1,50 @@
 {
-    "root_path":  "C:\\Users\\EDY\\Desktop\\ai回答模板\\rag-customer-service",
-    "current_task":  "Awaiting T01",
-    "contracts":  [
-                      "contracts/version.json 0.1.0"
-                  ],
-    "entrypoints":  [
-
-                    ],
-    "version":  "0.1.0",
-    "project_id":  "mumu-A",
-    "last_test_result":  "Not run during governance initialization",
-    "known_risks":  [
-                        "No synthetic baseline test evidence recorded"
-                    ],
-    "project_name":  "A：RAG Core 与安全回答服务",
-    "line":  "A",
-    "required_interfaces":  [
-
-                            ],
-    "current_gate":  "Not passed",
-    "current_stage":  "G0: governance and baseline inventory",
-    "git":  {
-                "branch":  "agent/rag-core",
-                "clean":  null,
-                "commit":  null,
-                "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
-            },
-    "forbidden_paths":  [
-                            "frontend/**",
-                            "extension/**",
-                            "platform_backend/**",
-                            "admin_web/**",
-                            "backend/vector_db/**"
-                        ],
-    "blockers":  [
-                     "Source directory is not a Git worktree for the required branch"
-                 ],
-    "test_commands":  [
-
-                      ],
-    "status":  "planning",
-    "owned_paths":  [
-                        "backend/**",
-                        "docs/rag/**"
-                    ],
-    "responsibilities":  [
-                             "A line delivery"
-                         ],
-    "last_updated":  "2026-07-21",
-    "out_of_scope":  [
-                         "Other-line business code"
-                     ],
-    "provided_interfaces":  [
-
-                            ],
-    "completed_tasks":  [
-                            "Governance documentation initialized"
-                        ]
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-core",
+  "project_id": "mumu-A",
+  "project_name": "A: RAG Core and safe-answer services",
+  "line": "A",
+  "version": "0.1.0",
+  "status": "blocked",
+  "current_task": "A-T01",
+  "next_recommended_task": "A-T02",
+  "current_stage": "A-T01 static audit and blocked baseline recorded",
+  "current_gate": "A-G1 not passed",
+  "last_test_result": "未运行，环境依赖缺失：pytest 命令在测试收集前因 No module named pytest 结束。",
+  "blockers": [
+    "Python runtime dependencies are missing, including pytest, FastAPI, Uvicorn, ChromaDB, sentence-transformers, PyMuPDF and OpenAI",
+    "Runtime tests, service startup, real-model execution and Chroma initialization were not executed",
+    "No real PDF knowledge base or vector database is available in the worktree"
+  ],
+  "known_risks": [
+    "Historical migration claims do not match the current worktree",
+    "Planned APIs and safe-answer behavior are not current verified capabilities"
+  ],
+  "git": {
+    "branch": "agent/rag-core",
+    "clean": false,
+    "commit": "ddb6bad",
+    "task_commit": null,
+    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
+  },
+  "checked_at": "2026-07-21T17:04:21+08:00",
+  "contracts": ["contracts/version.json 0.1.0"],
+  "entrypoints": ["backend/app/main.py", "scripts/start.ps1"],
+  "owned_paths": ["backend/**", "docs/rag/**"],
+  "forbidden_paths": [
+    "frontend/**",
+    "extension/**",
+    "platform_backend/**",
+    "admin_web/**",
+    "backend/vector_db/**"
+  ],
+  "test_commands": [
+    "python -m pytest -q backend/tests (not run: pytest unavailable before collection)"
+  ],
+  "completed_tasks": [
+    "Governance documentation initialized",
+    "A-T01 static capability audit and blocked baseline documentation"
+  ],
+  "required_interfaces": [],
+  "provided_interfaces": [],
+  "out_of_scope": ["Other-line business code"]
 }
