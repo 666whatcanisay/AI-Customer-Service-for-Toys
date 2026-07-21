@@ -26,9 +26,9 @@
     "current_stage":  "G1: verified frontend baseline",
     "git":  {
                 "branch":  "agent/user-client",
-                "clean":  false,
-                "commit":  null,
-                "task_commit":  null,
+                "clean":  true,
+                "commit":  "f073b8f",
+                "task_commit":  "f073b8f",
                 "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
             },
     "forbidden_paths":  [

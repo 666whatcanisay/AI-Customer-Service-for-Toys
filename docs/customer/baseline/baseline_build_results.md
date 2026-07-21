@@ -1,8 +1,8 @@
 # 前端基线构建结果
 
-任务：B-G1-FIX1  
-验证日期：2026-07-21  
-工作区：`C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS-user-client`  
+任务：B-G1-FIX1
+验证日期：2026-07-21
+工作区：`C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS-user-client`
 分支：`agent/user-client`
 
 ## 工具与安装
