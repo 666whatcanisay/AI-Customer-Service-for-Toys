@@ -1,59 +1,66 @@
 {
-    "root_path":  "C:\\Users\\EDY\\Desktop\\平台\\Platform",
-    "current_task":  "Awaiting T01",
-    "contracts":  [
-                      "contracts/version.json 0.1.0"
-                  ],
-    "entrypoints":  [
-
-                    ],
-    "version":  "0.1.0",
-    "project_id":  "mumu-C",
-    "last_test_result":  "Not run during governance initialization",
-    "known_risks":  [
-                        "No synthetic baseline test evidence recorded"
-                    ],
-    "project_name":  "C：知识治理中台与管理平台",
-    "line":  "C",
-    "required_interfaces":  [
-
-                            ],
-    "current_gate":  "Not passed",
-    "current_stage":  "G0: governance and baseline inventory",
-    "git":  {
-                "branch":  "agent/platform-center",
-                "clean":  null,
-                "commit":  null,
-                "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
-            },
-    "forbidden_paths":  [
-                            "backend/**",
-                            "frontend/**",
-                            "extension/**"
-                        ],
-    "blockers":  [
-                     "Source directory is not a Git worktree for the required branch"
-                 ],
-    "test_commands":  [
-
-                      ],
-    "status":  "planning",
-    "owned_paths":  [
-                        "platform_backend/**",
-                        "admin_web/**",
-                        "docs/platform/**"
-                    ],
-    "responsibilities":  [
-                             "C line delivery"
-                         ],
-    "last_updated":  "2026-07-21",
-    "out_of_scope":  [
-                         "Other-line business code"
-                     ],
-    "provided_interfaces":  [
-
-                            ],
-    "completed_tasks":  [
-                            "Governance documentation initialized"
-                        ]
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-platform-center",
+  "current_task": "C-T01",
+  "contracts": [
+    "contracts/version.json 0.1.0 (unchanged)"
+  ],
+  "entrypoints": [
+    "platform_backend/app/main.py:app",
+    "admin_web/src/main.ts",
+    "admin_web route: /system-status"
+  ],
+  "version": "0.1.0",
+  "project_id": "mumu-C",
+  "last_test_result": "Backend: pytest 3 passed with 1 upstream deprecation warning; GET /health returned HTTP 200 on port 8010. Admin: typecheck passed, Vitest 3 passed, Vite build passed.",
+  "known_risks": [
+    "Local port 8000 was occupied during verification; runtime health verification used port 8010.",
+    "FastAPI TestClient emitted an upstream HTTPX adapter deprecation warning.",
+    "This baseline exposes health status only and has no production business, data, authentication, audit persistence, or RAG capability."
+  ],
+  "project_name": "C：知识治理中台与管理平台",
+  "line": "C",
+  "required_interfaces": [],
+  "current_gate": "C-G1-FIX1 local acceptance passed; full G-C0 not claimed",
+  "current_stage": "C0: minimal runnable skeleton",
+  "git": {
+    "branch": "agent/platform-center",
+    "clean": false,
+    "commit": null,
+    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
+  },
+  "forbidden_paths": [
+    "backend/**",
+    "frontend/**",
+    "extension/**"
+  ],
+  "blockers": [],
+  "test_commands": [
+    "platform_backend/.venv/Scripts/python.exe -m pytest",
+    "platform_backend/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8010",
+    "GET http://127.0.0.1:8010/health with X-Request-ID: c-g1-fix1-health-check",
+    "pnpm typecheck",
+    "pnpm test",
+    "pnpm build"
+  ],
+  "status": "ready",
+  "owned_paths": [
+    "platform_backend/**",
+    "admin_web/**",
+    "docs/platform/**"
+  ],
+  "responsibilities": [
+    "C line delivery"
+  ],
+  "last_updated": "2026-07-21",
+  "out_of_scope": [
+    "Other-line business code",
+    "C-T02 and later business or contract work"
+  ],
+  "provided_interfaces": [
+    "GET /health (C-line local baseline; shared contract unchanged)"
+  ],
+  "completed_tasks": [
+    "Governance documentation initialized",
+    "C-T01 minimal platform backend and admin web skeleton implemented and locally verified"
+  ]
 }
