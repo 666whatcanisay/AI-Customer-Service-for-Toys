@@ -1,0 +1,32 @@
+{
+  "project_id": "mumu-control",
+  "project_name": "AI Customer Service for Toys control",
+  "line": "CONTROL",
+  "version": "0.1.0",
+  "status": "in_progress",
+  "current_task": "BASE-T04A",
+  "current_stage": "Shared Skill baseline correction",
+  "current_gate": "Pending PR merge and Agent worktree synchronization",
+  "git": {
+    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
+    "branch": "chore/complete-agent-skills",
+    "base_commit": "85961bfa97f437a96215630f5cf54f0947f0e152"
+  },
+  "skills": {
+    "required": 9,
+    "present": 9,
+    "validation": "passed: python scripts/check_project_skills.py"
+  },
+  "local_exclusions": [
+    "work/"
+  ],
+  "completed_tasks": [
+    "Classified work/ as local Codex initialization output",
+    "Excluded work/ through local .git/info/exclude",
+    "Corrected the shared project Skill layout"
+  ],
+  "blockers": [
+    "PR merge and Agent branch synchronization not yet completed"
+  ],
+  "last_updated": "2026-07-21"
+}
