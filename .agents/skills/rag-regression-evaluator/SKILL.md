@@ -1,8 +1,13 @@
 ---
 name: rag-regression-evaluator
-description: Use for RAG regression or evaluation requests.
+description: Use when running or reviewing baseline questions, formal RAG evaluations, or retrieval and answer regressions.
 ---
 
-# rag-regression-evaluator
+# RAG regression evaluator
 
-Run only approved synthetic cases; preserve Top-K, evidence, action, and answer outputs; classify data/retrieval/rule/prompt/model issues; never alter knowledge automatically.
+1. Run the approved baseline questions or formal evaluation set.
+2. Record each question, Top-K results, evidence, answer, action, risk, and latency.
+3. Classify failures as data, parsing, indexing, retrieval, rule, prompt, or model issues.
+4. Output attribution and repair recommendations only.
+
+Do not automatically modify the knowledge base, prompts, or rules.

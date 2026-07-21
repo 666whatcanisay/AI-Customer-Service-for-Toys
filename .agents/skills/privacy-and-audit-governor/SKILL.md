@@ -1,8 +1,12 @@
 ---
 name: privacy-and-audit-governor
-description: Use for source-material, privacy, audit, or recovery changes.
+description: Use for source-material handling, privacy boundaries, sensitive access, audit logging, recovery, or security-readiness claims.
 ---
 
-# privacy-and-audit-governor
+# Privacy and audit governor
 
-Separate raw, sanitized, and published zones; audit sensitive access; keep keys out of Git; minimize logs; require a reason and record for recovery.
+1. Isolate raw, sanitized, governed, trial, and production zones.
+2. Keep keys out of Git and complete customer information out of logs.
+3. Audit sensitive viewing and recovery operations with a reason and outcome.
+4. Treat a private repository as insufficient privacy protection.
+5. Do not claim an unverified security capability is complete.
