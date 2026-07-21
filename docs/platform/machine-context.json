@@ -24,8 +24,8 @@
   "current_stage": "C0: minimal runnable skeleton",
   "git": {
     "branch": "agent/platform-center",
-    "clean": false,
-    "commit": null,
+    "clean": true,
+    "commit": "356ca34038dd885866017e6811c86120405c7970",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
