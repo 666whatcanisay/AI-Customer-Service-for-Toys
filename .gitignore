@@ -29,7 +29,9 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Private data and databases
-backend/vector_db/
+backend/vector_db/*
+!backend/vector_db/
+!backend/vector_db/README.md
 vector_db/
 backend/knowledge_base/*
 !backend/knowledge_base/README.md
@@ -49,7 +51,9 @@ backups/
 *.bin
 *.onnx
 models/
-logs/
+logs/*
+!logs/
+!logs/README.md
 *.log
 .vscode/
 .idea/
