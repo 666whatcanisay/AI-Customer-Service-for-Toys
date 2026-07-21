@@ -21,12 +21,12 @@
   ],
   "git": {
     "branch": "agent/rag-core",
-    "clean": false,
-    "commit": "ddb6bad",
-    "task_commit": null,
+    "clean": true,
+    "commit": "fa6ff7e01be2152244cdfe64fc717db782e44dbf",
+    "task_commit": "fa6ff7e01be2152244cdfe64fc717db782e44dbf",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-21T17:04:21+08:00",
+  "checked_at": "2026-07-21T17:08:22+08:00",
   "contracts": ["contracts/version.json 0.1.0"],
   "entrypoints": ["backend/app/main.py", "scripts/start.ps1"],
   "owned_paths": ["backend/**", "docs/rag/**"],
