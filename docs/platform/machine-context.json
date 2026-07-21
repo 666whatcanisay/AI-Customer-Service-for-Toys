@@ -1,0 +1,59 @@
+{
+    "root_path":  "C:\\Users\\EDY\\Desktop\\平台\\Platform",
+    "current_task":  "Awaiting T01",
+    "contracts":  [
+                      "contracts/version.json 0.1.0"
+                  ],
+    "entrypoints":  [
+
+                    ],
+    "version":  "0.1.0",
+    "project_id":  "mumu-C",
+    "last_test_result":  "Not run during governance initialization",
+    "known_risks":  [
+                        "No synthetic baseline test evidence recorded"
+                    ],
+    "project_name":  "C：知识治理中台与管理平台",
+    "line":  "C",
+    "required_interfaces":  [
+
+                            ],
+    "current_gate":  "Not passed",
+    "current_stage":  "G0: governance and baseline inventory",
+    "git":  {
+                "branch":  "agent/platform-center",
+                "clean":  null,
+                "commit":  null,
+                "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
+            },
+    "forbidden_paths":  [
+                            "backend/**",
+                            "frontend/**",
+                            "extension/**"
+                        ],
+    "blockers":  [
+                     "Source directory is not a Git worktree for the required branch"
+                 ],
+    "test_commands":  [
+
+                      ],
+    "status":  "planning",
+    "owned_paths":  [
+                        "platform_backend/**",
+                        "admin_web/**",
+                        "docs/platform/**"
+                    ],
+    "responsibilities":  [
+                             "C line delivery"
+                         ],
+    "last_updated":  "2026-07-21",
+    "out_of_scope":  [
+                         "Other-line business code"
+                     ],
+    "provided_interfaces":  [
+
+                            ],
+    "completed_tasks":  [
+                            "Governance documentation initialized"
+                        ]
+}
