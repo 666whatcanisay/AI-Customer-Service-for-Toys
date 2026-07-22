@@ -28,9 +28,9 @@
     "current_stage":  "G1: real RAG API client integration",
     "git":  {
                 "branch":  "agent/user-client-t02",
-                "clean":  false,
-                "commit":  null,
-                "task_commit":  null,
+                "clean":  true,
+                "commit":  "e9a37f7",
+                "task_commit":  "e9a37f7",
                 "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
             },
     "forbidden_paths":  [
