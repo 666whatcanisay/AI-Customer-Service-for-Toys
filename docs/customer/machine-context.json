@@ -37,9 +37,9 @@
   "current_stage": "G2: manual store/product/SKU scoped customer-service workflow",
   "git": {
     "branch": "agent/user-client-t03",
-    "clean": false,
-    "commit": null,
-    "task_commit": null,
+    "clean": true,
+    "commit": "c7540b1",
+    "task_commit": "c7540b1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
