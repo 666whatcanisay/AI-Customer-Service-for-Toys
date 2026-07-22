@@ -3,32 +3,29 @@
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
-  "version": "0.1.0",
-  "status": "blocked",
-  "current_task": "A-T01",
-  "next_recommended_task": "A-T02",
-  "current_stage": "A-T01 static audit and blocked baseline recorded",
-  "current_gate": "A-G1 not passed",
-  "last_test_result": "未运行，环境依赖缺失：pytest 命令在测试收集前因 No module named pytest 结束。",
-  "blockers": [
-    "Python runtime dependencies are missing, including pytest, FastAPI, Uvicorn, ChromaDB, sentence-transformers, PyMuPDF and OpenAI",
-    "Runtime tests, service startup, real-model execution and Chroma initialization were not executed",
-    "No real PDF knowledge base or vector database is available in the worktree"
-  ],
+  "version": "0.2.0",
+  "status": "testing",
+  "current_task": "A-T02",
+  "next_recommended_task": "A-T03",
+  "current_stage": "A-T02 L1 implemented and locally validated; Draft PR pending",
+  "current_gate": "A-T02 local PASS; awaiting controller review",
+  "last_test_result": "14 passed, 13 warnings in 13.52s; synthetic PDF, real BGE, temporary Chroma and Ollama qwen3.5:9b were exercised.",
+  "blockers": [],
   "known_risks": [
-    "Historical migration claims do not match the current worktree",
-    "Planned APIs and safe-answer behavior are not current verified capabilities"
+    "A fresh environment needs the required Python dependencies, local BGE cache and Ollama qwen3.5:9b",
+    "Distance threshold evidence is limited to synthetic test data and needs broader calibration",
+    "Only text-layer PDFs are supported"
   ],
   "git": {
-    "branch": "agent/rag-core",
-    "clean": true,
-    "commit": "fa6ff7e01be2152244cdfe64fc717db782e44dbf",
-    "task_commit": "fa6ff7e01be2152244cdfe64fc717db782e44dbf",
+    "branch": "agent/rag-core-t02",
+    "clean": false,
+    "commit": "092cbfe4ebcd3da566fc07d74b9d63b237eebf10",
+    "task_commit": null,
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-21T17:08:22+08:00",
-  "contracts": ["contracts/version.json 0.1.0"],
-  "entrypoints": ["backend/app/main.py", "scripts/start.ps1"],
+  "checked_at": "2026-07-22T10:52:16+08:00",
+  "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
+  "entrypoints": ["backend/app/main.py", "backend/app/api/routes.py"],
   "owned_paths": ["backend/**", "docs/rag/**"],
   "forbidden_paths": [
     "frontend/**",
@@ -38,13 +35,19 @@
     "backend/vector_db/**"
   ],
   "test_commands": [
-    "python -m pytest -q backend/tests (not run: pytest unavailable before collection)"
+    "RUN_REAL_RAG_E2E=1 with offline Hugging Face variables: source read-only venv python -m pytest -q backend/tests"
   ],
   "completed_tasks": [
     "Governance documentation initialized",
-    "A-T01 static capability audit and blocked baseline documentation"
+    "A-T01 static capability audit and blocked baseline documentation",
+    "A-T02 synthetic-PDF real local RAG loop and API validation"
   ],
   "required_interfaces": [],
-  "provided_interfaces": [],
-  "out_of_scope": ["Other-line business code"]
+  "provided_interfaces": [
+    "GET /api/health",
+    "GET /api/status",
+    "POST /api/retrieval/search",
+    "POST /api/chat"
+  ],
+  "out_of_scope": ["A-T03", "Other-line business code", "Shared contract changes"]
 }

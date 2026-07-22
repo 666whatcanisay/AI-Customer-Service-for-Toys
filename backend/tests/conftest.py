@@ -17,7 +17,7 @@ from app.service.vector_store import VectorStore
 
 
 class DeterministicEmbeddingFunction(EmbeddingFunction[Documents]):
-    """Small deterministic test embedding; never downloads or loads the real model."""
+    """Deterministic test embedding that never loads or downloads a model."""
 
     def __init__(self):
         pass
@@ -52,16 +52,17 @@ def api_client(tmp_path: Path):
     vector_path = tmp_path / "vector_db"
     log_path = tmp_path / "logs"
     knowledge_path.mkdir()
-    (knowledge_path / "test-knowledge.pdf").write_bytes(b"test-only-placeholder")
+    (knowledge_path / "synthetic-placeholder.pdf").write_bytes(b"test-only")
 
-    base = Settings.from_env()
     settings = replace(
-        base,
+        Settings.from_env(),
         backend_root=tmp_path,
         project_root=tmp_path,
         knowledge_base_path=knowledge_path,
         vector_db_path=vector_path,
         log_dir=log_path,
+        llm_provider="bailian",
+        llm_model="qwen-turbo",
         dashscope_api_key="",
         rag_distance_threshold=0.35,
         top_k=2,
@@ -75,14 +76,14 @@ def api_client(tmp_path: Path):
     store.build_index(
         [
             {
-                "filename": "党员章程测试.pdf",
-                "page_number": 3,
-                "text": "党员必须履行学习理论、遵守纪律、联系群众等义务。",
+                "filename": "synthetic-toy-guide.pdf",
+                "page_number": 1,
+                "text": "星云狐狸玩具的指示灯是紫色，使用两节五号电池。",
             },
             {
-                "filename": "党费规定测试.pdf",
+                "filename": "synthetic-return-guide.pdf",
                 "page_number": 2,
-                "text": "党员应当按照规定按月缴纳党费。",
+                "text": "合成测试订单可在七天内申请退货。",
             },
         ]
     )
