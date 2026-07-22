@@ -79,9 +79,15 @@ class Settings:
     llm_provider: str
     dashscope_api_key: str
     llm_model: str
+    llm_base_url: str
     llm_timeout_seconds: float
+    llm_temperature: float
+    llm_max_tokens: int
+    llm_top_p: float
     embedding_model: str
     embedding_offline: bool
+    chunk_size: int
+    chunk_overlap: int
     chroma_collection_name: str
     rag_distance_threshold: float
     top_k: int
@@ -100,14 +106,22 @@ class Settings:
                 os.getenv("VECTOR_DB_PATH"), "vector_db"
             ),
             log_dir=_resolve_backend_path(os.getenv("LOG_DIR"), "../logs"),
-            llm_provider=os.getenv("LLM_PROVIDER", "bailian").strip(),
+            llm_provider=os.getenv("LLM_PROVIDER", "ollama").strip(),
             dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", "").strip(),
-            llm_model=os.getenv("LLM_MODEL", "qwen-turbo").strip(),
-            llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "30")),
+            llm_model=os.getenv("LLM_MODEL", "qwen3.5:9b").strip(),
+            llm_base_url=os.getenv(
+                "LLM_BASE_URL", "http://127.0.0.1:11434"
+            ).strip().rstrip("/"),
+            llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
+            llm_temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
+            llm_max_tokens=max(64, int(os.getenv("LLM_MAX_TOKENS", "512"))),
+            llm_top_p=float(os.getenv("LLM_TOP_P", "0.8")),
             embedding_model=os.getenv(
                 "EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5"
             ).strip(),
             embedding_offline=_as_bool(os.getenv("EMBEDDING_OFFLINE"), True),
+            chunk_size=max(100, int(os.getenv("CHUNK_SIZE", "500"))),
+            chunk_overlap=max(0, int(os.getenv("CHUNK_OVERLAP", "100"))),
             chroma_collection_name=os.getenv(
                 "CHROMA_COLLECTION_NAME", "documents"
             ).strip(),

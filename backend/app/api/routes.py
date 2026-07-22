@@ -150,7 +150,7 @@ def update_model_config(
             detail="清除 Key 与填写新 Key 不能同时操作",
         )
     new_key = "" if config.clear_api_key else (submitted_key or old_key)
-    if not new_key and not config.clear_api_key:
+    if config.provider != "ollama" and not new_key and not config.clear_api_key:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="首次配置必须填写 API Key",

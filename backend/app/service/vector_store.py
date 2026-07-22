@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +100,8 @@ class VectorStore:
         self.model_name = model_name
         self.chunk_size = chunk_size
         self.overlap = overlap
+        if overlap >= chunk_size:
+            raise ValueError("chunk overlap must be smaller than chunk size")
         self.persist_dir.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -154,18 +157,22 @@ class VectorStore:
             filename = document.get("filename", "")
             page_number = document.get("page_number", 0)
             for index, chunk in enumerate(self.chunk_text(text)):
-                all_ids.append(f"{filename}_{page_number}_{index}")
+                chunk_id = hashlib.sha256(
+                    f"{filename}\n{page_number}\n{index}\n{chunk}".encode("utf-8")
+                ).hexdigest()
+                all_ids.append(chunk_id)
                 all_chunks.append(chunk)
                 all_metadata.append(
                     {
                         "file": filename,
                         "page": page_number,
+                        "chunk_id": chunk_id,
                         "content": chunk[:100] + "..." if len(chunk) > 100 else chunk,
                     }
                 )
 
         if all_chunks:
-            self.collection.add(
+            self.collection.upsert(
                 documents=all_chunks,
                 metadatas=all_metadata,
                 ids=all_ids,
@@ -191,8 +198,9 @@ class VectorStore:
             metadata = results["metadatas"][0][index]
             search_results.append(
                 {
-                    "file": metadata["file"],
+                    "source_name": metadata["file"],
                     "page": metadata["page"],
+                    "chunk_id": metadata.get("chunk_id", results["ids"][0][index]),
                     "content": results["documents"][0][index],
                     "distance": float(results["distances"][0][index]),
                 }
@@ -208,7 +216,10 @@ class VectorStore:
         }
 
     def close(self) -> None:
-        system = getattr(self.client, "_system", None)
+        try:
+            system = getattr(self.client, "_system", None)
+        except KeyError:
+            system = None
         if system is not None:
             try:
                 system.stop()
