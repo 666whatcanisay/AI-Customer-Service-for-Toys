@@ -18,8 +18,17 @@ export interface RagHealth {
   ready: boolean
 }
 
+export interface RagChatContext {
+  tenant_id: string
+  platform: string
+  store_code: string
+  product_id: string
+  sku_id: string | null
+}
+
 export interface RagChatRequest {
-  message: string
+  question: string
+  context: RagChatContext
 }
 
 export interface RagCitation {
@@ -29,6 +38,9 @@ export interface RagCitation {
   summary: string
   distance: number | null
   knowledgeVersion: string | null
+  sourceIds: string[]
+  productId: string | null
+  skuId: string | null
 }
 
 export interface RagChatResult {
@@ -41,6 +53,7 @@ export interface RagChatResult {
   warnings: string[]
   requiredFields: string[]
   latencyMs: number | null
+  context: RagChatContext
 }
 
 export interface AdoptionRecord {
