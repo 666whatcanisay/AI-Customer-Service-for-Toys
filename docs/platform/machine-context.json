@@ -1,31 +1,32 @@
 {
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-platform-center",
-  "current_task": "C-T01",
+  "current_task": "C-T02",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)"
   ],
   "entrypoints": [
     "platform_backend/app/main.py:app",
     "admin_web/src/main.ts",
-    "admin_web route: /system-status"
+    "admin_web routes: /system-status, /imports, /imports/new, /imports/:batchId",
+    "platform_backend migrations: alembic upgrade head"
   ],
   "version": "0.1.0",
   "project_id": "mumu-C",
-  "last_test_result": "Backend: pytest 3 passed with 1 upstream deprecation warning; GET /health returned HTTP 200 on port 8010. Admin: typecheck passed, Vitest 3 passed, Vite build passed.",
+  "last_test_result": "2026-07-22: Backend pytest 23 passed with 1 upstream TestClient deprecation warning; Alembic upgrade-downgrade-upgrade passed at revision 0001_ct02_ingestion; live API import on port 8011 returned 20 total, 9 valid/staged PENDING_REVIEW, 10 invalid-or-conflict, 1 duplicate, and error CSV/template downloads passed. Admin offline install, typecheck, 11 Vitest tests, and production build passed.",
   "known_risks": [
-    "Local port 8000 was occupied during verification; runtime health verification used port 8010.",
     "FastAPI TestClient emitted an upstream HTTPX adapter deprecation warning.",
-    "This baseline exposes health status only and has no production business, data, authentication, audit persistence, or RAG capability."
+    "SQLite is local-development only; authentication, authorization, audit persistence, retention policy, cross-batch deduplication, and production security are not implemented.",
+    "The legacy C plan names C-T02 as OpenAPI/Mock, while the authorized task card defines product/SKU ingestion; shared contracts remain unchanged."
   ],
   "project_name": "C：知识治理中台与管理平台",
   "line": "C",
   "required_interfaces": [],
-  "current_gate": "C-G1-FIX1 local acceptance passed; full G-C0 not claimed",
-  "current_stage": "C0: minimal runnable skeleton",
+  "current_gate": "C-T02 Gate PASS; Draft PR #7 is open against develop and is not merged",
+  "current_stage": "C1: review-only product/SKU ingestion baseline",
   "git": {
     "branch": "agent/platform-center",
     "clean": true,
-    "commit": "356ca34038dd885866017e6811c86120405c7970",
+    "commit": "7040bf0",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
@@ -36,8 +37,10 @@
   "blockers": [],
   "test_commands": [
     "platform_backend/.venv/Scripts/python.exe -m pytest",
-    "platform_backend/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8010",
-    "GET http://127.0.0.1:8010/health with X-Request-ID: c-g1-fix1-health-check",
+    "platform_backend/.venv/Scripts/python.exe -m alembic upgrade head; downgrade base; upgrade head",
+    "platform_backend/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8011",
+    "POST /api/v1/import-batches/product-sku with synthetic validation fixture; GET batch/rows/errors/template",
+    "pnpm install --frozen-lockfile --offline",
     "pnpm typecheck",
     "pnpm test",
     "pnpm build"
@@ -49,18 +52,38 @@
     "docs/platform/**"
   ],
   "responsibilities": [
-    "C line delivery"
+    "C line delivery",
+    "Review-only product and SKU ingestion governance"
   ],
-  "last_updated": "2026-07-21",
+  "last_updated": "2026-07-22",
   "out_of_scope": [
     "Other-line business code",
-    "C-T02 and later business or contract work"
+    "C-T03 review workflow or later tasks",
+    "Kingdee and commerce-platform integration",
+    "A-line publication, RAG, Chroma, model completion, and real company data"
   ],
   "provided_interfaces": [
-    "GET /health (C-line local baseline; shared contract unchanged)"
+    "GET /health (C-line local baseline)",
+    "C-line local /api/v1 product-SKU import batch APIs (shared contracts unchanged)"
   ],
   "completed_tasks": [
     "Governance documentation initialized",
-    "C-T01 minimal platform backend and admin web skeleton implemented and locally verified"
-  ]
+    "C-T01 minimal platform backend and admin web skeleton implemented and locally verified",
+    "C-T02 product/SKU XLSX ingestion, validation, error reporting, and PENDING_REVIEW staging implemented and locally verified"
+  ],
+  "data_boundaries": {
+    "source": "MANUAL_EXCEL only; synthetic fixtures only",
+    "kingdee_connected": false,
+    "published_to_a_line": false,
+    "real_company_data_processed": false,
+    "rag_or_chroma_called": false
+  },
+  "c_t02_commits": {
+    "backend": "c2c6428",
+    "admin": "6d834f4",
+    "tests": "449e7d6",
+    "documentation": "7040bf0"
+  },
+  "draft_pr": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/7",
+  "next_recommended_task": "C-T03: separately authorized manual review/rejection workflow; do not auto-run"
 }
