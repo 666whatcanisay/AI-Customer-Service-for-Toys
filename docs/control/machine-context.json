@@ -3,30 +3,73 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "in_progress",
-  "current_task": "BASE-T04A",
-  "current_stage": "Shared Skill baseline correction",
-  "current_gate": "Pending PR merge and Agent worktree synchronization",
+  "status": "complete",
+  "current_task": "CONTROL-G1-MERGE",
+  "current_stage": "T01 deliveries merged, retested, and synchronized",
+  "current_gate": "CONTROL-G1-MERGE PASS",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "chore/complete-agent-skills",
-    "base_commit": "85961bfa97f437a96215630f5cf54f0947f0e152"
+    "branch": "agent/control-g1-merge-status",
+    "base_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
+    "line_delivery_develop_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
+    "final_sync_target": "origin/develop after this control-status change is merged"
   },
-  "skills": {
-    "required": 9,
-    "present": 9,
-    "validation": "passed: python scripts/check_project_skills.py"
+  "pull_requests": {
+    "3": {
+      "line": "A",
+      "merge_commit": "6284fcd014262427603338295d9fc13a757851f9",
+      "merged_at": "2026-07-22T09:00:14+08:00"
+    },
+    "4": {
+      "line": "B",
+      "merge_commit": "a93b4306087c7dc30be234b62c6aab96bf811965",
+      "merged_at": "2026-07-22T09:03:34+08:00"
+    },
+    "5": {
+      "line": "C",
+      "merge_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
+      "merged_at": "2026-07-22T09:18:04+08:00"
+    }
   },
-  "local_exclusions": [
-    "work/"
-  ],
+  "verification": {
+    "A": "A-T01 documentation baseline merged; runtime tests were not run and the RAG runtime gate remains not passed",
+    "B": "Node v24.14.0, npm 10.9.2; typecheck exit 0; production build exit 0; no test script",
+    "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
+    "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0"
+  },
+  "agent_worktrees": {
+    "A": {
+      "path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-rag-core",
+      "branch": "agent/rag-core",
+      "line_delivery_sync_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
+      "clean": true
+    },
+    "B": {
+      "path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-user-client",
+      "branch": "agent/user-client",
+      "line_delivery_sync_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
+      "clean": true
+    },
+    "C": {
+      "path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-platform-center",
+      "branch": "agent/platform-center",
+      "line_delivery_sync_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
+      "clean": true
+    }
+  },
   "completed_tasks": [
-    "Classified work/ as local Codex initialization output",
-    "Excluded work/ through local .git/info/exclude",
-    "Corrected the shared project Skill layout"
+    "A-T01",
+    "B-T01",
+    "C-T01",
+    "CONTROL-G1-R2",
+    "CONTROL-G1-MERGE"
   ],
-  "blockers": [
-    "PR merge and Agent branch synchronization not yet completed"
-  ],
-  "last_updated": "2026-07-21"
+  "next_tasks": {
+    "A": "May be dispatched separately; preserve the runtime and real-test blockers",
+    "B": "May be dispatched separately",
+    "C": "May be dispatched separately; recommended C-T02 direction is data ingestion and standardization foundations"
+  },
+  "t02_executed": false,
+  "blockers": [],
+  "last_updated": "2026-07-22T09:21:29+08:00"
 }
