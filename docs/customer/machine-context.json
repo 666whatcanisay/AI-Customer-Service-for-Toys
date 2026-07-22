@@ -1,6 +1,6 @@
 {
     "root_path":  "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-    "current_task":  "B-G1-FIX1 completed with conditional pass; awaiting Draft PR review",
+    "current_task":  "B-T02 completed; awaiting Draft PR review",
     "contracts":  [
                       "contracts/version.json 0.1.0"
                   ],
@@ -10,25 +10,27 @@
                     ],
     "version":  "0.1.0",
     "project_id":  "mumu-B",
-    "last_test_result":  "Node v24.14.0, npm 10.9.2: npm ci PASS; typecheck PASS (exit 0); test script missing; build PASS (exit 0)",
+    "last_test_result":  "2026-07-22: typecheck PASS; Vitest 7/7 PASS; production build PASS; real /api/health and /api/chat smoke PASS",
     "known_risks":  [
-                        "No frontend test script or automated test files",
-                        "Legacy page payload and response shape do not match shared contracts v0.1.0",
-                        "npm ci reported 5 dependency vulnerabilities (4 moderate, 1 high)",
+                        "A feedback endpoint is not published; adoption state is page-local",
+                        "Current A request/response differs from shared contracts v0.1.0 and is isolated in the adapter",
+                        "npm reported 7 dependency vulnerabilities (5 moderate, 1 high, 1 critical)",
                         "Production JavaScript chunk exceeds 500 kB warning threshold"
                     ],
     "project_name":  "B：客服用户端与浏览器助手",
     "line":  "B",
     "required_interfaces":  [
-
+                                "GET /api/health",
+                                "POST /api/chat",
+                                "Feedback endpoint pending"
                             ],
-    "current_gate":  "G1 conditional: typecheck and build passed; test script missing",
-    "current_stage":  "G1: verified frontend baseline",
+    "current_gate":  "B-T02 PASS: typed client, tests, build, and real smoke verified",
+    "current_stage":  "G1: real RAG API client integration",
     "git":  {
-                "branch":  "agent/user-client",
+                "branch":  "agent/user-client-t02",
                 "clean":  true,
-                "commit":  "f073b8f",
-                "task_commit":  "f073b8f",
+                "commit":  "e9a37f7",
+                "task_commit":  "e9a37f7",
                 "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
             },
     "forbidden_paths":  [
@@ -37,11 +39,11 @@
                             "admin_web/**"
                         ],
     "blockers":  [
-                     "Frontend test script and automated tests are missing",
-                     "Legacy frontend is not yet compatible with shared contracts v0.1.0"
+
                  ],
     "test_commands":  [
                           "npm run typecheck",
+                          "npm run test",
                           "npm run build"
                       ],
     "status":  "ready",
@@ -53,7 +55,7 @@
     "responsibilities":  [
                              "B line delivery"
                          ],
-    "last_updated":  "2026-07-21",
+    "last_updated":  "2026-07-22",
     "out_of_scope":  [
                          "Other-line business code"
                      ],
@@ -63,6 +65,7 @@
     "completed_tasks":  [
                             "Governance documentation initialized",
                             "B-T01 frontend baseline audit completed",
-                            "B-G1-FIX1 dependency install, typecheck, and production build verified"
+                            "B-G1-FIX1 dependency install, typecheck, and production build verified",
+                            "B-T02 real RAG client, adapter, page workflow, tests, build, and smoke completed"
                         ]
 }
