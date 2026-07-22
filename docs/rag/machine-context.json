@@ -3,51 +3,69 @@
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
-  "version": "0.2.0",
-  "status": "testing",
-  "current_task": "A-T02",
-  "next_recommended_task": "A-T03",
-  "current_stage": "A-T02 L1 implemented and locally validated; Draft PR pending",
-  "current_gate": "A-T02 local PASS; awaiting controller review",
-  "last_test_result": "14 passed, 13 warnings in 13.52s; synthetic PDF, real BGE, temporary Chroma and Ollama qwen3.5:9b were exercised.",
-  "blockers": [],
+  "version": "0.3.1-test",
+  "status": "blocked",
+  "current_task": "A-T03-FIX2",
+  "next_recommended_task": "Correct frozen V0.3.1 fact/source attribution gaps, then rerun A-T03 without case-specific branches",
+  "current_stage": "A-T03-FIX2 structured decision and evaluation repair complete; frozen-data gaps diagnosed",
+  "current_gate": "A-T03 BLOCKED at 19/28 by frozen fact/source attribution gaps",
+  "last_test_result": "Full pytest: 36 passed, 2 skipped, 18 warnings. Explicit real BGE/Chroma/Ollama E2E: 2 passed, 2 warnings. Live C strict parse 47 items; duplicate sync 47->47; evaluations 19/28. Checks: action 28, source_ids 21, key_facts 23, forbidden_claims 28, required_fields 28, risk_level 27, scope 28.",
+  "blockers": [
+    "Live C evaluation remains 19/28 rather than the required 28/28",
+    "Frozen rag-export omits or conflicts with required facts for CASE 007, 011, 019, 020, 023 and 027",
+    "Expected TEST-001 or cross-product REFERENCE source attribution is absent from compatible scoped knowledge for CASE 009, 011, 019, 021, 022, 023 and 026",
+    "CASE 019 expected MEDIUM risk is not supported by the retrieved LOW-risk knowledge metadata"
+  ],
   "known_risks": [
-    "A fresh environment needs the required Python dependencies, local BGE cache and Ollama qwen3.5:9b",
-    "Distance threshold evidence is limited to synthetic test data and needs broader calibration",
-    "Only text-layer PDFs are supported"
+    "Live report contains frozen non-production test questions and model answers but removes source excerpts",
+    "Future C package changes may require recalibration of intent and metadata-based structured decisions",
+    "Test package withdrawal, expiry and cross-version cleanup are not implemented"
   ],
   "git": {
-    "branch": "agent/rag-core-t02",
+    "branch": "agent/rag-core-t03",
     "clean": true,
-    "commit": "457fd7e5a1fefbeec9226f9cda5b32d21de930f2",
-    "task_commit": "457fd7e5a1fefbeec9226f9cda5b32d21de930f2",
+    "commit": "f18e05801096da395fbf17597247c44135c68e36",
+    "task_commit": "f18e05801096da395fbf17597247c44135c68e36",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-22T10:59:12+08:00",
+  "checked_at": "2026-07-22T16:52:57+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
-  "entrypoints": ["backend/app/main.py", "backend/app/api/routes.py"],
+  "entrypoints": [
+    "backend/app/main.py",
+    "backend/app/api/routes.py",
+    "backend/scripts/evaluate_test_knowledge.py"
+  ],
   "owned_paths": ["backend/**", "docs/rag/**"],
   "forbidden_paths": [
     "frontend/**",
     "extension/**",
     "platform_backend/**",
     "admin_web/**",
+    "contracts/**",
     "backend/vector_db/**"
   ],
   "test_commands": [
-    "RUN_REAL_RAG_E2E=1 with offline Hugging Face variables: source read-only venv python -m pytest -q backend/tests"
+    "source read-only venv python -m pytest backend -q",
+    "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_rag_e2e.py backend/tests/test_real_scoped_rag_e2e.py -q -s",
+    "PLATFORM_API_BASE_URL=http://127.0.0.1:8012 source read-only venv python backend/scripts/evaluate_test_knowledge.py PDD-SM-2026-001-TEST --output-dir docs/rag/evaluations/a-t03-v031-live"
   ],
   "completed_tasks": [
-    "Governance documentation initialized",
     "A-T01 static capability audit and blocked baseline documentation",
-    "A-T02 synthetic-PDF real local RAG loop and API validation"
+    "A-T02 synthetic-PDF real local RAG loop and API validation",
+    "A-T03 A-line V0.3.1 consumer implementation and synthetic 28-case validation",
+    "A-T03-FIX1 strict 0.3.1-test schema, store-scope safety compatibility and live C evaluation",
+    "A-T03-FIX2 structured decision repair, evaluator semantics and blocked 19/28 live diagnosis"
   ],
-  "required_interfaces": [],
+  "required_interfaces": [
+    "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
+    "GET C /api/v1/test-knowledge-packages/{package_id}/evaluations version V0.3.1 schema 0.3.1-test"
+  ],
   "provided_interfaces": [
+    "POST /api/chat with frozen question/context and data response",
+    "POST /api/retrieval/search with frozen context filtering",
+    "POST /api/test-knowledge/sync/{package_id}",
     "GET /api/health",
-    "GET /api/status",
-    "POST /api/retrieval/search",
-    "POST /api/chat"
+    "GET /api/status"
   ],
-  "out_of_scope": ["A-T03", "Other-line business code", "Shared contract changes"]
+  "out_of_scope": ["A-T04", "Other-line business code", "Shared contract changes"]
 }

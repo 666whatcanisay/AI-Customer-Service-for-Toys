@@ -1,0 +1,652 @@
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+from app.config.settings import Settings
+from app.main import create_app
+from app.models.chat import FrozenChatContext
+from app.service.evaluation import (
+    EvaluationCase,
+    EvaluationValidationError,
+    parse_evaluations,
+    render_markdown,
+    run_evaluations,
+)
+from app.service.rag_service import RAGService, SAFETY_ACTION_MESSAGES
+from app.service.test_knowledge import (
+    PlatformTestKnowledgeClient,
+    TestKnowledgeValidationError as PackageValidationError,
+    parse_test_knowledge_package,
+)
+from app.service.vector_store import VectorStore
+from conftest import DeterministicEmbeddingFunction
+
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+PACKAGE_ID = "PKG-PDD-SM-V031-SYNTHETIC"
+
+
+def load_json(name: str) -> dict:
+    return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
+
+
+def context(product_id: str = "P-Q80", sku_id: str | None = None):
+    return FrozenChatContext(
+        tenant_id="TENANT-PDD-SM-TEST",
+        platform="pdd",
+        store_code="PDD-SM",
+        product_id=product_id,
+        sku_id=sku_id,
+    )
+
+
+def is_store_guard(result: dict) -> bool:
+    return not result["product_id"] and (
+        result["knowledge_type"] == "SAFETY_RULE"
+        or (
+            result["knowledge_type"] == "FAQ"
+            and result["risk_level"] == "HIGH"
+            and result["answer_action"]
+            in {"ASK_CLARIFY", "REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
+        )
+    )
+
+
+@pytest.fixture()
+def scoped_service(tmp_path: Path):
+    embedding = DeterministicEmbeddingFunction()
+    legacy_store = VectorStore(
+        persist_dir=tmp_path / "vector_db",
+        collection_name="legacy_documents",
+        model_name="deterministic",
+        embedding_function=embedding,
+    )
+    test_store = VectorStore(
+        persist_dir=tmp_path / "vector_db",
+        collection_name="test_knowledge_v031",
+        model_name="deterministic",
+        embedding_function=embedding,
+    )
+    settings = replace(
+        Settings.from_env(),
+        backend_root=tmp_path,
+        project_root=tmp_path,
+        knowledge_base_path=tmp_path / "knowledge_base",
+        vector_db_path=tmp_path / "vector_db",
+        log_dir=tmp_path / "logs",
+        llm_provider="bailian",
+        dashscope_api_key="",
+        rag_distance_threshold=0.15,
+        top_k=3,
+        platform_api_base_url="",
+    )
+    service = RAGService(
+        settings,
+        vector_store=legacy_store,
+        test_vector_store=test_store,
+    )
+    package = parse_test_knowledge_package(
+        load_json("test_knowledge_v031.json"), PACKAGE_ID
+    )
+    service.test_knowledge_index.sync(package)
+    yield service, package
+    service.close()
+
+
+def test_v031_package_strict_safety_validation():
+    payload = load_json("test_knowledge_v031.json")
+    package = parse_test_knowledge_package(payload, PACKAGE_ID)
+    assert package.tenant_id == "TENANT-PDD-SM-TEST"
+    assert package.test_data_mode is True
+    assert package.production_usable is False
+    assert package.allow_auto_send is False
+    assert package.response_mode == "SUGGESTION_ONLY"
+    assert package.version == "V0.3.1"
+    assert package.schema_version == "0.3.1-test"
+    store_safety = [
+        item
+        for item in package.items
+        if item.knowledge_type == "SAFETY_RULE" and not item.product_id
+    ]
+    assert store_safety
+    assert all(not item.sku_id for item in store_safety)
+    store_safety_faq = [
+        item
+        for item in package.items
+        if item.knowledge_type == "FAQ" and not item.product_id
+    ]
+    assert store_safety_faq
+    assert all(
+        not item.sku_id
+        and item.risk_level == "HIGH"
+        and item.answer_action
+        in {"ASK_CLARIFY", "REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
+        for item in store_safety_faq
+    )
+
+    for field, invalid in (
+        ("tenant_id", "TENANT-OTHER"),
+        ("test_data_mode", False),
+        ("production_usable", True),
+        ("allow_auto_send", True),
+        ("response_mode", "AUTO_SEND"),
+    ):
+        changed = load_json("test_knowledge_v031.json")
+        changed[field] = invalid
+        with pytest.raises(PackageValidationError):
+            parse_test_knowledge_package(changed, PACKAGE_ID)
+
+    for field, invalid in (
+        ("version", "0.3.1-test"),
+        ("schema_version", "V0.3.1"),
+    ):
+        changed = load_json("test_knowledge_v031.json")
+        changed[field] = invalid
+        with pytest.raises(PackageValidationError):
+            parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+@pytest.mark.parametrize("knowledge_type", ["PRODUCT_FACT", "SKU_FACT", "FAQ"])
+def test_only_strict_store_guards_may_omit_product_id(knowledge_type):
+    changed = load_json("test_knowledge_v031.json")
+    item = next(
+        item for item in changed["items"] if item["knowledge_type"] == knowledge_type
+    )
+    item["product_id"] = None
+    item["sku_id"] = None
+    with pytest.raises(PackageValidationError, match="product_id is required"):
+        parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+def test_sku_fact_requires_sku_id():
+    changed = load_json("test_knowledge_v031.json")
+    item = next(
+        item for item in changed["items"] if item["knowledge_type"] == "SKU_FACT"
+    )
+    item["sku_id"] = None
+    with pytest.raises(PackageValidationError, match="sku_id is required"):
+        parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+@pytest.mark.parametrize(
+    ("risk_level", "answer_action"),
+    [("MEDIUM", "REQUIRE_LOOKUP"), ("HIGH", "DIRECT_ANSWER")],
+)
+def test_empty_product_faq_requires_high_risk_guard_action(
+    risk_level, answer_action
+):
+    changed = load_json("test_knowledge_v031.json")
+    item = next(
+        item
+        for item in changed["items"]
+        if item["knowledge_id"] == "K-STORE-GUARD-FAQ"
+    )
+    item["risk_level"] = risk_level
+    item["answer_action"] = answer_action
+    with pytest.raises(PackageValidationError, match="product_id is required"):
+        parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+def test_sync_is_idempotent_and_metadata_is_complete(scoped_service):
+    service, package = scoped_service
+    first_count = service.test_vector_store.collection.count()
+    result = service.test_knowledge_index.sync(package)
+    assert result["synced_items"] == 13
+    assert result["collection_count"] == first_count == 13
+
+    stored = service.test_vector_store.collection.get(
+        where={"package_id": {"$eq": PACKAGE_ID}},
+        include=["metadatas"],
+    )
+    metadata = stored["metadatas"][0]
+    assert {
+        "tenant_id",
+        "platform",
+        "store_code",
+        "product_id",
+        "sku_id",
+        "knowledge_type",
+        "answer_action",
+        "risk_level",
+        "source_ids",
+        "package_id",
+    } <= metadata.keys()
+
+
+def test_product_and_sku_scope_filtering_prevents_cross_product(scoped_service):
+    service, _ = scoped_service
+    product_results = service.test_knowledge_index.search(
+        "Q80磁力积木套装包含80颗积木，商品编号为Q80。",
+        context(),
+        top_k=5,
+    )
+    assert product_results
+    assert all(result["product_id"] in {"", "P-Q80"} for result in product_results)
+    assert all(
+        result["product_id"] == "P-Q80" or is_store_guard(result)
+        for result in product_results
+    )
+    assert all("1688颗" not in result["content"] for result in product_results)
+
+    sku_results = service.test_knowledge_index.search(
+        "SKU-Q80-BLUE是Q80蓝色款，包装主色为蓝色。",
+        context(sku_id="SKU-Q80-BLUE"),
+        top_k=3,
+    )
+    assert sku_results[0]["sku_id"] == "SKU-Q80-BLUE"
+    assert sku_results[0]["source_ids"] == ["SRC-Q80-SKU-BLUE"]
+
+    sku_safety = service.test_knowledge_index.search(
+        "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+        context(sku_id="SKU-Q80-BLUE"),
+        top_k=3,
+    )
+    assert any(
+        result["source_ids"] == ["SRC-Q80-SAFETY"] for result in sku_safety
+    )
+
+    other_product = service.test_knowledge_index.search(
+        "P-1688豪华积木套装包含1688颗积木。",
+        context(product_id="P-1688"),
+        top_k=3,
+    )
+    assert other_product
+    assert all(result["product_id"] in {"", "P-1688"} for result in other_product)
+    assert all(
+        result["product_id"] == "P-1688" or is_store_guard(result)
+        for result in other_product
+    )
+
+
+def test_store_safety_reaches_any_product_without_cross_product_facts(scoped_service):
+    service, _ = scoped_service
+    results = service.test_knowledge_index.search(
+        "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+        context(product_id="P-UNLISTED"),
+        top_k=5,
+    )
+    assert results
+    assert any(result["source_ids"] == ["SRC-Q80-SAFETY"] for result in results)
+    assert all(is_store_guard(result) for result in results)
+    assert all(result["product_id"] == "" for result in results)
+    assert all(result["sku_id"] == "" for result in results)
+    assert all("SRC-Q80-PRODUCT" not in result["source_ids"] for result in results)
+    assert all("SRC-1688-PRODUCT" not in result["source_ids"] for result in results)
+
+
+def test_store_guarded_faq_reaches_any_product_without_model_downgrade(
+    scoped_service, monkeypatch
+):
+    service, _ = scoped_service
+
+    def model_must_not_run(*args, **kwargs):
+        raise AssertionError("store guarded FAQ reached the model")
+
+    monkeypatch.setattr(service, "call_llm", model_must_not_run)
+    result = service.query(
+        "客户反馈订单缺少零件且缺少订单号、商品与缺件信息时，必须转人工客服处理。",
+        context(product_id="P-UNLISTED"),
+    )
+    assert result["action"] == "TRANSFER_HUMAN"
+    assert result["risk_level"] == "HIGH"
+    assert any(
+        "SRC-STORE-GUARD-FAQ" in source["source_ids"]
+        for source in result["sources"]
+    )
+    assert all(source["product_id"] == "" for source in result["sources"])
+
+
+def test_faq_reference_and_bundle_retrieval(scoped_service):
+    service, _ = scoped_service
+    faq = service.test_knowledge_index.search(
+        "Q80建议6岁及以上儿童在成人看护下使用。", context(), 1
+    )
+    assert faq[0]["knowledge_type"] == "FAQ"
+    assert faq[0]["source_ids"] == ["SRC-Q80-FAQ-AGE"]
+
+    reference = service.test_knowledge_index.search(
+        "SKU-Q80-BLUE为REFERENCE参考款，canonical SKU为SKU-Q80-BASE。",
+        context(sku_id="SKU-Q80-BLUE"),
+        1,
+    )
+    assert reference[0]["source_ids"] == ["SRC-Q80-REFERENCE"]
+
+    bundle = service.test_knowledge_index.search(
+        "SKU-Q80-BUNDLE为BUNDLE组合款，包含SKU-Q80-BLUE和SKU-Q80-PINK。",
+        context(sku_id="SKU-Q80-BUNDLE"),
+        1,
+    )
+    assert bundle[0]["source_ids"] == ["SRC-Q80-BUNDLE"]
+
+
+def test_all_six_answer_actions_and_safety_actions_bypass_model(
+    scoped_service, monkeypatch
+):
+    service, package = scoped_service
+    by_action = {}
+    for item in package.items:
+        by_action.setdefault(item.answer_action, item)
+    assert set(by_action) == {
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE",
+    }
+
+    for action in ("DIRECT_ANSWER", "CONTROLLED_ANSWER"):
+        item = by_action[action]
+        result = service.query(
+            item.content,
+            context(item.product_id or "P-Q80", item.sku_id or None),
+        )
+        assert result["action"] == action
+
+    def model_must_not_run(*args, **kwargs):
+        raise AssertionError("guarded safety action reached the model")
+
+    monkeypatch.setattr(service, "call_llm", model_must_not_run)
+    for action, message in SAFETY_ACTION_MESSAGES.items():
+        item = by_action[action]
+        result = service.query(
+            item.content,
+            context(item.product_id or "P-Q80", item.sku_id or None),
+        )
+        assert result["action"] == action
+        assert result["answer"]
+
+
+def test_nearby_high_risk_boundary_prevents_uncontrolled_direct_answer(
+    scoped_service,
+):
+    service, package = scoped_service
+    direct = next(
+        item
+        for item in package.items
+        if item.knowledge_id == "K-Q80-PRODUCT"
+    )
+    high_boundary = replace(
+        direct,
+        knowledge_id="K-Q80-HIGH-CONTROLLED-BOUNDARY",
+        answer_action="CONTROLLED_ANSWER",
+        risk_level="HIGH",
+        source_ids=("SRC-Q80-HIGH-CONTROLLED-BOUNDARY",),
+    )
+    service.test_knowledge_index.sync(
+        replace(package, items=package.items + (high_boundary,))
+    )
+
+    result = service.query(f"{direct.content} 客户声称是1688颗。", context())
+
+    assert result["action"] == "CONTROLLED_ANSWER"
+    assert result["risk_level"] == "HIGH"
+    assert any(
+        "SRC-Q80-HIGH-CONTROLLED-BOUNDARY" in source["source_ids"]
+        for source in result["sources"]
+    )
+
+
+def test_no_hit_refuses_without_sources(scoped_service):
+    service, _ = scoped_service
+    result = service.query(
+        "火星公司税率与量子发动机维修流程", context(product_id="P-Q80")
+    )
+    assert result["action"] == "REFUSE"
+    assert result["sources"] == []
+    assert result["warnings"] == ["NO_SCOPED_KNOWLEDGE"]
+
+
+def test_chat_and_retrieval_smoke_use_frozen_context(scoped_service):
+    service, _ = scoped_service
+
+    def factory(active_settings: Settings) -> RAGService:
+        return service
+
+    app = create_app(settings=service.settings, rag_factory=factory)
+    with TestClient(app) as client:
+        for _ in range(100):
+            if client.get("/api/status").json().get("ready"):
+                break
+            time.sleep(0.01)
+        assert client.get("/api/health").status_code == 200
+        payload = {
+            "question": "Q80磁力积木套装包含80颗积木，商品编号为Q80。",
+            "context": context().model_dump(),
+        }
+        response = client.post("/api/chat", json=payload)
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert set(data) == {
+            "answer",
+            "action",
+            "risk_level",
+            "sources",
+            "warnings",
+            "required_fields",
+            "model",
+            "latency_ms",
+            "request_id",
+            "context",
+        }
+        assert set(data["sources"][0]) == {
+            "source_name",
+            "page",
+            "chunk_id",
+            "distance",
+            "excerpt",
+            "knowledge_version",
+            "source_ids",
+            "product_id",
+            "sku_id",
+        }
+        retrieval = client.post(
+            "/api/retrieval/search",
+            json={"query": payload["question"], "context": payload["context"]},
+        )
+        assert retrieval.status_code == 200
+        assert retrieval.json()["data"]["accepted"] is True
+
+
+def test_invalid_store_context_and_unconfigured_live_sync_are_blocked(api_client):
+    client, _ = api_client
+    invalid = client.post(
+        "/api/chat",
+        json={
+            "question": "test",
+            "context": {
+                "tenant_id": "TENANT-PDD-SM-TEST",
+                "platform": "pdd",
+                "store_code": "OTHER",
+                "product_id": "P-Q80",
+                "sku_id": "",
+            },
+        },
+    )
+    assert invalid.status_code == 422
+    missing_context = client.post("/api/chat", json={"question": "test"})
+    assert missing_context.status_code == 422
+    sync = client.post(f"/api/test-knowledge/sync/{PACKAGE_ID}")
+    assert sync.status_code == 503
+    assert "ENV_BLOCKED" in sync.text
+
+    with pytest.raises(ValidationError):
+        FrozenChatContext(
+            tenant_id="TENANT-PDD-SM-TEST",
+            platform="pdd",
+            store_code="OTHER",
+            product_id="P-Q80",
+            sku_id=None,
+        )
+
+
+def test_platform_client_uses_frozen_export_path(monkeypatch):
+    payload = load_json("test_knowledge_v031.json")
+    seen = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    client = PlatformTestKnowledgeClient("http://127.0.0.1:8012", 7)
+    package = client.fetch_package(PACKAGE_ID)
+    assert package.package_id == PACKAGE_ID
+    assert seen == {
+        "url": (
+            "http://127.0.0.1:8012/api/v1/test-knowledge-packages/"
+            f"{PACKAGE_ID}/rag-export"
+        ),
+        "timeout": 7,
+    }
+
+
+def test_28_evaluations_execute_and_render_reports():
+    cases = parse_evaluations(load_json("evaluations_v031.json"), PACKAGE_ID)
+    assert len(cases) == 28
+    assert all(not case.store_scope for case in cases)
+
+    expected = {case.question: case for case in cases}
+
+    def deterministic_query(question, chat_context):
+        case = expected[question]
+        return {
+            "answer": " ".join(case.expected_contains),
+            "action": case.expected_action,
+            "risk_level": case.expected_risk_level,
+            "sources": [
+                {
+                    "source_ids": list(case.expected_source_ids),
+                    "product_id": chat_context.product_id,
+                    "sku_id": chat_context.sku_id or "",
+                }
+            ],
+            "required_fields": list(case.expected_missing_fields),
+            "latency_ms": 1.0,
+        }
+
+    report = run_evaluations(cases, deterministic_query)
+    assert report["total"] == 28
+    assert report["passed"] == 28
+    assert report["failed"] == 0
+    markdown = render_markdown(report)
+    assert "E01" in markdown and "E28" in markdown
+
+
+def test_required_fields_mean_only_still_missing_fields():
+    direct = EvaluationCase(
+        case_id="DIRECT",
+        question="Q80有多少颗？",
+        context=context(sku_id="SKU-Q80-BLUE"),
+        expected_action="DIRECT_ANSWER",
+        expected_source_ids=(),
+        expected_contains=(),
+        forbidden_contains=(),
+        expected_required_fields=("product_id", "sku_id"),
+        expected_risk_level="LOW",
+        store_scope=False,
+    )
+    assert direct.expected_missing_fields == ()
+
+    store_transfer = replace(
+        direct,
+        case_id="STORE",
+        context=context(product_id="__STORE_LEVEL_EVALUATION__"),
+        expected_action="TRANSFER_HUMAN",
+        expected_required_fields=("order_id", "product_id", "sku_id"),
+        store_scope=True,
+    )
+    assert store_transfer.expected_missing_fields == (
+        "order_id",
+        "product_id",
+        "sku_id",
+    )
+
+
+def test_evaluator_accepts_grounded_synonyms_but_reports_scope_metadata_gaps():
+    semantic_case = EvaluationCase(
+        case_id="SEMANTIC",
+        question="能同时拼吗？",
+        context=context(),
+        expected_action="DIRECT_ANSWER",
+        expected_source_ids=("SRC-OK",),
+        expected_contains=("共用零件", "不能同时拼"),
+        forbidden_contains=(),
+        expected_required_fields=(),
+        expected_risk_level="LOW",
+        store_scope=False,
+    )
+
+    def semantic_query(question, chat_context):
+        return {
+            "answer": "两种造型共用同一套零件，所以无法同时组装。",
+            "action": "DIRECT_ANSWER",
+            "risk_level": "LOW",
+            "required_fields": [],
+            "sources": [
+                {
+                    "source_ids": ["SRC-OK"],
+                    "product_id": chat_context.product_id,
+                    "sku_id": "",
+                    "excerpt": "两种造型共用同一套零件，不能同时组装。",
+                }
+            ],
+        }
+
+    semantic = run_evaluations([semantic_case], semantic_query)
+    assert semantic["passed"] == 1
+    assert "evaluator_semantic_error_corrected" in semantic["records"][0][
+        "diagnostic_categories"
+    ]
+
+    metadata_case = replace(
+        semantic_case,
+        case_id="METADATA",
+        expected_source_ids=("SRC-TEST",),
+        expected_contains=("ABS塑料",),
+    )
+    metadata = run_evaluations(
+        [metadata_case],
+        semantic_query,
+        available_source_ids={"SRC-OK", "SRC-TEST"},
+        source_catalog={
+            "SRC-TEST": [
+                {
+                    "product_id": "P-OTHER",
+                    "sku_id": "",
+                    "knowledge_type": "PRODUCT_FACT",
+                }
+            ]
+        },
+    )
+    assert metadata["passed"] == 0
+    assert "metadata_loss" in metadata["records"][0]["failure_classes"]
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid"),
+    [("version", "0.3.1-test"), ("schema_version", "V0.3.1")],
+)
+def test_evaluations_strictly_separate_version_and_schema(field, invalid):
+    payload = load_json("evaluations_v031.json")
+    payload[field] = invalid
+    with pytest.raises(EvaluationValidationError):
+        parse_evaluations(payload, PACKAGE_ID)
