@@ -72,6 +72,32 @@ class ProcessedRow(BaseModel):
     warnings: list[ValidationIssue] = Field(default_factory=list)
 
 
+class PreflightIssueSummary(BaseModel):
+    code: str
+    count: int
+    message: str
+
+
+class ProductSkuPreflightResponse(BaseModel):
+    original_filename: str
+    file_sha256: str
+    file_size_bytes: int
+    worksheets: list[str]
+    data_row_count: int
+    valid_rows: int
+    invalid_rows: int
+    duplicate_rows: int
+    conflict_rows: int
+    missing_columns: list[str]
+    unknown_columns: list[str]
+    formula_cell_count: int
+    hidden_sheet_warnings: list[str]
+    blank_row_count: int
+    error_summary: list[PreflightIssueSummary]
+    warning_summary: list[PreflightIssueSummary]
+    can_import: bool
+
+
 class BatchSummary(BaseModel):
     id: str
     batch_id: str
