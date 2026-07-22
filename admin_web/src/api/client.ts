@@ -83,10 +83,61 @@ export interface ProductSkuPreflight {
   can_import: boolean
 }
 
+export interface PackageIssue {
+  code: string
+  message: string
+}
+
+export interface TestPackagePreflight {
+  original_filename: string
+  file_sha256: string
+  file_size_bytes: number
+  package_id: string
+  package_name: string
+  version: string
+  schema_version: string
+  tenant_id: string
+  platform: string
+  store_code: string
+  test_data_mode: boolean
+  production_usable: boolean
+  response_mode: string
+  allow_auto_send: boolean
+  worksheets: string[]
+  counts: Record<string, number>
+  warnings: PackageIssue[]
+  errors: PackageIssue[]
+  can_import: boolean
+}
+
+export interface TestPackageSummary {
+  package_id: string
+  package_name: string
+  version: string
+  schema_version: string
+  tenant_id: string
+  platform: string
+  store_code: string
+  test_data_mode: boolean
+  production_usable: boolean
+  response_mode: string
+  allow_auto_send: boolean
+  import_status: string
+  original_filename: string
+  zip_sha256: string
+  counts: Record<string, number>
+  imported_at: string
+}
+
 export interface Page<T> {
   items: T[]
   page: number
   page_size: number
+  total: number
+}
+
+export interface ItemList<T> {
+  items: T[]
   total: number
 }
 
@@ -155,6 +206,29 @@ export async function preflightProductSku(file: File): Promise<ProductSkuPreflig
     '/api/v1/import-batches/product-sku/preflight',
     form,
   )
+  return response.data
+}
+
+export async function listTestDataPackages(): Promise<ItemList<TestPackageSummary>> {
+  const response = await apiClient.get<ItemList<TestPackageSummary>>('/api/v1/test-data-packages')
+  return response.data
+}
+
+export async function preflightTestDataPackage(file: File): Promise<TestPackagePreflight> {
+  const form = new FormData()
+  form.append('file', file)
+  const response = await apiClient.post<TestPackagePreflight>(
+    '/api/v1/test-data-packages/preflight',
+    form,
+  )
+  return response.data
+}
+
+export async function importTestDataPackage(file: File): Promise<TestPackageSummary> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('imported_by', 'admin-web-test-import')
+  const response = await apiClient.post<TestPackageSummary>('/api/v1/test-data-packages', form)
   return response.data
 }
 

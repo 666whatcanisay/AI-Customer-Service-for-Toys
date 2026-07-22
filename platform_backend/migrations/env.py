@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.database import Base
 from app.ingestion import models  # noqa: F401
+from app.test_catalog import models as test_catalog_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

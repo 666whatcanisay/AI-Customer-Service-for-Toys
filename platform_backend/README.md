@@ -20,6 +20,8 @@ python -m venv .venv
 
 `POST /api/v1/import-batches/product-sku/preflight` analyzes the same multipart `.xlsx` input entirely in memory. It reuses import file-safety, parser, normalizer, validator, duplicate, and conflict rules, but has no database dependency and creates no batch or staged row. The existing formal upload endpoint remains unchanged.
 
+C-T02B adds an isolated V0.3.1 test-package path under `/api/v1/test-data-packages` plus frozen read-only `/test-catalog` and `/test-knowledge-packages` endpoints. ZIP preflight validates safe paths, manifest file set, sizes, SHA-256, test-only flags, sheets 00-08, counts, source references, and SKU relationships before any database write. Imported data is fixed to `TENANT-PDD-SM-TEST`; attachment bytes and raw RTF are never stored or returned.
+
 ## Test
 
 ```powershell

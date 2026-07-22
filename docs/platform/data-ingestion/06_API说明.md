@@ -11,6 +11,14 @@
 | GET | `/api/v1/import-batches/{batch_id}` | 批次摘要及 `staged_rows` |
 | GET | `/api/v1/import-batches/{batch_id}/rows` | `status/page/page_size`；状态为 VALID/INVALID/DUPLICATE/CONFLICT |
 | GET | `/api/v1/import-batches/{batch_id}/errors` | UTF-8 BOM CSV 行级错误报告 |
+| POST | `/api/v1/test-data-packages/preflight` | V0.3.1 ZIP 只读预检，不获取数据库 Session |
+| POST | `/api/v1/test-data-packages` | 全量复验后写入隔离测试表 |
+| GET | `/api/v1/test-data-packages` | 管理端测试包列表 `{items,total}` |
+| GET | `/api/v1/test-catalog/stores` | 冻结店铺目录 `{items,total}` |
+| GET | `/api/v1/test-catalog/products?store_code=` | 冻结商品目录 `{items,total}` |
+| GET | `/api/v1/test-catalog/products/{product_id}/skus` | 冻结 SKU/关系目录 `{items,total}` |
+| GET | `/api/v1/test-knowledge-packages/{package_id}/rag-export` | 冻结测试知识导出，不调用 RAG |
+| GET | `/api/v1/test-knowledge-packages/{package_id}/evaluations` | 冻结测试评测集导出 |
 
 上传成功为 HTTP 201，返回 `id` 与同值 `batch_id`、状态、总行、有效行、错误/冲突行和重复行。文件级错误使用统一结构：
 
@@ -26,3 +34,5 @@
 未来 B 线线索提交草案只能传递本页标准字段及来源上下文，C 线仍需校验并写入待审核区；任何跨线正式接口必须另行执行 schema、版本、CHANGELOG、兼容性说明与受影响线路审查。
 
 C-T02A 预检响应及 `can_import` 判定见 `11_XLSX导入前预检.md`。正式上传接口、状态和响应保持兼容。
+
+C-T02B 的精确响应字段、六种动作、数组类型和固定测试值见 `12_C-T02B测试数据包.md`。本轮未修改 `contracts/**`，未返回附件二进制或原始 RTF，未建立正式发布接口。
