@@ -1,71 +1,85 @@
 {
-    "root_path":  "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-    "current_task":  "B-T02 completed; awaiting Draft PR review",
-    "contracts":  [
-                      "contracts/version.json 0.1.0"
-                  ],
-    "entrypoints":  [
-                        "frontend/index.html",
-                        "frontend/src/main.ts"
-                    ],
-    "version":  "0.1.0",
-    "project_id":  "mumu-B",
-    "last_test_result":  "2026-07-22: typecheck PASS; Vitest 7/7 PASS; production build PASS; real /api/health and /api/chat smoke PASS",
-    "known_risks":  [
-                        "A feedback endpoint is not published; adoption state is page-local",
-                        "Current A request/response differs from shared contracts v0.1.0 and is isolated in the adapter",
-                        "npm reported 7 dependency vulnerabilities (5 moderate, 1 high, 1 critical)",
-                        "Production JavaScript chunk exceeds 500 kB warning threshold"
-                    ],
-    "project_name":  "B：客服用户端与浏览器助手",
-    "line":  "B",
-    "required_interfaces":  [
-                                "GET /api/health",
-                                "POST /api/chat",
-                                "Feedback endpoint pending"
-                            ],
-    "current_gate":  "B-T02 PASS: typed client, tests, build, and real smoke verified",
-    "current_stage":  "G1: real RAG API client integration",
-    "git":  {
-                "branch":  "agent/user-client-t02",
-                "clean":  true,
-                "commit":  "e9a37f7",
-                "task_commit":  "e9a37f7",
-                "repository":  "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
-            },
-    "forbidden_paths":  [
-                            "backend/**",
-                            "platform_backend/**",
-                            "admin_web/**"
-                        ],
-    "blockers":  [
-
-                 ],
-    "test_commands":  [
-                          "npm run typecheck",
-                          "npm run test",
-                          "npm run build"
-                      ],
-    "status":  "ready",
-    "owned_paths":  [
-                        "frontend/**",
-                        "extension/**",
-                        "docs/customer/**"
-                    ],
-    "responsibilities":  [
-                             "B line delivery"
-                         ],
-    "last_updated":  "2026-07-22",
-    "out_of_scope":  [
-                         "Other-line business code"
-                     ],
-    "provided_interfaces":  [
-
-                            ],
-    "completed_tasks":  [
-                            "Governance documentation initialized",
-                            "B-T01 frontend baseline audit completed",
-                            "B-G1-FIX1 dependency install, typecheck, and production build verified",
-                            "B-T02 real RAG client, adapter, page workflow, tests, build, and smoke completed"
-                        ]
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
+  "current_task": "B-T03 frontend complete; real A/C page smoke INTEGRATION_PENDING",
+  "contracts": [
+    "contracts/version.json 0.1.0 (unchanged)",
+    "B-T03 task-local A/C compatibility agreement"
+  ],
+  "entrypoints": [
+    "frontend/index.html",
+    "frontend/src/main.ts",
+    "frontend/src/views/AiChat.vue",
+    "frontend/src/api/platformClient.ts",
+    "frontend/src/api/ragClient.ts"
+  ],
+  "version": "0.1.0",
+  "project_id": "mumu-B",
+  "last_test_result": "2026-07-22: Node v24.14.0/npm 10.9.2; typecheck PASS; Vitest 3 files 27/27 PASS; production build PASS; A health reachable but frozen chat request HTTP 422; C port 8012 unreachable; real page smoke INTEGRATION_PENDING",
+  "known_risks": [
+    "C stores/products/SKUs API is not available on the tested endpoint",
+    "Running A rejects the B-T03 {question,context} request with HTTP 422",
+    "A feedback endpoint is not published; adoption state is page-local",
+    "npm reported 7 dependency vulnerabilities (5 moderate, 1 high, 1 critical)",
+    "Production JavaScript chunk exceeds 500 kB warning threshold"
+  ],
+  "project_name": "B: customer user client and browser assistant",
+  "line": "B",
+  "required_interfaces": [
+    "GET A /api/health",
+    "POST A /api/chat with {question,context}",
+    "GET C /health",
+    "GET C /api/v1/stores",
+    "GET C /api/v1/stores/{store_code}/products",
+    "GET C /api/v1/products/{product_id}/skus",
+    "Feedback endpoint pending"
+  ],
+  "current_gate": "B-T03 frontend checks PASS; real A/C page smoke INTEGRATION_PENDING",
+  "current_stage": "G2: manual store/product/SKU scoped customer-service workflow",
+  "git": {
+    "branch": "agent/user-client-t03",
+    "clean": false,
+    "commit": null,
+    "task_commit": null,
+    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
+  },
+  "forbidden_paths": [
+    "backend/**",
+    "platform_backend/**",
+    "admin_web/**",
+    "contracts/**"
+  ],
+  "blockers": [
+    "A deployment must accept frozen B-T03 question/context request and return authoritative data.context",
+    "C deployment must publish frozen stores/products/SKUs catalog endpoints and synthetic test catalog"
+  ],
+  "test_commands": [
+    "npm run typecheck",
+    "npm run test",
+    "npm run build"
+  ],
+  "status": "testing",
+  "owned_paths": [
+    "frontend/**",
+    "extension/**",
+    "docs/customer/**"
+  ],
+  "responsibilities": [
+    "B line delivery"
+  ],
+  "last_updated": "2026-07-22",
+  "out_of_scope": [
+    "Other-line business code",
+    "Shared contract changes",
+    "Browser extension",
+    "Automatic customer message sending",
+    "Real customer use"
+  ],
+  "provided_interfaces": [],
+  "completed_tasks": [
+    "Governance documentation initialized",
+    "B-T01 frontend baseline audit completed",
+    "B-G1-FIX1 dependency install, typecheck, and production build verified",
+    "B-T02 real RAG client, adapter, page workflow, tests, build, and smoke completed",
+    "B-T03 manual store/product/SKU workflow, strict adapters, context request, safety UI, tests, and build completed"
+  ]
 }

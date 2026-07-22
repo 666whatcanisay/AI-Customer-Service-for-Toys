@@ -1,23 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import { adaptChatResponse, adaptHealthResponse, RagAdapterError } from './ragAdapter'
+import { RAG_ACTIONS, type RagAction } from './ragTypes'
 
-describe('ragAdapter', () => {
-  it('adapts the current A-line chat response without inventing risk', () => {
+const responseFor = (action: RagAction = 'DIRECT_ANSWER') => ({
+  answer: '建议由客服核对商品年龄标识后回复。',
+  action,
+  risk_level: action === 'TRANSFER_HUMAN' ? 'HIGH' : 'LOW',
+  sources: [
+    {
+      source_name: 'toy-guide.pdf',
+      page: 3,
+      chunk_id: 'chunk-7',
+      distance: 0.18,
+      excerpt: '适用年龄以包装标识为准。',
+      knowledge_version: 'v3',
+      source_ids: ['SRC-001'],
+      product_id: 'PROD-001',
+      sku_id: 'SKU-RED'
+    }
+  ],
+  warnings: [],
+  required_fields: action === 'ASK_CLARIFY' ? ['sku_id'] : [],
+  model: 'qwen-turbo',
+  latency_ms: 82,
+  request_id: 'req-001',
+  context: {
+    tenant_id: 'TENANT-PDD-SM-TEST',
+    platform: 'pdd',
+    store_code: 'PDD-SM',
+    product_id: 'PROD-001',
+    sku_id: 'SKU-RED'
+  }
+})
+
+describe('ragAdapter B-T03 contract', () => {
+  it('consumes only the authoritative data payload and exact source fields', () => {
     const result = adaptChatResponse({
-      answer: '建议由客服核对商品年龄标识后回复。',
-      action: 'ANSWER',
-      sources: [
-        {
-          source_name: 'toy-guide.pdf',
-          page: 3,
-          chunk_id: 'chunk-7',
-          distance: 0.18,
-          excerpt: '适用年龄以包装标识为准。'
-        }
-      ],
-      model: 'qwen-turbo',
-      latency_ms: 82,
-      request_id: 'req-001'
+      answer: 'top-level mirror must be ignored',
+      data: responseFor()
     })
 
     expect(result).toMatchObject({
@@ -25,8 +45,9 @@ describe('ragAdapter', () => {
       model: 'qwen-turbo',
       answer: '建议由客服核对商品年龄标识后回复。',
       action: 'DIRECT_ANSWER',
-      riskLevel: null,
-      latencyMs: 82
+      riskLevel: 'LOW',
+      latencyMs: 82,
+      context: responseFor().context
     })
     expect(result.citations[0]).toEqual({
       file: 'toy-guide.pdf',
@@ -34,44 +55,33 @@ describe('ragAdapter', () => {
       chunkId: 'chunk-7',
       summary: '适用年龄以包装标识为准。',
       distance: 0.18,
-      knowledgeVersion: null
+      knowledgeVersion: 'v3',
+      sourceIds: ['SRC-001'],
+      productId: 'PROD-001',
+      skuId: 'SKU-RED'
     })
   })
 
-  it('adapts the shared-contract envelope and citation fields', () => {
-    const result = adaptChatResponse({
-      success: true,
+  it.each(RAG_ACTIONS)('accepts frozen action %s', (action) => {
+    expect(adaptChatResponse({ data: responseFor(action) }).action).toBe(action)
+  })
+
+  it('rejects a legacy top-level-only chat response', () => {
+    expect(() => adaptChatResponse(responseFor())).toThrow(RagAdapterError)
+  })
+
+  it('rejects an unknown action and invalid source_ids', () => {
+    expect(() => adaptChatResponse({ data: { ...responseFor(), action: 'ANSWER' } }))
+      .toThrow('六种动作')
+    expect(() => adaptChatResponse({
       data: {
-        request_id: 'req-002',
-        answer: '需要转人工确认。',
-        action: 'TRANSFER_HUMAN',
-        risk_level: 'HIGH',
-        warnings: ['信息存在冲突'],
-        required_fields: ['sku'],
-        latency_ms: 120,
-        citations: [
-          {
-            source_name: 'policy.pdf',
-            page_number: 8,
-            summary: '高风险场景需人工复核。',
-            knowledge_version: 'v2'
-          }
-        ]
+        ...responseFor(),
+        sources: [{ ...responseFor().sources[0], source_ids: null }]
       }
-    })
-
-    expect(result.action).toBe('TRANSFER_HUMAN')
-    expect(result.riskLevel).toBe('HIGH')
-    expect(result.warnings).toEqual(['信息存在冲突'])
-    expect(result.requiredFields).toEqual(['sku'])
-    expect(result.citations[0]?.knowledgeVersion).toBe('v2')
+    })).toThrow('string[]')
   })
 
-  it('rejects a response without an answer', () => {
-    expect(() => adaptChatResponse({ sources: [] })).toThrow(RagAdapterError)
-  })
-
-  it('adapts health envelopes', () => {
+  it('adapts current health envelopes separately from chat', () => {
     expect(adaptHealthResponse({ data: { status: 'ok', ready: true } })).toEqual({
       status: 'ok',
       ready: true
