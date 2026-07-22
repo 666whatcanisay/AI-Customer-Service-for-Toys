@@ -1,18 +1,24 @@
 """Orchestration for product/SKU ingestion into the review-only zone."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import PurePosixPath
 
 from app.errors import AppError
 from app.ingestion.hashing import sha256_bytes, stable_identity_key, stable_row_hash
 from app.ingestion.models import ImportBatch
 from app.ingestion.normalizers.product_sku import normalize_product_sku
-from app.ingestion.parsers.product_sku_xlsx import parse_product_sku_xlsx
+from app.ingestion.parsers.product_sku_xlsx import (
+    DATA_SHEET,
+    inspect_product_sku_xlsx,
+    parse_product_sku_xlsx,
+)
 from app.ingestion.repository import IngestionRepository
 from app.ingestion.schemas import (
     BatchStatus,
     ErrorCode,
+    PreflightIssueSummary,
     ProcessedRow,
+    ProductSkuPreflightResponse,
     RowStatus,
     ValidationIssue,
 )
@@ -26,7 +32,7 @@ ALLOWED_MIME_TYPES = {
 class IngestionService:
     def __init__(
         self,
-        repository: IngestionRepository,
+        repository: IngestionRepository | None,
         *,
         max_upload_bytes: int,
         max_import_rows: int,
@@ -34,6 +40,153 @@ class IngestionService:
         self.repository = repository
         self.max_upload_bytes = max_upload_bytes
         self.max_import_rows = max_import_rows
+
+    def preflight_upload(
+        self,
+        *,
+        filename: str,
+        content_type: str | None,
+        content: bytes,
+    ) -> ProductSkuPreflightResponse:
+        """Analyze an XLSX without opening a database session or writing a batch."""
+        safe_filename = PurePosixPath(filename.replace("\\", "/")).name
+        self._validate_file(safe_filename, content_type, content)
+        inspection = inspect_product_sku_xlsx(content, max_rows=self.max_import_rows)
+
+        error_counts: Counter[str] = Counter()
+        error_messages: dict[str, str] = {}
+        warning_counts: Counter[str] = Counter()
+        warning_messages: dict[str, str] = {}
+
+        def add_error(code: str | ErrorCode, count: int, message: str) -> None:
+            if count <= 0:
+                return
+            key = str(code)
+            error_counts[key] += count
+            error_messages.setdefault(key, message)
+
+        def add_warning(code: str, count: int, message: str) -> None:
+            if count <= 0:
+                return
+            warning_counts[code] += count
+            warning_messages.setdefault(code, message)
+
+        if not inspection.data_sheet_present:
+            add_error(
+                ErrorCode.INVALID_TEMPLATE,
+                1,
+                f"Required worksheet '{DATA_SHEET}' is missing",
+            )
+        if inspection.missing_columns:
+            add_error(
+                ErrorCode.INVALID_TEMPLATE,
+                len(inspection.missing_columns),
+                "Required template columns are missing",
+            )
+        if inspection.unknown_columns:
+            add_error(
+                ErrorCode.INVALID_TEMPLATE,
+                len(inspection.unknown_columns),
+                "Unknown template columns are present",
+            )
+        if (
+            inspection.data_sheet_present
+            and not inspection.fixed_headers_match
+            and not inspection.missing_columns
+            and not inspection.unknown_columns
+        ):
+            add_error(
+                ErrorCode.INVALID_TEMPLATE,
+                1,
+                "Template columns are not in the fixed order",
+            )
+        if inspection.data_sheet_present and not inspection.data_sheet_visible:
+            add_error(
+                ErrorCode.INVALID_TEMPLATE,
+                1,
+                "The product data worksheet must be visible",
+            )
+        if inspection.row_limit_exceeded:
+            add_error(
+                ErrorCode.TOO_MANY_ROWS,
+                1,
+                f"Workbook exceeds the {self.max_import_rows}-row import limit",
+            )
+        if inspection.data_sheet_present and inspection.data_row_count == 0:
+            add_error(
+                ErrorCode.INVALID_TEMPLATE,
+                1,
+                "The product data worksheet has no data rows",
+            )
+
+        processed: list[ProcessedRow] = []
+        if (
+            inspection.data_sheet_present
+            and inspection.fixed_headers_match
+            and not inspection.row_limit_exceeded
+        ):
+            processed = self._process_rows(inspection.parsed_rows)
+            for row in processed:
+                for issue in row.errors:
+                    if issue.error_code != ErrorCode.FORMULA_NOT_ALLOWED:
+                        add_error(issue.error_code, 1, issue.message)
+
+        add_error(
+            ErrorCode.FORMULA_NOT_ALLOWED,
+            inspection.formula_cell_count,
+            "Formula cells are not accepted as trusted values",
+        )
+        add_warning(
+            "HIDDEN_WORKSHEET",
+            len(inspection.hidden_worksheet_names),
+            "Hidden worksheets require review and are never treated as product data",
+        )
+        add_warning(
+            "BLANK_ROWS_IGNORED",
+            inspection.blank_row_count,
+            "Blank rows will be ignored during import",
+        )
+
+        return ProductSkuPreflightResponse(
+            original_filename=safe_filename,
+            file_sha256=sha256_bytes(content),
+            file_size_bytes=len(content),
+            worksheets=inspection.worksheet_names,
+            data_row_count=inspection.data_row_count,
+            valid_rows=sum(row.validation_status == RowStatus.VALID for row in processed),
+            invalid_rows=sum(row.validation_status == RowStatus.INVALID for row in processed),
+            duplicate_rows=sum(
+                row.validation_status == RowStatus.DUPLICATE for row in processed
+            ),
+            conflict_rows=sum(
+                row.validation_status == RowStatus.CONFLICT for row in processed
+            ),
+            missing_columns=inspection.missing_columns,
+            unknown_columns=inspection.unknown_columns,
+            formula_cell_count=inspection.formula_cell_count,
+            hidden_sheet_warnings=[
+                f"Worksheet '{name}' is hidden"
+                for name in inspection.hidden_worksheet_names
+            ],
+            blank_row_count=inspection.blank_row_count,
+            error_summary=[
+                PreflightIssueSummary(
+                    code=code,
+                    count=error_counts[code],
+                    message=error_messages[code],
+                )
+                for code in sorted(error_counts)
+            ],
+            warning_summary=[
+                PreflightIssueSummary(
+                    code=code,
+                    count=warning_counts[code],
+                    message=warning_messages[code],
+                )
+                for code in sorted(warning_counts)
+            ],
+            can_import=not error_counts,
+        )
 
     def process_upload(
         self,
@@ -45,6 +198,8 @@ class IngestionService:
     ) -> ImportBatch:
         safe_filename = PurePosixPath(filename.replace("\\", "/")).name
         self._validate_file(safe_filename, content_type, content)
+        if self.repository is None:
+            raise RuntimeError("A repository is required for a persisted import")
         batch = self.repository.create_batch(
             original_filename=safe_filename,
             file_sha256=sha256_bytes(content),

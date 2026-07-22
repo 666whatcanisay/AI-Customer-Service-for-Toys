@@ -21,6 +21,7 @@ from app.ingestion.schemas import (
     ErrorCode,
     ImportRowListResponse,
     ImportRowResponse,
+    ProductSkuPreflightResponse,
     RowStatus,
     ValidationIssue,
 )
@@ -88,6 +89,27 @@ def download_product_sku_template() -> FileResponse:
         TEMPLATE_PATH,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         filename="商品与SKU资料模板.xlsx",
+    )
+
+
+@router.post(
+    "/import-batches/product-sku/preflight",
+    response_model=ProductSkuPreflightResponse,
+)
+async def preflight_product_sku(
+    file: UploadFile = File(...),
+) -> ProductSkuPreflightResponse:
+    settings = get_settings()
+    content = await file.read(settings.max_upload_bytes + 1)
+    service = IngestionService(
+        None,
+        max_upload_bytes=settings.max_upload_bytes,
+        max_import_rows=settings.max_import_rows,
+    )
+    return service.preflight_upload(
+        filename=file.filename or "upload.xlsx",
+        content_type=file.content_type,
+        content=content,
     )
 
 

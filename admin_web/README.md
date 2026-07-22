@@ -3,7 +3,7 @@
 Vue 3 administration shell for the C-line platform. It keeps the C-T01 `/system-status` page and adds the C-T02 review-only import workflow:
 
 - `/imports`: real API-backed batch list and explicit empty/error/loading states;
-- `/imports/new`: fixed-template download, `.xlsx`/5 MB client checks, upload progress, and server result summary;
+- `/imports/new`: fixed-template download, `.xlsx`/5 MB client checks, zero-write preflight summary, `can_import` upload gate, upload progress, and server result summary;
 - `/imports/:batchId`: batch counts, status filtering, row issues, and error-report download.
 
 The UI cannot approve, publish, edit formal products, call RAG, or display fabricated dashboard statistics.

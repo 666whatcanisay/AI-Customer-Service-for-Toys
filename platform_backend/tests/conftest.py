@@ -68,6 +68,7 @@ def workbook_bytes(
     sheet_name: str = DATA_SHEET,
     formula_cells: dict[str, str] | None = None,
     hide_data_sheet: bool = False,
+    hide_support_sheet: bool = False,
 ) -> bytes:
     workbook = Workbook()
     sheet = workbook.active
@@ -82,6 +83,9 @@ def workbook_bytes(
     if hide_data_sheet:
         workbook.create_sheet("说明")
         sheet.sheet_state = "hidden"
+    if hide_support_sheet:
+        support_sheet = workbook.create_sheet("隐藏说明")
+        support_sheet.sheet_state = "hidden"
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()

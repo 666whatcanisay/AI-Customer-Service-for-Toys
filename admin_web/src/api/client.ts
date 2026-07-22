@@ -57,6 +57,32 @@ export interface ImportRow {
   warnings: ValidationIssue[]
 }
 
+export interface PreflightIssueSummary {
+  code: string
+  count: number
+  message: string
+}
+
+export interface ProductSkuPreflight {
+  original_filename: string
+  file_sha256: string
+  file_size_bytes: number
+  worksheets: string[]
+  data_row_count: number
+  valid_rows: number
+  invalid_rows: number
+  duplicate_rows: number
+  conflict_rows: number
+  missing_columns: string[]
+  unknown_columns: string[]
+  formula_cell_count: number
+  hidden_sheet_warnings: string[]
+  blank_row_count: number
+  error_summary: PreflightIssueSummary[]
+  warning_summary: PreflightIssueSummary[]
+  can_import: boolean
+}
+
 export interface Page<T> {
   items: T[]
   page: number
@@ -118,6 +144,16 @@ export async function uploadProductSku(
         }
       },
     },
+  )
+  return response.data
+}
+
+export async function preflightProductSku(file: File): Promise<ProductSkuPreflight> {
+  const form = new FormData()
+  form.append('file', file)
+  const response = await apiClient.post<ProductSkuPreflight>(
+    '/api/v1/import-batches/product-sku/preflight',
+    form,
   )
   return response.data
 }

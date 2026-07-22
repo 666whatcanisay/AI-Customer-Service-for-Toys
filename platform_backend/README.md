@@ -18,6 +18,8 @@ python -m venv .venv
 
 `GET /health` returns service status and a request ID. Product/SKU import endpoints are under `/api/v1`; the fixed template is served by `GET /api/v1/import-templates/product-sku`.
 
+`POST /api/v1/import-batches/product-sku/preflight` analyzes the same multipart `.xlsx` input entirely in memory. It reuses import file-safety, parser, normalizer, validator, duplicate, and conflict rules, but has no database dependency and creates no batch or staged row. The existing formal upload endpoint remains unchanged.
+
 ## Test
 
 ```powershell
