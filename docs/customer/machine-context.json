@@ -1,6 +1,6 @@
 {
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "B-T03 frontend complete; real A/C page smoke INTEGRATION_PENDING",
+  "current_task": "B-T03-FIX1 frozen C test-catalog path correction in Draft PR #11",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "B-T03 task-local A/C compatibility agreement"
@@ -14,7 +14,7 @@
   ],
   "version": "0.1.0",
   "project_id": "mumu-B",
-  "last_test_result": "2026-07-22: Node v24.14.0/npm 10.9.2; typecheck PASS; Vitest 3 files 27/27 PASS; production build PASS; A health reachable but frozen chat request HTTP 422; C port 8012 unreachable; real page smoke INTEGRATION_PENDING",
+  "last_test_result": "2026-07-22 B-T03-FIX1: Node v24.14.0/npm 10.9.2; typecheck PASS; Vitest 4 files 28/28 PASS including exact frozen catalog URL test; production build PASS; real A/C smoke intentionally deferred to final develop integration",
   "known_risks": [
     "C stores/products/SKUs API is not available on the tested endpoint",
     "Running A rejects the B-T03 {question,context} request with HTTP 422",
@@ -28,18 +28,18 @@
     "GET A /api/health",
     "POST A /api/chat with {question,context}",
     "GET C /health",
-    "GET C /api/v1/stores",
-    "GET C /api/v1/stores/{store_code}/products",
-    "GET C /api/v1/products/{product_id}/skus",
+    "GET C /api/v1/test-catalog/stores",
+    "GET C /api/v1/test-catalog/products?store_code=",
+    "GET C /api/v1/test-catalog/products/{product_id}/skus",
     "Feedback endpoint pending"
   ],
-  "current_gate": "B-T03 frontend checks PASS; real A/C page smoke INTEGRATION_PENDING",
+  "current_gate": "B-T03-FIX1 frontend checks PASS; real A/C page smoke INTEGRATION_PENDING",
   "current_stage": "G2: manual store/product/SKU scoped customer-service workflow",
   "git": {
     "branch": "agent/user-client-t03",
-    "clean": true,
-    "commit": "c7540b1",
-    "task_commit": "c7540b1",
+    "clean": false,
+    "commit": "d76e228",
+    "task_commit": null,
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
@@ -80,6 +80,7 @@
     "B-T01 frontend baseline audit completed",
     "B-G1-FIX1 dependency install, typecheck, and production build verified",
     "B-T02 real RAG client, adapter, page workflow, tests, build, and smoke completed",
-    "B-T03 manual store/product/SKU workflow, strict adapters, context request, safety UI, tests, and build completed"
+    "B-T03 manual store/product/SKU workflow, strict adapters, context request, safety UI, tests, and build completed",
+    "B-T03-FIX1 corrected C catalog calls to the three frozen test-catalog paths in Draft PR #11"
   ]
 }

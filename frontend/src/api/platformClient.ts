@@ -32,7 +32,7 @@ export const platformClient: PlatformCatalogClient = {
 
   async listStores(signal) {
     try {
-      const response = await http.get('/api/v1/stores', { signal })
+      const response = await http.get('/api/v1/test-catalog/stores', { signal })
       return adaptStoresResponse(response.data)
     } catch (error) {
       throw toPlatformClientError(error)
@@ -41,34 +41,23 @@ export const platformClient: PlatformCatalogClient = {
 
   async listProducts(store, signal) {
     try {
-      const response = await http.get(
-        `/api/v1/stores/${encodeURIComponent(store.storeCode)}/products`,
-        {
-          signal,
-          params: {
-            tenant_id: store.tenantId,
-            platform: store.platform
-          }
+      const response = await http.get('/api/v1/test-catalog/products', {
+        signal,
+        params: {
+          store_code: store.storeCode
         }
-      )
+      })
       return adaptProductsResponse(response.data)
     } catch (error) {
       throw toPlatformClientError(error)
     }
   },
 
-  async listSkus(store, product, signal) {
+  async listSkus(_store, product, signal) {
     try {
       const response = await http.get(
-        `/api/v1/products/${encodeURIComponent(product.productId)}/skus`,
-        {
-          signal,
-          params: {
-            tenant_id: store.tenantId,
-            platform: store.platform,
-            store_code: store.storeCode
-          }
-        }
+        `/api/v1/test-catalog/products/${encodeURIComponent(product.productId)}/skus`,
+        { signal }
       )
       return adaptSkusResponse(response.data)
     } catch (error) {
