@@ -5,7 +5,10 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import get_settings
+from app.api.import_routes import router as import_router
 from app.errors import (
+    AppError,
+    app_exception_handler,
     http_exception_handler,
     unhandled_exception_handler,
     validation_exception_handler,
@@ -24,6 +27,8 @@ app.middleware("http")(request_id_middleware)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
+app.add_exception_handler(AppError, app_exception_handler)
+app.include_router(import_router)
 
 
 @app.get("/health")

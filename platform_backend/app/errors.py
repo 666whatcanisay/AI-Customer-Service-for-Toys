@@ -8,6 +8,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
+class AppError(Exception):
+    def __init__(self, code: str, message: str, *, status_code: int = 400) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+
+
 def _request_id(request: Request) -> str:
     return getattr(request.state, "request_id", "unknown")
 
@@ -57,6 +65,13 @@ async def validation_exception_handler(
             message="Request validation failed",
             details=exc.errors(),
         ),
+    )
+
+
+async def app_exception_handler(request: Request, exc: AppError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_error_payload(request, code=exc.code, message=exc.message),
     )
 
 
