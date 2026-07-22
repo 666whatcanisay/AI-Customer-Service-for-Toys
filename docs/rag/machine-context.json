@@ -3,31 +3,31 @@
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
-  "version": "0.3.0",
+  "version": "0.3.1-test",
   "status": "blocked",
-  "current_task": "A-T03",
-  "next_recommended_task": "A-T03 live C integration rerun",
-  "current_stage": "A-T03 consumer and synthetic fixture validation complete; live C integration pending",
-  "current_gate": "A-T03 BLOCKED by unavailable C V0.3.1 runtime",
-  "last_test_result": "25 passed, 16 warnings in 12.56s; real local BGE/Chroma/Ollama scoped E2E passed. Synthetic fixture evaluations: 28/28. Live C sync/evaluations not run.",
+  "current_task": "A-T03-FIX1",
+  "next_recommended_task": "A-T03 behavior quality fixes from live evaluation",
+  "current_stage": "A-T03-FIX1 schema/store-scope compatibility and live C evaluation complete",
+  "current_gate": "A-T03 BLOCKED by live answer-quality and response-semantic gaps",
+  "last_test_result": "Latest relevant pytest: 21 passed, 2 warnings. Earlier full suite in this task: 35 passed, 16 warnings. Latest synthetic fixture evaluation: 28/28. Live C: strict parse 47 items; duplicate sync 47->47; evaluations 0/28. Checks: action 19, source_ids 19, key_facts 1, forbidden_claims 28, required_fields 2, risk_level 18, scope 28.",
   "blockers": [
-    "PLATFORM_API_BASE_URL is not configured",
-    "C V0.3.1 rag-export and evaluations service is not running or present in the formal develop baseline",
-    "Live C package synchronization and live 28-case evaluation evidence are missing"
+    "Live C evaluation pass rate is 0/28",
+    "Key-fact preservation passes 1/28 and required_fields passes 2/28",
+    "Action, risk and expected source checks remain incomplete despite scope and forbidden-claim checks passing 28/28"
   ],
   "known_risks": [
-    "Synthetic fixture evidence must not be represented as live C integration",
+    "Live report is structural and redacts questions, answers and source excerpts before persistence",
     "Safety action distance margin needs calibration against the live C evaluation set",
     "Test package withdrawal, expiry and cross-version cleanup are not implemented"
   ],
   "git": {
     "branch": "agent/rag-core-t03",
-    "clean": true,
+    "clean": false,
     "commit": "3b73651e77b2945258dbc1934109796c4ec3d04a",
     "task_commit": "3b73651e77b2945258dbc1934109796c4ec3d04a",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-22T13:41:42+08:00",
+  "checked_at": "2026-07-22T14:35:30+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/main.py",
@@ -50,11 +50,12 @@
   "completed_tasks": [
     "A-T01 static capability audit and blocked baseline documentation",
     "A-T02 synthetic-PDF real local RAG loop and API validation",
-    "A-T03 A-line V0.3.1 consumer implementation and synthetic 28-case validation"
+    "A-T03 A-line V0.3.1 consumer implementation and synthetic 28-case validation",
+    "A-T03-FIX1 strict 0.3.1-test schema, store-scope safety compatibility and live C evaluation"
   ],
   "required_interfaces": [
-    "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export V0.3.1",
-    "GET C /api/v1/test-knowledge-packages/{package_id}/evaluations V0.3.1"
+    "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
+    "GET C /api/v1/test-knowledge-packages/{package_id}/evaluations version V0.3.1 schema 0.3.1-test"
   ],
   "provided_interfaces": [
     "POST /api/chat with frozen question/context and data response",

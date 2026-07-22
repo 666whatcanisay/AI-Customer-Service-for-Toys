@@ -1,7 +1,7 @@
 {
   "package_id": "PKG-PDD-SM-V031-SYNTHETIC",
   "version": "V0.3.1",
-  "schema_version": "V0.3.1",
+  "schema_version": "0.3.1-test",
   "tenant_id": "TENANT-PDD-SM-TEST",
   "platform": "pdd",
   "store_code": "PDD-SM",
@@ -80,8 +80,8 @@
       "tenant_id": "TENANT-PDD-SM-TEST",
       "platform": "pdd",
       "store_code": "PDD-SM",
-      "product_id": "P-Q80",
-      "sku_id": "",
+      "product_id": null,
+      "sku_id": null,
       "title": "Q80小零件安全规则",
       "content": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
       "answer_action": "CONTROLLED_ANSWER",
@@ -123,13 +123,29 @@
       "production_usable": false
     },
     {
+      "knowledge_id": "K-STORE-GUARD-FAQ",
+      "knowledge_type": "FAQ",
+      "tenant_id": "TENANT-PDD-SM-TEST",
+      "platform": "pdd",
+      "store_code": "PDD-SM",
+      "product_id": null,
+      "sku_id": null,
+      "title": "店铺级缺件升级规则",
+      "content": "客户反馈订单缺少零件且缺少订单号、商品与缺件信息时，必须转人工客服处理。",
+      "answer_action": "TRANSFER_HUMAN",
+      "risk_level": "HIGH",
+      "source_ids": ["SRC-STORE-GUARD-FAQ"],
+      "test_data_mode": true,
+      "production_usable": false
+    },
+    {
       "knowledge_id": "K-Q80-TRANSFER",
       "knowledge_type": "SAFETY_RULE",
       "tenant_id": "TENANT-PDD-SM-TEST",
       "platform": "pdd",
       "store_code": "PDD-SM",
-      "product_id": "P-Q80",
-      "sku_id": "",
+      "product_id": null,
+      "sku_id": null,
       "title": "Q80破损吞咽风险",
       "content": "如发生零件破损或疑似吞咽，必须停止自动回答并转人工客服。",
       "answer_action": "TRANSFER_HUMAN",
@@ -144,8 +160,8 @@
       "tenant_id": "TENANT-PDD-SM-TEST",
       "platform": "pdd",
       "store_code": "PDD-SM",
-      "product_id": "P-Q80",
-      "sku_id": "",
+      "product_id": null,
+      "sku_id": null,
       "title": "Q80医疗效果禁答",
       "content": "不得宣称Q80具有治疗、自闭症改善或其他医疗效果，此类请求必须拒答。",
       "answer_action": "REFUSE",
@@ -203,5 +219,5 @@
       "production_usable": false
     }
   ],
-  "total": 12
+  "total": 13
 }

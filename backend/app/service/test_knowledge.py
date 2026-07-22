@@ -13,7 +13,8 @@ from app.service.vector_store import VectorStore
 
 
 EXPECTED_TENANT_ID = "TENANT-PDD-SM-TEST"
-EXPECTED_SCHEMA_VERSION = "V0.3.1"
+EXPECTED_VERSION = "V0.3.1"
+EXPECTED_SCHEMA_VERSION = "0.3.1-test"
 ANSWER_ACTIONS = {
     "DIRECT_ANSWER",
     "CONTROLLED_ANSWER",
@@ -30,6 +31,12 @@ REQUIRED_KNOWLEDGE_TYPES = {
     "SAFETY_RULE",
 }
 RISK_LEVELS = {"LOW", "MEDIUM", "HIGH"}
+STORE_GUARD_ACTIONS = {
+    "ASK_CLARIFY",
+    "REQUIRE_LOOKUP",
+    "TRANSFER_HUMAN",
+    "REFUSE",
+}
 EXACT_SKU_DISTANCE_BONUS = 0.05
 
 
@@ -92,10 +99,8 @@ def parse_test_knowledge_package(
         raise TestKnowledgeValidationError("package_id does not match request")
     version = _required_string(raw, "version")
     schema_version = _required_string(raw, "schema_version")
-    if version != EXPECTED_SCHEMA_VERSION:
-        raise TestKnowledgeValidationError(
-            f"version must be {EXPECTED_SCHEMA_VERSION}"
-        )
+    if version != EXPECTED_VERSION:
+        raise TestKnowledgeValidationError(f"version must be {EXPECTED_VERSION}")
     if schema_version != EXPECTED_SCHEMA_VERSION:
         raise TestKnowledgeValidationError(
             f"schema_version must be {EXPECTED_SCHEMA_VERSION}"
@@ -174,6 +179,26 @@ def parse_test_knowledge_package(
         content = str(item_payload.get("content") or "").strip()
         if not content:
             raise TestKnowledgeValidationError("item content is required")
+        product_id = str(item_payload.get("product_id") or "").strip()
+        sku_id = str(item_payload.get("sku_id") or "").strip()
+        store_safety_rule = knowledge_type == "SAFETY_RULE" and not product_id
+        store_safety_faq = (
+            knowledge_type == "FAQ"
+            and not product_id
+            and not sku_id
+            and risk_level == "HIGH"
+            and answer_action in STORE_GUARD_ACTIONS
+        )
+        if not product_id and not (store_safety_rule or store_safety_faq):
+            raise TestKnowledgeValidationError(
+                f"product_id is required for {knowledge_type}"
+            )
+        if not product_id and sku_id:
+            raise TestKnowledgeValidationError(
+                "store-level safety knowledge must not define sku_id"
+            )
+        if knowledge_type == "SKU_FACT" and not sku_id:
+            raise TestKnowledgeValidationError("sku_id is required for SKU_FACT")
 
         items.append(
             TestKnowledgeItem(
@@ -183,8 +208,8 @@ def parse_test_knowledge_package(
                 tenant_id=item_tenant,
                 platform=_required_string(item_payload, "platform"),
                 store_code=_required_string(item_payload, "store_code"),
-                product_id=_required_string(item_payload, "product_id"),
-                sku_id=str(item_payload.get("sku_id") or "").strip(),
+                product_id=product_id,
+                sku_id=sku_id,
                 knowledge_type=knowledge_type,
                 answer_action=answer_action,
                 risk_level=risk_level,
@@ -308,7 +333,9 @@ class TestKnowledgeIndex:
         }
 
     @staticmethod
-    def _where(context: FrozenChatContext, sku_id: str) -> dict[str, Any]:
+    def _product_where(
+        context: FrozenChatContext, sku_id: str
+    ) -> dict[str, Any]:
         return {
             "$and": [
                 {"tenant_id": {"$eq": context.tenant_id}},
@@ -321,17 +348,59 @@ class TestKnowledgeIndex:
             ]
         }
 
+    @staticmethod
+    def _store_guard_where(
+        context: FrozenChatContext,
+        knowledge_type: str,
+        answer_action: str | None = None,
+    ) -> dict[str, Any]:
+        clauses: list[dict[str, Any]] = [
+            {"tenant_id": {"$eq": context.tenant_id}},
+            {"platform": {"$eq": context.platform}},
+            {"store_code": {"$eq": context.store_code}},
+            {"product_id": {"$eq": ""}},
+            {"sku_id": {"$eq": ""}},
+            {"knowledge_type": {"$eq": knowledge_type}},
+            {"test_data_mode": {"$eq": "true"}},
+            {"production_usable": {"$eq": "false"}},
+        ]
+        if answer_action:
+            clauses.extend(
+                [
+                    {"risk_level": {"$eq": "HIGH"}},
+                    {"answer_action": {"$eq": answer_action}},
+                ]
+            )
+        return {"$and": clauses}
+
     def search(
         self, query: str, context: FrozenChatContext, top_k: int
     ) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         seen: set[str] = set()
         scope_skus = [context.sku_id, ""] if context.sku_id else [""]
-        for scope_rank, sku_id in enumerate(scope_skus):
+        scoped_queries = [
+            (
+                self._product_where(context, sku_id or ""),
+                bool(context.sku_id and sku_id),
+            )
+            for sku_id in scope_skus
+        ]
+        scoped_queries.append(
+            (self._store_guard_where(context, "SAFETY_RULE"), False)
+        )
+        scoped_queries.extend(
+            (
+                self._store_guard_where(context, "FAQ", action),
+                False,
+            )
+            for action in sorted(STORE_GUARD_ACTIONS)
+        )
+        for where, exact_sku in scoped_queries:
             scoped = self.vector_store.search(
                 query,
                 top_k=top_k,
-                where=self._where(context, sku_id or ""),
+                where=where,
             )
             for result in scoped:
                 if result["chunk_id"] in seen:
@@ -351,14 +420,14 @@ class TestKnowledgeIndex:
                         "source_ids": json.loads(metadata.get("source_ids", "[]")),
                         "package_id": metadata.get("package_id", ""),
                         "knowledge_version": metadata.get(
-                            "knowledge_version", EXPECTED_SCHEMA_VERSION
+                            "knowledge_version", EXPECTED_VERSION
                         ),
-                        "_scope_rank": scope_rank,
+                        "_exact_sku": exact_sku,
                     }
                 )
                 results.append(result)
         results.sort(
             key=lambda item: float(item["distance"])
-            - (EXACT_SKU_DISTANCE_BONUS if item["_scope_rank"] == 0 and context.sku_id else 0)
+            - (EXACT_SKU_DISTANCE_BONUS if item["_exact_sku"] else 0)
         )
         return results[:top_k]

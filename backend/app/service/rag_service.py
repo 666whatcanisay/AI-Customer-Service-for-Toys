@@ -16,6 +16,7 @@ from app.config.settings import Settings
 from app.models.chat import FrozenChatContext
 from app.service.test_knowledge import (
     PlatformTestKnowledgeClient,
+    STORE_GUARD_ACTIONS,
     TestKnowledgeIndex,
 )
 from app.service.vector_store import VectorStore
@@ -191,16 +192,55 @@ class RAGService:
                 minimum_distance = min(
                     float(result["distance"]) for result in accepted_results
                 )
+                question_numbers = set(re.findall(r"\d+", question))
+                selected_numbers = set(
+                    re.findall(r"\d+", selected.get("content", ""))
+                )
+                unsupported_numeric_claim = bool(
+                    question_numbers - selected_numbers
+                )
                 safety_candidates = [
                     accepted_results[0],
                     *[
                         result
                         for result in accepted_results
-                        if result.get("knowledge_type") == "SAFETY_RULE"
-                        and result.get("answer_action")
-                        in {"CONTROLLED_ANSWER", "TRANSFER_HUMAN", "REFUSE"}
-                        and float(result["distance"])
-                        <= minimum_distance + SAFETY_ACTION_DISTANCE_MARGIN
+                        if (
+                            (
+                                unsupported_numeric_claim
+                                and bool(result.get("product_id"))
+                                and result.get("answer_action")
+                                == "CONTROLLED_ANSWER"
+                            )
+                            or (
+                                (
+                                    (
+                                        result.get("risk_level") == "HIGH"
+                                        and result.get("answer_action")
+                                        != "DIRECT_ANSWER"
+                                    )
+                                    or (
+                                        result.get("knowledge_type")
+                                        == "SAFETY_RULE"
+                                        and result.get("answer_action")
+                                        in {
+                                            "CONTROLLED_ANSWER",
+                                            "TRANSFER_HUMAN",
+                                            "REFUSE",
+                                        }
+                                    )
+                                    or (
+                                        result.get("knowledge_type") == "FAQ"
+                                        and not result.get("product_id")
+                                        and result.get("risk_level") == "HIGH"
+                                        and result.get("answer_action")
+                                        in STORE_GUARD_ACTIONS
+                                    )
+                                )
+                                and float(result["distance"])
+                                <= minimum_distance
+                                + SAFETY_ACTION_DISTANCE_MARGIN
+                            )
+                        )
                     ],
                 ]
                 selected = max(

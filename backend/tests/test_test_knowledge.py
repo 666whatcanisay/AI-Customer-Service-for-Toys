@@ -12,7 +12,12 @@ from pydantic import ValidationError
 from app.config.settings import Settings
 from app.main import create_app
 from app.models.chat import FrozenChatContext
-from app.service.evaluation import parse_evaluations, render_markdown, run_evaluations
+from app.service.evaluation import (
+    EvaluationValidationError,
+    parse_evaluations,
+    render_markdown,
+    run_evaluations,
+)
 from app.service.rag_service import RAGService, SAFETY_ACTION_MESSAGES
 from app.service.test_knowledge import (
     PlatformTestKnowledgeClient,
@@ -38,6 +43,18 @@ def context(product_id: str = "P-Q80", sku_id: str | None = None):
         store_code="PDD-SM",
         product_id=product_id,
         sku_id=sku_id,
+    )
+
+
+def is_store_guard(result: dict) -> bool:
+    return not result["product_id"] and (
+        result["knowledge_type"] == "SAFETY_RULE"
+        or (
+            result["knowledge_type"] == "FAQ"
+            and result["risk_level"] == "HIGH"
+            and result["answer_action"]
+            in {"ASK_CLARIFY", "REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
+        )
     )
 
 
@@ -90,6 +107,28 @@ def test_v031_package_strict_safety_validation():
     assert package.production_usable is False
     assert package.allow_auto_send is False
     assert package.response_mode == "SUGGESTION_ONLY"
+    assert package.version == "V0.3.1"
+    assert package.schema_version == "0.3.1-test"
+    store_safety = [
+        item
+        for item in package.items
+        if item.knowledge_type == "SAFETY_RULE" and not item.product_id
+    ]
+    assert store_safety
+    assert all(not item.sku_id for item in store_safety)
+    store_safety_faq = [
+        item
+        for item in package.items
+        if item.knowledge_type == "FAQ" and not item.product_id
+    ]
+    assert store_safety_faq
+    assert all(
+        not item.sku_id
+        and item.risk_level == "HIGH"
+        and item.answer_action
+        in {"ASK_CLARIFY", "REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
+        for item in store_safety_faq
+    )
 
     for field, invalid in (
         ("tenant_id", "TENANT-OTHER"),
@@ -103,13 +142,63 @@ def test_v031_package_strict_safety_validation():
         with pytest.raises(PackageValidationError):
             parse_test_knowledge_package(changed, PACKAGE_ID)
 
+    for field, invalid in (
+        ("version", "0.3.1-test"),
+        ("schema_version", "V0.3.1"),
+    ):
+        changed = load_json("test_knowledge_v031.json")
+        changed[field] = invalid
+        with pytest.raises(PackageValidationError):
+            parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+@pytest.mark.parametrize("knowledge_type", ["PRODUCT_FACT", "SKU_FACT", "FAQ"])
+def test_only_strict_store_guards_may_omit_product_id(knowledge_type):
+    changed = load_json("test_knowledge_v031.json")
+    item = next(
+        item for item in changed["items"] if item["knowledge_type"] == knowledge_type
+    )
+    item["product_id"] = None
+    item["sku_id"] = None
+    with pytest.raises(PackageValidationError, match="product_id is required"):
+        parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+def test_sku_fact_requires_sku_id():
+    changed = load_json("test_knowledge_v031.json")
+    item = next(
+        item for item in changed["items"] if item["knowledge_type"] == "SKU_FACT"
+    )
+    item["sku_id"] = None
+    with pytest.raises(PackageValidationError, match="sku_id is required"):
+        parse_test_knowledge_package(changed, PACKAGE_ID)
+
+
+@pytest.mark.parametrize(
+    ("risk_level", "answer_action"),
+    [("MEDIUM", "REQUIRE_LOOKUP"), ("HIGH", "DIRECT_ANSWER")],
+)
+def test_empty_product_faq_requires_high_risk_guard_action(
+    risk_level, answer_action
+):
+    changed = load_json("test_knowledge_v031.json")
+    item = next(
+        item
+        for item in changed["items"]
+        if item["knowledge_id"] == "K-STORE-GUARD-FAQ"
+    )
+    item["risk_level"] = risk_level
+    item["answer_action"] = answer_action
+    with pytest.raises(PackageValidationError, match="product_id is required"):
+        parse_test_knowledge_package(changed, PACKAGE_ID)
+
 
 def test_sync_is_idempotent_and_metadata_is_complete(scoped_service):
     service, package = scoped_service
     first_count = service.test_vector_store.collection.count()
     result = service.test_knowledge_index.sync(package)
-    assert result["synced_items"] == 12
-    assert result["collection_count"] == first_count == 12
+    assert result["synced_items"] == 13
+    assert result["collection_count"] == first_count == 13
 
     stored = service.test_vector_store.collection.get(
         where={"package_id": {"$eq": PACKAGE_ID}},
@@ -138,8 +227,11 @@ def test_product_and_sku_scope_filtering_prevents_cross_product(scoped_service):
         top_k=5,
     )
     assert product_results
-    assert all(result["product_id"] == "P-Q80" for result in product_results)
-    assert all(result["sku_id"] == "" for result in product_results)
+    assert all(result["product_id"] in {"", "P-Q80"} for result in product_results)
+    assert all(
+        result["product_id"] == "P-Q80" or is_store_guard(result)
+        for result in product_results
+    )
     assert all("1688颗" not in result["content"] for result in product_results)
 
     sku_results = service.test_knowledge_index.search(
@@ -165,7 +257,49 @@ def test_product_and_sku_scope_filtering_prevents_cross_product(scoped_service):
         top_k=3,
     )
     assert other_product
-    assert all(result["product_id"] == "P-1688" for result in other_product)
+    assert all(result["product_id"] in {"", "P-1688"} for result in other_product)
+    assert all(
+        result["product_id"] == "P-1688" or is_store_guard(result)
+        for result in other_product
+    )
+
+
+def test_store_safety_reaches_any_product_without_cross_product_facts(scoped_service):
+    service, _ = scoped_service
+    results = service.test_knowledge_index.search(
+        "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+        context(product_id="P-UNLISTED"),
+        top_k=5,
+    )
+    assert results
+    assert any(result["source_ids"] == ["SRC-Q80-SAFETY"] for result in results)
+    assert all(is_store_guard(result) for result in results)
+    assert all(result["product_id"] == "" for result in results)
+    assert all(result["sku_id"] == "" for result in results)
+    assert all("SRC-Q80-PRODUCT" not in result["source_ids"] for result in results)
+    assert all("SRC-1688-PRODUCT" not in result["source_ids"] for result in results)
+
+
+def test_store_guarded_faq_reaches_any_product_without_model_downgrade(
+    scoped_service, monkeypatch
+):
+    service, _ = scoped_service
+
+    def model_must_not_run(*args, **kwargs):
+        raise AssertionError("store guarded FAQ reached the model")
+
+    monkeypatch.setattr(service, "call_llm", model_must_not_run)
+    result = service.query(
+        "客户反馈订单缺少零件且缺少订单号、商品与缺件信息时，必须转人工客服处理。",
+        context(product_id="P-UNLISTED"),
+    )
+    assert result["action"] == "TRANSFER_HUMAN"
+    assert result["risk_level"] == "HIGH"
+    assert any(
+        "SRC-STORE-GUARD-FAQ" in source["source_ids"]
+        for source in result["sources"]
+    )
+    assert all(source["product_id"] == "" for source in result["sources"])
 
 
 def test_faq_reference_and_bundle_retrieval(scoped_service):
@@ -209,7 +343,10 @@ def test_all_six_answer_actions_and_safety_actions_bypass_model(
 
     for action in ("DIRECT_ANSWER", "CONTROLLED_ANSWER"):
         item = by_action[action]
-        result = service.query(item.content, context(item.product_id, item.sku_id))
+        result = service.query(
+            item.content,
+            context(item.product_id or "P-Q80", item.sku_id or None),
+        )
         assert result["action"] == action
 
     def model_must_not_run(*args, **kwargs):
@@ -218,9 +355,42 @@ def test_all_six_answer_actions_and_safety_actions_bypass_model(
     monkeypatch.setattr(service, "call_llm", model_must_not_run)
     for action, message in SAFETY_ACTION_MESSAGES.items():
         item = by_action[action]
-        result = service.query(item.content, context(item.product_id, item.sku_id))
+        result = service.query(
+            item.content,
+            context(item.product_id or "P-Q80", item.sku_id or None),
+        )
         assert result["action"] == action
         assert result["answer"] == message
+
+
+def test_nearby_high_risk_boundary_prevents_uncontrolled_direct_answer(
+    scoped_service,
+):
+    service, package = scoped_service
+    direct = next(
+        item
+        for item in package.items
+        if item.knowledge_id == "K-Q80-PRODUCT"
+    )
+    high_boundary = replace(
+        direct,
+        knowledge_id="K-Q80-HIGH-CONTROLLED-BOUNDARY",
+        answer_action="CONTROLLED_ANSWER",
+        risk_level="HIGH",
+        source_ids=("SRC-Q80-HIGH-CONTROLLED-BOUNDARY",),
+    )
+    service.test_knowledge_index.sync(
+        replace(package, items=package.items + (high_boundary,))
+    )
+
+    result = service.query(f"{direct.content} 客户声称是1688颗。", context())
+
+    assert result["action"] == "CONTROLLED_ANSWER"
+    assert result["risk_level"] == "HIGH"
+    assert any(
+        "SRC-Q80-HIGH-CONTROLLED-BOUNDARY" in source["source_ids"]
+        for source in result["sources"]
+    )
 
 
 def test_no_hit_refuses_without_sources(scoped_service):
@@ -351,6 +521,7 @@ def test_platform_client_uses_frozen_export_path(monkeypatch):
 def test_28_evaluations_execute_and_render_reports():
     cases = parse_evaluations(load_json("evaluations_v031.json"), PACKAGE_ID)
     assert len(cases) == 28
+    assert all(not case.store_scope for case in cases)
 
     expected = {case.question: case for case in cases}
 
@@ -377,3 +548,14 @@ def test_28_evaluations_execute_and_render_reports():
     assert report["failed"] == 0
     markdown = render_markdown(report)
     assert "E01" in markdown and "E28" in markdown
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid"),
+    [("version", "0.3.1-test"), ("schema_version", "V0.3.1")],
+)
+def test_evaluations_strictly_separate_version_and_schema(field, invalid):
+    payload = load_json("evaluations_v031.json")
+    payload[field] = invalid
+    with pytest.raises(EvaluationValidationError):
+        parse_evaluations(payload, PACKAGE_ID)

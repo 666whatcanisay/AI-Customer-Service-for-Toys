@@ -1,0 +1,1700 @@
+{
+  "total": 28,
+  "passed": 0,
+  "failed": 28,
+  "pass_rate": 0.0,
+  "check_pass_counts": {
+    "action": 19,
+    "source_ids": 19,
+    "key_facts": 1,
+    "forbidden_claims": 28,
+    "required_fields": 2,
+    "risk_level": 18,
+    "scope": 28
+  },
+  "records": [
+    {
+      "case_id": "CASE-PDD-SM-001",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0001",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "fdac9e91868e26adf46f33bc5cf91b17ea3caa86af0547dcf89a2f726f7e02ce",
+          "distance": 0.2111130952835083,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-005"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0d9926e27f352d57ac6b461850d24963c9acf1cf07e83301d73f9a061b91fbfc",
+          "distance": 0.40427154302597046,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-001",
+            "SRC-PDD-SM-P0001-IMG-002",
+            "SRC-PDD-SM-P0001-IMG-003",
+            "SRC-PDD-SM-P0001-IMG-004",
+            "SRC-PDD-SM-P0001-IMG-005",
+            "SRC-PDD-SM-P0001-IMG-006"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1389.0,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-002",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0001",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "fb5201df7b62ed341ad3df4905b46802c804b90c21f47acb9e8f65fcb798f0f7",
+          "distance": 0.4494823217391968,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "fdac9e91868e26adf46f33bc5cf91b17ea3caa86af0547dcf89a2f726f7e02ce",
+          "distance": 0.42404264211654663,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-005"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1044.4,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-003",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0001",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "fb5201df7b62ed341ad3df4905b46802c804b90c21f47acb9e8f65fcb798f0f7",
+          "distance": 0.46760350465774536,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0d9926e27f352d57ac6b461850d24963c9acf1cf07e83301d73f9a061b91fbfc",
+          "distance": 0.5787777900695801,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-001",
+            "SRC-PDD-SM-P0001-IMG-002",
+            "SRC-PDD-SM-P0001-IMG-003",
+            "SRC-PDD-SM-P0001-IMG-004",
+            "SRC-PDD-SM-P0001-IMG-005",
+            "SRC-PDD-SM-P0001-IMG-006"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1348.5,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-004",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b730c293a3ff9f793923fe0d98ce50e60c82637cecd4f9baa08e35f21305d262",
+          "distance": 0.23344027996063232,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "deb7446a36892400c1294fe54d77aef6e3e36559e52ffda9038cdee42ff810bb",
+          "distance": 0.5898159146308899,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1033.9,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-005",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "6a39ef36a1e9912cf15e2551583f6500e3e4565ffe891178abefcde16fefd018",
+          "distance": 0.5361877083778381,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002",
+            "SRC-PDD-SM-P0002-IMG-003",
+            "SRC-PDD-SM-P0002-IMG-004",
+            "SRC-PDD-SM-P0002-IMG-005",
+            "SRC-PDD-SM-P0002-IMG-006",
+            "SRC-PDD-SM-P0002-IMG-007",
+            "SRC-PDD-SM-P0002-IMG-008"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "deb7446a36892400c1294fe54d77aef6e3e36559e52ffda9038cdee42ff810bb",
+          "distance": 0.543785572052002,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1006.7,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-006",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "7c9272483ef4eb0292a4820d50605f157137868713705b8f2584c8e5bf9fc54f",
+          "distance": 0.4126085042953491,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-008"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "6a39ef36a1e9912cf15e2551583f6500e3e4565ffe891178abefcde16fefd018",
+          "distance": 0.4477699398994446,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002",
+            "SRC-PDD-SM-P0002-IMG-003",
+            "SRC-PDD-SM-P0002-IMG-004",
+            "SRC-PDD-SM-P0002-IMG-005",
+            "SRC-PDD-SM-P0002-IMG-006",
+            "SRC-PDD-SM-P0002-IMG-007",
+            "SRC-PDD-SM-P0002-IMG-008"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 851.5,
+      "passed": false,
+      "failure_classes": [
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": true,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-007",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": "PDD-SM-P0002-SKU-Q66-RGB6"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "7caa7af552719d1349d17aa4b91a9c661234b8f0281de0f671552d1e45aa30e9",
+          "distance": 0.5227941870689392,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "d77c82c57137a542ca44fe05349590fa0fa418ee4073ca35514f31032322c709",
+          "distance": 0.5648946762084961,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-002",
+            "SRC-PDD-SM-P0002-IMG-006"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": "PDD-SM-P0002-SKU-Q66-RGB6"
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "ASK_CLARIFY",
+      "risk": "HIGH",
+      "latency_ms": 73.2,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": true,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-008",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0003",
+        "sku_id": "PDD-SM-P0003-SKU-Q80"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "c96e79c3af141ba93893381027d82a88bc23cea570aa9dc2f395ba9a0af752c8",
+          "distance": 0.3580225706100464,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b80777fae94bfc32ca0277fe7e1029e4113628cfd8c2cf8612e1a99c9338f434",
+          "distance": 0.5802832841873169,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001",
+            "SRC-PDD-SM-P0003-IMG-002",
+            "SRC-PDD-SM-P0003-IMG-003",
+            "SRC-PDD-SM-P0003-IMG-004",
+            "SRC-PDD-SM-P0003-IMG-005",
+            "SRC-PDD-SM-P0003-IMG-006",
+            "SRC-PDD-SM-P0003-IMG-007",
+            "SRC-PDD-SM-P0003-IMG-008",
+            "SRC-PDD-SM-P0003-IMG-009",
+            "SRC-PDD-SM-P0003-IMG-010",
+            "SRC-PDD-SM-P0003-IMG-011",
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-013",
+            "SRC-PDD-SM-P0003-IMG-014",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 917.7,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-009",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0003",
+        "sku_id": "PDD-SM-P0003-SKU-Q80"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "c96e79c3af141ba93893381027d82a88bc23cea570aa9dc2f395ba9a0af752c8",
+          "distance": 0.403129518032074,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b80777fae94bfc32ca0277fe7e1029e4113628cfd8c2cf8612e1a99c9338f434",
+          "distance": 0.5616795420646667,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001",
+            "SRC-PDD-SM-P0003-IMG-002",
+            "SRC-PDD-SM-P0003-IMG-003",
+            "SRC-PDD-SM-P0003-IMG-004",
+            "SRC-PDD-SM-P0003-IMG-005",
+            "SRC-PDD-SM-P0003-IMG-006",
+            "SRC-PDD-SM-P0003-IMG-007",
+            "SRC-PDD-SM-P0003-IMG-008",
+            "SRC-PDD-SM-P0003-IMG-009",
+            "SRC-PDD-SM-P0003-IMG-010",
+            "SRC-PDD-SM-P0003-IMG-011",
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-013",
+            "SRC-PDD-SM-P0003-IMG-014",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1173.8,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-010",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0003",
+        "sku_id": "PDD-SM-P0003-SKU-Q80-3G132"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "60d2964ceda3d17c04b9e363ec0c63604b1588b23857872cdcf046982e040c94",
+          "distance": 0.4057576060295105,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80-3G132"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "617e58229368fd91538079eee9c78c2454890bba90f04297fdfa9d945b0d9425",
+          "distance": 0.4938448667526245,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-016"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80-3G132"
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1050.4,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-011",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0003",
+        "sku_id": "PDD-SM-P0003-SKU-Q80-3M718"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "d3d96ef3fb45a47aefd867e70be684bb17438748657969cf522be8330e164771",
+          "distance": 0.5460946559906006,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-011",
+            "SRC-PDD-SM-P0003-IMG-013",
+            "SRC-PDD-SM-P0003-IMG-014"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80-3M718"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b80777fae94bfc32ca0277fe7e1029e4113628cfd8c2cf8612e1a99c9338f434",
+          "distance": 0.5692628622055054,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001",
+            "SRC-PDD-SM-P0003-IMG-002",
+            "SRC-PDD-SM-P0003-IMG-003",
+            "SRC-PDD-SM-P0003-IMG-004",
+            "SRC-PDD-SM-P0003-IMG-005",
+            "SRC-PDD-SM-P0003-IMG-006",
+            "SRC-PDD-SM-P0003-IMG-007",
+            "SRC-PDD-SM-P0003-IMG-008",
+            "SRC-PDD-SM-P0003-IMG-009",
+            "SRC-PDD-SM-P0003-IMG-010",
+            "SRC-PDD-SM-P0003-IMG-011",
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-013",
+            "SRC-PDD-SM-P0003-IMG-014",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1221.9,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-012",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0004",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b79d05dce9fd02e54132e462d675510c1bafb8aceed5c87afd265fcd63adc25e",
+          "distance": 0.40915387868881226,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0004-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0004",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "736f106942fb1bd38a8614229f14b06e6e74229ee106d1a0c31d123af39df5b7",
+          "distance": 0.525027871131897,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0004-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0004",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1625.1,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-013",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0005",
+        "sku_id": "PDD-SM-P0005-SKU-S3352"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "676683b13a5ec37cc286ae79fcff04fbcd0f333e8cffe55f76b15f0550371e20",
+          "distance": 0.382072389125824,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0005-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0005",
+          "sku_id": "PDD-SM-P0005-SKU-S3352"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "9d09ab014f935d4c5dfbfb23d35ccf8d0d74ba63488fc8a83a4dcfeb1ea7deb2",
+          "distance": 0.5624464750289917,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0005-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0005",
+          "sku_id": "PDD-SM-P0005-SKU-S3352"
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 911.3,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-014",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0005",
+        "sku_id": "PDD-SM-P0005-SKU-S3352"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "9d09ab014f935d4c5dfbfb23d35ccf8d0d74ba63488fc8a83a4dcfeb1ea7deb2",
+          "distance": 0.3295600414276123,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0005-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0005",
+          "sku_id": "PDD-SM-P0005-SKU-S3352"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "676683b13a5ec37cc286ae79fcff04fbcd0f333e8cffe55f76b15f0550371e20",
+          "distance": 0.3639402389526367,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0005-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0005",
+          "sku_id": "PDD-SM-P0005-SKU-S3352"
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1149.5,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-015",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "__STORE_LEVEL_EVALUATION__",
+        "sku_id": null
+      },
+      "scope_mode": "store",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "a1c3b02f2c3cd0245718a8833fbc4f2e6316ffcc6efcfa653fc0f849e21cb0c9",
+          "distance": 0.3148752450942993,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "fe82137e9a87384a2a4b12c96bb507f3a32c8f20a5a36de48e726bac45bf2e69",
+          "distance": 0.35660839080810547,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "TRANSFER_HUMAN",
+      "risk": "HIGH",
+      "latency_ms": 68.3,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-016",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "__STORE_LEVEL_EVALUATION__",
+        "sku_id": null
+      },
+      "scope_mode": "store",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "71f37fb28bf4ae120d8911caae49b559173a24cd661dbc1dac60b6bb5feee6d4",
+          "distance": 0.3121538758277893,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0a5a0013398ed80051821f9262a4a8de159a657b35e013c035f9080d091092a4",
+          "distance": 0.3282287120819092,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "REQUIRE_LOOKUP",
+      "risk": "HIGH",
+      "latency_ms": 59.6,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-017",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "__STORE_LEVEL_EVALUATION__",
+        "sku_id": null
+      },
+      "scope_mode": "store",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b951f1a8b11928679f29a49d1555ecbbbf17780d984fc7f4a927f868a243667e",
+          "distance": 0.44065821170806885,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "bdbbfc5649b6499543f84cbff0d660bb8421e4da40562f3f5191c5fcf447caf0",
+          "distance": 0.47136569023132324,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "TRANSFER_HUMAN",
+      "risk": "HIGH",
+      "latency_ms": 61.9,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-018",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "__STORE_LEVEL_EVALUATION__",
+        "sku_id": null
+      },
+      "scope_mode": "store",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "71f37fb28bf4ae120d8911caae49b559173a24cd661dbc1dac60b6bb5feee6d4",
+          "distance": 0.38387662172317505,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0a5a0013398ed80051821f9262a4a8de159a657b35e013c035f9080d091092a4",
+          "distance": 0.38918864727020264,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "REQUIRE_LOOKUP",
+      "risk": "HIGH",
+      "latency_ms": 60.9,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": true,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-019",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0005",
+        "sku_id": "PDD-SM-P0005-SKU-S3352"
+      },
+      "scope_mode": "product",
+      "top_k": [],
+      "answer": "[redacted live model answer]",
+      "action": "REFUSE",
+      "risk": "HIGH",
+      "latency_ms": 72.6,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-020",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b730c293a3ff9f793923fe0d98ce50e60c82637cecd4f9baa08e35f21305d262",
+          "distance": 0.2054910659790039,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "6a39ef36a1e9912cf15e2551583f6500e3e4565ffe891178abefcde16fefd018",
+          "distance": 0.5345699191093445,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002",
+            "SRC-PDD-SM-P0002-IMG-003",
+            "SRC-PDD-SM-P0002-IMG-004",
+            "SRC-PDD-SM-P0002-IMG-005",
+            "SRC-PDD-SM-P0002-IMG-006",
+            "SRC-PDD-SM-P0002-IMG-007",
+            "SRC-PDD-SM-P0002-IMG-008"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 851.4,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-021",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0003",
+        "sku_id": "PDD-SM-P0003-SKU-Q80"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b80777fae94bfc32ca0277fe7e1029e4113628cfd8c2cf8612e1a99c9338f434",
+          "distance": 0.558470606803894,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001",
+            "SRC-PDD-SM-P0003-IMG-002",
+            "SRC-PDD-SM-P0003-IMG-003",
+            "SRC-PDD-SM-P0003-IMG-004",
+            "SRC-PDD-SM-P0003-IMG-005",
+            "SRC-PDD-SM-P0003-IMG-006",
+            "SRC-PDD-SM-P0003-IMG-007",
+            "SRC-PDD-SM-P0003-IMG-008",
+            "SRC-PDD-SM-P0003-IMG-009",
+            "SRC-PDD-SM-P0003-IMG-010",
+            "SRC-PDD-SM-P0003-IMG-011",
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-013",
+            "SRC-PDD-SM-P0003-IMG-014",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "c96e79c3af141ba93893381027d82a88bc23cea570aa9dc2f395ba9a0af752c8",
+          "distance": 0.33980756998062134,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80"
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1875.7,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-022",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0004",
+        "sku_id": "PDD-SM-P0004-SKU-Q65-LIGHT"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b79d05dce9fd02e54132e462d675510c1bafb8aceed5c87afd265fcd63adc25e",
+          "distance": 0.3236820697784424,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0004-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0004",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "736f106942fb1bd38a8614229f14b06e6e74229ee106d1a0c31d123af39df5b7",
+          "distance": 0.427892804145813,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0004-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0004",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1843.5,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-023",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0003",
+        "sku_id": "PDD-SM-P0003-SKU-Q80-3G132"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "60d2964ceda3d17c04b9e363ec0c63604b1588b23857872cdcf046982e040c94",
+          "distance": 0.440716028213501,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": "PDD-SM-P0003-SKU-Q80-3G132"
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b80777fae94bfc32ca0277fe7e1029e4113628cfd8c2cf8612e1a99c9338f434",
+          "distance": 0.4999462366104126,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0003-IMG-001",
+            "SRC-PDD-SM-P0003-IMG-002",
+            "SRC-PDD-SM-P0003-IMG-003",
+            "SRC-PDD-SM-P0003-IMG-004",
+            "SRC-PDD-SM-P0003-IMG-005",
+            "SRC-PDD-SM-P0003-IMG-006",
+            "SRC-PDD-SM-P0003-IMG-007",
+            "SRC-PDD-SM-P0003-IMG-008",
+            "SRC-PDD-SM-P0003-IMG-009",
+            "SRC-PDD-SM-P0003-IMG-010",
+            "SRC-PDD-SM-P0003-IMG-011",
+            "SRC-PDD-SM-P0003-IMG-012",
+            "SRC-PDD-SM-P0003-IMG-013",
+            "SRC-PDD-SM-P0003-IMG-014",
+            "SRC-PDD-SM-P0003-IMG-015",
+            "SRC-PDD-SM-P0003-IMG-016",
+            "SRC-PDD-SM-P0003-IMG-017"
+          ],
+          "product_id": "PDD-SM-P0003",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1139.1,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-024",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "19c2890243314c684fbced03a65538d057ad3fb1134824bdd7d050d58693ccaf",
+          "distance": 0.5420639514923096,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-005",
+            "SRC-PDD-SM-P0002-IMG-006",
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "TRANSFER_HUMAN",
+      "risk": "HIGH",
+      "latency_ms": 74.7,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-025",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "__STORE_LEVEL_EVALUATION__",
+        "sku_id": null
+      },
+      "scope_mode": "store",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "71f37fb28bf4ae120d8911caae49b559173a24cd661dbc1dac60b6bb5feee6d4",
+          "distance": 0.2857339382171631,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0a5a0013398ed80051821f9262a4a8de159a657b35e013c035f9080d091092a4",
+          "distance": 0.3637944459915161,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "REQUIRE_LOOKUP",
+      "risk": "HIGH",
+      "latency_ms": 84.3,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": false,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-026",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0001",
+        "sku_id": null
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "fb5201df7b62ed341ad3df4905b46802c804b90c21f47acb9e8f65fcb798f0f7",
+          "distance": 0.4496048092842102,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-001"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0d9926e27f352d57ac6b461850d24963c9acf1cf07e83301d73f9a061b91fbfc",
+          "distance": 0.5811278820037842,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0001-IMG-001",
+            "SRC-PDD-SM-P0001-IMG-002",
+            "SRC-PDD-SM-P0001-IMG-003",
+            "SRC-PDD-SM-P0001-IMG-004",
+            "SRC-PDD-SM-P0001-IMG-005",
+            "SRC-PDD-SM-P0001-IMG-006"
+          ],
+          "product_id": "PDD-SM-P0001",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1816.8,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "retrieval",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": false,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": false,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-027",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0002",
+        "sku_id": "PDD-SM-P0002-SKU-Q66"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "b730c293a3ff9f793923fe0d98ce50e60c82637cecd4f9baa08e35f21305d262",
+          "distance": 0.24675768613815308,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-002"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "3ff8e8ec8c92988ece07eae30436effb7a08c66008117f3931d58bc0621620ce",
+          "distance": 0.5240660309791565,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-P0002-IMG-001",
+            "SRC-PDD-SM-P0002-IMG-004"
+          ],
+          "product_id": "PDD-SM-P0002",
+          "sku_id": "PDD-SM-P0002-SKU-Q66"
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1783.8,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    },
+    {
+      "case_id": "CASE-PDD-SM-028",
+      "question": "[redacted live evaluation question]",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "PDD-SM-P0005",
+        "sku_id": "PDD-SM-P0005-SKU-S3352"
+      },
+      "scope_mode": "product",
+      "top_k": [
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "0a5a0013398ed80051821f9262a4a8de159a657b35e013c035f9080d091092a4",
+          "distance": 0.5201044678688049,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-TEST-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PDD-SM-2026-001-TEST",
+          "page": 0,
+          "chunk_id": "71f37fb28bf4ae120d8911caae49b559173a24cd661dbc1dac60b6bb5feee6d4",
+          "distance": 0.5215833783149719,
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-PDD-SM-RAW-001"
+          ],
+          "product_id": "",
+          "sku_id": ""
+        }
+      ],
+      "answer": "[redacted live model answer]",
+      "action": "REQUIRE_LOOKUP",
+      "risk": "HIGH",
+      "latency_ms": 83.2,
+      "passed": false,
+      "failure_classes": [
+        "model",
+        "rule"
+      ],
+      "checks": {
+        "action": true,
+        "source_ids": true,
+        "key_facts": false,
+        "forbidden_claims": true,
+        "required_fields": false,
+        "risk_level": true,
+        "scope": true
+      }
+    }
+  ],
+  "package_id": "PDD-SM-2026-001-TEST",
+  "version": "V0.3.1",
+  "schema_version": "0.3.1-test",
+  "evidence_mode": "live_c_api",
+  "production_usable": false,
+  "sync_evidence": {
+    "first_collection_count": 47,
+    "second_collection_count": 47,
+    "synced_items": 47,
+    "idempotent": true
+  }
+}
