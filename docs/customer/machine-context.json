@@ -1,6 +1,6 @@
 {
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "B-T03-FIX1 frozen C test-catalog path correction in Draft PR #11",
+  "current_task": "B-T03-FIX1 completed in Draft PR #11; real A/C smoke deferred",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "B-T03 task-local A/C compatibility agreement"
@@ -37,9 +37,9 @@
   "current_stage": "G2: manual store/product/SKU scoped customer-service workflow",
   "git": {
     "branch": "agent/user-client-t03",
-    "clean": false,
-    "commit": "d76e228",
-    "task_commit": null,
+    "clean": true,
+    "commit": "4e04eea",
+    "task_commit": "4e04eea",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
