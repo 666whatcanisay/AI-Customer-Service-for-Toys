@@ -7,6 +7,10 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from app.config.settings import update_env_values
 from app.models.chat import ChatRequest, ModelConfigUpdate, SearchRequest
+from app.service.test_knowledge import (
+    PlatformIntegrationUnavailable,
+    TestKnowledgeValidationError,
+)
 
 
 router = APIRouter()
@@ -179,7 +183,11 @@ def update_model_config(
 @router.post("/retrieval/search", tags=["knowledge"])
 def retrieval_search(request: Request, search_request: SearchRequest) -> dict[str, Any]:
     rag = get_rag(request)
-    result = rag.retrieve(search_request.query, search_request.top_k)
+    result = rag.retrieve(
+        search_request.query,
+        search_request.top_k,
+        context=search_request.context,
+    )
     result.pop("results", None)
     return envelope(result)
 
@@ -187,8 +195,28 @@ def retrieval_search(request: Request, search_request: SearchRequest) -> dict[st
 @router.post("/chat", tags=["chat"])
 def chat(request: Request, chat_request: ChatRequest) -> dict[str, Any]:
     rag = get_rag(request)
-    result = rag.query(chat_request.message)
+    result = rag.query(
+        chat_request.resolved_question, context=chat_request.context
+    )
     return {**envelope(result), **result}
+
+
+@router.post("/test-knowledge/sync/{package_id}", tags=["test-knowledge"])
+def sync_test_knowledge(request: Request, package_id: str) -> dict[str, Any]:
+    require_loopback_client(request)
+    try:
+        result = get_rag(request).sync_test_knowledge(package_id)
+    except PlatformIntegrationUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"ENV_BLOCKED: {exc}",
+        ) from exc
+    except TestKnowledgeValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"invalid V0.3.1 test package: {exc}",
+        ) from exc
+    return envelope(result, message="V0.3.1 test knowledge synchronized")
 
 
 @router.get("/ai/status", tags=["compatibility"])
@@ -207,5 +235,7 @@ def java_proxy_stats_compatibility(request: Request) -> dict[str, Any]:
 def java_proxy_chat_compatibility(
     request: Request, chat_request: ChatRequest
 ) -> dict[str, Any]:
-    result = get_rag(request).query(chat_request.message)
+    result = get_rag(request).query(
+        chat_request.resolved_question, context=chat_request.context
+    )
     return {"code": 200, "message": "success", "data": result}

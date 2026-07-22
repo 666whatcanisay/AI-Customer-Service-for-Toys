@@ -1,3 +1,8 @@
-from .chat import ChatRequest, ModelConfigUpdate, SearchRequest
+from .chat import ChatRequest, FrozenChatContext, ModelConfigUpdate, SearchRequest
 
-__all__ = ["ChatRequest", "ModelConfigUpdate", "SearchRequest"]
+__all__ = [
+    "ChatRequest",
+    "FrozenChatContext",
+    "ModelConfigUpdate",
+    "SearchRequest",
+]

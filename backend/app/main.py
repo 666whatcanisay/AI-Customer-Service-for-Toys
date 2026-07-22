@@ -71,7 +71,7 @@ def create_app(
 
         service = getattr(application.state, "rag_service", None)
         if service is not None:
-            service.vector_store.close()
+            service.close()
 
     application = FastAPI(
         title="独立 RAG AI 客服原型",
