@@ -3,51 +3,65 @@
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
-  "version": "0.2.0",
-  "status": "testing",
-  "current_task": "A-T02",
-  "next_recommended_task": "A-T03",
-  "current_stage": "A-T02 L1 implemented and locally validated; Draft PR pending",
-  "current_gate": "A-T02 local PASS; awaiting controller review",
-  "last_test_result": "14 passed, 13 warnings in 13.52s; synthetic PDF, real BGE, temporary Chroma and Ollama qwen3.5:9b were exercised.",
-  "blockers": [],
+  "version": "0.3.0",
+  "status": "blocked",
+  "current_task": "A-T03",
+  "next_recommended_task": "A-T03 live C integration rerun",
+  "current_stage": "A-T03 consumer and synthetic fixture validation complete; live C integration pending",
+  "current_gate": "A-T03 BLOCKED by unavailable C V0.3.1 runtime",
+  "last_test_result": "25 passed, 16 warnings in 12.56s; real local BGE/Chroma/Ollama scoped E2E passed. Synthetic fixture evaluations: 28/28. Live C sync/evaluations not run.",
+  "blockers": [
+    "PLATFORM_API_BASE_URL is not configured",
+    "C V0.3.1 rag-export and evaluations service is not running or present in the formal develop baseline",
+    "Live C package synchronization and live 28-case evaluation evidence are missing"
+  ],
   "known_risks": [
-    "A fresh environment needs the required Python dependencies, local BGE cache and Ollama qwen3.5:9b",
-    "Distance threshold evidence is limited to synthetic test data and needs broader calibration",
-    "Only text-layer PDFs are supported"
+    "Synthetic fixture evidence must not be represented as live C integration",
+    "Safety action distance margin needs calibration against the live C evaluation set",
+    "Test package withdrawal, expiry and cross-version cleanup are not implemented"
   ],
   "git": {
-    "branch": "agent/rag-core-t02",
-    "clean": true,
-    "commit": "457fd7e5a1fefbeec9226f9cda5b32d21de930f2",
-    "task_commit": "457fd7e5a1fefbeec9226f9cda5b32d21de930f2",
+    "branch": "agent/rag-core-t03",
+    "clean": false,
+    "commit": "5f7391a4d68717c6521d00694970bfcce76d2962",
+    "task_commit": null,
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-22T10:59:12+08:00",
+  "checked_at": "2026-07-22T13:39:35+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
-  "entrypoints": ["backend/app/main.py", "backend/app/api/routes.py"],
+  "entrypoints": [
+    "backend/app/main.py",
+    "backend/app/api/routes.py",
+    "backend/scripts/evaluate_test_knowledge.py"
+  ],
   "owned_paths": ["backend/**", "docs/rag/**"],
   "forbidden_paths": [
     "frontend/**",
     "extension/**",
     "platform_backend/**",
     "admin_web/**",
+    "contracts/**",
     "backend/vector_db/**"
   ],
   "test_commands": [
-    "RUN_REAL_RAG_E2E=1 with offline Hugging Face variables: source read-only venv python -m pytest -q backend/tests"
+    "RUN_REAL_RAG_E2E=1 with offline Hugging Face variables: source read-only venv python -m pytest -q backend/tests",
+    "source read-only venv python backend/scripts/evaluate_test_knowledge.py PKG-PDD-SM-V031-SYNTHETIC --fixture-dir backend/tests/fixtures --output-dir docs/rag/evaluations/a-t03-v031-fixture"
   ],
   "completed_tasks": [
-    "Governance documentation initialized",
     "A-T01 static capability audit and blocked baseline documentation",
-    "A-T02 synthetic-PDF real local RAG loop and API validation"
+    "A-T02 synthetic-PDF real local RAG loop and API validation",
+    "A-T03 A-line V0.3.1 consumer implementation and synthetic 28-case validation"
   ],
-  "required_interfaces": [],
+  "required_interfaces": [
+    "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export V0.3.1",
+    "GET C /api/v1/test-knowledge-packages/{package_id}/evaluations V0.3.1"
+  ],
   "provided_interfaces": [
+    "POST /api/chat with frozen question/context and data response",
+    "POST /api/retrieval/search with frozen context filtering",
+    "POST /api/test-knowledge/sync/{package_id}",
     "GET /api/health",
-    "GET /api/status",
-    "POST /api/retrieval/search",
-    "POST /api/chat"
+    "GET /api/status"
   ],
-  "out_of_scope": ["A-T03", "Other-line business code", "Shared contract changes"]
+  "out_of_scope": ["A-T04", "Other-line business code", "Shared contract changes"]
 }

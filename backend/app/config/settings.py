@@ -89,6 +89,9 @@ class Settings:
     chunk_size: int
     chunk_overlap: int
     chroma_collection_name: str
+    test_knowledge_collection_name: str
+    platform_api_base_url: str
+    platform_api_timeout_seconds: float
     rag_distance_threshold: float
     top_k: int
     host: str
@@ -125,6 +128,15 @@ class Settings:
             chroma_collection_name=os.getenv(
                 "CHROMA_COLLECTION_NAME", "documents"
             ).strip(),
+            test_knowledge_collection_name=os.getenv(
+                "TEST_KNOWLEDGE_COLLECTION_NAME", "test_knowledge_v031"
+            ).strip(),
+            platform_api_base_url=os.getenv(
+                "PLATFORM_API_BASE_URL", ""
+            ).strip().rstrip("/"),
+            platform_api_timeout_seconds=float(
+                os.getenv("PLATFORM_API_TIMEOUT_SECONDS", "30")
+            ),
             rag_distance_threshold=float(
                 os.getenv(
                     "RAG_DISTANCE_THRESHOLD",

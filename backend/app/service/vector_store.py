@@ -184,7 +184,28 @@ class VectorStore:
             )
         return len(all_chunks)
 
-    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
+    def upsert_records(
+        self,
+        documents: list[str],
+        metadatas: list[dict[str, Any]],
+        ids: list[str],
+    ) -> int:
+        if not (len(documents) == len(metadatas) == len(ids)):
+            raise ValueError("documents, metadatas and ids must have equal lengths")
+        if documents:
+            self.collection.upsert(
+                documents=documents,
+                metadatas=metadatas,
+                ids=ids,
+            )
+        return len(documents)
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        where: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         count = self.collection.count()
         if count == 0:
             return []
@@ -192,6 +213,7 @@ class VectorStore:
         results = self.collection.query(
             query_texts=[query],
             n_results=min(top_k, count),
+            where=where,
         )
         search_results: list[dict[str, Any]] = []
         for index in range(len(results["ids"][0])):
@@ -203,6 +225,7 @@ class VectorStore:
                     "chunk_id": metadata.get("chunk_id", results["ids"][0][index]),
                     "content": results["documents"][0][index],
                     "distance": float(results["distances"][0][index]),
+                    "metadata": dict(metadata),
                 }
             )
         return search_results

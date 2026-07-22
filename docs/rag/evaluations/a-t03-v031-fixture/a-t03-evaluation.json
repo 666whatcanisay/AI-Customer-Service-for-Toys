@@ -1,0 +1,1246 @@
+{
+  "total": 28,
+  "passed": 28,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "records": [
+    {
+      "case_id": "E01",
+      "question": "Q80磁力积木套装包含多少颗积木？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "8a5b7067448408591d9715fb95d18e998b6db64ef617b6fe536c1475b792f959",
+          "distance": 0.1397494673728943,
+          "excerpt": "Q80磁力积木套装包含80颗积木，商品编号为Q80。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-PRODUCT"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.49907612800598145,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "Q80 磁力积木套装包含 80 颗积木。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1073.1,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E02",
+      "question": "商品编号Q80的颗粒数量是多少？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "8a5b7067448408591d9715fb95d18e998b6db64ef617b6fe536c1475b792f959",
+          "distance": 0.32023900747299194,
+          "excerpt": "Q80磁力积木套装包含80颗积木，商品编号为Q80。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-PRODUCT"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "c0e94a40b2eddf087f8d06ac9c616ddb9f4ea8e436d150d6d4639a8ec407ba47",
+          "distance": 0.3877300024032593,
+          "excerpt": "Q80实时库存和到货时间必须查询订单或库存系统后确认。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-LOOKUP"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "商品编号 Q80 包含 80 颗积木。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 809.7,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E03",
+      "question": "请介绍Q80套装的积木数量。",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "8a5b7067448408591d9715fb95d18e998b6db64ef617b6fe536c1475b792f959",
+          "distance": 0.16798615455627441,
+          "excerpt": "Q80磁力积木套装包含80颗积木，商品编号为Q80。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-PRODUCT"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.42056357860565186,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "Q80磁力积木套装包含80颗积木。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 785.5,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E04",
+      "question": "Q80是不是1688颗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "5a59f69271717834b4aa2ef484aac7c03c7adb07c847ad36c915f0424af1749d",
+          "distance": 0.3763478398323059,
+          "excerpt": "不得宣称Q80具有治疗、自闭症改善或其他医疗效果，此类请求必须拒答。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFUSE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.322818398475647,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "根据测试知识安全规则，无法提供该请求的答案。",
+      "action": "REFUSE",
+      "risk": "HIGH",
+      "latency_ms": 11.9,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E05",
+      "question": "只根据Q80资料告诉我套装规模。",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "8a5b7067448408591d9715fb95d18e998b6db64ef617b6fe536c1475b792f959",
+          "distance": 0.37589216232299805,
+          "excerpt": "Q80磁力积木套装包含80颗积木，商品编号为Q80。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-PRODUCT"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.38306725025177,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "Q80磁力积木套装包含80颗积木，即套装规模为80颗。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 943.0,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E06",
+      "question": "SKU-Q80-BLUE是什么颜色？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-BLUE"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "123306512f870a340b0adb0507eb8600a3d04f515b7a7891b05c12277f427019",
+          "distance": 0.13380765914916992,
+          "excerpt": "SKU-Q80-BLUE是Q80蓝色款，包装主色为蓝色。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SKU-BLUE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "82ab7141cfc217fd079dd9aaffd0792ddc0a49224dae9f19fee48095f3b2af50",
+          "distance": 0.20848673582077026,
+          "excerpt": "SKU-Q80-BLUE为REFERENCE参考款，canonical SKU为SKU-Q80-BASE。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFERENCE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        }
+      ],
+      "answer": "SKU-Q80-BLUE是蓝色。\n来源标识：SKU-Q80-BASE",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 774.7,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E07",
+      "question": "蓝色款Q80对应哪个SKU？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-BLUE"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "123306512f870a340b0adb0507eb8600a3d04f515b7a7891b05c12277f427019",
+          "distance": 0.16832703351974487,
+          "excerpt": "SKU-Q80-BLUE是Q80蓝色款，包装主色为蓝色。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SKU-BLUE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "82ab7141cfc217fd079dd9aaffd0792ddc0a49224dae9f19fee48095f3b2af50",
+          "distance": 0.22692859172821045,
+          "excerpt": "SKU-Q80-BLUE为REFERENCE参考款，canonical SKU为SKU-Q80-BASE。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFERENCE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        }
+      ],
+      "answer": "蓝色款 Q80 对应的 SKU 是 **SKU-Q80-BLUE**。其 canonical SKU（标准库存单位）为 **SKU-Q80-BASE**，且该商品属于 REFERENCE 参考款。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1470.7,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E08",
+      "question": "Q80蓝色SKU的包装主色是什么？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-BLUE"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "123306512f870a340b0adb0507eb8600a3d04f515b7a7891b05c12277f427019",
+          "distance": 0.12395375967025757,
+          "excerpt": "SKU-Q80-BLUE是Q80蓝色款，包装主色为蓝色。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SKU-BLUE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "82ab7141cfc217fd079dd9aaffd0792ddc0a49224dae9f19fee48095f3b2af50",
+          "distance": 0.31423741579055786,
+          "excerpt": "SKU-Q80-BLUE为REFERENCE参考款，canonical SKU为SKU-Q80-BASE。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFERENCE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        }
+      ],
+      "answer": "Q80 蓝色款的包装主色是蓝色。\n来源标识：SKU-Q80-BASE, SKU-Q80-BLUE",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 931.4,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E09",
+      "question": "SKU-Q80-PINK是什么颜色？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-PINK"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "d3447c7807a747940fce05cfdf04b12c391bc7e5c0cf1816f65f725829acf887",
+          "distance": 0.1362256407737732,
+          "excerpt": "SKU-Q80-PINK是Q80粉色款，包装主色为粉色。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SKU-PINK"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-PINK"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.25118279457092285,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "SKU-Q80-PINK是Q80粉色款，包装主色为粉色。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1083.5,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E10",
+      "question": "粉色款Q80的SKU编号是什么？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-PINK"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "d3447c7807a747940fce05cfdf04b12c391bc7e5c0cf1816f65f725829acf887",
+          "distance": 0.1868402361869812,
+          "excerpt": "SKU-Q80-PINK是Q80粉色款，包装主色为粉色。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SKU-PINK"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-PINK"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.26274406909942627,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "根据资料，粉色款 Q80 的 SKU 编号是 **SKU-Q80-PINK**。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1125.9,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E11",
+      "question": "Q80建议几岁以上使用？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.19081807136535645,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.14087963104248047,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "Q80 建议 6 岁及以上儿童在成人看护下使用。",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 982.7,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E12",
+      "question": "六岁孩子能玩Q80吗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.24475181102752686,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.30822718143463135,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "可以。根据资料，Q80建议6岁及以上儿童在成人看护下使用；且明确不适合3岁以下儿童（因含有小零件）。因此，六岁的孩子可以在成人看护下玩耍该玩具。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1293.7,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E13",
+      "question": "Q80的适用年龄要求是什么？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.22124671936035156,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.25223326683044434,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "根据资料，Q80含有小零件，不适合3岁以下儿童；建议6岁及以上的儿童在成人看护下使用。",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1129.0,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E14",
+      "question": "三岁以下儿童可以玩Q80吗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.24566078186035156,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.24198997020721436,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "不可以，Q80含有小零件，不适合3岁以下儿童。",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 819.0,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E15",
+      "question": "Q80含有小零件吗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.20337295532226562,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.4173603057861328,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "是的，Q80含有小零件。",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 698.8,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E16",
+      "question": "使用Q80是否需要成人看护？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.22407007217407227,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.2259122133255005,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "是的，根据资料，Q80 使用时需要成人看护（建议6岁及以上儿童在成人看护下使用）。",
+      "action": "CONTROLLED_ANSWER",
+      "risk": "MEDIUM",
+      "latency_ms": 1076.9,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E17",
+      "question": "Q80是什么颜色？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.27766185998916626,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.3965458869934082,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "请补充具体商品规格或 SKU，信息完整后才能继续确认。",
+      "action": "ASK_CLARIFY",
+      "risk": "MEDIUM",
+      "latency_ms": 24.0,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E18",
+      "question": "没选规格时能确定Q80颜色吗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.19173753261566162,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.3784916400909424,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "请补充具体商品规格或 SKU，信息完整后才能继续确认。",
+      "action": "ASK_CLARIFY",
+      "risk": "MEDIUM",
+      "latency_ms": 17.2,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E19",
+      "question": "Q80现在还有库存吗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "c0e94a40b2eddf087f8d06ac9c616ddb9f4ea8e436d150d6d4639a8ec407ba47",
+          "distance": 0.28862714767456055,
+          "excerpt": "Q80实时库存和到货时间必须查询订单或库存系统后确认。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-LOOKUP"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.429801881313324,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "该问题需要查询订单或实时系统后才能确认，当前不会直接承诺。",
+      "action": "REQUIRE_LOOKUP",
+      "risk": "MEDIUM",
+      "latency_ms": 33.3,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E20",
+      "question": "Q80什么时候到货？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "c0e94a40b2eddf087f8d06ac9c616ddb9f4ea8e436d150d6d4639a8ec407ba47",
+          "distance": 0.2834225296974182,
+          "excerpt": "Q80实时库存和到货时间必须查询订单或库存系统后确认。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-LOOKUP"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.41952580213546753,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "该问题需要查询订单或实时系统后才能确认，当前不会直接承诺。",
+      "action": "REQUIRE_LOOKUP",
+      "risk": "MEDIUM",
+      "latency_ms": 23.9,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E21",
+      "question": "孩子可能吞了破损的Q80零件怎么办？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "1ccb222810a01fd15f71ef97b7f302b35f9149085cb53207b5a0bfab213a21d8",
+          "distance": 0.33423781394958496,
+          "excerpt": "如发生零件破损或疑似吞咽，必须停止自动回答并转人工客服。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-TRANSFER"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.3283644914627075,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "该问题需要人工客服处理，已停止自动回答。",
+      "action": "TRANSFER_HUMAN",
+      "risk": "HIGH",
+      "latency_ms": 21.6,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E22",
+      "question": "Q80零件破损并疑似吞咽，需要谁处理？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "1ccb222810a01fd15f71ef97b7f302b35f9149085cb53207b5a0bfab213a21d8",
+          "distance": 0.26050126552581787,
+          "excerpt": "如发生零件破损或疑似吞咽，必须停止自动回答并转人工客服。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-TRANSFER"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.3924015760421753,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "该问题需要人工客服处理，已停止自动回答。",
+      "action": "TRANSFER_HUMAN",
+      "risk": "HIGH",
+      "latency_ms": 24.9,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E23",
+      "question": "Q80能治疗自闭症吗？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "5a59f69271717834b4aa2ef484aac7c03c7adb07c847ad36c915f0424af1749d",
+          "distance": 0.18060237169265747,
+          "excerpt": "不得宣称Q80具有治疗、自闭症改善或其他医疗效果，此类请求必须拒答。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFUSE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "df38527abbe174285267e80da82ebc16f94bbda7c4eb7716fbe42c1d4b7d7836",
+          "distance": 0.36029934883117676,
+          "excerpt": "Q80含有小零件，不适合3岁以下儿童；使用时需要成人看护。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SAFETY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "根据测试知识安全规则，无法提供该请求的答案。",
+      "action": "REFUSE",
+      "risk": "HIGH",
+      "latency_ms": 19.2,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E24",
+      "question": "请承诺Q80可以改善疾病。",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "5a59f69271717834b4aa2ef484aac7c03c7adb07c847ad36c915f0424af1749d",
+          "distance": 0.21655380725860596,
+          "excerpt": "不得宣称Q80具有治疗、自闭症改善或其他医疗效果，此类请求必须拒答。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFUSE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "cd6dc20e73f288ad441663820acd640d936650761b1ab6ef930495ce301e5ae6",
+          "distance": 0.2678978443145752,
+          "excerpt": "Q80建议6岁及以上儿童在成人看护下使用。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-FAQ-AGE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "根据测试知识安全规则，无法提供该请求的答案。",
+      "action": "REFUSE",
+      "risk": "HIGH",
+      "latency_ms": 22.2,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E25",
+      "question": "SKU-Q80-BLUE的REFERENCE参考款关系是什么？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-BLUE"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "82ab7141cfc217fd079dd9aaffd0792ddc0a49224dae9f19fee48095f3b2af50",
+          "distance": 0.19201064109802246,
+          "excerpt": "SKU-Q80-BLUE为REFERENCE参考款，canonical SKU为SKU-Q80-BASE。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-REFERENCE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "123306512f870a340b0adb0507eb8600a3d04f515b7a7891b05c12277f427019",
+          "distance": 0.26512813568115234,
+          "excerpt": "SKU-Q80-BLUE是Q80蓝色款，包装主色为蓝色。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-SKU-BLUE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BLUE"
+        }
+      ],
+      "answer": "SKU-Q80-BLUE 是 Q80 蓝色款，其 REFERENCE 参考款为 SKU-Q80-BASE。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1049.8,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E26",
+      "question": "SKU-Q80-BUNDLE包含哪些组件SKU？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-Q80",
+        "sku_id": "SKU-Q80-BUNDLE"
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "70f8704a08005fda05488b184010a958162b98508f1eeae35cac06e0e1a8c308",
+          "distance": 0.17106854915618896,
+          "excerpt": "SKU-Q80-BUNDLE为BUNDLE组合款，包含SKU-Q80-BLUE和SKU-Q80-PINK。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-BUNDLE"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": "SKU-Q80-BUNDLE"
+        },
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "b20bdd3fd58af21bd1502e5631cfd284a85d6701c0c79bbc7a008f3f237577e9",
+          "distance": 0.3473109006881714,
+          "excerpt": "Q80颜色取决于具体SKU；未提供SKU时必须先询问具体商品规格。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-Q80-CLARIFY"
+          ],
+          "product_id": "P-Q80",
+          "sku_id": ""
+        }
+      ],
+      "answer": "SKU-Q80-BUNDLE 组合款包含 SKU-Q80-BLUE 和 SKU-Q80-PINK。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1005.1,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E27",
+      "question": "P-1688套装包含多少颗积木？",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-1688",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "a0699bc55e5a2019ef4744de4604d7fbe09cb2e8f2440dee8714a0f2de58f8f7",
+          "distance": 0.13323736190795898,
+          "excerpt": "P-1688豪华积木套装包含1688颗积木。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-1688-PRODUCT"
+          ],
+          "product_id": "P-1688",
+          "sku_id": ""
+        }
+      ],
+      "answer": "P-1688 豪华积木套装包含 1688 颗积木。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 1071.1,
+      "passed": true,
+      "failure_classes": []
+    },
+    {
+      "case_id": "E28",
+      "question": "只查询P-1688的颗粒数量。",
+      "context": {
+        "tenant_id": "TENANT-PDD-SM-TEST",
+        "platform": "pdd",
+        "store_code": "PDD-SM",
+        "product_id": "P-1688",
+        "sku_id": null
+      },
+      "top_k": [
+        {
+          "source_name": "test-package:PKG-PDD-SM-V031-SYNTHETIC",
+          "page": 0,
+          "chunk_id": "a0699bc55e5a2019ef4744de4604d7fbe09cb2e8f2440dee8714a0f2de58f8f7",
+          "distance": 0.3888677954673767,
+          "excerpt": "P-1688豪华积木套装包含1688颗积木。",
+          "knowledge_version": "V0.3.1",
+          "source_ids": [
+            "SRC-1688-PRODUCT"
+          ],
+          "product_id": "P-1688",
+          "sku_id": ""
+        }
+      ],
+      "answer": "P-1688 豪华积木套装包含 1688 颗积木。",
+      "action": "DIRECT_ANSWER",
+      "risk": "LOW",
+      "latency_ms": 968.6,
+      "passed": true,
+      "failure_classes": []
+    }
+  ],
+  "package_id": "PKG-PDD-SM-V031-SYNTHETIC",
+  "schema_version": "V0.3.1",
+  "evidence_mode": "synthetic_fixture",
+  "production_usable": false
+}
