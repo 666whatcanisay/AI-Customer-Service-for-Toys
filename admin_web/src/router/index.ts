@@ -4,6 +4,7 @@ import SystemStatusView from '../views/SystemStatusView.vue'
 import ImportBatchDetailView from '../views/ImportBatchDetailView.vue'
 import ImportBatchListView from '../views/ImportBatchListView.vue'
 import NewImportView from '../views/NewImportView.vue'
+import TestDataPackagesView from '../views/TestDataPackagesView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -29,6 +30,11 @@ export const router = createRouter({
       name: 'import-batch-detail',
       component: ImportBatchDetailView,
       props: true,
+    },
+    {
+      path: '/test-data-packages',
+      name: 'test-data-packages',
+      component: TestDataPackagesView,
     },
   ],
 })

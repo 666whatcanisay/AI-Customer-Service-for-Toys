@@ -16,6 +16,10 @@ class Settings:
     database_url: str
     max_upload_bytes: int
     max_import_rows: int
+    max_test_package_upload_bytes: int
+    max_test_package_entries: int
+    max_test_package_uncompressed_bytes: int
+    max_test_package_single_file_bytes: int
 
 
 @lru_cache
@@ -28,4 +32,14 @@ def get_settings() -> Settings:
         database_url=os.getenv("DATABASE_URL", "sqlite:///./platform.db"),
         max_upload_bytes=int(os.getenv("PLATFORM_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024))),
         max_import_rows=int(os.getenv("PLATFORM_MAX_IMPORT_ROWS", "1000")),
+        max_test_package_upload_bytes=int(
+            os.getenv("PLATFORM_MAX_TEST_PACKAGE_UPLOAD_BYTES", str(32 * 1024 * 1024))
+        ),
+        max_test_package_entries=int(os.getenv("PLATFORM_MAX_TEST_PACKAGE_ENTRIES", "100")),
+        max_test_package_uncompressed_bytes=int(
+            os.getenv("PLATFORM_MAX_TEST_PACKAGE_UNCOMPRESSED_BYTES", str(64 * 1024 * 1024))
+        ),
+        max_test_package_single_file_bytes=int(
+            os.getenv("PLATFORM_MAX_TEST_PACKAGE_SINGLE_FILE_BYTES", str(20 * 1024 * 1024))
+        ),
     )

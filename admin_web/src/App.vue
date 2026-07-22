@@ -4,6 +4,7 @@
     <nav aria-label="主要导航">
       <RouterLink to="/system-status">系统状态</RouterLink>
       <RouterLink to="/imports">数据导入</RouterLink>
+      <RouterLink to="/test-data-packages">测试数据包</RouterLink>
     </nav>
   </header>
   <RouterView />
