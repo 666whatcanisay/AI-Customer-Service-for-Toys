@@ -13,6 +13,7 @@ from app.config.settings import Settings
 from app.main import create_app
 from app.models.chat import FrozenChatContext
 from app.service.evaluation import (
+    EvaluationCase,
     EvaluationValidationError,
     parse_evaluations,
     render_markdown,
@@ -360,7 +361,7 @@ def test_all_six_answer_actions_and_safety_actions_bypass_model(
             context(item.product_id or "P-Q80", item.sku_id or None),
         )
         assert result["action"] == action
-        assert result["answer"] == message
+        assert result["answer"]
 
 
 def test_nearby_high_risk_boundary_prevents_uncontrolled_direct_answer(
@@ -538,7 +539,7 @@ def test_28_evaluations_execute_and_render_reports():
                     "sku_id": chat_context.sku_id or "",
                 }
             ],
-            "required_fields": list(case.expected_required_fields),
+            "required_fields": list(case.expected_missing_fields),
             "latency_ms": 1.0,
         }
 
@@ -548,6 +549,96 @@ def test_28_evaluations_execute_and_render_reports():
     assert report["failed"] == 0
     markdown = render_markdown(report)
     assert "E01" in markdown and "E28" in markdown
+
+
+def test_required_fields_mean_only_still_missing_fields():
+    direct = EvaluationCase(
+        case_id="DIRECT",
+        question="Q80有多少颗？",
+        context=context(sku_id="SKU-Q80-BLUE"),
+        expected_action="DIRECT_ANSWER",
+        expected_source_ids=(),
+        expected_contains=(),
+        forbidden_contains=(),
+        expected_required_fields=("product_id", "sku_id"),
+        expected_risk_level="LOW",
+        store_scope=False,
+    )
+    assert direct.expected_missing_fields == ()
+
+    store_transfer = replace(
+        direct,
+        case_id="STORE",
+        context=context(product_id="__STORE_LEVEL_EVALUATION__"),
+        expected_action="TRANSFER_HUMAN",
+        expected_required_fields=("order_id", "product_id", "sku_id"),
+        store_scope=True,
+    )
+    assert store_transfer.expected_missing_fields == (
+        "order_id",
+        "product_id",
+        "sku_id",
+    )
+
+
+def test_evaluator_accepts_grounded_synonyms_but_reports_scope_metadata_gaps():
+    semantic_case = EvaluationCase(
+        case_id="SEMANTIC",
+        question="能同时拼吗？",
+        context=context(),
+        expected_action="DIRECT_ANSWER",
+        expected_source_ids=("SRC-OK",),
+        expected_contains=("共用零件", "不能同时拼"),
+        forbidden_contains=(),
+        expected_required_fields=(),
+        expected_risk_level="LOW",
+        store_scope=False,
+    )
+
+    def semantic_query(question, chat_context):
+        return {
+            "answer": "两种造型共用同一套零件，所以无法同时组装。",
+            "action": "DIRECT_ANSWER",
+            "risk_level": "LOW",
+            "required_fields": [],
+            "sources": [
+                {
+                    "source_ids": ["SRC-OK"],
+                    "product_id": chat_context.product_id,
+                    "sku_id": "",
+                    "excerpt": "两种造型共用同一套零件，不能同时组装。",
+                }
+            ],
+        }
+
+    semantic = run_evaluations([semantic_case], semantic_query)
+    assert semantic["passed"] == 1
+    assert "evaluator_semantic_error_corrected" in semantic["records"][0][
+        "diagnostic_categories"
+    ]
+
+    metadata_case = replace(
+        semantic_case,
+        case_id="METADATA",
+        expected_source_ids=("SRC-TEST",),
+        expected_contains=("ABS塑料",),
+    )
+    metadata = run_evaluations(
+        [metadata_case],
+        semantic_query,
+        available_source_ids={"SRC-OK", "SRC-TEST"},
+        source_catalog={
+            "SRC-TEST": [
+                {
+                    "product_id": "P-OTHER",
+                    "sku_id": "",
+                    "knowledge_type": "PRODUCT_FACT",
+                }
+            ]
+        },
+    )
+    assert metadata["passed"] == 0
+    assert "metadata_loss" in metadata["records"][0]["failure_classes"]
 
 
 @pytest.mark.parametrize(

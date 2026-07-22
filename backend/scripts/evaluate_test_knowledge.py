@@ -27,10 +27,12 @@ from app.service.test_knowledge import (  # noqa: E402
 
 
 def redact_live_records(report: dict) -> None:
-    """Keep live evidence structural; never persist source text in the repo."""
+    """Keep source excerpts out of durable reports.
+
+    Questions and answers belong to the frozen, explicitly non-production test
+    package and are retained for the required per-case diagnosis.
+    """
     for record in report["records"]:
-        record["question"] = "[redacted live evaluation question]"
-        record["answer"] = "[redacted live model answer]"
         for source in record["top_k"]:
             source.pop("excerpt", None)
 
@@ -83,15 +85,34 @@ def main() -> int:
             second_sync = service.test_knowledge_index.sync(package)
             evidence_mode = "synthetic_fixture"
         else:
-            first_sync = service.sync_test_knowledge(args.package_id)
-            second_sync = service.sync_test_knowledge(args.package_id)
+            package = service.platform_client.fetch_package(args.package_id)
+            first_sync = service.test_knowledge_index.sync(package)
+            second_sync = service.test_knowledge_index.sync(package)
             evaluations_payload = service.platform_client.fetch_evaluations(
                 args.package_id
             )
             evidence_mode = "live_c_api"
 
         cases = parse_evaluations(evaluations_payload, args.package_id)
-        report = run_evaluations(cases, service.query)
+        available_source_ids = {
+            source_id for item in package.items for source_id in item.source_ids
+        }
+        source_catalog: dict[str, list[dict[str, str]]] = {}
+        for item in package.items:
+            for source_id in item.source_ids:
+                source_catalog.setdefault(source_id, []).append(
+                    {
+                        "product_id": item.product_id,
+                        "sku_id": item.sku_id,
+                        "knowledge_type": item.knowledge_type,
+                    }
+                )
+        report = run_evaluations(
+            cases,
+            service.query,
+            available_source_ids=available_source_ids,
+            source_catalog=source_catalog,
+        )
         report.update(
             {
                 "package_id": args.package_id,

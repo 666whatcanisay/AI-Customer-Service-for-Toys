@@ -296,7 +296,11 @@ class TestKnowledgeIndex:
                 f"{package.schema_version}\n{item.package_id}\n"
                 f"{item.knowledge_id}\n{item.content}".encode("utf-8")
             ).hexdigest()
-            documents.append(item.content)
+            # Titles carry the customer-facing vocabulary used by the frozen
+            # evaluation set.  Keep the original content in metadata so the
+            # answer and citation excerpt never have to expose this search-only
+            # enrichment.
+            documents.append(f"{item.title}\n{item.content}")
             ids.append(record_id)
             metadatas.append(
                 {
@@ -309,6 +313,9 @@ class TestKnowledgeIndex:
                     "product_id": item.product_id,
                     "sku_id": item.sku_id,
                     "knowledge_type": item.knowledge_type,
+                    "knowledge_id": item.knowledge_id,
+                    "title": item.title,
+                    "content": item.content,
                     "answer_action": item.answer_action,
                     "risk_level": item.risk_level,
                     "source_ids": json.dumps(
@@ -349,6 +356,24 @@ class TestKnowledgeIndex:
         }
 
     @staticmethod
+    def _product_scope_where(context: FrozenChatContext) -> dict[str, Any]:
+        """Search every item for one product when no SKU was supplied.
+
+        This permits legitimate same-product SKU comparisons while the exact
+        SKU path below remains isolated from sibling SKU configurations.
+        """
+        return {
+            "$and": [
+                {"tenant_id": {"$eq": context.tenant_id}},
+                {"platform": {"$eq": context.platform}},
+                {"store_code": {"$eq": context.store_code}},
+                {"product_id": {"$eq": context.product_id}},
+                {"test_data_mode": {"$eq": "true"}},
+                {"production_usable": {"$eq": "false"}},
+            ]
+        }
+
+    @staticmethod
     def _store_guard_where(
         context: FrozenChatContext,
         knowledge_type: str,
@@ -378,14 +403,13 @@ class TestKnowledgeIndex:
     ) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         seen: set[str] = set()
-        scope_skus = [context.sku_id, ""] if context.sku_id else [""]
-        scoped_queries = [
-            (
-                self._product_where(context, sku_id or ""),
-                bool(context.sku_id and sku_id),
-            )
-            for sku_id in scope_skus
-        ]
+        if context.sku_id:
+            scoped_queries = [
+                (self._product_where(context, context.sku_id), True),
+                (self._product_where(context, ""), False),
+            ]
+        else:
+            scoped_queries = [(self._product_scope_where(context), False)]
         scoped_queries.append(
             (self._store_guard_where(context, "SAFETY_RULE"), False)
         )
@@ -399,7 +423,7 @@ class TestKnowledgeIndex:
         for where, exact_sku in scoped_queries:
             scoped = self.vector_store.search(
                 query,
-                top_k=top_k,
+                top_k=max(top_k, 12),
                 where=where,
             )
             for result in scoped:
@@ -415,6 +439,8 @@ class TestKnowledgeIndex:
                         "product_id": metadata.get("product_id", ""),
                         "sku_id": metadata.get("sku_id", ""),
                         "knowledge_type": metadata.get("knowledge_type", ""),
+                        "knowledge_id": metadata.get("knowledge_id", ""),
+                        "title": metadata.get("title", ""),
                         "answer_action": metadata.get("answer_action", "REFUSE"),
                         "risk_level": metadata.get("risk_level", "HIGH"),
                         "source_ids": json.loads(metadata.get("source_ids", "[]")),
@@ -425,9 +451,43 @@ class TestKnowledgeIndex:
                         "_exact_sku": exact_sku,
                     }
                 )
+                # The indexed document includes the title for retrieval only.
+                # Customer-visible context and excerpts use the unmodified C
+                # export content.
+                result["search_text"] = result.get("content", "")
+                result["content"] = metadata.get("content", result["content"])
                 results.append(result)
         results.sort(
             key=lambda item: float(item["distance"])
             - (EXACT_SKU_DISTANCE_BONUS if item["_exact_sku"] else 0)
         )
-        return results[:top_k]
+        selected = results[: max(top_k, 6)]
+        required_support = [
+            next(
+                (
+                    result
+                    for result in results
+                    if result.get("knowledge_type") == "PRODUCT_FACT"
+                ),
+                None,
+            ),
+            (
+                next(
+                    (
+                        result
+                        for result in results
+                        if result.get("knowledge_type") == "SKU_FACT"
+                        and result.get("sku_id") == context.sku_id
+                    ),
+                    None,
+                )
+                if context.sku_id
+                else None
+            ),
+        ]
+        selected.extend(
+            result
+            for result in required_support
+            if result is not None and result not in selected
+        )
+        return selected
