@@ -1,34 +1,43 @@
 {
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-platform-center",
-  "current_task": "C-T02A",
+  "current_task": "C-T02B",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)"
   ],
   "entrypoints": [
     "platform_backend/app/main.py:app",
     "admin_web/src/main.ts",
-    "admin_web routes: /system-status, /imports, /imports/new, /imports/:batchId",
+    "admin_web routes: /system-status, /imports, /imports/new, /imports/:batchId, /test-data-packages",
     "POST /api/v1/import-batches/product-sku/preflight (zero-write)",
+    "POST /api/v1/test-data-packages/preflight and POST /api/v1/test-data-packages",
+    "GET /api/v1/test-catalog/* and /api/v1/test-knowledge-packages/*",
     "platform_backend migrations: alembic upgrade head"
   ],
   "version": "0.1.0",
   "project_id": "mumu-C",
-  "last_test_result": "2026-07-22 C-T02A: Backend pytest 29 passed with 1 upstream TestClient deprecation warning. Live preflight on port 8012 returned can_import=true for 10 valid synthetic rows and can_import=false for the 20-row validation fixture; an unmigrated, nonexistent SQLite path remained absent after both requests. Admin typecheck passed, 15 Vitest tests passed, and production build passed. Existing formal upload regressions passed; no migration was added.",
+  "last_test_result": "2026-07-22 C-T02B: manifest 42/42 sizes and SHA-256 passed. Backend pytest 40 passed with 1 upstream TestClient deprecation warning. Alembic upgrade-downgrade-upgrade passed at 0002_ct02b_test_catalog. Live V0.3.1 ZIP preflight/import on port 8013 returned HTTP 200/201 and imported 1 store, 5 products, 18 SKUs, 37 sources including 35 images, 16 FAQs, 8 safety rules, 28 evaluations, and 13 conflicts; original formal import tables remained empty. Admin typecheck, 20 Vitest tests, and production build passed.",
   "known_risks": [
     "FastAPI TestClient emitted an upstream HTTPX adapter deprecation warning.",
     "SQLite is local-development only; authentication, authorization, audit persistence, retention policy, cross-batch deduplication, and production security are not implemented.",
-    "Preflight is structural and business-rule analysis, not antivirus scanning, content sanitization, or a production security certification.",
-    "The admin can_import gate does not replace the formal upload endpoint's repeated server-side validation."
+    "ZIP validation is bounded structural, manifest, and hash validation, not antivirus scanning, content sanitization, or a production security certification.",
+    "The isolated test catalog has no authentication, authorization, persistent audit log, retention policy, formal publication, or concurrent re-import recovery.",
+    "C-T02B read-only response fields are frozen by task-local compatibility notes; contracts and A/B clients are unchanged, so live cross-line integration is not claimed."
   ],
   "project_name": "C：知识治理中台与管理平台",
   "line": "C",
-  "required_interfaces": [],
-  "current_gate": "C-T02A L2 Gate PASS; Draft PR #10 is open against develop",
-  "current_stage": "C1: review-only product/SKU ingestion with zero-write preflight",
+  "required_interfaces": [
+    "GET /api/v1/test-catalog/stores",
+    "GET /api/v1/test-catalog/products?store_code=",
+    "GET /api/v1/test-catalog/products/{product_id}/skus",
+    "GET /api/v1/test-knowledge-packages/{package_id}/rag-export",
+    "GET /api/v1/test-knowledge-packages/{package_id}/evaluations"
+  ],
+  "current_gate": "C-T02B L2 Gate PASS; Draft PR #13 is open against develop",
+  "current_stage": "C1: isolated V0.3.1 test catalog and frozen read-only exports",
   "git": {
-    "branch": "agent/platform-center-t02a",
+    "branch": "agent/platform-center-t02b",
     "clean": true,
-    "commit": "30e00db",
+    "commit": "72de66d",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
@@ -39,9 +48,10 @@
   "blockers": [],
   "test_commands": [
     "platform_backend/.venv/Scripts/python.exe -m pytest",
-    "platform_backend/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8012 with DATABASE_URL pointing to a nonexistent unmigrated temp SQLite path",
-    "POST /api/v1/import-batches/product-sku/preflight with valid and validation synthetic fixtures; verify temp database file remains absent",
-    "pnpm install --frozen-lockfile --offline",
+    "platform_backend/.venv/Scripts/python.exe -m alembic upgrade head; downgrade base; upgrade head on an isolated temp SQLite database",
+    "platform_backend/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8013 --no-access-log with isolated temp DATABASE_URL",
+    "POST V0.3.1 temp ZIP preflight/import and call all five frozen GET interfaces; verify direct database counts and formal import tables remain empty",
+    "pnpm install --frozen-lockfile",
     "pnpm typecheck",
     "pnpm test",
     "pnpm build"
@@ -54,32 +64,41 @@
   ],
   "responsibilities": [
     "C line delivery",
-    "Review-only product and SKU ingestion governance"
+    "Review-only product and SKU ingestion governance",
+    "Isolated test package catalog and read-only test exports"
   ],
   "last_updated": "2026-07-22",
   "out_of_scope": [
     "Other-line business code",
-    "C-T02B, C-T03, and later tasks",
+    "C-T03 and later tasks",
+    "Formal publication, operational review, auto-send, and A/B live integration",
     "Kingdee and commerce-platform integration",
     "A-line publication, RAG, Chroma, model completion, and real company data"
   ],
   "provided_interfaces": [
     "GET /health (C-line local baseline)",
     "POST /api/v1/import-batches/product-sku/preflight (C-line local, zero-write)",
-    "C-line local /api/v1 product-SKU import batch APIs (shared contracts unchanged)"
+    "C-line local /api/v1 product-SKU import batch APIs (shared contracts unchanged)",
+    "POST /api/v1/test-data-packages/preflight and POST /api/v1/test-data-packages",
+    "Five frozen C-line test catalog and knowledge-package GET interfaces (task-local compatibility agreement; shared contracts unchanged)"
   ],
   "completed_tasks": [
     "Governance documentation initialized",
     "C-T01 minimal platform backend and admin web skeleton implemented and locally verified",
     "C-T02 product/SKU XLSX ingestion, validation, error reporting, and PENDING_REVIEW staging implemented and locally verified",
-    "C-T02A zero-write XLSX preflight and admin can_import gate implemented and locally verified"
+    "C-T02A zero-write XLSX preflight and admin can_import gate implemented and locally verified",
+    "C-T02B V0.3.1 ZIP import, isolated test catalog, frozen GET responses, and admin page implemented and locally verified"
   ],
   "data_boundaries": {
-    "source": "MANUAL_EXCEL only; synthetic fixtures only",
+    "source": "Validated V0.3.1 provided test baseline package; source directory remained read-only and was not copied into Git",
     "kingdee_connected": false,
     "published_to_a_line": false,
-    "real_company_data_processed": false,
-    "rag_or_chroma_called": false
+    "production_data_imported": false,
+    "provided_test_package_processed": true,
+    "attachment_binary_stored": false,
+    "raw_rtf_returned": false,
+    "rag_or_chroma_called": false,
+    "a_b_live_integration_claimed": false
   },
   "c_t02_commits": {
     "backend": "c2c6428",
@@ -92,6 +111,11 @@
     "admin": "3789316",
     "documentation": "30e00db"
   },
-  "draft_pr": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/10",
-  "next_recommended_task": "C-T02B or C-T03 only after separate authorization; do not auto-run"
+  "c_t02b_commits": {
+    "backend": "07fa4f8",
+    "admin": "1b6d744",
+    "documentation": "72de66d"
+  },
+  "draft_pr": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/13",
+  "next_recommended_task": "C-T03 or cross-line integration only after separate authorization; do not auto-run"
 }
