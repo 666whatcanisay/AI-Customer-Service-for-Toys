@@ -13,7 +13,7 @@
 
 - `scripts/windows/config.local.ps1` 被 Git 忽略，且 `RepositoryRoot`、A/C Python 路径均精确指向正式主仓库。
 - 端口配置为 A `8000`、B `5173`、C `8011`；原始 V0.3.1 测试 ZIP 存在且由本机配置直接引用。
-- 当前三个服务端口均无监听；本轮没有删除虚拟环境、依赖、原始 ZIP、数据库、向量库或日志。
+- 启动前三个服务端口均无监听；本轮没有删除虚拟环境、依赖、原始 ZIP、数据库、向量库或日志。
 
 ## 当前 Gate：BLOCKED
 
@@ -25,3 +25,10 @@
 2. 在正式主仓库运行 `scripts\windows\启动局域网客服.bat`。
 3. 以脚本显示的私有 IPv4 访问 `http://<主电脑IPv4>:5173/`，完成商品/SKU、真实 Ollama 回答、编辑、复制、反馈和无自动发送的笔记本人工验收。
 4. 人工反馈成功后才可将 Gate 更新为 `READY_FOR_LAN_USER_TEST`。体验完成后使用 `scripts\windows\停止AI客服.bat` 正常停止。
+
+## 2026-07-23 Private 网络真实启动结果
+
+- 用户已将物理以太网改为 `Private`。正式 LAN 启动成功：A/C/B 分别监听 `0.0.0.0:8000`、`0.0.0.0:8011`、`0.0.0.0:5173`；局域网页面为 `http://192.168.1.11:5173/`。
+- 迁移已在当前 revision；测试包为 `IMPORTED_TEST_ONLY`；A 同步记录为 47/47；`ready=true`、`model_configured=true`；真实 Ollama `CONTROLLED_ANSWER` 带来源且未命中兜底标记；A/C 对 LAN Origin 的 GET 与 OPTIONS CORS 均通过；C 目录为 1 店铺、5 商品、18 SKU。
+- 当前不能进行笔记本交接：环境变量注入函数覆盖服务名，导致运行记录未按 `platform`、`rag`、`customer-web` 保存。状态脚本能确认健康，却无法显示受管 PID；停止脚本不能安全停止这些进程。
+- 保持当前服务运行，不要手工删除 `.runtime`、强杀监听 PID 或执行停止脚本。须先以独立 OPS 修复纠正运行记录命名、重启并验证安全停止后，再继续笔记本人工验收。

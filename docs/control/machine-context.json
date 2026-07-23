@@ -5,8 +5,8 @@
   "version": "0.1.0",
   "status": "blocked",
   "current_task": "CONTROL-LAN-BATCH-05-FINAL",
-  "current_stage": "A LAN CORS and OPS LAN mode were integrated and pushed; controlled LAN startup is blocked before binding because the physical Ethernet profile is Public",
-  "current_gate": "CONTROL-LAN-BATCH-05-FINAL BLOCKED: change the physical LAN network to Private or DomainAuthenticated, then rerun the official LAN launcher",
+  "current_stage": "Physical Ethernet is Private and official LAN startup passed A/B/C, migration, test-data, CORS and real-Ollama checks; managed service records are misnamed, so safe lifecycle verification is blocked",
+  "current_gate": "CONTROL-LAN-BATCH-05-FINAL BLOCKED: fix the OPS environment-variable scope collision, restart, then verify correct runtime records and safe stop before laptop acceptance",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -38,7 +38,7 @@
     "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
     "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
     "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified.",
-    "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. config.local.ps1 paths and original V0.3.1 ZIP were verified; ports 8000/5173/8011 had no listeners. The physical Ethernet network category was Public, so no LAN service was started and user network reclassification is required before real LAN acceptance."
+    "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. After the user changed Ethernet to Private, official LAN startup completed migration, imported-test-only package validation, 47/47 sync, real Ollama smoke, LAN CORS, C catalog 1/5/18, and B LAN HTTP 200. A scope collision in Invoke-WithProcessEnvironment overwrote service names with environment variable names, so runtime records cannot safely authenticate the live service PIDs for status or stop."
   },
   "agent_worktrees": {
     "A": {
@@ -76,8 +76,8 @@
   },
   "t02_executed": false,
   "blockers": [
-    "The physical Ethernet network profile is Public; official LAN startup must not expose services until it is changed to Private or DomainAuthenticated",
-    "Real LAN service and laptop acceptance have not started; ports 8000, 5173, and 8011 are intentionally unbound"
+    "Invoke-WithProcessEnvironment reuses the dynamic-scope variable name and overwrites platform/rag/customer-web runtime record names with environment variable names",
+    "Safe status and stop cannot authenticate the live LAN service PIDs; laptop manual acceptance must wait for a narrow OPS lifecycle-record repair and restart"
   ],
   "last_updated": "2026-07-23"
 }

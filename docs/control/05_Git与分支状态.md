@@ -23,3 +23,8 @@
 - 共同基线为已推送的 `913a440a703b961ff48ceb232b088b8481567a72`；`agent/rag-lan-t04` 的已验证提交 `055aaac60cdce1ad5004832c0bb71129c6ab6c97` 无冲突 squash 为 `3f20686c48dbec4dd7d389e6eac7dcfe16eeb28f`。
 - `control/ops-lan-t05` 的已验证提交 `b7cb6eec0bcd686cbdd9079a2d98c47083af03b5` 随后无冲突 squash 为 `978f884b41b8a1ea0c0f42ac5e5e319516f0cac`。
 - 两项功能提交已按快进方式推送至 `origin/develop`；未 reset、未重写已验收历史，也未创建或冒充 GitHub PR。
+
+## 2026-07-23 真实 LAN 启动验证
+
+- 用户将物理以太网改为 `Private` 后，正式 `启动局域网客服.bat` 成功完成 A/B/C 启动、迁移、测试包幂等检查、47/47 同步和真实 Ollama chat smoke。
+- 该运行验证暴露 OPS 生命周期登记缺陷：环境注入函数中的 `$name` 覆盖服务名，生成的 `.runtime` 记录名为环境变量而非服务名。此缺陷尚未修复；本节只记录事实，不产生新的业务代码提交。
