@@ -7,6 +7,10 @@
     CustomerWebUrl = 'http://127.0.0.1:5173/'
     RagHealthPath = '/api/health'; PlatformHealthPath = '/health'
     OllamaModel = 'qwen3.5:9b'
+    OllamaBaseUrl = 'http://127.0.0.1:11434'
+    PlatformDatabaseUrl = 'sqlite:///./platform.db'
+    TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
+    AutoSyncTestKnowledge = $true
     CorsAllowedOrigins = @('http://127.0.0.1:5173')
     OpenBrowser = $true
     RuntimeDirectory = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path '.runtime')
