@@ -4,10 +4,9 @@
 
 ## 当前任务
 
-- 任务卡：B-T04 客服工作台小白化改造。
-- 分支：`agent/user-client-t04`。
-- 基线：`origin/develop@0c447ae03da445b2b92a5559dc916d2616825ce3`。
-- 状态：三步页面与自动化验证完成，等待提交和 Draft PR。
+- 任务：客服工作台一屏 UI 优化（仅 UI）。
+- 分支：本机 `develop`。
+- 状态：桌面一屏布局与真实本机页面 smoke 已完成，等待评审。
 
 ## 允许范围
 
@@ -64,10 +63,10 @@ Node：`v24.14.0`。
 - `npm run test`
 - `npm run build`
 
-2026-07-23 结果：typecheck PASS；Vitest 4 文件、30/30 PASS；
-production build PASS。构建仍报告 JavaScript chunk 超过 500 kB。
+2026-07-23 结果：现有本机 `vue-tsc --noEmit` PASS；Vitest 4 文件、30/30 PASS；
+production build PASS。1273×912 的空态、选择态和真实回答态均无页面横向/纵向滚动；构建仍报告 JavaScript chunk 超过 500 kB。
 
 ## 交接
 
-- A/C 真实服务可用后再做页面 smoke，不得用 Mock 冒充联调成功。
+- 本机 A/C 已完成真实页面 smoke；后续环境仍必须独立验证，不得用 Mock 冒充联调成功。
 - 下一任务不得自动进入 B-T05。
