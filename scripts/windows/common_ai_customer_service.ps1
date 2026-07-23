@@ -1,8 +1,8 @@
 ﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-LocalConfig {
-    $configPath = Join-Path $PSScriptRoot 'config.local.ps1'
+function Get-LocalConfig([string]$ConfigPath) {
+    $configPath = if ([string]::IsNullOrWhiteSpace($ConfigPath)) { Join-Path $PSScriptRoot 'config.local.ps1' } else { $ConfigPath }
     if (-not (Test-Path -LiteralPath $configPath)) {
         throw "缺少本地配置：$configPath。请将 config.local.ps1.example 复制为 config.local.ps1 后填写。"
     }
@@ -59,7 +59,7 @@ function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$Executabl
 
 function Get-PortOwner([int]$Port) { @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique) }
 function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
-    $owners = Get-PortOwner $Port
+    $owners = @(Get-PortOwner $Port)
     if ($owners.Count -eq 0) { return }
     $record = Test-RecordedProcess $Config $Name
     if ($record -and $record.Valid -and $owners -contains $record.Process.Id) { throw "$Name 已由本工具启动（PID $($record.Process.Id)，端口 $Port）。请使用检查脚本，或先停止后再启动。" }
@@ -68,6 +68,16 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
 
 function Test-HttpOk([string]$Url) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3; return $r.StatusCode -ge 200 -and $r.StatusCode -lt 400 } catch { return $false } }
 function Wait-HttpOk([string]$Url, [int]$Seconds, [string]$Label) { for ($i=0; $i -lt $Seconds; $i++) { if (Test-HttpOk $Url) { return }; Start-Sleep -Seconds 1 }; throw "$Label 未在 $Seconds 秒内就绪：$Url。请查看运行日志。" }
+
+function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl) {
+    $record = Test-RecordedProcess $Config $Name
+    $serviceProcessId = if ($record -and $record.Process) { $record.Process.Id } else { '-' }
+    $serviceState = if ($record -and $record.Valid) { '运行中' } else { '未运行' }
+    $portOwners = @(Get-PortOwner $Port)
+    $portState = if ($portOwners.Count -gt 0) { "监听（PID $($portOwners -join ', ')）" } else { '未监听' }
+    $healthState = if (Test-HttpOk $HealthUrl) { '可用' } else { '不可用' }
+    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; Record=$record }
+}
 
 function Assert-Dependencies($Config) {
     foreach ($item in @(@{Name='RAG Python';Path=$Config.RagPythonPath}, @{Name='平台 Python';Path=$Config.PlatformPythonPath})) { & $item.Path --version | Out-Null; if ($LASTEXITCODE -ne 0) { throw "$($item.Name) 无法执行：$($item.Path)" } }
@@ -78,6 +88,21 @@ function Assert-Dependencies($Config) {
     if (-not ($models | Where-Object { $_ -match "^$([regex]::Escape($Config.OllamaModel))\s" })) { throw "Ollama 模型不存在：$($Config.OllamaModel)。脚本不会下载模型。" }
     foreach ($path in @((Join-Path $Config.RepositoryRoot 'backend\.venv\Scripts\python.exe'), (Join-Path $Config.RepositoryRoot 'platform_backend\.venv\Scripts\python.exe'), (Join-Path $Config.RepositoryRoot 'frontend\node_modules'))) { if (-not (Test-Path -LiteralPath $path)) { throw "缺少预先安装的运行依赖：$path" } }
     if (-not (Test-Path -LiteralPath (Join-Path $Config.RepositoryRoot 'frontend\node_modules\vite\bin\vite.js'))) { throw 'frontend node_modules 中缺少 Vite。请人工安装依赖。' }
+}
+
+function Assert-RagVirtualEnvironment($Config) {
+    $ragVenvPython = Join-Path $Config.RepositoryRoot 'backend\.venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $ragVenvPython)) {
+        throw "A .venv 缺失：$ragVenvPython。脚本不会自动安装依赖。"
+    }
+}
+
+function Write-StartupFailureSummary($Config, [string[]]$StartedServices) {
+    Write-Host '启动失败；本次启动流程服务状态：' -ForegroundColor Yellow
+    foreach ($service in @(@{ Label='C'; Name='platform' }, @{ Label='A'; Name='rag' }, @{ Label='B'; Name='customer-web' })) {
+        $state = if ($StartedServices -contains $service.Name) { '已启动' } else { '未启动' }
+        Write-Host "$($service.Label)：$state"
+    }
 }
 
 function Start-ManagedService($Config, [string]$Name, [string]$ExecutablePath, [string[]]$Arguments, [string]$WorkingDirectory, [string]$CommandFeature, [int]$Port) {
