@@ -3,8 +3,50 @@
 from dataclasses import dataclass
 from functools import lru_cache
 import os
+from urllib.parse import urlsplit
 
 from app import __version__
+
+
+DEFAULT_CORS_ALLOWED_ORIGINS = "http://127.0.0.1:5173"
+
+
+def parse_cors_allowed_origins(raw_value: str) -> tuple[str, ...]:
+    """Parse and validate the explicit browser origins allowed to call C APIs."""
+
+    origins: list[str] = []
+    for raw_origin in raw_value.split(","):
+        origin = raw_origin.strip()
+        if not origin:
+            continue
+        if origin == "*":
+            raise ValueError("CORS_ALLOWED_ORIGINS must not contain the wildcard '*'")
+
+        parsed = urlsplit(origin)
+        try:
+            parsed.port
+        except ValueError as exc:
+            raise ValueError(f"CORS_ALLOWED_ORIGINS contains an invalid origin: {origin!r}") from exc
+
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+            or any(character.isspace() for character in origin)
+        ):
+            raise ValueError(f"CORS_ALLOWED_ORIGINS contains an invalid origin: {origin!r}")
+
+        normalized_origin = origin.removesuffix("/")
+        if normalized_origin not in origins:
+            origins.append(normalized_origin)
+
+    if not origins:
+        raise ValueError("CORS_ALLOWED_ORIGINS must contain at least one explicit origin")
+    return tuple(origins)
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,6 +55,7 @@ class Settings:
     service_name: str
     version: str
     environment: str
+    cors_allowed_origins: tuple[str, ...]
     database_url: str
     max_upload_bytes: int
     max_import_rows: int
@@ -29,6 +72,9 @@ def get_settings() -> Settings:
         service_name=os.getenv("PLATFORM_SERVICE_NAME", "platform-backend"),
         version=os.getenv("PLATFORM_VERSION", __version__),
         environment=os.getenv("PLATFORM_ENVIRONMENT", "development"),
+        cors_allowed_origins=parse_cors_allowed_origins(
+            os.getenv("CORS_ALLOWED_ORIGINS", DEFAULT_CORS_ALLOWED_ORIGINS)
+        ),
         database_url=os.getenv("DATABASE_URL", "sqlite:///./platform.db"),
         max_upload_bytes=int(os.getenv("PLATFORM_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024))),
         max_import_rows=int(os.getenv("PLATFORM_MAX_IMPORT_ROWS", "1000")),
