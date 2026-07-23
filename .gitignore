@@ -55,8 +55,13 @@ logs/*
 !logs/
 !logs/README.md
 *.log
+.runtime/
+scripts/windows/config.local.ps1
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local Windows OPS runtime state, logs, databases, and generated config
+/.runtime/

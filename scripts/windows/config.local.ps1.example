@@ -1,0 +1,15 @@
+@{
+    RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    RagPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\.venv\Scripts\python.exe')
+    PlatformPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'platform_backend\.venv\Scripts\python.exe')
+    PnpmCommand = 'pnpm.cmd'
+    RagPort = 8000; CustomerWebPort = 5173; PlatformPort = 8011; BindAddress = '127.0.0.1'
+    CustomerWebUrl = 'http://127.0.0.1:5173/'
+    RagHealthPath = '/api/health'; PlatformHealthPath = '/health'
+    OllamaModel = 'qwen3.5:9b'
+    CorsAllowedOrigins = @('http://127.0.0.1:5173')
+    OpenBrowser = $true
+    RuntimeDirectory = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path '.runtime')
+    TestDataPackagePath = ''
+    AutoImportTestData = $false
+}
