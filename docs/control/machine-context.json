@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "blocked",
+  "status": "ready_for_user_test",
   "current_task": "CONTROL-LOCAL-DEMO-FINAL",
-  "current_stage": "C package and OPS runtime fixes locally squash merged; final one-click launch is waiting for port 5173",
-  "current_gate": "CONTROL-LOCAL-DEMO-FINAL ENV_BLOCKED",
+  "current_stage": "Official one-click local startup completed; A, B, and C are running for user testing",
+  "current_gate": "CONTROL-LOCAL-DEMO-FINAL READY_FOR_USER_TEST",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -36,7 +36,7 @@
     "B": "Node v24.14.0, npm 10.9.2; typecheck exit 0; production build exit 0; no test script",
     "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
     "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
-    "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. The official one-click script was not launched because its elevated port guard found an unregistered external Vite process on 127.0.0.1:5173."
+    "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified."
   },
   "agent_worktrees": {
     "A": {
@@ -71,8 +71,6 @@
     "C": "May be dispatched separately; recommended C-T02 direction is data ingestion and standardization foundations"
   },
   "t02_executed": false,
-  "blockers": [
-    "Port 5173 is occupied by PID 35176, an unregistered node/Vite process from C:/Users/EDY/Documents/Codex/2026-07-23/多多商家版聚合聊天/项目开发者; do not terminate it from this task."
-  ],
+  "blockers": [],
   "last_updated": "2026-07-23"
 }
