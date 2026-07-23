@@ -262,6 +262,12 @@ def make_package(
     allow_auto_send: bool = False,
     tamper: bool = False,
     traversal: bool = False,
+    wrapper: str | None = None,
+    duplicate_wrapped_manifest: bool = False,
+    extra_top_level_file: bool = False,
+    extra_top_level_directory: bool = False,
+    duplicate_wrapped_path: bool = False,
+    manifest_references_wrapper_path: bool = False,
 ) -> bytes:
     attachments = {
         f"attachments/P{((index - 1) % 5) + 1}/image-{index:03d}.png": f"image-{index}".encode()
@@ -304,13 +310,26 @@ def make_package(
         "file_count_excluding_manifest": len(manifest_entries),
         "files": manifest_entries,
     }
+    if manifest_references_wrapper_path:
+        manifest["files"][0]["relative_path"] = (
+            f"{wrapper}/{manifest['files'][0]['relative_path']}"
+        )
     if tamper:
         files[next(iter(attachments))] = b"IMAGEXX"
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
-        archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
+        prefix = f"{wrapper}/" if wrapper else ""
+        archive.writestr(f"{prefix}manifest.json", json.dumps(manifest, ensure_ascii=False))
         for path, content in files.items():
-            archive.writestr(path, content)
+            archive.writestr(f"{prefix}{path}", content)
+        if duplicate_wrapped_manifest:
+            archive.writestr("outer/manifest.json", json.dumps(manifest, ensure_ascii=False))
+        if extra_top_level_file:
+            archive.writestr("another-root/extra.txt", b"blocked")
+        if extra_top_level_directory:
+            archive.writestr("another-root/", b"")
+        if duplicate_wrapped_path:
+            archive.writestr(f"{prefix}attachments/P1/image-001.png", b"duplicate")
         if traversal:
             archive.writestr("../escape.txt", b"blocked")
     return output.getvalue()
@@ -346,6 +365,48 @@ def test_valid_package_preflight_writes_nothing(client: TestClient, session: Ses
     assert body["production_usable"] is False
     assert body["allow_auto_send"] is False
     assert count(session, KnowledgePackageModel) == 0
+
+
+def test_single_wrapped_package_is_imported_without_changing_upload_hash(
+    client: TestClient, session: Session
+) -> None:
+    content = make_package(wrapper="外层 目录")
+
+    preflight = upload(client, content, PREFLIGHT_URL)
+    imported = upload(client, content)
+
+    assert preflight.status_code == 200, preflight.text
+    assert preflight.json()["file_sha256"] == sha256(content).hexdigest()
+    assert imported.status_code == 201, imported.text
+    assert count(session, StoreModel) == 1
+    assert count(session, ProductModel) == 5
+    assert count(session, SkuModel) == 18
+    assert count(session, EvaluationCaseModel) == 28
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error_code"),
+    [
+        ({"duplicate_wrapped_manifest": True}, "MANIFEST_FILE_SET_MISMATCH"),
+        ({"wrapper": "外层", "extra_top_level_file": True}, "MANIFEST_MISSING"),
+        ({"wrapper": "外层", "extra_top_level_directory": True}, "MANIFEST_MISSING"),
+        ({"wrapper": "outer/inner"}, "MANIFEST_MISSING"),
+        ({"wrapper": "outer", "duplicate_wrapped_path": True}, "ZIP_DUPLICATE_PATH"),
+        ({"wrapper": "outer", "manifest_references_wrapper_path": True}, "MANIFEST_FILE_MISSING"),
+    ],
+)
+def test_rejects_ambiguous_or_unsafe_wrapped_layouts(
+    client: TestClient, kwargs: dict[str, object], error_code: str
+) -> None:
+    if kwargs.get("duplicate_wrapped_path"):
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            content = make_package(**kwargs)
+    else:
+        content = make_package(**kwargs)
+    response = upload(client, content, PREFLIGHT_URL)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == error_code
 
 
 def test_import_persists_exact_test_counts_without_formal_ingestion(

@@ -170,15 +170,16 @@ def parse_test_package_zip(
         raise AppError("INVALID_ZIP", "The uploaded file is not a valid ZIP archive") from exc
 
     with archive:
-        files = _validate_zip_entries(
+        physical_files = _validate_zip_entries(
             archive.infolist(),
             max_entries=max_entries,
             max_uncompressed_bytes=max_uncompressed_bytes,
             max_single_file_bytes=max_single_file_bytes,
         )
+        files = _resolve_logical_root(physical_files, archive.infolist())
         manifest_info = files.get("manifest.json")
         if manifest_info is None:
-            raise AppError("MANIFEST_MISSING", "manifest.json must exist at the ZIP root")
+            raise AppError("MANIFEST_MISSING", "manifest.json must exist at the logical ZIP root")
         if manifest_info.file_size > 1024 * 1024:
             raise AppError("MANIFEST_TOO_LARGE", "manifest.json exceeds the 1 MB limit")
         try:
@@ -251,6 +252,52 @@ def _safe_archive_path(raw_path: str) -> str:
     if path.parts and re.match(r"^[A-Za-z]:", path.parts[0]):
         raise AppError("ZIP_PATH_TRAVERSAL", f"ZIP contains an unsafe path: {raw_path}")
     return path.as_posix()
+
+
+def _resolve_logical_root(
+    files: dict[str, ZipInfo], infos: list[ZipInfo]
+) -> dict[str, ZipInfo]:
+    """Return a safe in-memory logical root for a root or singly-wrapped package."""
+    if "manifest.json" in files:
+        if any(path.endswith("/manifest.json") for path in files):
+            raise AppError(
+                "MANIFEST_FILE_SET_MISMATCH",
+                "ZIP cannot contain both a root manifest and a wrapped manifest",
+            )
+        return files
+
+    top_level_names = {
+        PurePosixPath(_safe_archive_path(info.filename)).parts[0]
+        for info in infos
+    }
+    if len(top_level_names) != 1:
+        raise AppError(
+            "MANIFEST_MISSING",
+            "manifest.json must be at the ZIP root or in one wrapped directory",
+        )
+
+    logical_files: dict[str, ZipInfo] = {}
+    for physical_path, info in files.items():
+        physical_parts = PurePosixPath(physical_path).parts
+        if len(physical_parts) < 2:
+            raise AppError(
+                "MANIFEST_MISSING",
+                "manifest.json must be at the ZIP root or in one wrapped directory",
+            )
+        logical_path = PurePosixPath(*physical_parts[1:]).as_posix()
+        if logical_path in logical_files:
+            raise AppError(
+                "ZIP_DUPLICATE_PATH",
+                f"Duplicate logical ZIP path: {logical_path}",
+            )
+        logical_files[logical_path] = info
+
+    if "manifest.json" not in logical_files:
+        raise AppError(
+            "MANIFEST_MISSING",
+            "manifest.json must be at the ZIP root or in one wrapped directory",
+        )
+    return logical_files
 
 
 def _validate_manifest(

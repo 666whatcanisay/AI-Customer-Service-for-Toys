@@ -1,6 +1,6 @@
 {
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-platform-center",
-  "current_task": "C-T04",
+  "current_task": "C-PACKAGE-FIX2",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)"
   ],
@@ -15,7 +15,7 @@
   ],
   "version": "0.1.0",
   "project_id": "mumu-C",
-  "last_test_result": "2026-07-23 C-T04: backend pytest 53 passed with 1 existing upstream TestClient deprecation warning. Real Uvicorn on 127.0.0.1:8011 returned /health HTTP 200 with matching request_id response header/body. Allowed-origin OPTIONS and GET returned the exact http://127.0.0.1:5173 allow-origin header; denied-origin OPTIONS returned 400 and denied-origin GET omitted the allow-origin header. The test process was stopped and port 8011 was closed.",
+  "last_test_result": "2026-07-23 C-PACKAGE-FIX2: backend pytest 60 passed with 1 existing upstream TestClient deprecation warning. Synthetic root and single Chinese/space-wrapped ZIPs passed; double-manifest, multi-root including an empty directory, double-wrap, traversal, duplicate logical path, external wrapper reference, and manifest hash tampering were rejected. The provided original V0.3.1 ZIP preflight returned HTTP 200 and import returned HTTP 201 using an in-memory SQLite database; SHA matched the upload bytes and store/product/SKU/evaluation/RAG totals were 1/5/18/28/47. No package or database file was retained.",
   "known_risks": [
     "FastAPI TestClient emitted an upstream HTTPX adapter deprecation warning.",
     "SQLite is local-development only; authentication, authorization, audit persistence, retention policy, cross-batch deduplication, and production security are not implemented.",
@@ -34,13 +34,13 @@
     "GET /api/v1/test-knowledge-packages/{package_id}/rag-export",
     "GET /api/v1/test-knowledge-packages/{package_id}/evaluations"
   ],
-  "current_gate": "C-T04 L2 local implementation and verification PASS; Draft PR #15 is open against develop for batch review",
-  "current_stage": "C1: explicit test-environment CORS integration baseline",
+  "current_gate": "C-PACKAGE-FIX2 L2 local implementation and verification PASS; Draft PR publication is BLOCKED because GitHub CLI is absent",
+  "current_stage": "C1: safe V0.3.1 test-package logical-root compatibility",
   "git": {
-    "branch": "agent/platform-center-t04",
-    "clean": true,
-    "commit": "c1763ce8297aa3864fcde904537185ea0b886e1c",
-    "commit_role": "C-T04 implementation commit; PR head also includes the machine-context-only synchronization commit",
+    "branch": "agent/platform-package-fix2",
+    "clean": false,
+    "commit": "a985fe2",
+    "commit_role": "C-PACKAGE-FIX2 local changes are uncommitted because the GitHub publish prerequisite is unavailable",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
@@ -49,14 +49,16 @@
     "extension/**",
     "admin_web/**"
   ],
-  "blockers": [],
+  "blockers": [
+    "GitHub CLI (gh) is not installed in this environment; the required publish workflow stops before commit, push, and Draft PR creation."
+  ],
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
     "CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173 and isolated temp DATABASE_URL; .venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8011 --no-access-log",
     "GET /health with Origin and X-Request-ID; allowed and denied OPTIONS preflight plus denied-origin actual GET",
     "Stop the exact test process and verify port 8011 has no listener"
   ],
-  "status": "ready",
+  "status": "blocked",
   "owned_paths": [
     "platform_backend/**",
     "admin_web/**",
@@ -90,7 +92,8 @@
     "C-T02 product/SKU XLSX ingestion, validation, error reporting, and PENDING_REVIEW staging implemented and locally verified",
     "C-T02A zero-write XLSX preflight and admin can_import gate implemented and locally verified",
     "C-T02B V0.3.1 ZIP import, isolated test catalog, frozen GET responses, and admin page implemented and locally verified",
-    "C-T04 explicit CORS parsing, middleware, tests, and live port 8011 verification completed"
+    "C-T04 explicit CORS parsing, middleware, tests, and live port 8011 verification completed",
+    "C-PACKAGE-FIX2 safe single-wrapper logical-root parsing, synthetic regression coverage, and original V0.3.1 in-memory import verification completed locally"
   ],
   "data_boundaries": {
     "source": "Validated V0.3.1 provided test baseline package; source directory remained read-only and was not copied into Git",
@@ -123,6 +126,6 @@
     "implementation_and_docs": "c1763ce8297aa3864fcde904537185ea0b886e1c",
     "machine_context": "the final PR commit containing this file"
   },
-  "draft_pr": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/15",
-  "next_recommended_task": "CONTROL-MVP-BATCH-04 batch review and final integration; C-T03 remains separately locked"
+  "draft_pr": null,
+  "next_recommended_task": "Install and authenticate GitHub CLI, then create the requested C-PACKAGE-FIX2 Draft PR against develop; C-T03 remains separately locked"
 }
