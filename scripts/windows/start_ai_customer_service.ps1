@@ -40,7 +40,7 @@ try {
     Write-Host "日志目录：$(Get-ServiceLogDirectory $config)"
     if ([bool]$config.OpenBrowser) { Start-Process $config.CustomerWebUrl }
 } catch {
-    Write-Error $_
     if ($null -ne $config) { Write-StartupFailureSummary $config $startedServices }
+    Write-Error $_
     exit 1
 }
