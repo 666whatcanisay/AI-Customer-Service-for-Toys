@@ -11,3 +11,8 @@
 - 2026-07-22 09:21 +08:00，三个 Agent 分支均已使用 `reset --hard` 与 `push --force-with-lease` 对齐三线交付共同基线；没有使用普通 `--force`。
 - 总控状态分支：`agent/control-g1-merge-status`，基于 `ba9c0c9`，仅允许修改 `docs/control/**`。
 - 总控状态提交的 squash merge 会产生新的 `develop` SHA；该自引用 SHA 不写入自身内容，以最终执行回报为准，并在合并后再次对齐三个 Agent 分支。
+
+## 2026-07-23 本机体验修复
+
+- 本地 `develop` 从 `a985fe2f069452e9d8d0cc8839ef0292245c83c1` 依次 squash 合入 C 包解析修复 `2f997219a61c92439a3dddb6a923c7d8e282add1` 与 OPS 启动编排修复 `ba03ec254619667a1072245198724fb9aecea426`，均无冲突。
+- 本任务未推送远端；记录时 `origin/develop` 仍为共同基线 `a985fe2f069452e9d8d0cc8839ef0292245c83c1`。最终运行 Gate 受其他项目占用 5173 阻断，详见本机体验交接记录。
