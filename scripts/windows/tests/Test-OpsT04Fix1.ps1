@@ -10,10 +10,10 @@ $shellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
 $fakeProcess = $null
 
 try {
-    New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path @($testRoot, (Join-Path $testRoot 'backend'), (Join-Path $testRoot 'frontend'), (Join-Path $testRoot 'platform_backend')) | Out-Null
     @"
 @{
-    RepositoryRoot = '$((Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path.Replace("'", "''"))'
+    RepositoryRoot = '$($testRoot.Replace("'", "''"))'
     RagPythonPath = '$($shellPath.Replace("'", "''"))'
     PlatformPythonPath = '$($shellPath.Replace("'", "''"))'
     PnpmCommand = '$($shellPath.Replace("'", "''"))'
@@ -43,13 +43,13 @@ try {
 
     . $commonScript
     $config = Get-LocalConfig $configPath
-    $listenerCommand = '$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 65403); $listener.Start(); Start-Sleep -Seconds 20'
+    $listenerCommand = '$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 65403); $listener.Start(); Start-Sleep -Seconds 90'
     $fakeProcess = Start-Process -FilePath $shellPath -ArgumentList @('-NoProfile','-Command',$listenerCommand) -WindowStyle Hidden -PassThru
     Start-Sleep -Milliseconds 300
     Save-ServiceRecord $config 'platform' $fakeProcess $shellPath $testRoot 'test C listener' 'TcpListener' 65403
     $onlyCOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
     if ($LASTEXITCODE -ne 0 -or ($onlyCOutput -join "`n") -notmatch 'C：运行中' -or ($onlyCOutput -join "`n") -notmatch '端口 65403：监听') { throw '只有 C 运行时未正确展示。' }
-    Stop-Process -Id $fakeProcess.Id -Force
+    if (Get-Process -Id $fakeProcess.Id -ErrorAction SilentlyContinue) { Stop-Process -Id $fakeProcess.Id -Force }
     $fakeProcess = $null
 
     @{ name='platform'; pid=999999; executablePath=$shellPath; workingDirectory=$testRoot; startedUtc='2000-01-01T00:00:00.0000000Z'; commandFeature='never'; port=65403 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $config.RuntimeDirectory 'platform.json') -Encoding UTF8
@@ -60,8 +60,17 @@ try {
     $runtimeMissingOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
     if ($LASTEXITCODE -ne 0 -or ($runtimeMissingOutput -join "`n") -notmatch 'C：未运行') { throw '缺少 .runtime 时状态脚本不应失败。' }
 
-    $startOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -ConfigPath $configPath 2>&1
-    if ($LASTEXITCODE -eq 0 -or ($startOutput -join "`n") -notmatch 'A .venv 缺失' -or ($startOutput -join "`n") -notmatch 'C：未启动' -or ($startOutput -join "`n") -notmatch 'B：未启动') { throw '缺少 A .venv 时未给出完整安全提示。' }
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # The child launcher is expected to fail for this scenario.  Do not let
+        # PowerShell 7 promote its non-zero exit code before the assertions run.
+        $ErrorActionPreference = 'Continue'
+        $startOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -ConfigPath $configPath 2>&1
+        $startExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($startExitCode -eq 0 -or ($startOutput -join "`n") -notmatch 'A \.ve\s*nv 缺失' -or ($startOutput -join "`n") -notmatch 'C：未启动' -or ($startOutput -join "`n") -notmatch 'B：未启动') { throw '缺少 A .venv 时未给出完整安全提示。' }
     Write-Host 'OPS-T04-FIX1 测试：PASS（状态未运行、仅 C、过期 PID、$PID 冲突、缺少 .runtime、缺少 A .venv 与语法）。' -ForegroundColor Green
 } finally {
     if ($fakeProcess -and -not $fakeProcess.HasExited) { Stop-Process -Id $fakeProcess.Id -Force -ErrorAction SilentlyContinue }
