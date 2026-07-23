@@ -73,6 +73,8 @@
       </div>
     </nav>
 
+    <section class="workbench-grid" aria-label="客服建议工作区">
+      <div class="composer-pane">
     <section class="step-card context-card">
       <div class="section-heading">
         <div>
@@ -239,6 +241,8 @@
       </div>
     </section>
 
+      </div>
+      <div class="review-pane">
     <section v-if="result" class="step-card answer-card" data-testid="answer-card">
       <div class="section-heading answer-heading">
         <div>
@@ -353,26 +357,26 @@
         <code>risk_level={{ result.riskLevel ?? '未分类' }}</code>
       </div>
 
-      <div class="feedback-section">
-        <div>
-          <h2>最后，记录这条建议有没有用</h2>
+      <details class="feedback-section" data-testid="feedback-section">
+        <summary>记录这条建议有没有用（可选）</summary>
+        <div class="feedback-body">
           <p>当前反馈只记录在本页，反馈 API 尚未发布。</p>
+          <div class="feedback-actions">
+            <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
+              直接采用
+            </el-button>
+            <el-button data-testid="edited-accept" text @click="recordAdoption('EDITED_ACCEPT')">
+              修改后采用
+            </el-button>
+            <el-button data-testid="reject" text @click="recordAdoption('REJECTED')">
+              未采用
+            </el-button>
+          </div>
+          <p v-if="adoptionMessage" class="feedback-result" data-testid="adoption-result">
+            {{ adoptionMessage }}
+          </p>
         </div>
-        <div class="feedback-actions">
-          <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
-            直接采用
-          </el-button>
-          <el-button data-testid="edited-accept" text @click="recordAdoption('EDITED_ACCEPT')">
-            修改后采用
-          </el-button>
-          <el-button data-testid="reject" text @click="recordAdoption('REJECTED')">
-            未采用
-          </el-button>
-        </div>
-        <p v-if="adoptionMessage" class="feedback-result" data-testid="adoption-result">
-          {{ adoptionMessage }}
-        </p>
-      </div>
+      </details>
     </section>
 
     <section v-else-if="!loading" class="empty-card">
@@ -380,6 +384,8 @@
       <div>
         <h2>建议回复会显示在这里</h2>
         <p>完成前两步后点击“生成建议回复”。SKU 不确定时请留空，不要猜款式。</p>
+      </div>
+    </section>
       </div>
     </section>
   </main>
@@ -1136,4 +1142,401 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   .connection-card { grid-template-columns: 1fr; }
   .workflow-progress strong { display: none; }
 }
+
+/* Desktop workbench refresh: keep the full three-step flow in one calm workspace. */
+.workspace-shell {
+  --ink: #14213d;
+  --muted: #69758a;
+  --line: #dbe5f2;
+  --panel: #ffffff;
+  --canvas: #f3f7fc;
+  --primary: #245bda;
+  --primary-soft: #eaf0ff;
+  --success: #0f9d7a;
+  width: min(1440px, calc(100% - 40px));
+  color: var(--ink);
+}
+
+:global(body) {
+  background:
+    radial-gradient(circle at 10% 0%, rgb(128 183 255 / 19%), transparent 28rem),
+    radial-gradient(circle at 100% 100%, rgb(47 174 146 / 12%), transparent 30rem),
+    var(--canvas);
+}
+
+.workspace-header {
+  margin-bottom: 0;
+  padding: 18px 22px;
+  border: 1px solid rgb(202 218 240 / 85%);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 12px 32px rgb(24 58 118 / 8%);
+}
+
+.eyebrow,
+.section-label {
+  margin-bottom: 4px;
+  color: var(--primary);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+h1 {
+  margin-bottom: 4px;
+  font-size: clamp(27px, 3vw, 38px);
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+h2 {
+  margin-bottom: 4px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle,
+.section-heading p,
+.system-summary p,
+.input-hint,
+.copy-row span,
+.feedback-section p,
+.empty-card p,
+.loading-card p,
+.evidence-heading p {
+  color: var(--muted);
+}
+
+.subtitle,
+.section-heading p {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.system-summary {
+  min-width: 278px;
+  padding: 10px 12px;
+  border-color: #cfe0f7;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f9fcff, #edf7ff);
+}
+
+.system-summary p { font-size: 12px; }
+.system-summary .el-button { padding-inline: 2px; color: #486177; }
+.status-dot.ready { background: var(--success); box-shadow: 0 0 0 5px rgb(15 157 122 / 12%); }
+
+.safety-alert {
+  margin: 0;
+  border: 1px solid #f3b9bd;
+  border-radius: 12px;
+  background: #fff7f7;
+}
+
+.safety-alert :deep(.el-alert__content) { min-width: 0; }
+.safety-alert :deep(.el-alert__title) { font-size: 13px; font-weight: 800; }
+.safety-alert :deep(.el-alert__description) { margin-top: 1px; font-size: 12px; line-height: 1.35; }
+
+.connection-card,
+.status-alert {
+  margin-top: 0;
+}
+
+.connection-card {
+  border-color: #cbd9ee;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 88%);
+}
+
+.workflow-progress {
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 0 4px;
+}
+
+.workflow-progress div { font-size: 13px; }
+.workflow-progress div > span { width: 24px; height: 24px; font-size: 12px; }
+.workflow-progress i { width: min(7vw, 72px); }
+
+.workbench-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+.composer-pane,
+.review-pane {
+  min-width: 0;
+  min-height: 0;
+}
+
+.composer-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.review-pane {
+  display: flex;
+}
+
+.step-card,
+.empty-card,
+.loading-card {
+  margin-top: 0;
+  border-color: var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 10px 26px rgb(27 67 129 / 7%);
+}
+
+.step-card { padding: 18px; }
+.context-card { flex: 0 0 auto; }
+.question-card { flex: 1 1 auto; min-height: 0; }
+
+.context-grid {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.context-grid label { gap: 6px; min-width: 0; }
+.context-grid label > span { font-size: 13px; white-space: nowrap; }
+.context-grid label b { width: 20px; height: 20px; font-size: 12px; }
+.context-grid label small { min-height: 28px; font-size: 11px; line-height: 1.3; }
+.context-grid :deep(.el-select__wrapper) { min-height: 34px; }
+
+.selection-confirmed {
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #c7eddf;
+  border-radius: 12px;
+  background: #effbf7;
+}
+
+.selection-confirmed strong { font-size: 13px; }
+.selection-confirmed p { font-size: 12px; }
+.check-mark { width: 26px; height: 26px; font-size: 13px; }
+
+.technical-box {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.question-label,
+.reply-label { margin: 14px 0 6px; font-size: 13px; }
+
+.question-card :deep(.el-textarea__inner) {
+  min-height: 114px !important;
+  padding: 10px 12px;
+  line-height: 1.55;
+  resize: none;
+}
+
+.example-row { gap: 6px; margin-top: 9px; font-size: 12px; }
+.example-row button { padding: 4px 8px; font-size: 12px; }
+.question-actions,
+.copy-row { margin-top: 10px; }
+.input-hint { font-size: 12px; }
+
+.loading-card,
+.empty-card {
+  width: 100%;
+  padding: 22px;
+}
+
+.empty-card {
+  align-items: center;
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, rgb(234 240 255 / 82%), rgb(255 255 255 / 95%));
+}
+
+.empty-card h2 { margin-bottom: 5px; }
+.empty-number { background: var(--primary-soft); color: var(--primary); }
+
+.review-pane > .step-card,
+.review-pane > .empty-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.answer-card {
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c6d4e7 transparent;
+}
+
+.answer-heading { align-items: flex-start; }
+.result-tags { gap: 6px; margin-top: 6px; }
+.result-tags :deep(.el-tag) { font-size: 11px; }
+
+.action-guide {
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.guide-icon { width: 30px; height: 30px; font-size: 16px; }
+.action-guide p { margin: 4px 0 5px; font-size: 13px; }
+.action-guide ul { padding-left: 17px; font-size: 12px; line-height: 1.5; }
+
+.result-alert,
+.reply-editor { margin-top: 10px; }
+.result-alert :deep(.el-alert__title) { font-size: 12px; }
+
+.reply-editor :deep(.el-textarea__inner) {
+  min-height: 138px !important;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.copy-row { align-items: center; }
+.copy-row .el-button,
+.question-actions .el-button { min-height: 34px; }
+
+.evidence-section,
+.feedback-section {
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.evidence-section summary {
+  cursor: pointer;
+  color: #365174;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.evidence-list { gap: 8px; margin-top: 10px; }
+.evidence-item { padding: 10px; }
+.evidence-item > p { margin-top: 6px; font-size: 13px; line-height: 1.5; }
+.technical-toggle-row { margin-top: 10px; }
+.feedback-actions { margin: 9px 0; }
+.feedback-section > .el-button { margin-top: 8px; }
+
+@media (min-width: 901px) and (min-height: 741px) {
+  :global(html),
+  :global(body),
+  :global(#app) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .workspace-shell {
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    gap: 10px;
+    height: 100vh;
+    min-height: 0;
+    padding: 18px 0;
+    overflow: hidden;
+  }
+
+  .workspace-header,
+  .safety-alert,
+  .connection-card,
+  .status-alert,
+  .workflow-progress,
+  .workbench-grid {
+    min-width: 0;
+  }
+
+  .workbench-grid {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .composer-pane {
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #c6d4e7 transparent;
+  }
+
+  .review-pane,
+  .review-pane > .answer-card,
+  .review-pane > .empty-card {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .empty-card { justify-content: center; }
+}
+
+@media (max-width: 1040px) {
+  .workspace-shell { width: min(100% - 28px, 1440px); }
+  .context-grid { grid-template-columns: 1fr; }
+  .context-grid label small { min-height: auto; }
+}
+
+@media (max-width: 900px), (max-height: 740px) {
+  .workspace-shell { padding-bottom: 32px; }
+  .workbench-grid { grid-template-columns: 1fr; }
+  .review-pane { min-height: 300px; }
+  .answer-card { overflow: visible; }
+}
+
+@media (max-width: 700px) {
+  .workspace-shell { width: min(100% - 20px, 1440px); }
+  .workspace-header { padding: 16px; }
+  .context-grid { grid-template-columns: 1fr; }
+  .system-summary { min-width: 0; }
+  .workflow-progress { justify-content: center; }
+  .workflow-progress i { width: 28px; }
+}
+
+/* Keep the review controls visible before optional evidence and feedback. */
+.answer-card { padding: 14px; }
+.answer-card .section-label { margin-bottom: 2px; }
+.answer-card h2 { font-size: 17px; }
+
+.action-guide {
+  gap: 9px;
+  margin-top: 9px;
+  padding: 9px 10px;
+}
+
+.action-guide ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.action-guide li {
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.result-alert,
+.reply-editor { margin-top: 7px; }
+.result-alert :deep(.el-alert) { padding: 6px 8px; }
+.result-alert :deep(.el-alert__title) { font-size: 11px; line-height: 1.35; }
+
+.reply-label { margin: 9px 0 4px; }
+.reply-editor :deep(.el-textarea__inner) {
+  min-height: 118px !important;
+  height: 118px !important;
+}
+
+.copy-row { margin-top: 7px; }
+.copy-row span { font-size: 12px; }
+
+.evidence-section { margin-top: 10px; padding-top: 10px; }
+.feedback-section { margin-top: 10px; padding-top: 10px; }
+.feedback-section summary {
+  cursor: pointer;
+  color: #365174;
+  font-size: 12px;
+  font-weight: 800;
+}
+.feedback-body { padding-top: 8px; }
+.feedback-section p { margin-bottom: 0; font-size: 12px; }
+.feedback-actions { margin: 6px 0; }
 </style>
