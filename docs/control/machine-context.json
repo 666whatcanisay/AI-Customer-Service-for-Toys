@@ -3,16 +3,16 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "complete",
-  "current_task": "CONTROL-G1-MERGE",
-  "current_stage": "T01 deliveries merged, retested, and synchronized",
-  "current_gate": "CONTROL-G1-MERGE PASS",
+  "status": "blocked",
+  "current_task": "CONTROL-LOCAL-DEMO-FINAL",
+  "current_stage": "C package and OPS runtime fixes locally squash merged; final one-click launch is waiting for port 5173",
+  "current_gate": "CONTROL-LOCAL-DEMO-FINAL ENV_BLOCKED",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "agent/control-g1-merge-status",
-    "base_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
-    "line_delivery_develop_commit": "ba9c0c92df3b8927663246f5b36597f1a39db3cc",
-    "final_sync_target": "origin/develop after this control-status change is merged"
+    "branch": "develop",
+    "base_commit": "a985fe2f069452e9d8d0cc8839ef0292245c83c1",
+    "line_delivery_develop_commit": "ba03ec254619667a1072245198724fb9aecea426",
+    "final_sync_target": "No remote update was performed during CONTROL-LOCAL-DEMO-FINAL"
   },
   "pull_requests": {
     "3": {
@@ -35,7 +35,8 @@
     "A": "A-T01 documentation baseline merged; runtime tests were not run and the RAG runtime gate remains not passed",
     "B": "Node v24.14.0, npm 10.9.2; typecheck exit 0; production build exit 0; no test script",
     "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
-    "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0"
+    "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
+    "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. The official one-click script was not launched because its elevated port guard found an unregistered external Vite process on 127.0.0.1:5173."
   },
   "agent_worktrees": {
     "A": {
@@ -70,6 +71,8 @@
     "C": "May be dispatched separately; recommended C-T02 direction is data ingestion and standardization foundations"
   },
   "t02_executed": false,
-  "blockers": [],
-  "last_updated": "2026-07-22T09:21:29+08:00"
+  "blockers": [
+    "Port 5173 is occupied by PID 35176, an unregistered node/Vite process from C:/Users/EDY/Documents/Codex/2026-07-23/多多商家版聚合聊天/项目开发者; do not terminate it from this task."
+  ],
+  "last_updated": "2026-07-23"
 }
