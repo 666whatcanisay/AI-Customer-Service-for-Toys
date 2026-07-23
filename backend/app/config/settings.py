@@ -3,7 +3,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from ipaddress import ip_address
 from pathlib import Path
+import re
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -11,6 +14,13 @@ from dotenv import load_dotenv
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_ROOT.parent
 load_dotenv(BACKEND_ROOT / ".env")
+
+
+DEFAULT_CORS_ALLOWED_ORIGINS = (
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+)
+_ORIGIN_HOST_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
 
 def _as_bool(value: str | None, default: bool) -> bool:
@@ -24,6 +34,82 @@ def _resolve_backend_path(value: str | None, default_name: str) -> Path:
     if not raw.is_absolute():
         raw = BACKEND_ROOT / raw
     return raw.resolve()
+
+
+def _normalize_origin_host(host: str) -> str:
+    """Return a canonical IP address or DNS hostname accepted in an Origin."""
+    try:
+        address = ip_address(host)
+    except ValueError:
+        try:
+            normalized = host.encode("idna").decode("ascii").lower()
+        except UnicodeError as exc:
+            raise ValueError("CORS_ALLOWED_ORIGINS contains an invalid host") from exc
+
+        if (
+            not normalized
+            or len(normalized) > 253
+            or normalized.endswith(".")
+            or any(
+                not _ORIGIN_HOST_LABEL.fullmatch(label)
+                for label in normalized.split(".")
+            )
+        ):
+            raise ValueError("CORS_ALLOWED_ORIGINS contains an invalid host")
+        return normalized
+
+    return str(address)
+
+
+def _normalize_cors_origin(value: str) -> str:
+    """Validate and canonicalize one explicit HTTP(S) Origin value."""
+    origin = value.strip(" ")
+    if not origin:
+        raise ValueError("CORS_ALLOWED_ORIGINS must not contain an empty Origin")
+    if origin == "*" or any(character.isspace() for character in origin):
+        raise ValueError("CORS_ALLOWED_ORIGINS must contain explicit Origins only")
+
+    try:
+        parsed = urlsplit(origin)
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("CORS_ALLOWED_ORIGINS contains an invalid Origin") from exc
+
+    scheme = parsed.scheme.lower()
+    if (
+        scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+        or parsed.hostname is None
+    ):
+        raise ValueError(
+            "CORS_ALLOWED_ORIGINS must use http(s) scheme, host, and optional port only"
+        )
+
+    host = _normalize_origin_host(parsed.hostname)
+    rendered_host = f"[{host}]" if ":" in host else host
+    if port is None or (scheme == "http" and port == 80) or (
+        scheme == "https" and port == 443
+    ):
+        return f"{scheme}://{rendered_host}"
+    return f"{scheme}://{rendered_host}:{port}"
+
+
+def parse_cors_allowed_origins(value: str | None) -> tuple[str, ...]:
+    """Parse CORS_ALLOWED_ORIGINS, preserving order while removing duplicates."""
+    raw_origins = DEFAULT_CORS_ALLOWED_ORIGINS if value is None else value.split(",")
+    origins: list[str] = []
+    seen: set[str] = set()
+    for raw_origin in raw_origins:
+        origin = _normalize_cors_origin(raw_origin)
+        if origin not in seen:
+            origins.append(origin)
+            seen.add(origin)
+    return tuple(origins)
 
 
 def update_env_values(settings: "Settings", values: dict[str, str]) -> None:
@@ -94,6 +180,7 @@ class Settings:
     platform_api_timeout_seconds: float
     rag_distance_threshold: float
     top_k: int
+    cors_allowed_origins: tuple[str, ...]
     host: str
     port: int
 
@@ -144,6 +231,9 @@ class Settings:
                 )
             ),
             top_k=max(1, int(os.getenv("TOP_K", "2"))),
+            cors_allowed_origins=parse_cors_allowed_origins(
+                os.getenv("CORS_ALLOWED_ORIGINS")
+            ),
             host=os.getenv("HOST", "127.0.0.1").strip(),
             port=int(os.getenv("PORT", "8000")),
         )
