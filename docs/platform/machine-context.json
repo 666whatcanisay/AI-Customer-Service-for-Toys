@@ -1,6 +1,6 @@
 {
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-platform-center",
-  "current_task": "C-T02B",
+  "current_task": "C-T04",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)"
   ],
@@ -15,13 +15,15 @@
   ],
   "version": "0.1.0",
   "project_id": "mumu-C",
-  "last_test_result": "2026-07-22 C-T02B: manifest 42/42 sizes and SHA-256 passed. Backend pytest 40 passed with 1 upstream TestClient deprecation warning. Alembic upgrade-downgrade-upgrade passed at 0002_ct02b_test_catalog. Live V0.3.1 ZIP preflight/import on port 8013 returned HTTP 200/201 and imported 1 store, 5 products, 18 SKUs, 37 sources including 35 images, 16 FAQs, 8 safety rules, 28 evaluations, and 13 conflicts; original formal import tables remained empty. Admin typecheck, 20 Vitest tests, and production build passed.",
+  "last_test_result": "2026-07-23 C-T04: backend pytest 53 passed with 1 existing upstream TestClient deprecation warning. Real Uvicorn on 127.0.0.1:8011 returned /health HTTP 200 with matching request_id response header/body. Allowed-origin OPTIONS and GET returned the exact http://127.0.0.1:5173 allow-origin header; denied-origin OPTIONS returned 400 and denied-origin GET omitted the allow-origin header. The test process was stopped and port 8011 was closed.",
   "known_risks": [
     "FastAPI TestClient emitted an upstream HTTPX adapter deprecation warning.",
     "SQLite is local-development only; authentication, authorization, audit persistence, retention policy, cross-batch deduplication, and production security are not implemented.",
     "ZIP validation is bounded structural, manifest, and hash validation, not antivirus scanning, content sanitization, or a production security certification.",
     "The isolated test catalog has no authentication, authorization, persistent audit log, retention policy, formal publication, or concurrent re-import recovery.",
-    "C-T02B read-only response fields are frozen by task-local compatibility notes; contracts and A/B clients are unchanged, so live cross-line integration is not claimed."
+    "C-T02B read-only response fields are frozen by task-local compatibility notes; contracts and A/B clients are unchanged, so live cross-line integration is not claimed.",
+    "CORS constrains browser response access only; it is not authentication, authorization, CSRF protection, or a production security certification.",
+    "The default allows only http://127.0.0.1:5173; localhost or a future HTTPS deployment origin must be configured explicitly and reviewed."
   ],
   "project_name": "C：知识治理中台与管理平台",
   "line": "C",
@@ -32,29 +34,27 @@
     "GET /api/v1/test-knowledge-packages/{package_id}/rag-export",
     "GET /api/v1/test-knowledge-packages/{package_id}/evaluations"
   ],
-  "current_gate": "C-T02B L2 Gate PASS; Draft PR #13 is open against develop",
-  "current_stage": "C1: isolated V0.3.1 test catalog and frozen read-only exports",
+  "current_gate": "C-T04 L2 local implementation and verification PASS; Draft PR #15 is open against develop for batch review",
+  "current_stage": "C1: explicit test-environment CORS integration baseline",
   "git": {
-    "branch": "agent/platform-center-t02b",
+    "branch": "agent/platform-center-t04",
     "clean": true,
-    "commit": "72de66d",
+    "commit": "c1763ce8297aa3864fcde904537185ea0b886e1c",
+    "commit_role": "C-T04 implementation commit; PR head also includes the machine-context-only synchronization commit",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "forbidden_paths": [
     "backend/**",
     "frontend/**",
-    "extension/**"
+    "extension/**",
+    "admin_web/**"
   ],
   "blockers": [],
   "test_commands": [
-    "platform_backend/.venv/Scripts/python.exe -m pytest",
-    "platform_backend/.venv/Scripts/python.exe -m alembic upgrade head; downgrade base; upgrade head on an isolated temp SQLite database",
-    "platform_backend/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8013 --no-access-log with isolated temp DATABASE_URL",
-    "POST V0.3.1 temp ZIP preflight/import and call all five frozen GET interfaces; verify direct database counts and formal import tables remain empty",
-    "pnpm install --frozen-lockfile",
-    "pnpm typecheck",
-    "pnpm test",
-    "pnpm build"
+    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
+    "CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173 and isolated temp DATABASE_URL; .venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8011 --no-access-log",
+    "GET /health with Origin and X-Request-ID; allowed and denied OPTIONS preflight plus denied-origin actual GET",
+    "Stop the exact test process and verify port 8011 has no listener"
   ],
   "status": "ready",
   "owned_paths": [
@@ -67,10 +67,11 @@
     "Review-only product and SKU ingestion governance",
     "Isolated test package catalog and read-only test exports"
   ],
-  "last_updated": "2026-07-22",
+  "last_updated": "2026-07-23",
   "out_of_scope": [
     "Other-line business code",
     "C-T03 and later tasks",
+    "B-T04, OPS-T04, and A-line changes",
     "Formal publication, operational review, auto-send, and A/B live integration",
     "Kingdee and commerce-platform integration",
     "A-line publication, RAG, Chroma, model completion, and real company data"
@@ -80,14 +81,16 @@
     "POST /api/v1/import-batches/product-sku/preflight (C-line local, zero-write)",
     "C-line local /api/v1 product-SKU import batch APIs (shared contracts unchanged)",
     "POST /api/v1/test-data-packages/preflight and POST /api/v1/test-data-packages",
-    "Five frozen C-line test catalog and knowledge-package GET interfaces (task-local compatibility agreement; shared contracts unchanged)"
+    "Five frozen C-line test catalog and knowledge-package GET interfaces (task-local compatibility agreement; shared contracts unchanged)",
+    "Explicit CORS_ALLOWED_ORIGINS runtime configuration for the B test origin; API payload contracts unchanged"
   ],
   "completed_tasks": [
     "Governance documentation initialized",
     "C-T01 minimal platform backend and admin web skeleton implemented and locally verified",
     "C-T02 product/SKU XLSX ingestion, validation, error reporting, and PENDING_REVIEW staging implemented and locally verified",
     "C-T02A zero-write XLSX preflight and admin can_import gate implemented and locally verified",
-    "C-T02B V0.3.1 ZIP import, isolated test catalog, frozen GET responses, and admin page implemented and locally verified"
+    "C-T02B V0.3.1 ZIP import, isolated test catalog, frozen GET responses, and admin page implemented and locally verified",
+    "C-T04 explicit CORS parsing, middleware, tests, and live port 8011 verification completed"
   ],
   "data_boundaries": {
     "source": "Validated V0.3.1 provided test baseline package; source directory remained read-only and was not copied into Git",
@@ -116,6 +119,10 @@
     "admin": "1b6d744",
     "documentation": "72de66d"
   },
-  "draft_pr": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/13",
-  "next_recommended_task": "C-T03 or cross-line integration only after separate authorization; do not auto-run"
+  "c_t04_commits": {
+    "implementation_and_docs": "c1763ce8297aa3864fcde904537185ea0b886e1c",
+    "machine_context": "the final PR commit containing this file"
+  },
+  "draft_pr": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/15",
+  "next_recommended_task": "CONTROL-MVP-BATCH-04 batch review and final integration; C-T03 remains separately locked"
 }
