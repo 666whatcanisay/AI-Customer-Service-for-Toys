@@ -212,19 +212,27 @@ function Get-LanFrontendEnvironment($Config) {
 function Invoke-WithProcessEnvironment([hashtable]$Environment, [scriptblock]$Action) {
     $previous = @{}
     try {
-        foreach ($name in $Environment.Keys) {
-            if ($name -notmatch '^[A-Z_][A-Z0-9_]*$') { throw "非法环境变量名：$name" }
-            $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
-            [Environment]::SetEnvironmentVariable($name, [string]$Environment[$name], 'Process')
+        foreach ($environmentVariableName in $Environment.Keys) {
+            if ($environmentVariableName -notmatch '^[A-Z_][A-Z0-9_]*$') { throw "非法环境变量名：$environmentVariableName" }
+            $previous[$environmentVariableName] = [Environment]::GetEnvironmentVariable($environmentVariableName, 'Process')
+            [Environment]::SetEnvironmentVariable($environmentVariableName, [string]$Environment[$environmentVariableName], 'Process')
         }
         & $Action
     } finally {
-        foreach ($name in $Environment.Keys) { [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process') }
+        foreach ($environmentVariableName in $Environment.Keys) { [Environment]::SetEnvironmentVariable($environmentVariableName, $previous[$environmentVariableName], 'Process') }
     }
 }
 
 function Start-ManagedServiceWithEnvironment($Config, [string]$Name, [string]$ExecutablePath, [string[]]$Arguments, [string]$WorkingDirectory, [string]$CommandFeature, [int]$Port, [hashtable]$Environment) {
-    return Invoke-WithProcessEnvironment $Environment { Start-ManagedService $Config $Name $ExecutablePath $Arguments $WorkingDirectory $CommandFeature $Port }
+    $serviceName = $Name
+    $serviceExecutablePath = $ExecutablePath
+    $serviceArguments = @($Arguments)
+    $serviceWorkingDirectory = $WorkingDirectory
+    $serviceCommandFeature = $CommandFeature
+    $servicePort = $Port
+    return Invoke-WithProcessEnvironment -Environment $Environment -Action {
+        Start-ManagedService -Config $Config -Name $serviceName -ExecutablePath $serviceExecutablePath -Arguments $serviceArguments -WorkingDirectory $serviceWorkingDirectory -CommandFeature $serviceCommandFeature -Port $servicePort
+    }
 }
 
 function Get-LanFirewallStatusMessage($NetworkProfile) {
