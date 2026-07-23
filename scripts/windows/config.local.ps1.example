@@ -16,4 +16,12 @@
     RuntimeDirectory = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path '.runtime')
     TestDataPackagePath = ''
     AutoImportTestData = $false
+    # 本机入口保持本机模式；“启动局域网客服.bat”会显式启用 LAN 模式。
+    LanMode = $false
+    # 局域网模式固定监听所有本机接口，但只公布经校验的私有 IPv4。
+    LanBindAddress = '0.0.0.0'
+    # 留空时只在恰好一个有效物理网卡 IPv4 时自动选择；多网卡时必须显式填写。
+    LanAdvertisedHost = ''
+    # Public 网络默认阻止。仅在明确理解风险后才可改为 $true，脚本不会修改防火墙。
+    AllowPublicNetwork = $false
 }

@@ -13,6 +13,10 @@ function Get-LocalConfig([string]$ConfigPath) {
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
         AutoSyncTestKnowledge = $true
+        LanMode = $false
+        LanBindAddress = '0.0.0.0'
+        LanAdvertisedHost = ''
+        AllowPublicNetwork = $false
     }
     foreach ($entry in $optionalDefaults.GetEnumerator()) {
         if (-not $config.ContainsKey($entry.Key) -or $null -eq $config[$entry.Key] -or [string]::IsNullOrWhiteSpace([string]$config[$entry.Key])) {
@@ -47,7 +51,7 @@ function Get-LocalConfig([string]$ConfigPath) {
     foreach ($key in @('PlatformDatabaseUrl', 'TestKnowledgePackageId')) {
         if ([string]::IsNullOrWhiteSpace([string]$config[$key])) { throw "配置项 $key 缺失或为空。" }
     }
-    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge')) {
+    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'LanMode', 'AllowPublicNetwork')) {
         if ($config[$key] -isnot [bool]) {
             $parsed = $false
             if (-not [bool]::TryParse([string]$config[$key], [ref]$parsed)) { throw "配置项 $key 必须为 true 或 false。" }
@@ -59,7 +63,188 @@ function Get-LocalConfig([string]$ConfigPath) {
 
 function Get-ServiceRecordPath($Config, [string]$Name) { Join-Path $Config.RuntimeDirectory "$Name.json" }
 function Get-ServiceLogDirectory($Config) { Join-Path $Config.RuntimeDirectory 'logs' }
-function Get-ServiceUrl($Config, [int]$Port, [string]$Path = '/') { "http://$($Config.BindAddress):$Port$Path" }
+function Get-ServiceUrl($Config, [int]$Port, [string]$Path = '/') {
+    $serviceHost = [string]$Config.BindAddress
+    if ($serviceHost -in @('0.0.0.0', '::')) { $serviceHost = '127.0.0.1' }
+    "http://${serviceHost}:$Port$Path"
+}
+
+function Test-PrivateLanIpv4([string]$Address) {
+    $parsed = $null
+    if (-not [System.Net.IPAddress]::TryParse($Address, [ref]$parsed)) { return $false }
+    if ($parsed.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { return $false }
+    $bytes = $parsed.GetAddressBytes()
+    if ($bytes[0] -eq 10) { return $true }
+    if ($bytes[0] -eq 172 -and $bytes[1] -ge 16 -and $bytes[1] -le 31) { return $true }
+    return $bytes[0] -eq 192 -and $bytes[1] -eq 168
+}
+
+function Test-LanAdapterEligible($Adapter) {
+    if ([string]$Adapter.Status -ne 'Up') { return $false }
+    $description = "{0} {1}" -f [string]$Adapter.Name, [string]$Adapter.InterfaceDescription
+    return $description -notmatch '(?i)(virtual|vmware|hyper-v|vEthernet|wsl|docker|loopback|tunnel|tap|vpn)'
+}
+
+function Get-LanIpv4Candidates {
+    $candidates = @()
+    try {
+        $adapters = @(Get-NetAdapter -ErrorAction Stop)
+    } catch {
+        throw "无法读取 Windows 网络适配器：$($_.Exception.Message)"
+    }
+    foreach ($adapter in $adapters) {
+        if (-not (Test-LanAdapterEligible $adapter)) { continue }
+        $interfaceIndex = [int]$adapter.ifIndex
+        $addresses = @(Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue)
+        foreach ($address in $addresses) {
+            $ip = [string]$address.IPAddress
+            if (-not (Test-PrivateLanIpv4 $ip)) { continue }
+            $candidates += [pscustomobject]@{
+                IPAddress = $ip
+                InterfaceIndex = $interfaceIndex
+                InterfaceAlias = [string]$adapter.Name
+                InterfaceDescription = [string]$adapter.InterfaceDescription
+            }
+        }
+    }
+    return @($candidates | Sort-Object IPAddress -Unique)
+}
+
+function Get-LanNetworkProfile($Candidate) {
+    try {
+        $profiles = @(Get-NetConnectionProfile -InterfaceIndex ([int]$Candidate.InterfaceIndex) -ErrorAction Stop)
+    } catch {
+        return [pscustomobject]@{ InterfaceAlias=[string]$Candidate.InterfaceAlias; NetworkName=''; NetworkCategory='Unknown'; Detail=$_.Exception.Message }
+    }
+    $profile = $profiles | Select-Object -First 1
+    if ($null -eq $profile) {
+        return [pscustomobject]@{ InterfaceAlias=[string]$Candidate.InterfaceAlias; NetworkName=''; NetworkCategory='Unknown'; Detail='Windows 未返回网络配置文件' }
+    }
+    return [pscustomobject]@{
+        InterfaceAlias = [string]$Candidate.InterfaceAlias
+        NetworkName = [string]$profile.Name
+        NetworkCategory = [string]$profile.NetworkCategory
+        Detail = ''
+    }
+}
+
+function Assert-LanNetworkSafety($Config, $NetworkProfile) {
+    if ([string]$NetworkProfile.NetworkCategory -eq 'Public') {
+        if (-not [bool]$Config.AllowPublicNetwork) {
+            throw "当前网络 [$($NetworkProfile.NetworkName)]（$($NetworkProfile.InterfaceAlias)）配置为 Public。为避免在公共网络暴露测试服务，局域网启动已阻止；请在 Windows 设置中将该网络改为 Private 后重试。"
+        }
+        Write-Warning "当前网络 [$($NetworkProfile.NetworkName)] 配置为 Public；因 AllowPublicNetwork=true 正在继续。请确认这是受控网络，脚本不会修改防火墙。"
+    }
+}
+
+function Get-LanCorsAllowedOrigins($Config) {
+    $lanOrigin = "http://$($Config.LanAdvertisedHost):$($Config.CustomerWebPort)"
+    $origins = @($lanOrigin, "http://127.0.0.1:$($Config.CustomerWebPort)", "http://localhost:$($Config.CustomerWebPort)") | Select-Object -Unique
+    if (@($origins | Where-Object { $_ -eq '*' -or $_ -match '\*' }).Count -gt 0) { throw '局域网 CORS 只允许显式 Origin，禁止通配符。' }
+    return ($origins -join ',')
+}
+
+function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfile, [switch]$SkipPublicNetworkGuard) {
+    if ([string]$Config.LanBindAddress -ne '0.0.0.0') {
+        throw "LanBindAddress 必须为 0.0.0.0；拒绝绑定到指定地址或公网 IP：$($Config.LanBindAddress)"
+    }
+    if ($null -eq $Candidates) { $Candidates = @(Get-LanIpv4Candidates) }
+    $configuredHost = [string]$Config.LanAdvertisedHost
+    $selected = $null
+    if (-not [string]::IsNullOrWhiteSpace($configuredHost)) {
+        if (-not (Test-PrivateLanIpv4 $configuredHost)) {
+            throw "LanAdvertisedHost 必须是主电脑有效的私有 IPv4；拒绝地址：$configuredHost"
+        }
+        $selected = @($Candidates | Where-Object { [string]$_.IPAddress -eq $configuredHost } | Select-Object -First 1)
+        if ($selected.Count -ne 1) {
+            throw "LanAdvertisedHost=$configuredHost 不属于已连接的有效物理网络适配器；请检查 IP、网卡状态，或移除虚拟网卡地址。"
+        }
+        $selected = $selected[0]
+    } else {
+        if ($Candidates.Count -eq 0) { throw '未发现有效私有 IPv4。请连接网络后重试，或在 config.local.ps1 中显式设置 LanAdvertisedHost。' }
+        if ($Candidates.Count -gt 1) {
+            $available = @($Candidates | ForEach-Object { "$($_.IPAddress)（$($_.InterfaceAlias)）" }) -join '；'
+            throw "发现多个有效私有 IPv4：$available。为避免猜测，请在 config.local.ps1 中明确设置 LanAdvertisedHost。"
+        }
+        $selected = $Candidates[0]
+    }
+    if ($null -eq $NetworkProfile) { $NetworkProfile = Get-LanNetworkProfile $selected }
+    if (-not $SkipPublicNetworkGuard) { Assert-LanNetworkSafety $Config $NetworkProfile }
+
+    $lanConfig = @{}
+    foreach ($entry in $Config.GetEnumerator()) { $lanConfig[$entry.Key] = $entry.Value }
+    $lanConfig.LanMode = $true
+    $lanConfig.LanAdvertisedHost = [string]$selected.IPAddress
+    $lanConfig.BindAddress = '0.0.0.0'
+    $lanConfig.CustomerWebUrl = "http://$($lanConfig.LanAdvertisedHost):$($lanConfig.CustomerWebPort)/"
+    $lanConfig.LocalCustomerWebUrl = "http://127.0.0.1:$($lanConfig.CustomerWebPort)/"
+    $lanConfig.LanNetworkProfile = $NetworkProfile
+    $lanConfig.LanCorsAllowedOrigins = Get-LanCorsAllowedOrigins $lanConfig
+    return $lanConfig
+}
+
+function Get-LanServiceListenerAddress($Config, [int]$Port) { "$($Config.BindAddress):$Port" }
+
+function Get-LanPlatformEnvironment($Config) {
+    return @{
+        DATABASE_URL = [string]$Config.PlatformDatabaseUrl
+        CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
+    }
+}
+
+function Get-LanRagEnvironment($Config) {
+    return @{
+        CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
+        LLM_PROVIDER = 'ollama'
+        LLM_MODEL = [string]$Config.OllamaModel
+        LLM_BASE_URL = [string]$Config.OllamaBaseUrl
+        PLATFORM_API_BASE_URL = "http://127.0.0.1:$($Config.PlatformPort)"
+    }
+}
+
+function Get-LanFrontendEnvironment($Config) {
+    return @{
+        VITE_RAG_API_BASE_URL = "http://$($Config.LanAdvertisedHost):$($Config.RagPort)"
+        VITE_PLATFORM_API_BASE_URL = "http://$($Config.LanAdvertisedHost):$($Config.PlatformPort)"
+    }
+}
+
+function Invoke-WithProcessEnvironment([hashtable]$Environment, [scriptblock]$Action) {
+    $previous = @{}
+    try {
+        foreach ($name in $Environment.Keys) {
+            if ($name -notmatch '^[A-Z_][A-Z0-9_]*$') { throw "非法环境变量名：$name" }
+            $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+            [Environment]::SetEnvironmentVariable($name, [string]$Environment[$name], 'Process')
+        }
+        & $Action
+    } finally {
+        foreach ($name in $Environment.Keys) { [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process') }
+    }
+}
+
+function Start-ManagedServiceWithEnvironment($Config, [string]$Name, [string]$ExecutablePath, [string[]]$Arguments, [string]$WorkingDirectory, [string]$CommandFeature, [int]$Port, [hashtable]$Environment) {
+    return Invoke-WithProcessEnvironment $Environment { Start-ManagedService $Config $Name $ExecutablePath $Arguments $WorkingDirectory $CommandFeature $Port }
+}
+
+function Get-LanFirewallStatusMessage($NetworkProfile) {
+    $profileName = switch ([string]$NetworkProfile.NetworkCategory) {
+        'DomainAuthenticated' { 'Domain' }
+        'Private' { 'Private' }
+        'Public' { 'Public' }
+        default { '' }
+    }
+    if ([string]::IsNullOrWhiteSpace($profileName)) {
+        return 'Windows 防火墙状态：无法按当前网络类型确认；它仍可能阻断来自笔记本的访问。脚本未修改任何规则。'
+    }
+    try {
+        $profile = Get-NetFirewallProfile -Profile $profileName -ErrorAction Stop
+        if (-not [bool]$profile.Enabled) { return "Windows 防火墙状态：$profileName 配置文件已关闭（脚本未作任何修改）。" }
+        return "Windows 防火墙状态：$profileName 配置文件已启用，可能阻断笔记本对 5173、8000、8011 的入站访问；脚本未创建规则。仅在受控网络上手动配置 Private 规则。"
+    } catch {
+        return "Windows 防火墙状态：无法读取 $profileName 配置文件（$($_.Exception.Message)）；它仍可能阻断笔记本访问。脚本未修改任何规则。"
+    }
+}
 
 function Get-ProcessMetadata([int]$Id) {
     Get-CimInstance Win32_Process -Filter "ProcessId = $Id" -ErrorAction SilentlyContinue
