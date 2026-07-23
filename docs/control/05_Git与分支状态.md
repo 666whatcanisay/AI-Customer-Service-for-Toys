@@ -17,3 +17,9 @@
 - 本地 `develop` 从 `a985fe2f069452e9d8d0cc8839ef0292245c83c1` 依次 squash 合入 C 包解析修复 `2f997219a61c92439a3dddb6a923c7d8e282add1` 与 OPS 启动编排修复 `ba03ec254619667a1072245198724fb9aecea426`，均无冲突。
 - 本任务未推送远端；记录时 `origin/develop` 仍为共同基线 `a985fe2f069452e9d8d0cc8839ef0292245c83c1`。最终运行 Gate 受其他项目占用 5173 阻断，详见本机体验交接记录。
 - 用户释放 5173 后，正式一键脚本与状态脚本均成功完成；最终本地体验结果记录在 `docs/control/ops/CONTROL-LOCAL-DEMO-FINAL_交接.md`。本任务仍未推送远端。
+
+## 2026-07-23 局域网模式集成
+
+- 共同基线为已推送的 `913a440a703b961ff48ceb232b088b8481567a72`；`agent/rag-lan-t04` 的已验证提交 `055aaac60cdce1ad5004832c0bb71129c6ab6c97` 无冲突 squash 为 `3f20686c48dbec4dd7d389e6eac7dcfe16eeb28f`。
+- `control/ops-lan-t05` 的已验证提交 `b7cb6eec0bcd686cbdd9079a2d98c47083af03b5` 随后无冲突 squash 为 `978f884b41b8a1ea0c0f42ac5e5e319516f0cac`。
+- 两项功能提交已按快进方式推送至 `origin/develop`；未 reset、未重写已验收历史，也未创建或冒充 GitHub PR。

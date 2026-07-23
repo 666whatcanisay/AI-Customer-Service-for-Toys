@@ -3,16 +3,17 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "ready_for_user_test",
-  "current_task": "CONTROL-LOCAL-DEMO-FINAL",
-  "current_stage": "Official one-click local startup completed; A, B, and C are running for user testing",
-  "current_gate": "CONTROL-LOCAL-DEMO-FINAL READY_FOR_USER_TEST",
+  "status": "blocked",
+  "current_task": "CONTROL-LAN-BATCH-05-FINAL",
+  "current_stage": "A LAN CORS and OPS LAN mode were integrated and pushed; controlled LAN startup is blocked before binding because the physical Ethernet profile is Public",
+  "current_gate": "CONTROL-LAN-BATCH-05-FINAL BLOCKED: change the physical LAN network to Private or DomainAuthenticated, then rerun the official LAN launcher",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
-    "base_commit": "a985fe2f069452e9d8d0cc8839ef0292245c83c1",
-    "line_delivery_develop_commit": "ba03ec254619667a1072245198724fb9aecea426",
-    "final_sync_target": "No remote update was performed during CONTROL-LOCAL-DEMO-FINAL"
+    "base_commit": "913a440a703b961ff48ceb232b088b8481567a72",
+    "lan_cors_squash_commit": "3f20686c48dbec4dd7d389e6eac7dcfe16eeb28f",
+    "ops_lan_squash_commit": "978f884b41b8a1ea0c0f42ac5e5e319516f0cac",
+    "origin_develop_after_feature_push": "978f884b41b8a1ea0c0f42ac5e5e319516f0cac"
   },
   "pull_requests": {
     "3": {
@@ -36,7 +37,8 @@
     "B": "Node v24.14.0, npm 10.9.2; typecheck exit 0; production build exit 0; no test script",
     "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
     "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
-    "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified."
+    "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified.",
+    "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. config.local.ps1 paths and original V0.3.1 ZIP were verified; ports 8000/5173/8011 had no listeners. The physical Ethernet network category was Public, so no LAN service was started and user network reclassification is required before real LAN acceptance."
   },
   "agent_worktrees": {
     "A": {
@@ -63,7 +65,9 @@
     "B-T01",
     "C-T01",
     "CONTROL-G1-R2",
-    "CONTROL-G1-MERGE"
+    "CONTROL-G1-MERGE",
+    "CONTROL-LAN-BATCH-05-PREP",
+    "CONTROL-LAN-BATCH-05-INTEGRATION"
   ],
   "next_tasks": {
     "A": "May be dispatched separately; preserve the runtime and real-test blockers",
@@ -71,6 +75,9 @@
     "C": "May be dispatched separately; recommended C-T02 direction is data ingestion and standardization foundations"
   },
   "t02_executed": false,
-  "blockers": [],
+  "blockers": [
+    "The physical Ethernet network profile is Public; official LAN startup must not expose services until it is changed to Private or DomainAuthenticated",
+    "Real LAN service and laptop acceptance have not started; ports 8000, 5173, and 8011 are intentionally unbound"
+  ],
   "last_updated": "2026-07-23"
 }
