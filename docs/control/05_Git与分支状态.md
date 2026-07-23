@@ -16,3 +16,4 @@
 
 - 本地 `develop` 从 `a985fe2f069452e9d8d0cc8839ef0292245c83c1` 依次 squash 合入 C 包解析修复 `2f997219a61c92439a3dddb6a923c7d8e282add1` 与 OPS 启动编排修复 `ba03ec254619667a1072245198724fb9aecea426`，均无冲突。
 - 本任务未推送远端；记录时 `origin/develop` 仍为共同基线 `a985fe2f069452e9d8d0cc8839ef0292245c83c1`。最终运行 Gate 受其他项目占用 5173 阻断，详见本机体验交接记录。
+- 用户释放 5173 后，正式一键脚本与状态脚本均成功完成；最终本地体验结果记录在 `docs/control/ops/CONTROL-LOCAL-DEMO-FINAL_交接.md`。本任务仍未推送远端。
