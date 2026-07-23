@@ -10,10 +10,10 @@ $shellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
 $fakeProcess = $null
 
 try {
-    New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path @($testRoot, (Join-Path $testRoot 'backend'), (Join-Path $testRoot 'frontend'), (Join-Path $testRoot 'platform_backend')) | Out-Null
     @"
 @{
-    RepositoryRoot = '$((Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path.Replace("'", "''"))'
+    RepositoryRoot = '$($testRoot.Replace("'", "''"))'
     RagPythonPath = '$($shellPath.Replace("'", "''"))'
     PlatformPythonPath = '$($shellPath.Replace("'", "''"))'
     PnpmCommand = '$($shellPath.Replace("'", "''"))'
