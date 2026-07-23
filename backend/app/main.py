@@ -81,10 +81,10 @@ def create_app(
     )
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_origins=list(active_settings.cors_allowed_origins),
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "OPTIONS"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type"],
     )
 
     @application.middleware("http")

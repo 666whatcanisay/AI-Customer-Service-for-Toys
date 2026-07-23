@@ -1,5 +1,15 @@
 # API 文档
 
+## Browser CORS configuration
+
+Set `CORS_ALLOWED_ORIGINS` to an English-comma-separated list of explicit Origins, for example:
+
+```text
+CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://192.168.1.20:5173
+```
+
+When omitted, only `http://127.0.0.1:5173` and `http://localhost:5173` are allowed. Entries are trimmed, canonicalized, and deduplicated. Every entry must be exactly `http(s)://host[:port]`: paths, queries, fragments, credentials, wildcards, invalid hosts, and invalid ports abort startup. CORS allows GET, POST, PUT, and OPTIONS with Content-Type only; credentials are disabled. An unlisted Origin receives no ACAO header, while a request without Origin remains a normal server-to-server request.
+
 ## POST /api/chat
 
 新规范请求固定为 question + context；context 只接受 `TENANT-PDD-SM-TEST / pdd / PDD-SM`。
