@@ -2,8 +2,10 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlatformClientError, RagClientError } from '@/api/errorMapper'
-import { RAG_ACTIONS, type RagAction, type RagChatResult } from '@/api/ragTypes'
+import type { RagAction, RagChatResult } from '@/api/ragTypes'
 import AiChat from './AiChat.vue'
+
+const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
 
 const apiMocks = vi.hoisted(() => ({
   getRagHealth: vi.fn(),
@@ -81,7 +83,9 @@ const sku = {
 const resultFor = (action: RagAction = 'DIRECT_ANSWER', withSku = true): RagChatResult => ({
   requestId: 'req-ui-1',
   model: 'qwen-turbo',
-  answer: action === 'ASK_CLARIFY' ? '请先确认客户咨询的具体款式。' : '建议回复：适用年龄请以商品包装标识为准。',
+  answer: action === 'ASK_CLARIFY'
+    ? '请先确认客户咨询的具体款式。'
+    : '建议回复：适用年龄请以商品包装标识为准。',
   action,
   riskLevel: action === 'TRANSFER_HUMAN' ? 'HIGH' : 'LOW',
   citations: [{
@@ -134,9 +138,10 @@ const submit = async (wrapper: VueWrapper, withSku = true) => {
   await flushPromises()
 }
 
-describe('AiChat B-T03', () => {
+describe('AiChat B-T04 three-step workbench', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
     apiMocks.getRagHealth.mockResolvedValue({ status: 'ok', ready: true })
     apiMocks.getPlatformHealth.mockResolvedValue({ status: 'ok', service: 'platform' })
     apiMocks.listStores.mockResolvedValue([store, secondStore])
@@ -153,17 +158,32 @@ describe('AiChat B-T03', () => {
     })
   })
 
-  it('loads C stores, cascades products/SKUs, and marks the test-only boundary', async () => {
+  it('shows the three-step flow and cascades the platform/store, product, and SKU', async () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(apiMocks.listStores).toHaveBeenCalledOnce()
-    expect(wrapper.get('[data-testid="safety-notice"]').text()).toContain('不可用于真实客户')
+    expect(wrapper.get('[data-testid="safety-notice"]').text()).toContain(
+      '当前为测试数据，仅供内部验证，禁止直接用于真实客户。'
+    )
+    expect(wrapper.text()).toContain('第 1 步')
+    expect(wrapper.text()).toContain('第 2 步')
+    expect(wrapper.text()).toContain('建议回复会显示在这里')
 
     await selectAt(wrapper, 0, 'TENANT-PDD-SM-TEST::pdd::PDD-SM')
     expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
     await selectAt(wrapper, 1, 'PROD-001')
     expect(apiMocks.listSkus).toHaveBeenCalledWith(store, product, expect.any(AbortSignal))
+  })
+
+  it('remembers the last store and restores its product list', async () => {
+    window.localStorage.setItem(LAST_STORE_KEY, 'TENANT-PDD-SM-TEST::pdd::PDD-SM')
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' })
+    expect(selects[0]?.props('modelValue')).toBe('TENANT-PDD-SM-TEST::pdd::PDD-SM')
+    expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
   })
 
   it('clears product and SKU on store switch, and clears SKU on product switch', async () => {
@@ -175,6 +195,9 @@ describe('AiChat B-T03', () => {
     let selects = wrapper.findAllComponents({ name: 'ElSelect' })
     expect(selects[1]?.props('modelValue')).toBe('')
     expect(selects[2]?.props('modelValue')).toBe('')
+    expect(window.localStorage.getItem(LAST_STORE_KEY)).toBe(
+      'TENANT-PDD-SM-TEST::pdd::PDD-SM-2'
+    )
 
     await selectAt(wrapper, 1, 'PROD-001')
     await selectAt(wrapper, 2, 'SKU-RED')
@@ -183,7 +206,19 @@ describe('AiChat B-T03', () => {
     expect(selects[2]?.props('modelValue')).toBe('')
   })
 
-  it('sends the frozen question/context request and renders answer and source', async () => {
+  it('explains that a product must be selected before generating', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="question-input"]').setValue('这个商品适合几岁？')
+    await wrapper.get('[data-testid="submit-button"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="request-error"]').text()).toContain(
+      '尚未选择商品，请先完成第一步。'
+    )
+    expect(apiMocks.chat).not.toHaveBeenCalled()
+  })
+
+  it('sends the frozen context request and keeps sources folded by default', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
@@ -198,44 +233,79 @@ describe('AiChat B-T03', () => {
         sku_id: 'SKU-RED'
       }
     }, expect.any(AbortSignal))
-    expect(wrapper.get('[data-testid="answer-card"]').text()).toContain('直接回答')
-    expect(wrapper.get('[data-testid="risk-tag"]').text()).toContain('低风险')
+    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe('可以直接参考')
+    expect(wrapper.get('[data-testid="sources-details"]').attributes('open')).toBeUndefined()
     expect(wrapper.get('[data-testid="citation-item"]').text()).toContain('toy-guide.pdf')
   })
 
-  it('keeps sku_id null and displays ASK_CLARIFY without guessing a SKU', async () => {
+  it('keeps SKU optional and translates the clarification field into Chinese', async () => {
     apiMocks.chat.mockResolvedValue(resultFor('ASK_CLARIFY', false))
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper, false)
 
     expect(apiMocks.chat.mock.calls[0]?.[0].context.sku_id).toBeNull()
-    expect(wrapper.get('[data-testid="action-tag"]').text()).toContain('需要追问')
-    expect(wrapper.text()).toContain('仍需补充：sku_id')
+    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe('需要补充信息')
+    expect(wrapper.get('[data-testid="required-fields"]').text()).toContain('具体款式（SKU）')
+    expect(wrapper.get('[data-testid="required-fields"]').text()).not.toContain('sku_id')
   })
 
-  it.each(RAG_ACTIONS)('displays frozen action %s', async (action) => {
+  it.each([
+    ['DIRECT_ANSWER', '可以直接参考'],
+    ['CONTROLLED_ANSWER', '请核对后使用'],
+    ['ASK_CLARIFY', '需要补充信息'],
+    ['REQUIRE_LOOKUP', '需要查询系统'],
+    ['TRANSFER_HUMAN', '需要人工处理'],
+    ['REFUSE', '不能作出该承诺']
+  ] as const)('displays %s as %s', async (action, label) => {
     apiMocks.chat.mockResolvedValue(resultFor(action))
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
-    expect(wrapper.get('[data-testid="action-tag"]').text()).not.toContain('未分类')
+
+    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe(label)
+    expect(wrapper.get('[data-testid="answer-card"]').text()).not.toContain(action)
   })
 
-  it('blocks an answer when A returns a different context', async () => {
-    apiMocks.chat.mockResolvedValue({
-      ...resultFor(),
-      context: { ...resultFor().context, product_id: 'WRONG-PRODUCT' }
-    })
+  it('keeps model, request, IDs, and retrieval details inside a closed technical section', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
 
-    expect(wrapper.find('[data-testid="answer-card"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="request-error"]').text()).toContain('context 与所选')
+    const visibleAnswer = wrapper.get('[data-testid="answer-card"]').text()
+    expect(visibleAnswer).not.toContain('req-ui-1')
+    expect(visibleAnswer).not.toContain('qwen-turbo')
+    expect(visibleAnswer).not.toContain('PROD-001')
+    expect(visibleAnswer).not.toContain('DIRECT_ANSWER')
+    expect(visibleAnswer).not.toContain('SRC-001')
+
+    expect(wrapper.find('[data-testid="answer-technical-details"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="technical-toggle"]').trigger('click')
+    const technical = wrapper.get('[data-testid="answer-technical-details"]')
+    expect(technical.text()).toContain('req-ui-1')
+    expect(technical.text()).toContain('qwen-turbo')
+    expect(wrapper.get('[data-testid="citation-technical-details"]').text()).toContain('SRC-001')
   })
 
-  it('shows C unavailable separately from A health', async () => {
+  it('copies the customer-service edit and records all three page-local outcomes', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reply-draft"]').setValue('客服修改后的测试回复')
+    await wrapper.get('[data-testid="copy-button"]').trigger('click')
+    await flushPromises()
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('客服修改后的测试回复')
+
+    await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('直接采用')
+    await wrapper.get('[data-testid="edited-accept"]').trigger('click')
+    expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('修改后采用')
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
+  })
+
+  it('shows an actionable data-service error separately from AI health', async () => {
     apiMocks.getPlatformHealth.mockRejectedValue(
       new PlatformClientError('unavailable', 'C 目录服务当前不可用', 503)
     )
@@ -245,48 +315,34 @@ describe('AiChat B-T03', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="platform-error"]').text()).toContain('C 目录接口尚未发布')
-    expect(wrapper.get('[data-testid="rag-health-status"]').text()).toContain('已就绪')
+    expect(wrapper.get('[data-testid="platform-error"]').text()).toContain(
+      '数据服务不可用，请联系技术人员检查中台。'
+    )
+    expect(wrapper.get('[data-testid="system-summary"]').text()).toContain('系统正在连接')
   })
 
-  it('shows A unavailable and timeout errors without Mock fallback', async () => {
+  it('shows actionable AI unavailable and timeout messages without Mock fallback', async () => {
     apiMocks.chat.mockRejectedValueOnce(
       new RagClientError('unavailable', 'RAG API 当前不可用，请稍后重试', 503)
     )
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
-    expect(wrapper.get('[data-testid="request-error"]').text()).toContain('A 问答服务失败')
+    expect(wrapper.get('[data-testid="request-error"]').text()).toContain(
+      'AI 服务不可用，请稍后重试或按原客服流程处理。'
+    )
 
     apiMocks.chat.mockRejectedValueOnce(
       new RagClientError('timeout', '请求超时，请确认 RAG 服务状态后重试')
     )
     await wrapper.get('[data-testid="submit-button"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('[data-testid="request-error"]').text()).toContain('请求超时')
-  })
-
-  it('copies and records all three page-local adoption outcomes', async () => {
-    const wrapper = mountPage()
-    await flushPromises()
-    await submit(wrapper)
-
-    await wrapper.get('[data-testid="copy-button"]').trigger('click')
-    await flushPromises()
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      '建议回复：适用年龄请以商品包装标识为准。'
+    expect(wrapper.get('[data-testid="request-error"]').text()).toContain(
+      'AI 服务请求超时，请稍后重试或按原客服流程处理。'
     )
-
-    await wrapper.get('[data-testid="direct-accept"]').trigger('click')
-    expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('直接采用')
-    await wrapper.get('[data-testid="reply-draft"]').setValue('客服修改后的测试回复')
-    await wrapper.get('[data-testid="edited-accept"]').trigger('click')
-    expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('修改后采用')
-    await wrapper.get('[data-testid="reject"]').trigger('click')
-    expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
   })
 
-  it('blocks duplicate submissions and allows cancellation', async () => {
+  it('blocks duplicate submissions, shows the loading copy, and allows cancellation', async () => {
     apiMocks.chat.mockImplementation((_request, signal: AbortSignal) =>
       new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(new Error('aborted')))
@@ -297,11 +353,15 @@ describe('AiChat B-T03', () => {
     await selectContext(wrapper)
     await wrapper.get('[data-testid="question-input"]').setValue('测试取消')
     await wrapper.get('[data-testid="submit-button"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="loading-state"]').text()).toContain(
+      '正在查询商品资料并生成建议'
+    )
     await wrapper.get('[data-testid="submit-button"]').trigger('click')
     expect(apiMocks.chat).toHaveBeenCalledTimes(1)
 
     await wrapper.get('[data-testid="cancel-button"]').trigger('click')
     await flushPromises()
-    expect(wrapper.get('[data-testid="request-error"]').text()).toContain('已取消')
+    expect(wrapper.get('[data-testid="request-error"]').text()).toContain('问答请求已取消')
   })
 })

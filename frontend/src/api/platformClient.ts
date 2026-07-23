@@ -8,7 +8,7 @@ import {
 import { toPlatformClientError } from './errorMapper'
 import type { PlatformCatalogClient } from './platformTypes'
 
-const configuredBaseUrl = (import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8012')
+const configuredBaseUrl = (import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8011')
   .trim()
   .replace(/\/$/, '')
 
