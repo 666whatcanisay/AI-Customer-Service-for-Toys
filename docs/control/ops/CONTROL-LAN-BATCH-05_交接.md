@@ -32,3 +32,9 @@
 - 迁移已在当前 revision；测试包为 `IMPORTED_TEST_ONLY`；A 同步记录为 47/47；`ready=true`、`model_configured=true`；真实 Ollama `CONTROLLED_ANSWER` 带来源且未命中兜底标记；A/C 对 LAN Origin 的 GET 与 OPTIONS CORS 均通过；C 目录为 1 店铺、5 商品、18 SKU。
 - 当前不能进行笔记本交接：环境变量注入函数覆盖服务名，导致运行记录未按 `platform`、`rag`、`customer-web` 保存。状态脚本能确认健康，却无法显示受管 PID；停止脚本不能安全停止这些进程。
 - 保持当前服务运行，不要手工删除 `.runtime`、强杀监听 PID 或执行停止脚本。须先以独立 OPS 修复纠正运行记录命名、重启并验证安全停止后，再继续笔记本人工验收。
+
+## 2026-07-23 OPS-LAN-RECORD-FIX1 结果
+
+- 修复已合并并推送为 `56acf9792bf728eaad12f8025be658a6dcfdbbcc`；后续启动会稳定登记 `platform.json`、`rag.json`、`customer-web.json`。五套正式 OPS 回归和 PowerShell 语法检查均通过。
+- 停止前证据已保存至被忽略的 `.runtime/recovery-backup/`。重新读取后，8000 的错误记录可沿父子进程验证，5173 的错误记录可直接验证；8011 的 `platform` 标准记录已被覆盖而缺失。
+- 8011 health 仍为 200，监听者可沿父进程到正式 C 虚拟环境，但缺少可比对的历史运行记录启动时间。此项不满足 Gate；没有停止任何服务、没有清理任何记录、也没有执行新版 LAN 重启。不要按端口结束、强杀、手工删除记录或关闭防火墙。笔记本人工验收继续等待。
