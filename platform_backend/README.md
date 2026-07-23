@@ -21,7 +21,7 @@ $env:CORS_ALLOWED_ORIGINS = "http://127.0.0.1:5173"
 
 `POST /api/v1/import-batches/product-sku/preflight` analyzes the same multipart `.xlsx` input entirely in memory. It reuses import file-safety, parser, normalizer, validator, duplicate, and conflict rules, but has no database dependency and creates no batch or staged row. The existing formal upload endpoint remains unchanged.
 
-C-T02B adds an isolated V0.3.1 test-package path under `/api/v1/test-data-packages` plus frozen read-only `/test-catalog` and `/test-knowledge-packages` endpoints. ZIP preflight validates safe paths, manifest file set, sizes, SHA-256, test-only flags, sheets 00-08, counts, source references, and SKU relationships before any database write. Imported data is fixed to `TENANT-PDD-SM-TEST`; attachment bytes and raw RTF are never stored or returned.
+C-T02B adds an isolated V0.3.1 test-package path under `/api/v1/test-data-packages` plus frozen read-only `/test-catalog` and `/test-knowledge-packages` endpoints. ZIP preflight first validates every physical entry for safe paths, duplicate paths, links, encryption, and size limits, then accepts either a root `manifest.json` or one safe wrapping directory whose immediate logical root contains `manifest.json`. Manifest paths, file-set checks, hashes, workbooks, and evidence paths always use that in-memory logical root; the upload bytes and their SHA-256 are never rewritten. Imported data is fixed to `TENANT-PDD-SM-TEST`; attachment bytes and raw RTF are never stored or returned.
 
 ## Test
 
