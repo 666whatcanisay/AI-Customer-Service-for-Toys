@@ -2,40 +2,49 @@
   <main class="workspace-shell">
     <header class="workspace-header">
       <div>
-        <p class="eyebrow">木木小栈 · 客服工作台</p>
-        <h1>商品范围问答助手</h1>
-        <p class="subtitle">手动确认店铺、商品和 SKU 后，再向真实 RAG API 请求一条建议。</p>
+        <p class="eyebrow">木木小栈 · AI 客服工作台</p>
+        <h1>跟着步骤，生成一条客服建议</h1>
+        <p class="subtitle">先选客户咨询的商品，再输入问题。AI 只生成建议，由你确认、修改和复制。</p>
       </div>
-      <div class="health-panel">
-        <div data-testid="rag-health-status">
-          <el-tag :type="ragHealthTagType" effect="light">{{ ragHealthStatusText }}</el-tag>
-          <el-button link :loading="ragHealthLoading" @click="refreshRagHealth">刷新</el-button>
+      <div class="system-summary" data-testid="system-summary">
+        <span class="status-dot" :class="{ ready: systemReady }" />
+        <div>
+          <strong>{{ systemReady ? '系统已就绪' : '系统正在连接' }}</strong>
+          <p>{{ systemReady ? '可以开始处理测试问题' : '请稍候或刷新连接状态' }}</p>
         </div>
-        <div data-testid="platform-health-status">
-          <el-tag :type="platformHealthTagType" effect="light">
-            {{ platformHealthStatusText }}
-          </el-tag>
-          <el-button link :loading="platformHealthLoading" @click="refreshPlatform">
-            刷新
-          </el-button>
-        </div>
+        <el-button link @click="showConnectionDetails = !showConnectionDetails">
+          {{ showConnectionDetails ? '收起' : '连接详情' }}
+        </el-button>
       </div>
     </header>
 
     <el-alert
       data-testid="safety-notice"
       class="safety-alert"
-      title="测试数据 · 仅供建议 · 禁止自动发送 · 不可用于真实客户"
-      description="本页面用于内部联调试用。客服必须核对商品范围、回复内容和引用，并且只能人工复制；系统不会向电商平台发送消息。"
+      title="当前为测试数据，仅供内部验证，禁止直接用于真实客户。"
+      description="仅供建议，禁止自动发送。发送前必须人工核对商品、回复内容和引用。"
       type="error"
       :closable="false"
       show-icon
     />
 
+    <section v-if="showConnectionDetails" class="connection-card" data-testid="connection-details">
+      <div data-testid="rag-health-status">
+        <span>A 问答服务</span>
+        <el-tag :type="ragHealthTagType" effect="light">{{ ragHealthStatusText }}</el-tag>
+        <el-button link :loading="ragHealthLoading" @click="refreshRagHealth">刷新</el-button>
+      </div>
+      <div data-testid="platform-health-status">
+        <span>C 商品目录</span>
+        <el-tag :type="platformHealthTagType" effect="light">{{ platformHealthStatusText }}</el-tag>
+        <el-button link :loading="platformHealthLoading" @click="refreshPlatform">刷新</el-button>
+      </div>
+    </section>
+
     <el-alert
       v-if="ragHealthError"
       class="status-alert"
-      :title="`A 问答服务状态异常：${ragHealthError}`"
+      title="AI 服务不可用，请稍后重试或按原客服流程处理。"
       type="warning"
       :closable="false"
       show-icon
@@ -44,28 +53,43 @@
       v-if="platformError"
       data-testid="platform-error"
       class="status-alert"
-      :title="`C 目录服务异常：${platformError}`"
+      title="数据服务不可用，请联系技术人员检查中台。"
       type="error"
       :closable="false"
       show-icon
     />
 
-    <section class="context-card">
+    <nav class="workflow-progress" aria-label="操作步骤">
+      <div :class="{ active: workflowStep === 1, done: workflowStep > 1 }">
+        <span>1</span><strong>选择商品</strong>
+      </div>
+      <i />
+      <div :class="{ active: workflowStep === 2, done: workflowStep > 2 }">
+        <span>2</span><strong>输入问题</strong>
+      </div>
+      <i />
+      <div :class="{ active: workflowStep === 3 }">
+        <span>3</span><strong>核对并复制</strong>
+      </div>
+    </nav>
+
+    <section class="step-card context-card">
       <div class="section-heading">
         <div>
-          <p class="section-label">第一步 · 选择测试范围</p>
-          <h2>店铺、商品与可选 SKU</h2>
+          <p class="section-label">第 1 步</p>
+          <h2>客户问的是哪件商品？</h2>
+          <p>按顺序选择店铺和商品；知道具体款式时再选 SKU。</p>
         </div>
-        <el-tag type="warning" effect="dark">测试数据</el-tag>
+        <el-tag type="warning" effect="dark">仅测试数据</el-tag>
       </div>
 
       <div class="context-grid">
         <label>
-          <span>店铺</span>
+          <span><b>1</b> 平台与店铺 <em>必选</em></span>
           <el-select
             v-model="selectedStoreKey"
             data-testid="store-select"
-            placeholder="先选择店铺"
+            placeholder="例如：拼多多 → 汕明"
             :loading="storesLoading"
             :disabled="loading"
             filterable
@@ -78,14 +102,15 @@
               :value="storeKey(store)"
             />
           </el-select>
+          <small>先确认客户来自哪个店铺</small>
         </label>
 
         <label>
-          <span>商品</span>
+          <span><b>2</b> 商品 <em>必选</em></span>
           <el-select
             v-model="selectedProductId"
             data-testid="product-select"
-            placeholder="选择店铺后加载商品"
+            placeholder="选择店铺后可选商品"
             :loading="productsLoading"
             :disabled="!selectedStore || loading"
             filterable
@@ -99,14 +124,15 @@
               :disabled="!product.publishable"
             />
           </el-select>
+          <small>{{ selectedStore ? '请选择客户正在咨询的商品' : '请先选择上方店铺' }}</small>
         </label>
 
         <label>
-          <span>SKU（可选）</span>
+          <span><b>3</b> 具体款式 / SKU <em class="optional">可选</em></span>
           <el-select
             v-model="selectedSkuId"
             data-testid="sku-select"
-            placeholder="不确定款式时可以不选"
+            placeholder="不确定就留空"
             :loading="skusLoading"
             :disabled="!selectedProduct || loading"
             clearable
@@ -121,42 +147,63 @@
               :disabled="!sku.publishable"
             />
           </el-select>
+          <small>不知道款式时不要猜，AI 会提示追问</small>
         </label>
       </div>
 
-      <div v-if="selectedStore && selectedProduct" class="context-summary" data-testid="context-summary">
-        <strong>本次请求范围</strong>
-        <span>tenant_id={{ selectedStore.tenantId }}</span>
-        <span>platform={{ selectedStore.platform }}</span>
-        <span>store_code={{ selectedStore.storeCode }}</span>
-        <span>product_id={{ selectedProduct.productId }}</span>
-        <span>sku_id={{ selectedSku?.skuId ?? '未选择' }}</span>
+      <div v-if="selectedStore && selectedProduct" class="selection-confirmed" data-testid="context-summary">
+        <span class="check-mark">✓</span>
+        <div>
+          <strong>已选择：{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
+          <p>{{ selectedProduct.displayName }}<template v-if="selectedSku"> · {{ selectedSku.displayName }}</template></p>
+        </div>
+        <el-button link @click="showTechnicalDetails = !showTechnicalDetails">
+          {{ showTechnicalDetails ? '隐藏技术信息' : '查看技术信息' }}
+        </el-button>
       </div>
-      <p v-else class="context-hint">店铺和商品为必选；SKU 可以留空，由 A 返回追问动作，不在前端猜测款式。</p>
+      <div v-if="showTechnicalDetails && selectedStore && selectedProduct" class="technical-box" data-testid="context-technical-details">
+        <code>tenant_id={{ selectedStore.tenantId }}</code>
+        <code>platform={{ selectedStore.platform }}</code>
+        <code>store_code={{ selectedStore.storeCode }}</code>
+        <code>product_id={{ selectedProduct.productId }}</code>
+        <code>sku_id={{ selectedSku?.skuId ?? '未选择' }}</code>
+      </div>
     </section>
 
-    <section class="question-card">
-      <p class="section-label">第二步 · 输入问题</p>
+    <section class="step-card question-card">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">第 2 步</p>
+          <h2>客户具体问了什么？</h2>
+          <p>尽量保留客户原话，不要自行补充价格、库存或承诺。</p>
+        </div>
+      </div>
       <label class="question-label" for="customer-question">客户问题</label>
       <el-input
         id="customer-question"
         v-model="customerQuestion"
         data-testid="question-input"
         type="textarea"
-        :rows="4"
+        :rows="6"
         maxlength="4000"
         show-word-limit
-        placeholder="仅输入测试问题，例如：这个款式适合几岁的小朋友？"
+        placeholder="例如：这个款式适合几岁的小朋友？"
         :disabled="loading"
         @keydown.enter.exact.prevent="submitQuestion"
       />
+      <div class="example-row">
+        <span>不会写？试试：</span>
+        <button type="button" @click="useExample('这个款式适合几岁的小朋友？')">适用年龄</button>
+        <button type="button" @click="useExample('这个商品现在有库存吗？')">查询库存</button>
+        <button type="button" @click="useExample('客户说少了零件，应该怎么处理？')">缺件处理</button>
+      </div>
       <div class="question-actions">
-        <span class="input-hint">店铺和商品必选；Enter 提交，Shift+Enter 换行</span>
+        <span class="input-hint">店铺和商品选好后才可生成；Shift+Enter 换行</span>
         <el-button
           v-if="loading"
           data-testid="cancel-button"
           type="danger"
-          plain
+          link
           @click="cancelRequest"
         >
           取消请求
@@ -164,6 +211,7 @@
         <el-button
           data-testid="submit-button"
           type="primary"
+          size="large"
           :loading="loading"
           :disabled="!canSubmit"
           @click="submitQuestion"
@@ -186,47 +234,60 @@
     <section v-if="loading" class="loading-card" data-testid="loading-state">
       <div class="loading-dot" />
       <div>
-        <strong>A 问答服务正在生成建议</strong>
-        <p>重复提交已禁用，可随时取消。系统不会自动发送回复。</p>
+        <strong>正在查询商品资料并生成建议</strong>
+        <p>请稍候，不要重复提交；系统不会自动发送回复。</p>
       </div>
     </section>
 
-    <section v-if="result" class="answer-card" data-testid="answer-card">
-      <div class="answer-heading">
+    <section v-if="result" class="step-card answer-card" data-testid="answer-card">
+      <div class="section-heading answer-heading">
         <div>
-          <p class="section-label">第三步 · 核对和人工处理</p>
-          <h2>AI 建议回复</h2>
+          <p class="section-label">第 3 步</p>
+          <h2>核对、修改，再人工复制</h2>
           <div class="result-tags">
             <el-tag :type="actionTagType" data-testid="action-tag">{{ actionText }}</el-tag>
             <el-tag :type="riskTagType" data-testid="risk-tag">{{ riskText }}</el-tag>
-            <span v-if="result.model" class="latency">模型 {{ result.model }}</span>
-            <span v-if="result.latencyMs !== null" class="latency">
-              {{ Math.round(result.latencyMs) }} ms
-            </span>
           </div>
         </div>
-        <el-button data-testid="copy-button" type="primary" plain @click="copyReply">
-          {{ copyStatus === 'copied' ? '已复制' : '一键复制' }}
-        </el-button>
+      </div>
+
+      <div class="action-guide" :class="actionGuide.tone" data-testid="action-guidance">
+        <div class="guide-icon">{{ actionGuide.icon }}</div>
+        <div>
+          <strong>{{ actionGuide.title }}</strong>
+          <p>{{ actionGuide.description }}</p>
+          <ul>
+            <li v-for="item in actionGuide.steps" :key="item">{{ item }}</li>
+          </ul>
+        </div>
       </div>
 
       <el-alert
         class="result-alert"
-        title="仅供建议，禁止自动发送；请客服核对后人工复制。"
+        title="仅供建议，禁止自动发送。请先阅读并修改，再复制到客服工具。"
         type="warning"
         :closable="false"
         show-icon
       />
 
+      <label class="reply-label" for="reply-draft">建议回复 <span>可以直接修改</span></label>
       <el-input
+        id="reply-draft"
         v-model="replyDraft"
         data-testid="reply-draft"
         class="reply-editor"
         type="textarea"
-        :rows="6"
+        :rows="7"
         maxlength="8000"
         show-word-limit
+        @input="copyStatus = 'idle'"
       />
+      <div class="copy-row">
+        <span>复制的是上方当前内容，包括你的修改。</span>
+        <el-button data-testid="copy-button" type="primary" size="large" @click="copyReply">
+          {{ copyStatus === 'copied' ? '✓ 已复制修改后的回复' : '复制修改后的回复' }}
+        </el-button>
+      </div>
 
       <el-alert
         v-if="result.warnings.length"
@@ -238,16 +299,21 @@
       />
       <el-alert
         v-if="result.requiredFields.length"
+        data-testid="required-fields"
         class="result-alert"
-        :title="`仍需补充：${result.requiredFields.join('、')}`"
+        :title="`还需要向客户确认：${requiredFieldText}`"
         type="info"
         :closable="false"
         show-icon
       />
 
-      <div class="evidence-section">
+      <details class="evidence-section" data-testid="sources-details">
+        <summary>查看回答依据（{{ result.citations.length }} 条）</summary>
         <div class="evidence-heading">
-          <h2>引用依据</h2>
+          <div>
+            <h2>回答依据</h2>
+            <p>发送前至少核对一条依据是否与所选商品一致。</p>
+          </div>
           <span>{{ result.citations.length }} 条</span>
         </div>
         <div v-if="result.citations.length" class="evidence-list">
@@ -257,34 +323,49 @@
             class="evidence-item"
             data-testid="citation-item"
           >
-            <div class="evidence-meta">
-              <strong>{{ citation.file }}</strong>
-              <span>{{ citation.page === null ? '页码未提供' : `第 ${citation.page} 页` }}</span>
+            <div class="evidence-title">
+              <strong>依据 {{ index + 1 }}</strong>
+              <span>{{ citation.file }}{{ citation.page === null ? '' : ` · 第 ${citation.page} 页` }}</span>
+            </div>
+            <p>{{ citation.summary || 'API 未返回可读摘要，请勿仅凭此条发送。' }}</p>
+            <div v-if="showTechnicalDetails" class="evidence-meta" data-testid="citation-technical-details">
               <span v-if="citation.chunkId">片段 {{ citation.chunkId }}</span>
               <span v-if="citation.knowledgeVersion">版本 {{ citation.knowledgeVersion }}</span>
               <span v-if="citation.productId">商品 {{ citation.productId }}</span>
               <span v-if="citation.skuId">SKU {{ citation.skuId }}</span>
               <span v-if="citation.sourceIds.length">来源 ID {{ citation.sourceIds.join('、') }}</span>
             </div>
-            <p>{{ citation.summary || 'API 未返回摘要。' }}</p>
           </article>
         </div>
-        <el-empty v-else description="A API 本次未返回引用依据" :image-size="64" />
+        <el-empty v-else description="本次没有返回依据，请不要直接采用" :image-size="64" />
+      </details>
+
+      <div class="technical-toggle-row">
+        <el-button data-testid="technical-toggle" plain @click="showTechnicalDetails = !showTechnicalDetails">
+          {{ showTechnicalDetails ? '隐藏技术详情' : '需要排查问题？展开技术详情' }}
+        </el-button>
+      </div>
+      <div v-if="showTechnicalDetails" class="technical-box" data-testid="answer-technical-details">
+        <code>request_id={{ result.requestId ?? '未提供' }}</code>
+        <code>model={{ result.model ?? '未提供' }}</code>
+        <code>latency={{ result.latencyMs === null ? '未提供' : `${Math.round(result.latencyMs)} ms` }}</code>
+        <code>action={{ result.action ?? '未分类' }}</code>
+        <code>risk_level={{ result.riskLevel ?? '未分类' }}</code>
       </div>
 
       <div class="feedback-section">
         <div>
-          <h2>采用结果</h2>
-          <p>反馈端点尚未发布；选择只记录在本页，不会冒充远端提交成功。</p>
+          <h2>最后，记录这条建议有没有用</h2>
+          <p>当前反馈只记录在本页，反馈 API 尚未发布。</p>
         </div>
         <div class="feedback-actions">
-          <el-button data-testid="direct-accept" @click="recordAdoption('DIRECT_ACCEPT')">
+          <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
             直接采用
           </el-button>
-          <el-button data-testid="edited-accept" @click="recordAdoption('EDITED_ACCEPT')">
+          <el-button data-testid="edited-accept" text @click="recordAdoption('EDITED_ACCEPT')">
             修改后采用
           </el-button>
-          <el-button data-testid="reject" @click="recordAdoption('REJECTED')">
+          <el-button data-testid="reject" text @click="recordAdoption('REJECTED')">
             未采用
           </el-button>
         </div>
@@ -295,8 +376,11 @@
     </section>
 
     <section v-else-if="!loading" class="empty-card">
-      <h2>等待完整测试上下文</h2>
-      <p>选择店铺和商品后才能请求；SKU 留空时保留 A 的 ASK_CLARIFY，不自动猜测。</p>
+      <div class="empty-number">3</div>
+      <div>
+        <h2>建议回复会显示在这里</h2>
+        <p>完成前两步后点击“生成建议回复”。SKU 不确定时请留空，不要猜款式。</p>
+      </div>
     </section>
   </main>
 </template>
@@ -327,13 +411,15 @@ import type {
   RiskLevel
 } from '@/api/ragTypes'
 
+const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
+
 const actionLabels: Record<RagAction, string> = {
-  DIRECT_ANSWER: '直接回答',
-  CONTROLLED_ANSWER: '受控回答',
-  ASK_CLARIFY: '需要追问',
-  REQUIRE_LOOKUP: '需要查询',
-  TRANSFER_HUMAN: '转人工',
-  REFUSE: '拒答'
+  DIRECT_ANSWER: '可以直接参考',
+  CONTROLLED_ANSWER: '请核对后使用',
+  ASK_CLARIFY: '需要补充信息',
+  REQUIRE_LOOKUP: '需要查询系统',
+  TRANSFER_HUMAN: '需要人工处理',
+  REFUSE: '不能作出该承诺'
 }
 
 const riskLabels: Record<RiskLevel, string> = {
@@ -355,6 +441,67 @@ const platformLabels: Record<string, string> = {
   jd: '京东',
   offline: '线下',
   other: '其他'
+}
+
+const requiredFieldLabels: Record<string, string> = {
+  tenant_id: '店铺归属',
+  platform: '平台',
+  store_code: '店铺',
+  product_id: '商品',
+  sku_id: '具体款式（SKU）'
+}
+
+const actionGuides: Record<RagAction, { icon: string; title: string; description: string; steps: string[]; tone: string }> = {
+  DIRECT_ANSWER: {
+    icon: '✓',
+    title: '资料足够，可以核对后回复',
+    description: 'AI 找到了当前商品范围内的明确依据。',
+    steps: ['核对商品与款式', '阅读至少一条回答依据', '必要时修改措辞后人工复制'],
+    tone: 'safe'
+  },
+  CONTROLLED_ANSWER: {
+    icon: '!',
+    title: '可以回复，但必须保留限制条件',
+    description: '不要删掉建议中的条件、范围或不确定性说明。',
+    steps: ['核对限制条件', '避免改成绝对承诺', '确认依据后人工复制'],
+    tone: 'caution'
+  },
+  ASK_CLARIFY: {
+    icon: '?',
+    title: '信息不够，先向客户追问',
+    description: '不要猜商品款式或缺失信息，先把下方建议作为追问发给客户。',
+    steps: ['查看“还需要确认”的字段', '用客户听得懂的话追问', '拿到信息后重新生成建议'],
+    tone: 'caution'
+  },
+  REQUIRE_LOOKUP: {
+    icon: '⌕',
+    title: '需要先查询订单或业务系统',
+    description: '价格、库存、物流等实时信息不能只靠知识库判断。',
+    steps: ['不要承诺查询结果', '在业务系统核对实时状态', '把查询结果补充后再回复'],
+    tone: 'caution'
+  },
+  TRANSFER_HUMAN: {
+    icon: '↗',
+    title: '停止直接处理，请转人工专员',
+    description: '这是高风险或需要授权的情况，AI 建议不能代替人工决策。',
+    steps: ['不要作赔付、补发或时效承诺', '收集必要订单和问题信息', '按团队流程转给人工专员'],
+    tone: 'danger'
+  },
+  REFUSE: {
+    icon: '×',
+    title: '不能按客户要求直接回答或承诺',
+    description: '保持礼貌拒绝，不要绕过安全限制。',
+    steps: ['保留拒绝边界', '可说明下一步可行方式', '不确定时转人工'],
+    tone: 'danger'
+  }
+}
+
+const fallbackGuide = {
+  icon: '!',
+  title: '动作未分类，请先停止发送',
+  description: '服务没有返回可识别的处理动作。',
+  steps: ['不要直接采用', '展开技术详情记录信息', '联系技术人员排查'],
+  tone: 'danger'
 }
 
 const customerQuestion = ref('')
@@ -379,6 +526,8 @@ const result = ref<RagChatResult | null>(null)
 const replyDraft = ref('')
 const copyStatus = ref<'idle' | 'copied'>('idle')
 const adoption = ref<AdoptionRecord | null>(null)
+const showTechnicalDetails = ref(false)
+const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
 let activeCatalogController: AbortController | null = null
 
@@ -395,14 +544,21 @@ const selectedSku = computed(() =>
   skus.value.find((sku) => sku.skuId === selectedSkuId.value) ?? null
 )
 
-const canSubmit = computed(() =>
-  Boolean(
-    customerQuestion.value.trim() &&
-    selectedStore.value &&
-    selectedProduct.value &&
-    !loading.value
-  )
+const canSubmit = computed(() => Boolean(customerQuestion.value.trim() && !loading.value))
+
+const systemReady = computed(() =>
+  ragHealth.value?.ready === true &&
+  platformHealth.value?.status === 'ok' &&
+  stores.value.length > 0 &&
+  !ragHealthError.value &&
+  !platformError.value
 )
+
+const workflowStep = computed(() => {
+  if (result.value) return 3
+  if (selectedStore.value && selectedProduct.value) return 2
+  return 1
+})
 
 const platformName = (platform: string) => platformLabels[platform] ?? platform
 const storeOptionLabel = (store: CatalogStore) =>
@@ -413,19 +569,19 @@ const skuOptionLabel = (sku: CatalogSku) =>
   `${sku.displayName}${sku.publishable ? '' : '（待发布）'}`
 
 const ragHealthStatusText = computed(() => {
-  if (ragHealthLoading.value) return '正在检查 A 问答服务'
-  if (ragHealthError.value) return 'A 问答服务不可用'
-  if (ragHealth.value?.ready) return 'A 问答服务已就绪'
-  if (ragHealth.value) return 'A 问答服务初始化中'
-  return 'A 问答服务状态未知'
+  if (ragHealthLoading.value) return '正在检查'
+  if (ragHealthError.value) return '不可用'
+  if (ragHealth.value?.ready) return '已就绪'
+  if (ragHealth.value) return '初始化中'
+  return '状态未知'
 })
 
 const platformHealthStatusText = computed(() => {
-  if (platformHealthLoading.value || storesLoading.value) return '正在检查 C 目录服务'
-  if (platformError.value) return 'C 目录服务不可用'
-  if (platformHealth.value?.status === 'ok' && stores.value.length) return 'C 目录服务已就绪'
-  if (platformHealth.value?.status === 'ok') return 'C 服务在线，目录待发布'
-  return 'C 目录服务状态未知'
+  if (platformHealthLoading.value || storesLoading.value) return '正在检查'
+  if (platformError.value) return '不可用'
+  if (platformHealth.value?.status === 'ok' && stores.value.length) return '已就绪'
+  if (platformHealth.value?.status === 'ok') return '在线，目录待发布'
+  return '状态未知'
 })
 
 const ragHealthTagType = computed(() => {
@@ -448,6 +604,16 @@ const riskText = computed(() =>
   result.value?.riskLevel ? riskLabels[result.value.riskLevel] : '风险未分类'
 )
 
+const requiredFieldText = computed(() =>
+  result.value?.requiredFields
+    .map((field) => requiredFieldLabels[field] ?? '其他必要信息')
+    .join('、') ?? ''
+)
+
+const actionGuide = computed(() =>
+  result.value?.action ? actionGuides[result.value.action] : fallbackGuide
+)
+
 const actionTagType = computed(() =>
   result.value?.action === 'TRANSFER_HUMAN' || result.value?.action === 'REFUSE'
     ? 'danger'
@@ -467,7 +633,7 @@ const riskTagType = computed(() => {
 
 const adoptionMessage = computed(() =>
   adoption.value
-    ? `已在本页记录：${adoptionLabels[adoption.value.type]}（反馈 API 待发布）`
+    ? `已在本页记录：${adoptionLabels[adoption.value.type]}。未发送到远端反馈服务。`
     : ''
 )
 
@@ -477,6 +643,27 @@ const clearAnswer = () => {
   adoption.value = null
   copyStatus.value = 'idle'
   requestError.value = ''
+}
+
+const readRememberedStore = () => {
+  try {
+    return window.localStorage.getItem(LAST_STORE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+const rememberStore = (value: string) => {
+  try {
+    if (value) window.localStorage.setItem(LAST_STORE_KEY, value)
+    else window.localStorage.removeItem(LAST_STORE_KEY)
+  } catch {
+    // Store memory is optional and must not block customer-service work.
+  }
+}
+
+const useExample = (question: string) => {
+  if (!loading.value) customerQuestion.value = question
 }
 
 const refreshRagHealth = async () => {
@@ -498,6 +685,7 @@ const loadStores = async () => {
   activeCatalogController = controller
   storesLoading.value = true
   platformError.value = ''
+  let shouldRestoreStore = false
   try {
     const nextStores = await platformClient.listStores(controller.signal)
     const unsafeStore = nextStores.find((store) =>
@@ -510,10 +698,11 @@ const loadStores = async () => {
     if (unsafeStore) {
       throw new PlatformClientError(
         'contract',
-        `店铺 ${unsafeStore.storeCode} 不符合 B-T03 测试/建议/禁止自动发送边界`
+        `店铺 ${unsafeStore.storeCode} 不符合测试数据、仅供建议、禁止自动发送的安全边界`
       )
     }
     stores.value = nextStores
+    shouldRestoreStore = !selectedStoreKey.value && Boolean(readRememberedStore())
   } catch (error) {
     if (!controller.signal.aborted) {
       stores.value = []
@@ -522,6 +711,16 @@ const loadStores = async () => {
   } finally {
     if (activeCatalogController === controller) activeCatalogController = null
     storesLoading.value = false
+  }
+
+  if (shouldRestoreStore) {
+    const rememberedKey = readRememberedStore()
+    if (stores.value.some((store) => storeKey(store) === rememberedKey)) {
+      selectedStoreKey.value = rememberedKey
+      await handleStoreChange()
+    } else {
+      rememberStore('')
+    }
   }
 }
 
@@ -546,7 +745,12 @@ const handleStoreChange = async () => {
   selectedProductId.value = ''
   selectedSkuId.value = ''
   clearAnswer()
-  if (!selectedStore.value) return
+  if (!selectedStore.value) {
+    rememberStore('')
+    return
+  }
+
+  rememberStore(selectedStoreKey.value)
 
   const controller = new AbortController()
   activeCatalogController = controller
@@ -558,7 +762,7 @@ const handleStoreChange = async () => {
     if (nextProducts.some((product) =>
       product.platform !== store.platform || product.storeCode !== store.storeCode
     )) {
-      throw new PlatformClientError('contract', 'C 商品列表与所选店铺范围不一致')
+      throw new PlatformClientError('contract', '商品列表与所选店铺不一致，已停止加载')
     }
     products.value = nextProducts
   } catch (error) {
@@ -591,7 +795,7 @@ const handleProductChange = async () => {
       controller.signal
     )
     if (nextSkus.some((sku) => sku.productId !== product.productId)) {
-      throw new PlatformClientError('contract', 'C SKU 列表与所选商品范围不一致')
+      throw new PlatformClientError('contract', 'SKU 列表与所选商品不一致，已停止加载')
     }
     skus.value = nextSkus
   } catch (error) {
@@ -605,10 +809,16 @@ const handleProductChange = async () => {
 }
 
 const submitQuestion = async () => {
+  if (loading.value) return
+
   const message = customerQuestion.value.trim()
   const store = selectedStore.value
   const product = selectedProduct.value
-  if (!message || !store || !product || loading.value) return
+  if (!message) return
+  if (!store || !product) {
+    requestError.value = '尚未选择商品，请先完成第一步。'
+    return
+  }
 
   activeRagController?.abort()
   activeRagController = new AbortController()
@@ -637,15 +847,20 @@ const submitQuestion = async () => {
       ([key, value]) => response.context[key as keyof RagChatContext] === value
     )
     if (!contextMatches) {
-      requestError.value = 'A 问答服务返回的 context 与所选店铺、商品或 SKU 不一致，已停止展示答案'
+      requestError.value = '问答服务返回的店铺、商品或 SKU 与当前选择不一致，已停止展示答案'
       return
     }
     result.value = response
     replyDraft.value = response.answer
   } catch (error) {
-    requestError.value = controller.signal.aborted
-      ? 'A 问答请求已取消，可重新提交'
-      : `A 问答服务失败：${toRagClientError(error).message}`
+    const clientError = toRagClientError(error)
+    if (controller.signal.aborted || clientError.kind === 'canceled') {
+      requestError.value = '问答请求已取消，可以重新提交'
+    } else if (clientError.kind === 'timeout') {
+      requestError.value = 'AI 服务请求超时，请稍后重试或按原客服流程处理。'
+    } else {
+      requestError.value = 'AI 服务不可用，请稍后重试或按原客服流程处理。'
+    }
   } finally {
     if (activeRagController === controller) activeRagController = null
     loading.value = false
@@ -665,7 +880,7 @@ const copyReply = async () => {
   try {
     await navigator.clipboard.writeText(text)
     copyStatus.value = 'copied'
-    ElMessage.success('建议回复已复制，请由客服核对并人工发送')
+    ElMessage.success('已复制当前回复，请核对后人工发送')
   } catch {
     copyStatus.value = 'idle'
     ElMessage.error('复制失败，请手动选择回复文本')
@@ -692,6 +907,7 @@ const recordAdoption = (type: AdoptionType) => {
     originalAnswer,
     finalAnswer
   }
+  ElMessage.success('已记录本页反馈')
 }
 
 onMounted(() => {
@@ -709,231 +925,197 @@ onBeforeUnmount(() => {
 .workspace-shell {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 56px;
+  padding: 32px 0 64px;
   color: #172033;
 }
 
 .workspace-header,
-.answer-heading,
+.section-heading,
 .question-actions,
+.copy-row,
 .evidence-heading,
-.section-heading {
+.selection-confirmed {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
-.workspace-header {
-  margin-bottom: 22px;
-}
+.workspace-header { margin-bottom: 22px; }
 
 .eyebrow,
 .section-label {
   margin: 0 0 6px;
   color: #3157c8;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-h1,
-h2,
-p {
-  margin-top: 0;
-}
-
-h1 {
-  margin-bottom: 8px;
-  font-size: clamp(28px, 4vw, 42px);
-}
-
-h2 {
-  margin-bottom: 8px;
-  font-size: 18px;
-}
-
-.subtitle,
-.input-hint,
-.latency,
-.feedback-section p,
-.empty-card p,
-.loading-card p,
-.context-hint {
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 42px); }
+h2 { margin-bottom: 7px; font-size: 21px; }
+.subtitle, .section-heading p, .system-summary p, .input-hint, .copy-row span,
+.feedback-section p, .empty-card p, .loading-card p, .evidence-heading p {
   color: #697386;
 }
+.subtitle, .section-heading p, .system-summary p, .feedback-section p,
+.empty-card p, .loading-card p, .evidence-heading p { margin-bottom: 0; }
 
-.subtitle,
-.loading-card p,
-.feedback-section p,
-.empty-card p,
-.context-hint {
-  margin-bottom: 0;
-}
-
-.health-panel {
-  display: grid;
-  gap: 8px;
-  min-width: 250px;
-}
-
-.health-panel > div,
-.result-tags,
-.feedback-actions,
-.evidence-meta,
-.context-summary {
+.system-summary {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.safety-alert {
-  border: 2px solid #d93025;
-}
-
-.context-card,
-.question-card,
-.answer-card,
-.empty-card,
-.loading-card {
+  gap: 11px;
+  min-width: 300px;
+  padding: 13px 15px;
   border: 1px solid #dce3f0;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 10px 30px rgb(43 62 101 / 8%);
 }
+.system-summary p { margin-top: 3px; font-size: 12px; }
+.status-dot { width: 12px; height: 12px; border-radius: 50%; background: #f59e0b; }
+.status-dot.ready { background: #22a06b; box-shadow: 0 0 0 5px rgb(34 160 107 / 12%); }
 
-.context-card,
-.question-card,
-.answer-card {
-  padding: 24px;
+.safety-alert { border: 2px solid #d93025; }
+.connection-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 18px;
+  border: 1px dashed #b8c5da;
+  border-radius: 12px;
+  background: #f8fafc;
 }
+.connection-card > div { display: flex; align-items: center; gap: 10px; }
 
-.context-card,
-.question-card,
-.status-alert,
-.answer-card,
-.empty-card,
-.loading-card {
+.workflow-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 24px auto 0;
+}
+.workflow-progress div { display: flex; align-items: center; gap: 8px; color: #8a94a6; }
+.workflow-progress div > span {
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border: 2px solid #cbd5e1; border-radius: 50%; font-weight: 800;
+}
+.workflow-progress div.active, .workflow-progress div.done { color: #3157c8; }
+.workflow-progress div.active > span, .workflow-progress div.done > span {
+  border-color: #3157c8; background: #3157c8; color: white;
+}
+.workflow-progress i { width: 70px; height: 2px; background: #dce3f0; }
+
+.step-card, .empty-card, .loading-card {
   margin-top: 18px;
+  border: 1px solid #dce3f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgb(43 62 101 / 8%);
 }
-
+.step-card { padding: 26px; }
+.status-alert { margin-top: 16px; }
 .context-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 22px;
+}
+.context-grid label { display: grid; gap: 9px; }
+.context-grid label > span { font-weight: 800; }
+.context-grid label b {
+  display: inline-grid; place-items: center; width: 23px; height: 23px;
+  margin-right: 4px; border-radius: 50%; background: #e9efff; color: #3157c8;
+}
+.context-grid label em {
+  margin-left: 5px; color: #c2413b; font-size: 11px; font-style: normal;
+}
+.context-grid label em.optional { color: #697386; }
+.context-grid label small { color: #7b8496; }
+.context-grid .el-select { width: 100%; }
+
+.selection-confirmed {
+  justify-content: flex-start;
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 12px;
+  background: #ecf8f2;
+  color: #19633f;
+}
+.selection-confirmed p { margin: 3px 0 0; color: #356d53; }
+.selection-confirmed .el-button { margin-left: auto; }
+.check-mark {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 50%; background: #22a06b; color: #fff; font-weight: 900;
 }
 
-.context-grid label {
-  display: grid;
-  gap: 8px;
-  font-weight: 700;
-}
-
-.context-grid .el-select {
-  width: 100%;
-}
-
-.context-summary {
-  margin-top: 18px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #eef4ff;
-  color: #2b416f;
-  font-size: 13px;
-}
-
-.context-summary span {
-  padding-left: 8px;
-  border-left: 1px solid #b8c8eb;
-}
-
-.context-hint {
-  margin-top: 14px;
-}
-
-.question-label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 700;
-}
-
-.question-actions {
-  margin-top: 14px;
-}
-
-.loading-card,
-.empty-card {
-  padding: 28px;
-}
-
-.loading-card {
+.technical-box {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: 10px;
+  background: #172033;
+  color: #e6edf7;
 }
+.technical-box code { font-size: 12px; }
 
+.question-label, .reply-label { display: block; margin: 20px 0 8px; font-weight: 800; }
+.reply-label span { margin-left: 8px; color: #3157c8; font-size: 13px; }
+.example-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: #697386; font-size: 13px; }
+.example-row button {
+  padding: 5px 10px; border: 1px solid #cbd7ef; border-radius: 999px;
+  background: #f6f8ff; color: #3157c8; cursor: pointer;
+}
+.question-actions, .copy-row { margin-top: 16px; }
+
+.loading-card, .empty-card { display: flex; align-items: center; gap: 16px; padding: 28px; }
 .loading-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #3157c8;
-  box-shadow: 0 0 0 8px rgb(49 87 200 / 12%);
-  animation: pulse 1.2s infinite ease-in-out;
+  width: 14px; height: 14px; border-radius: 50%; background: #3157c8;
+  box-shadow: 0 0 0 8px rgb(49 87 200 / 12%); animation: pulse 1.2s infinite ease-in-out;
+}
+.empty-number {
+  display: grid; place-items: center; flex: 0 0 auto; width: 44px; height: 44px;
+  border-radius: 50%; background: #eef2f7; color: #94a3b8; font-size: 20px; font-weight: 900;
 }
 
-.reply-editor,
-.result-alert {
-  margin-top: 14px;
+.answer-heading { align-items: flex-start; }
+.result-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.action-guide {
+  display: flex; gap: 16px; margin-top: 18px; padding: 18px;
+  border: 1px solid; border-radius: 14px;
 }
+.action-guide.safe { border-color: #a7dac2; background: #effaf4; color: #165c3a; }
+.action-guide.caution { border-color: #f0ce83; background: #fff8e8; color: #7a5200; }
+.action-guide.danger { border-color: #efaaa6; background: #fff1f0; color: #8f2d28; }
+.guide-icon {
+  display: grid; place-items: center; flex: 0 0 auto; width: 36px; height: 36px;
+  border: 2px solid currentColor; border-radius: 50%; font-size: 20px; font-weight: 900;
+}
+.action-guide p { margin: 5px 0 8px; }
+.action-guide ul { margin: 0; padding-left: 20px; line-height: 1.75; }
+.result-alert, .reply-editor { margin-top: 15px; }
+.copy-row { justify-content: flex-end; }
 
-.evidence-section,
-.feedback-section {
-  margin-top: 26px;
-  padding-top: 22px;
+.evidence-section, .feedback-section {
+  margin-top: 28px;
+  padding-top: 24px;
   border-top: 1px solid #e7ebf2;
 }
+.evidence-heading span { color: #697386; font-size: 13px; }
+.evidence-list { display: grid; gap: 12px; margin-top: 14px; }
+.evidence-item { padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.evidence-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.evidence-title span { color: #697386; font-size: 12px; }
+.evidence-item > p { margin: 10px 0 0; color: #475569; line-height: 1.7; white-space: pre-wrap; }
+.evidence-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; color: #697386; font-size: 12px; }
+.technical-toggle-row { margin-top: 16px; text-align: right; }
 
-.evidence-heading span {
-  color: #697386;
-  font-size: 13px;
-}
-
-.evidence-list {
-  display: grid;
-  gap: 12px;
-}
-
-.evidence-item {
-  padding: 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
-}
-
-.evidence-item p {
-  margin: 10px 0 0;
-  color: #475569;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-.evidence-meta span {
-  color: #697386;
-  font-size: 12px;
-}
-
-.feedback-actions {
-  margin-top: 14px;
-}
-
-.feedback-result {
-  margin-top: 12px;
-  color: #246b3f !important;
-  font-weight: 600;
-}
+.feedback-actions { display: flex; flex-wrap: wrap; margin: 16px 12px 14px 0; }
+.feedback-section > .el-button { vertical-align: top; margin-top: 16px; }
+.feedback-result { margin-top: 12px; color: #246b3f !important; font-weight: 700; }
 
 @keyframes pulse {
   0%, 100% { opacity: 0.45; transform: scale(0.88); }
@@ -941,29 +1123,17 @@ h2 {
 }
 
 @media (max-width: 820px) {
-  .context-grid {
-    grid-template-columns: 1fr;
-  }
+  .context-grid { grid-template-columns: 1fr; }
+  .workflow-progress i { width: 28px; }
 }
 
 @media (max-width: 700px) {
-  .workspace-shell {
-    width: min(100% - 20px, 1120px);
-    padding-top: 18px;
+  .workspace-shell { width: min(100% - 20px, 1120px); padding-top: 18px; }
+  .workspace-header, .section-heading, .question-actions, .copy-row, .evidence-heading {
+    align-items: flex-start; flex-direction: column;
   }
-
-  .workspace-header,
-  .answer-heading,
-  .question-actions,
-  .section-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .health-panel,
-  .question-actions .el-button,
-  .answer-heading .el-button {
-    width: 100%;
-  }
+  .system-summary, .question-actions .el-button, .copy-row .el-button { width: 100%; }
+  .connection-card { grid-template-columns: 1fr; }
+  .workflow-progress strong { display: none; }
 }
 </style>
