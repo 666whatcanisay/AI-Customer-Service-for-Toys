@@ -3,14 +3,15 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "blocked",
-  "current_task": "OPS-LAN-RECOVERY2",
-  "current_stage": "Read-only recovery checks found existing local connections to 5173 and a legacy 8011 process whose executable and parent paths do not match the task-specified AI-CS-platform-center worktree. No process or existing service record was changed; a new ignored evidence record was written.",
-  "current_gate": "OPS-LAN-RECOVERY2 BLOCKED: do not stop, archive, clean, or restart while a user may be connected and PID 21816 fails the task-specific executable/worktree identity requirements.",
+  "status": "in_review",
+  "current_task": "MVP-BATCH-05",
+  "current_stage": "An isolated feature worktree implements a single LAN browser entry through fixed same-origin Vite proxies, physical-adapter auto-selection, firewall/diagnostic helpers, runtime-record strengthening, and responsive/version UI details. It is ready for Draft PR review; the formal develop runtime remains intentionally untouched.",
+  "current_gate": "MVP-BATCH-05 L2: implementation and isolated verification passed. Do not merge or restart the formal runtime from this worktree; final real LAN listener and second-computer acceptance occur only after reviewed deployment.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
-    "base_commit": "913a440a703b961ff48ceb232b088b8481567a72",
+    "base_commit": "6ea5dddc0b1e5b536e3833f353d34a7ac731930d",
+    "feature_branch": "codex/mvp-lan-batch-05",
     "lan_cors_squash_commit": "3f20686c48dbec4dd7d389e6eac7dcfe16eeb28f",
     "ops_lan_squash_commit": "978f884b41b8a1ea0c0f42ac5e5e319516f0cac",
     "ops_lan_record_fix1_squash_commit": "56acf9792bf728eaad12f8025be658a6dcfdbbcc",
@@ -41,7 +42,8 @@
     "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified.",
     "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. After the user changed Ethernet to Private, official LAN startup completed migration, imported-test-only package validation, 47/47 sync, real Ollama smoke, LAN CORS, C catalog 1/5/18, and B LAN HTTP 200. A scope collision in Invoke-WithProcessEnvironment overwrote service names with environment variable names.",
     "OPS_LAN_RECORD_FIX1": "The scope repair was squash merged as 56acf97 and five formal OPS script suites, PowerShell syntax and diff checks passed. Stop-time evidence was retained. A and B legacy processes can be tied to wrong records, but the C standard record was overwritten and no historical start-time record exists for 8011. The live services and records were intentionally left untouched; LAN lifecycle closure and laptop acceptance remain blocked.",
-    "OPS_LAN_RECOVERY2": "At the 844dbe6 baseline, A/C/B health checks passed and the repaired OPS code was present. Two established local connections to 5173 preceded health probes. PID 21816 listened on 8011 and had the expected uvicorn command, but its executable and parent paths did not match the task-specified AI-CS-platform-center C worktree. A no-secret verification record was written under ignored .runtime/recovery-backup; no process, existing service record, database or code was changed."
+    "OPS_LAN_RECOVERY2": "At the 844dbe6 baseline, A/C/B health checks passed and the repaired OPS code was present. Two established local connections to 5173 preceded health probes. PID 21816 listened on 8011 and had the expected uvicorn command, but its executable and parent paths did not match the task-specified AI-CS-platform-center C worktree. A no-secret verification record was written under ignored .runtime/recovery-backup; no process, existing service record, database or code was changed.",
+    "MVP_BATCH_05": "Feature worktree verification passed: full PowerShell syntax, LAN auto-selection for Ethernet/WLAN, VPN/virtual exclusion, ambiguity blocking, changed-IP selection, loopback A/C plus selected-IP B listener specification, fixed Vite proxy paths, firewall constraints, trusted/unknown process protections, 33 frontend Vitest tests, typecheck, production build, and temporary Vite proxy GET smoke to A/C health. The formal runtime remains on the pre-feature develop checkout, so final physical LAN listener and second-computer acceptance are pending review and deployment."
   },
   "agent_worktrees": {
     "A": {
@@ -79,8 +81,8 @@
   },
   "t02_executed": false,
   "blockers": [
-    "The legacy C LAN process on 8011 has no surviving standard or erroneous record with which to compare its historical start time, and it also fails OPS-LAN-RECOVERY2's task-specific AI-CS-platform-center path requirement.",
-    "A local client was connected to 5173 during the recovery precheck; laptop manual acceptance must wait for a confirmed idle window, safe legacy-process resolution, new LAN startup, correct standard records, status/stop closure and final restart."
+    "Draft PR review and deployment to the formal develop checkout are required before the new loopback-only A/C listener boundary can be tested on the real server network.",
+    "Second-computer manual acceptance remains pending. If company Wi-Fi and wired clients cannot route to the selected 5173 address after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure."
   ],
   "last_updated": "2026-07-24"
 }

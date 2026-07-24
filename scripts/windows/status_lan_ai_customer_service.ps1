@@ -25,9 +25,9 @@ try {
     Write-Host "Ollama 地址：$($config.OllamaBaseUrl)；模型：$($config.OllamaModel)"
 
     foreach ($item in @(
-        @{Label='C';Name='platform';Port=$config.PlatformPort;Url=(Get-ServiceUrl $config $config.PlatformPort $config.PlatformHealthPath)},
-        @{Label='A';Name='rag';Port=$config.RagPort;Url=(Get-ServiceUrl $config $config.RagPort $config.RagHealthPath)},
-        @{Label='B';Name='customer-web';Port=$config.CustomerWebPort;Url=(Get-ServiceUrl $config $config.CustomerWebPort '/')}
+        @{Label='C';Name='platform';Port=$config.PlatformPort;Url=(Get-ManagedServiceHealthUrl $config 'platform')},
+        @{Label='A';Name='rag';Port=$config.RagPort;Url=(Get-ManagedServiceHealthUrl $config 'rag')},
+        @{Label='B';Name='customer-web';Port=$config.CustomerWebPort;Url=(Get-ManagedServiceHealthUrl $config 'customer-web')}
     )) {
         $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url
         $listener = if ($lanResolutionError) { '无法确定' } else { Get-LanServiceListenerAddress $config $item.Port }
@@ -58,7 +58,6 @@ try {
     } catch { $modelState = "无法读取（$($_.Exception.Message)）" }
     Write-Host "A 模型状态：$modelState"
 
-    Write-Host "本机页面：http://127.0.0.1:$($config.CustomerWebPort)/"
     if ($lanResolutionError) {
         Write-Host "局域网页面：未确定（$lanResolutionError）" -ForegroundColor Yellow
         Write-Host '当前网络配置类型：无法确定'
@@ -67,12 +66,13 @@ try {
         $network = $config.LanNetworkProfile
         Write-Host "局域网页面：$($config.CustomerWebUrl)"
         Write-Host "当前网络配置类型：$($network.NetworkCategory)；适配器：$($network.InterfaceAlias)；网络：$($network.NetworkName)"
+        Write-Host "选定网卡：$($config.LanSelection.InterfaceAlias)；IPv4：$($config.LanSelection.IPAddress)；子网掩码：$($config.LanSelection.SubnetMask)；默认网关：$($config.LanSelection.DefaultGateway)"
         if ([string]$network.NetworkCategory -eq 'Public' -and -not [bool]$config.AllowPublicNetwork) {
             Write-Host 'Public 网络：启动局域网客服会被阻止。请在 Windows 设置中将当前网络改为 Private 后重试。' -ForegroundColor Yellow
         }
         Write-Host (Get-LanFirewallStatusMessage $network) -ForegroundColor Yellow
-        Write-Host "前端 API：RAG=http://$($config.LanAdvertisedHost):$($config.RagPort)；平台=http://$($config.LanAdvertisedHost):$($config.PlatformPort)"
-        Write-Host "CORS_ALLOWED_ORIGINS=$($config.LanCorsAllowedOrigins)"
+        Write-Host '前端 API：RAG=/rag-api；平台=/platform-api；模式=SAME_ORIGIN_PROXY'
+        Write-Host '外部入口：仅 TCP 5173；A/C 仅监听 127.0.0.1。'
     }
     Write-Host "日志目录：$(Get-ServiceLogDirectory $config)"
 } catch {
