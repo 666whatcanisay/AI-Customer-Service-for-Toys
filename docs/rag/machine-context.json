@@ -1,15 +1,15 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-lan-t04",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-core",
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
   "status": "blocked",
-  "current_task": "A-T04-LAN-CORS",
-  "next_recommended_task": "CONTROL-LAN-BATCH-05-FINAL: integrate the verified A-T04-LAN-CORS source branch before the OPS LAN startup branch, then perform controlled LAN acceptance.",
-  "current_stage": "Explicit CORS Origin configuration implemented and validated; source branch is ready for CONTROL-LAN-BATCH-05-FINAL ordered integration",
-  "current_gate": "Functional PASS: A-T04-LAN-CORS acceptance criteria verified; eligible for ordered control integration",
-  "last_test_result": "CORS tests: 16 passed, 3 warnings. Full pytest: 52 passed, 2 skipped, 21 warnings in 2.43s. Explicit real BGE/Chroma/Ollama E2E: 2 passed, 2 warnings in 11.04s.",
+  "current_task": "A-REPLY-QUALITY-FIX1-FINAL",
+  "next_recommended_task": "Review and merge the A-REPLY-QUALITY-FIX1 Draft PR after confirming customer wording and sources compatibility; do not auto-start another task.",
+  "current_stage": "Frozen fixture restored; bounded age evidence moved into tests; live C-to-A-to-Ollama delivery validation complete",
+  "current_gate": "Functional PASS pending PR #24 review: frozen package unchanged, 6-12 age range retained, one supervision reminder, sources preserved",
+  "last_test_result": "Focused reply-quality tests: 27 passed. Full pytest: 56 passed, 2 skipped, 21 warnings. Explicit test-local scoped BGE/Chroma/qwen3.5:9b E2E: 1 passed, 1 warning. Live C V0.3.1 import and strict A sync: 47 items; qwen3.5:9b reply contained 6～12岁, omitted 6岁及以上 and internal evidence, and contained one adult-supervision reminder.",
   "blockers": [],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -21,21 +21,22 @@
     "Live report contains frozen non-production test questions and model answers but removes source excerpts",
     "Future C package changes may require recalibration of intent and metadata-based structured decisions",
     "Test package withdrawal, expiry and cross-version cleanup are not implemented",
-    "A-T03 remains historically blocked at 19/28 frozen fact/source attribution quality; A-T04 does not alter that Gate"
+    "A-T03 remains historically blocked at 19/28 frozen fact/source attribution quality; A-REPLY-QUALITY-FIX1 does not alter that Gate",
+    "The reply-quality smoke and live C integration use frozen non-production test knowledge and do not establish production knowledge quality"
   ],
   "git": {
-    "branch": "agent/rag-lan-t04",
+    "branch": "agent/rag-reply-quality-fix1",
     "clean": true,
-    "baseline_commit": "913a440a703b961ff48ceb232b088b8481567a72",
+    "baseline_commit": "2b8a727df624622bc0f590077d9cc79c8071eeaa",
+    "commit": "54808fafc0482891cd9d058af2fad2a8c5adc9f0",
+    "task_commit": "54808fafc0482891cd9d058af2fad2a8c5adc9f0",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-23T15:41:02+08:00",
+  "checked_at": "2026-07-24T17:31:09+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
-    "backend/app/config/settings.py",
-    "backend/app/main.py",
-    "backend/app/api/routes.py",
-    "backend/scripts/evaluate_test_knowledge.py"
+    "backend/app/service/rag_service.py",
+    "backend/app/api/routes.py"
   ],
   "owned_paths": ["backend/**", "docs/rag/**"],
   "forbidden_paths": [
@@ -47,9 +48,9 @@
     "backend/vector_db/**"
   ],
   "test_commands": [
+    "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
     "source read-only venv python -m pytest backend -q",
-    "source read-only venv python -m pytest backend/tests/test_cors.py -q",
-    "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_rag_e2e.py backend/tests/test_real_scoped_rag_e2e.py -q -s",
+    "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
     "PLATFORM_API_BASE_URL=http://127.0.0.1:8012 source read-only venv python backend/scripts/evaluate_test_knowledge.py PDD-SM-2026-001-TEST --output-dir docs/rag/evaluations/a-t03-v031-live"
   ],
   "completed_tasks": [
@@ -58,7 +59,10 @@
     "A-T03 A-line V0.3.1 consumer implementation and synthetic 28-case validation",
     "A-T03-FIX1 strict 0.3.1-test schema, store-scope safety compatibility and live C evaluation",
     "A-T03-FIX2 structured decision repair, evaluator semantics and blocked 19/28 live diagnosis",
-    "A-T04-LAN-CORS explicit browser Origin configuration and CORS regression coverage"
+    "A-T04-LAN-CORS explicit browser Origin configuration and CORS regression coverage",
+    "A-REPLY-QUALITY-FIX1 customer reply and internal evidence separation",
+    "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
+    "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -70,7 +74,8 @@
     "POST /api/test-knowledge/sync/{package_id}",
     "GET /api/health",
     "GET /api/status",
-    "Explicit CORS policy configured by CORS_ALLOWED_ORIGINS (no shared contract change)"
+    "Explicit CORS policy configured by CORS_ALLOWED_ORIGINS (no shared contract change)",
+    "POST /api/chat answer remains field-compatible while sources retain internal evidence"
   ],
-  "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation"]
+  "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }
