@@ -12,8 +12,8 @@
     "branch": "agent/customer-platform-shell-t05",
     "base_commit": "36ec2d326d1613f62cb647ad9ef5835315e4db21",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "clean": false,
-    "task_commit": null
+    "clean": true,
+    "task_commit": "0e929f559c02f20a1be690c6ef377bd9db3b0695"
   },
   "owned_paths": [
     "frontend/**",
