@@ -5,11 +5,11 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "blocked",
-  "current_task": "A-REPLY-QUALITY-FIX1-DELIVERY",
+  "current_task": "A-REPLY-QUALITY-FIX1-FINAL",
   "next_recommended_task": "Review and merge the A-REPLY-QUALITY-FIX1 Draft PR after confirming customer wording and sources compatibility; do not auto-start another task.",
-  "current_stage": "Age-range fidelity and adult-supervision deduplication implemented and validated; ready for Draft PR delivery",
-  "current_gate": "Functional PASS: 6-12 age range retained, no lower-bound generalization, one supervision reminder, sources preserved",
-  "last_test_result": "Focused reply-quality tests: 27 passed. Full pytest: 56 passed, 2 skipped, 21 warnings. Explicit real scoped BGE/Chroma/qwen3.5:9b E2E: 1 passed, 1 warning; answer used 6～12岁, omitted 6岁及以上, and contained one adult-supervision reminder.",
+  "current_stage": "Frozen fixture restored; bounded age evidence moved into tests; live C-to-A-to-Ollama delivery validation complete",
+  "current_gate": "Functional PASS pending PR #24 review: frozen package unchanged, 6-12 age range retained, one supervision reminder, sources preserved",
+  "last_test_result": "Focused reply-quality tests: 27 passed. Full pytest: 56 passed, 2 skipped, 21 warnings. Explicit test-local scoped BGE/Chroma/qwen3.5:9b E2E: 1 passed, 1 warning. Live C V0.3.1 import and strict A sync: 47 items; qwen3.5:9b reply contained 6～12岁, omitted 6岁及以上 and internal evidence, and contained one adult-supervision reminder.",
   "blockers": [],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -22,17 +22,17 @@
     "Future C package changes may require recalibration of intent and metadata-based structured decisions",
     "Test package withdrawal, expiry and cross-version cleanup are not implemented",
     "A-T03 remains historically blocked at 19/28 frozen fact/source attribution quality; A-REPLY-QUALITY-FIX1 does not alter that Gate",
-    "The real reply-quality smoke uses synthetic test knowledge and does not establish production knowledge quality"
+    "The reply-quality smoke and live C integration use frozen non-production test knowledge and do not establish production knowledge quality"
   ],
   "git": {
     "branch": "agent/rag-reply-quality-fix1",
-    "clean": true,
+    "clean": false,
     "baseline_commit": "2b8a727df624622bc0f590077d9cc79c8071eeaa",
     "commit": "cd2bf07a859ed8bdbdf516db8ea0f969cede0c16",
     "task_commit": "cd2bf07a859ed8bdbdf516db8ea0f969cede0c16",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-24T16:57:20+08:00",
+  "checked_at": "2026-07-24T17:28:17+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/service/rag_service.py",
@@ -61,7 +61,8 @@
     "A-T03-FIX2 structured decision repair, evaluator semantics and blocked 19/28 live diagnosis",
     "A-T04-LAN-CORS explicit browser Origin configuration and CORS regression coverage",
     "A-REPLY-QUALITY-FIX1 customer reply and internal evidence separation",
-    "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication"
+    "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
+    "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",

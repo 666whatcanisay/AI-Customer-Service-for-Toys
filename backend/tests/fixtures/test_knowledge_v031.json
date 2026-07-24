@@ -67,7 +67,7 @@
       "product_id": "P-Q80",
       "sku_id": "",
       "title": "Q80适用年龄",
-      "content": "Q80建议6～12岁儿童在成人看护下使用。",
+      "content": "Q80建议6岁及以上儿童在成人看护下使用。",
       "answer_action": "DIRECT_ANSWER",
       "risk_level": "LOW",
       "source_ids": ["SRC-Q80-FAQ-AGE"],

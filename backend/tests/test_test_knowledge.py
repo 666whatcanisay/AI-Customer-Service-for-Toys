@@ -311,7 +311,7 @@ def test_store_guarded_faq_reaches_any_product_without_model_downgrade(
 def test_faq_reference_and_bundle_retrieval(scoped_service):
     service, _ = scoped_service
     faq = service.test_knowledge_index.search(
-        "Q80建议6～12岁儿童在成人看护下使用。", context(), 1
+        "Q80建议6岁及以上儿童在成人看护下使用。", context(), 1
     )
     assert faq[0]["knowledge_type"] == "FAQ"
     assert faq[0]["source_ids"] == ["SRC-Q80-FAQ-AGE"]
@@ -405,7 +405,11 @@ def test_age_answer_is_copy_ready_and_sources_remain_structured(
     service, package = scoped_service
     captured = {}
     selected = [
-        item
+        (
+            replace(item, content="Q80建议6～12岁儿童在成人看护下使用。")
+            if item.knowledge_id == "K-Q80-FAQ-AGE"
+            else item
+        )
         for item in package.items
         if item.knowledge_id in {"K-Q80-FAQ-AGE", "K-Q80-SAFETY"}
     ]

@@ -71,6 +71,22 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
             ),
             PACKAGE_ID,
         )
+        # Keep the frozen fixture untouched. This test-local evidence mirrors
+        # the bounded age fact returned by the real C V0.3.1 package.
+        package = replace(
+            package,
+            items=tuple(
+                (
+                    replace(
+                        item,
+                        content="Q80建议6～12岁儿童在成人看护下使用。",
+                    )
+                    if item.knowledge_id == "K-Q80-FAQ-AGE"
+                    else item
+                )
+                for item in package.items
+            ),
+        )
         service.test_knowledge_index.sync(package)
         chat_context = FrozenChatContext(
             tenant_id="TENANT-PDD-SM-TEST",
