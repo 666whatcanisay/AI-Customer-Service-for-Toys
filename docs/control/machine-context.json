@@ -4,9 +4,9 @@
   "line": "CONTROL",
   "version": "0.1.0",
   "status": "blocked",
-  "current_task": "OPS-LAN-RECORD-FIX1",
-  "current_stage": "The OPS service-name scope repair was merged and passed full script regression. The legacy LAN platform record was already overwritten, so the live 8011 process cannot meet the required historical identity check and was not stopped.",
-  "current_gate": "OPS-LAN-RECORD-FIX1 BLOCKED: do not stop, remove records, or restart until the legacy C process without a historical standard record is safely resolved; then verify the new standard records and lifecycle loop before laptop acceptance.",
+  "current_task": "OPS-LAN-RECOVERY2",
+  "current_stage": "Read-only recovery checks found existing local connections to 5173 and a legacy 8011 process whose executable and parent paths do not match the task-specified AI-CS-platform-center worktree. No process or existing service record was changed; a new ignored evidence record was written.",
+  "current_gate": "OPS-LAN-RECOVERY2 BLOCKED: do not stop, archive, clean, or restart while a user may be connected and PID 21816 fails the task-specific executable/worktree identity requirements.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -40,7 +40,8 @@
     "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
     "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified.",
     "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. After the user changed Ethernet to Private, official LAN startup completed migration, imported-test-only package validation, 47/47 sync, real Ollama smoke, LAN CORS, C catalog 1/5/18, and B LAN HTTP 200. A scope collision in Invoke-WithProcessEnvironment overwrote service names with environment variable names.",
-    "OPS_LAN_RECORD_FIX1": "The scope repair was squash merged as 56acf97 and five formal OPS script suites, PowerShell syntax and diff checks passed. Stop-time evidence was retained. A and B legacy processes can be tied to wrong records, but the C standard record was overwritten and no historical start-time record exists for 8011. The live services and records were intentionally left untouched; LAN lifecycle closure and laptop acceptance remain blocked."
+    "OPS_LAN_RECORD_FIX1": "The scope repair was squash merged as 56acf97 and five formal OPS script suites, PowerShell syntax and diff checks passed. Stop-time evidence was retained. A and B legacy processes can be tied to wrong records, but the C standard record was overwritten and no historical start-time record exists for 8011. The live services and records were intentionally left untouched; LAN lifecycle closure and laptop acceptance remain blocked.",
+    "OPS_LAN_RECOVERY2": "At the 844dbe6 baseline, A/C/B health checks passed and the repaired OPS code was present. Two established local connections to 5173 preceded health probes. PID 21816 listened on 8011 and had the expected uvicorn command, but its executable and parent paths did not match the task-specified AI-CS-platform-center C worktree. A no-secret verification record was written under ignored .runtime/recovery-backup; no process, existing service record, database or code was changed."
   },
   "agent_worktrees": {
     "A": {
@@ -78,8 +79,8 @@
   },
   "t02_executed": false,
   "blockers": [
-    "The legacy C LAN process on 8011 has no surviving standard or erroneous record with which to compare its historical start time; policy forbids stopping or deleting it without that verification.",
-    "Laptop manual acceptance must wait for safe legacy-process resolution, new LAN startup, correct standard records, status/stop closure and final restart."
+    "The legacy C LAN process on 8011 has no surviving standard or erroneous record with which to compare its historical start time, and it also fails OPS-LAN-RECOVERY2's task-specific AI-CS-platform-center path requirement.",
+    "A local client was connected to 5173 during the recovery precheck; laptop manual acceptance must wait for a confirmed idle window, safe legacy-process resolution, new LAN startup, correct standard records, status/stop closure and final restart."
   ],
-  "last_updated": "2026-07-23"
+  "last_updated": "2026-07-24"
 }
