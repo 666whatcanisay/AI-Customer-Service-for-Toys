@@ -4,78 +4,64 @@
 
 ## 当前任务
 
-- 任务：MVP-BATCH-05 统一局域网入口与网络自诊断。
-- 分支：PR #20 已 squash 合入 `develop`；随后两个真实 Windows 执行路径热修复已作为 PR #21、#22 squash 合入。
-- 状态：正式主机 LAN 验证完成。客服浏览器入口为 `http://192.168.1.11:5173/`；A/C 仅服务器回环访问，B 绑定选定物理网卡。
+- 任务：B-T05-LONG 客服工作台平台壳与意见建议闭环。
+- 分支：`agent/customer-platform-shell-t05`，基线 `origin/develop@36ec2d326d1613f62cb647ad9ef5835315e4db21`。
+- 状态：前端实现、测试和 production build 已完成；C 建议接口尚未发布，真实建议联调为 `ENV_BLOCKED`。
 
 ## 允许范围
 
 - `frontend/**`
-- `scripts/windows/**`
-- `docs/control/**`
 - `docs/customer/**`
 
-禁止修改 `backend/**`、`platform_backend/**`、`admin_web/**`、`contracts/**`。
+禁止修改 `backend/**`、`platform_backend/**`、`admin_web/**`、`contracts/**`、`extension/**`。
 
-## 当前页面
+## 工作台入口
 
-入口：`frontend/src/views/AiChat.vue`。
+- `/`：模块化首页，显示 12 个模块的用途、阶段、输入/输出与人工确认边界。
+- `/ai-chat`：保留原三步式 AI 客服完整链路。
+- `/suggestions`：提交意见建议。
+- `/suggestions/mine`：按本机测试客服 ID 查询建议摘要。
+- `/modules/:moduleKey`：未上线模块说明，不提供虚假执行按钮。
 
-面向客服的流程：
+布局包含左侧导航、顶部当前客服/店铺、A/C 状态、测试安全横幅和移动端菜单。
 
-1. 选择平台/店铺、商品和可选 SKU。
-2. 粘贴或输入客户问题并生成建议。
-3. 编辑建议回复、复制当前文本，并记录采用结果。
+## 测试身份与建议
 
-店铺选择保存在浏览器本地；切换店铺会清空商品和 SKU，
-切换商品会清空 SKU。来源和技术字段默认隐藏。
-
-## 冻结接口
-
-RAG 服务由 `VITE_RAG_API_BASE_URL` 配置，默认使用同源代理基址 `/rag-api`；显式设置完整 URL 时保留直连排错模式：
-
-- `GET /api/health`
-- `POST /api/chat`
-
-目录服务由 `VITE_PLATFORM_API_BASE_URL` 配置，默认使用同源代理基址 `/platform-api`；显式设置完整 URL 时保留直连排错模式：
-
-- `GET /health`
-- `GET /api/v1/test-catalog/stores`
-- `GET /api/v1/test-catalog/products?store_code=`
-- `GET /api/v1/test-catalog/products/{product_id}/skus`
-
-请求/响应差异只允许在 `frontend/src/api/*Adapter.ts` 中处理。
-生产模式不得回退 Mock。本任务不修改共享 contracts。
+- 本机仅保存 `reporterId`、`reporterName`、`defaultStoreCode`；它不是登录或权限认证。
+- 建议正文不写入 localStorage；页面持续提醒不填写客户姓名、电话、地址、订单号或隐私截图。
+- 提交：`POST /platform-api/api/v1/customer-suggestions`。
+- 我的建议：`GET /platform-api/api/v1/customer-suggestions?reporter_id=`。
+- 生产代码不回退 Mock；测试 Mock 只存在于 Vitest。
+- 提交响应只适配顶层或 `data` 中的 `suggestion_id/status`；列表严格消费 `{items,total}`。
+- 未冻结状态按“状态待确认”显示，不在页面猜测第二套枚举。
 
 ## 安全边界
 
-- 当前仅使用测试数据，禁止直接用于真实客户。
-- 页面只生成建议，不自动发送到电商平台。
-- 不实现浏览器扩展、登录、快麦或 B-T05。
-- 反馈 API 未发布，采用结果只记录在当前页面。
+- 当前为测试工作台，仅供内部验证，禁止直接用于真实客户。
+- 不自动发送消息，不执行退款、补发、申诉、订单修改或自动化动作。
+- 未上线模块只能查看说明并提交建议。
+- 本任务没有修改共享 contracts 或其他线路代码。
 
 ## 验证
 
 Node：`v24.14.0`。
 
-项目脚本：
+- `vue-tsc --noEmit`：PASS。
+- Vitest：15 个文件、68/68 PASS；包含原 `AiChat` 18 个回归测试。
+- `vite build --mode production`：PASS。
+- package/lock 无变化；`node_modules`、`dist` 未被跟踪。
+- 构建仍报告单个 JavaScript chunk 超过 500 kB，作为后续性能债保留。
 
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
+## 实际服务检查
 
-2026-07-24 结果：`vue-tsc --noEmit` PASS；Vitest 5 文件、33/33 PASS；
-production build PASS。1366×768 保持双栏；低高度时允许页面或面板滚动，不再仅因高度切换为单栏。构建仍报告 JavaScript chunk 超过 500 kB。
+- A `GET http://127.0.0.1:8000/api/health`：HTTP 200。
+- C `GET http://127.0.0.1:8011/health`：HTTP 200。
+- C `GET /api/v1/customer-suggestions?reporter_id=TESTER-CONTRACT-PROBE`：HTTP 404。
 
-## 交接
+因此不能声明意见建议真实联调通过；待 C 发布冻结端点后再做 POST/GET smoke，不得用 Mock 冒充。
 
-- 本机 A/C 已完成真实页面 smoke；后续环境仍必须独立验证，不得用 Mock 冒充联调成功。
-- 下一任务不得自动进入 B-T05。
+## 已知风险与交接
 
-## MVP-BATCH-05 前端路由
-
-- 客服浏览器只访问 `http://服务器IPv4:5173/`。Vite 只允许两个固定代理：`/rag-api/**` 到 `127.0.0.1:8000`，`/platform-api/**` 到 `127.0.0.1:8011`；不存在任意转发代理。
-- API 请求路径、Adapter、错误映射和共享 contracts 没有改变；生产模式不会回退 Mock。
-- 技术详情默认折叠，显示前端版本、Git 短 SHA、启动模式、API 模式和当前客服入口，不干扰客服选择商品、生成建议、编辑与复制的流程。
-- 正式 LAN 冒烟已验证：通过 `http://192.168.1.11:5173/` 请求 `/rag-api/api/health` 与 `/platform-api/health` 均返回 HTTP 200；测试目录为 1 店、5 商品，来源受限的真实 Ollama 回答通过同源代理返回。1366×768 保持双栏。
-- 后续交接：公司有线电脑使用同一 5173 地址完成商品选择、生成建议、编辑和复制；若公司 Wi-Fi 与有线网不互通，记录 `NETWORK_SEGMENTED`，不回退到直连 8000/8011 或 Mock。
+- C 建议端点 404 是当前唯一交付阻塞，前端代码审查和回归验证不受影响。
+- production chunk 大于 500 kB；本任务不进行依赖升级或拆包重构。
+- 下一任务不得自动实现退款、补发、浏览器扩展、快麦或自动发送。

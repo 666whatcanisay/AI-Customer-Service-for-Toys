@@ -1179,7 +1179,10 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   --primary: #245bda;
   --primary-soft: #eaf0ff;
   --success: #0f9d7a;
-  width: min(1440px, calc(100% - 40px));
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0;
   color: var(--ink);
 }
 
@@ -1444,21 +1447,13 @@ h2 {
 .feedback-section > .el-button { margin-top: 8px; }
 
 @media (min-width: 901px) {
-  :global(html),
-  :global(body),
-  :global(#app) {
-    height: 100%;
-    overflow: hidden;
-  }
-
   .workspace-shell {
     display: grid;
     grid-template-rows: auto auto auto minmax(0, 1fr);
     gap: 10px;
-    height: 100vh;
-    min-height: 0;
-    padding: 18px 0;
-    overflow: hidden;
+    height: auto;
+    min-height: 650px;
+    overflow: visible;
   }
 
   .workspace-header,
@@ -1471,12 +1466,12 @@ h2 {
   }
 
   .workbench-grid {
-    min-height: 0;
-    overflow: hidden;
+    min-height: 500px;
+    overflow: visible;
   }
 
   .composer-pane {
-    overflow: auto;
+    overflow: visible;
     scrollbar-width: thin;
     scrollbar-color: #c6d4e7 transparent;
   }
@@ -1484,8 +1479,8 @@ h2 {
   .review-pane,
   .review-pane > .answer-card,
   .review-pane > .empty-card {
-    min-height: 0;
-    height: 100%;
+    min-height: 500px;
+    height: auto;
   }
 
   .empty-card { justify-content: center; }
@@ -1505,17 +1500,9 @@ h2 {
 }
 
 @media (min-width: 901px) and (max-height: 740px) {
-  :global(html),
-  :global(body),
-  :global(#app) {
-    height: auto;
-    min-height: 100%;
-    overflow: auto;
-  }
-
   .workspace-shell {
     height: auto;
-    min-height: 100vh;
+    min-height: 650px;
     overflow: visible;
   }
 
