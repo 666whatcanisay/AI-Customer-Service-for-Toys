@@ -89,9 +89,15 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
         assert all("SRC-1688-PRODUCT" not in source["source_ids"] for source in result["sources"])
 
         age_result = service.query("这个款式适合几岁的小朋友？", chat_context)
-        assert re.search(r"6\s*岁", age_result["answer"])
+        assert "6～12岁" in age_result["answer"]
+        assert not re.search(r"6\s*岁\s*(?:及\s*)?以上", age_result["answer"])
         assert re.search(r"3\s*岁以下", age_result["answer"])
-        assert any(term in age_result["answer"] for term in ("成人", "家长"))
+        assert len(
+            re.findall(
+                r"(?:成人|家长|大人).{0,12}(?:陪同|看护|监护|陪伴)",
+                age_result["answer"],
+            )
+        ) == 1
         assert all(
             term not in age_result["answer"]
             for term in ("资料", "依据摘要", "source_id", "SRC-")

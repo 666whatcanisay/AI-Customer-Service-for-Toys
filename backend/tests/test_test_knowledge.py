@@ -311,7 +311,7 @@ def test_store_guarded_faq_reaches_any_product_without_model_downgrade(
 def test_faq_reference_and_bundle_retrieval(scoped_service):
     service, _ = scoped_service
     faq = service.test_knowledge_index.search(
-        "Q80建议6岁及以上儿童在成人看护下使用。", context(), 1
+        "Q80建议6～12岁儿童在成人看护下使用。", context(), 1
     )
     assert faq[0]["knowledge_type"] == "FAQ"
     assert faq[0]["source_ids"] == ["SRC-Q80-FAQ-AGE"]
@@ -442,8 +442,9 @@ def test_age_answer_is_copy_ready_and_sources_remain_structured(
         captured["context"] = model_context
         captured["focus"] = kwargs["answer_focus"]
         return (
-            "根据【资料2】亲，这款建议6岁及以上的小朋友玩哦。"
-            "产品含小零件，3岁以下儿童不建议使用，建议成人陪同。\n"
+            "根据【资料2】亲，这款建议6岁及以上的小朋友在成人看护下玩哦。"
+            "产品含小零件，3岁以下儿童不建议使用，建议家长陪同拼装。\n"
+            "请家长陪同拼装，确保安全。\n"
             "依据摘要：80颗积木；彩袋包装；约17×8×8.2cm。\n"
             "来源标识：SRC-Q80-FAQ-AGE"
         )
@@ -453,9 +454,16 @@ def test_age_answer_is_copy_ready_and_sources_remain_structured(
     result = service.query("这个款式适合几岁的小朋友？", context())
 
     assert result["action"] == "CONTROLLED_ANSWER"
-    assert "6岁" in result["answer"]
+    assert "6～12岁" in result["answer"]
+    assert "6岁及以上" not in result["answer"]
     assert "3岁以下" in result["answer"]
-    assert "成人陪同" in result["answer"]
+    assert len(
+        re.findall(
+            r"(?:成人|家长|大人).{0,12}(?:陪同|看护|监护|陪伴)",
+            result["answer"],
+        )
+    ) == 1
+    assert "确保安全" not in result["answer"]
     assert all(term not in result["answer"] for term in ("资料", "依据摘要", "SRC-"))
     assert all(term not in captured["context"] for term in ("80颗", "彩袋", "17×8"))
     assert "建议年龄" in captured["focus"]

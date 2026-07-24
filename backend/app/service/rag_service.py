@@ -311,6 +311,90 @@ class RAGService:
         ]
         return "".join(sentences[:CUSTOMER_ANSWER_MAX_SENTENCES]).strip()
 
+    @classmethod
+    def _dedupe_adult_guidance(cls, answer: str) -> str:
+        """Keep one adult-supervision reminder while preserving other facts."""
+        sentences = re.findall(r"[^。！？!?]+[。！？!?]?", answer)
+        seen_guidance = False
+        normalized: list[str] = []
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            ending = sentence[-1] if sentence[-1] in "。！？!?" else ""
+            body = sentence[:-1] if ending else sentence
+            clauses = [
+                clause.strip()
+                for clause in re.split(r"[，,；;]", body)
+                if clause.strip()
+            ]
+            retained: list[str] = []
+            removed_duplicate_guidance = False
+            for clause in clauses:
+                is_guidance = cls._question_has(
+                    clause,
+                    r"(?:成人|家长|大人).{0,12}(?:陪同|看护|监护|陪伴)",
+                    r"(?:陪同|看护|监护|陪伴).{0,12}(?:成人|家长|大人)",
+                )
+                if is_guidance and seen_guidance:
+                    removed_duplicate_guidance = True
+                    continue
+                if is_guidance:
+                    seen_guidance = True
+                retained.append(clause)
+            if removed_duplicate_guidance:
+                retained = [
+                    clause
+                    for clause in retained
+                    if not cls._question_has(
+                        clause,
+                        r"^(?:以|来)?确保(?:使用)?安全(?:哦|哟|呀)?$",
+                        r"^注意安全(?:哦|哟|呀)?$",
+                    )
+                ]
+            if retained:
+                normalized.append("，".join(retained) + ending)
+        return "".join(normalized)
+
+    @classmethod
+    def _enforce_age_constraints(
+        cls,
+        question: str,
+        answer_context: str,
+        answer: str,
+    ) -> str:
+        """Preserve an evidence-backed age range and deduplicate supervision."""
+        if "age" not in cls._answer_topics(question):
+            return answer
+        text = str(answer or "")
+        age_range = re.search(
+            r"(\d+)\s*岁?\s*(?:～|~|至|到|-|—|–)\s*(\d+)\s*岁",
+            answer_context,
+        )
+        if age_range:
+            lower, upper = age_range.groups()
+            canonical = f"{lower}～{upper}岁"
+            text = re.sub(
+                rf"{re.escape(lower)}\s*岁?\s*(?:～|~|至|到|-|—|–)\s*"
+                rf"{re.escape(upper)}\s*岁",
+                canonical,
+                text,
+            )
+            text = re.sub(
+                rf"{re.escape(lower)}\s*岁\s*(?:及\s*)?以上",
+                canonical,
+                text,
+            )
+            text = re.sub(
+                rf"{re.escape(lower)}\s*岁(?!\s*(?:以下|以内|以上|及以上))",
+                canonical,
+                text,
+                count=1,
+            )
+            if canonical not in text:
+                text = f"亲，这款建议{canonical}的小朋友玩哦。{text}"
+        return cls._dedupe_adult_guidance(text)
+
     @staticmethod
     def _answer_content(result: dict[str, Any]) -> str:
         """Add field meaning to C's compact SKU fact serialization."""
@@ -682,6 +766,7 @@ class RAGService:
 5. 可自然使用“亲”，但不得夸张承诺。
 6. 安全提示只能来自上方明确事实；年龄问题仅保留建议年龄和必要安全提示，
    且事实中已有的小颗粒、低龄限制、成人陪同提示必须保留。
+7. 年龄事实包含上下限时必须完整保留，不得泛化为“X岁以上”；成人陪同类提示只表达一次。
 """
         try:
             messages = [
@@ -775,9 +860,10 @@ class RAGService:
         if context and answer_action in SAFETY_ACTION_MESSAGES:
             answer = self._guarded_answer(question, answer_action, results)
         else:
+            answer_context = self.build_context(results, question)
             answer = self.call_llm(
                 question,
-                self.build_context(results, question),
+                answer_context,
                 answer_action=answer_action,
                 risk_level=risk_level or "LOW",
                 answer_focus=self._answer_focus(question),
@@ -833,6 +919,11 @@ class RAGService:
                 )
                 if missing_skus:
                     answer = f"{answer}\n对应SKU为{', '.join(missing_skus)}。"
+            answer = self._enforce_age_constraints(
+                question,
+                answer_context,
+                answer,
+            )
             answer = self._sanitize_customer_answer(answer)
         return {
             "answer": answer,

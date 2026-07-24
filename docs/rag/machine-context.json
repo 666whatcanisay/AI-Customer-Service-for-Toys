@@ -5,11 +5,11 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "blocked",
-  "current_task": "A-REPLY-QUALITY-FIX1",
+  "current_task": "A-REPLY-QUALITY-FIX1-DELIVERY",
   "next_recommended_task": "Review and merge the A-REPLY-QUALITY-FIX1 Draft PR after confirming customer wording and sources compatibility; do not auto-start another task.",
-  "current_stage": "Customer reply and internal evidence separation implemented and validated",
-  "current_gate": "Functional PASS: 1-3 sentence customer replies, scoped fact focus, source separation and safety traceability verified",
-  "last_test_result": "Focused reply-quality tests: 27 passed. Full pytest: 56 passed, 2 skipped, 21 warnings. Explicit real scoped BGE/Chroma/qwen3.5:9b E2E: 1 passed, 1 warning.",
+  "current_stage": "Age-range fidelity and adult-supervision deduplication implemented and validated; ready for Draft PR delivery",
+  "current_gate": "Functional PASS: 6-12 age range retained, no lower-bound generalization, one supervision reminder, sources preserved",
+  "last_test_result": "Focused reply-quality tests: 27 passed. Full pytest: 56 passed, 2 skipped, 21 warnings. Explicit real scoped BGE/Chroma/qwen3.5:9b E2E: 1 passed, 1 warning; answer used 6～12岁, omitted 6岁及以上, and contained one adult-supervision reminder.",
   "blockers": [],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -26,13 +26,13 @@
   ],
   "git": {
     "branch": "agent/rag-reply-quality-fix1",
-    "clean": true,
+    "clean": false,
     "baseline_commit": "2b8a727df624622bc0f590077d9cc79c8071eeaa",
     "commit": "121c9da06fa1ebcfc45ba46faaec56de7b86dfd0",
     "task_commit": "121c9da06fa1ebcfc45ba46faaec56de7b86dfd0",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-24T16:43:50+08:00",
+  "checked_at": "2026-07-24T16:55:26+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/service/rag_service.py",
@@ -60,7 +60,8 @@
     "A-T03-FIX1 strict 0.3.1-test schema, store-scope safety compatibility and live C evaluation",
     "A-T03-FIX2 structured decision repair, evaluator semantics and blocked 19/28 live diagnosis",
     "A-T04-LAN-CORS explicit browser Origin configuration and CORS regression coverage",
-    "A-REPLY-QUALITY-FIX1 customer reply and internal evidence separation"
+    "A-REPLY-QUALITY-FIX1 customer reply and internal evidence separation",
+    "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
