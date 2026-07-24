@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -86,6 +87,39 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
         assert result["sources"]
         assert all(source["product_id"] == "P-Q80" for source in result["sources"])
         assert all("SRC-1688-PRODUCT" not in source["source_ids"] for source in result["sources"])
+
+        age_result = service.query("这个款式适合几岁的小朋友？", chat_context)
+        assert re.search(r"6\s*岁", age_result["answer"])
+        assert re.search(r"3\s*岁以下", age_result["answer"])
+        assert any(term in age_result["answer"] for term in ("成人", "家长"))
+        assert all(
+            term not in age_result["answer"]
+            for term in ("资料", "依据摘要", "source_id", "SRC-")
+        )
+        assert "80颗" not in age_result["answer"]
+        assert any(
+            "SRC-Q80-SAFETY" in source["source_ids"]
+            for source in age_result["sources"]
+        )
+        print(
+            "REPLY_QUALITY_SMOKE="
+            + json.dumps(
+                {
+                    "question": "这个款式适合几岁的小朋友？",
+                    "answer": age_result["answer"],
+                    "action": age_result["action"],
+                    "risk_level": age_result["risk_level"],
+                    "source_ids": [
+                        source_id
+                        for source in age_result["sources"]
+                        for source_id in source["source_ids"]
+                    ],
+                    "model": age_result["model"],
+                    "latency_ms": age_result["latency_ms"],
+                },
+                ensure_ascii=False,
+            )
+        )
 
         def factory(active_settings: Settings) -> RAGService:
             return service

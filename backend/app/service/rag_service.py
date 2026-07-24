@@ -32,6 +32,9 @@ SAFETY_ACTION_MESSAGES = {
     "TRANSFER_HUMAN": "该问题需要人工客服处理，已停止自动回答。",
     "REFUSE": "根据测试知识安全规则，无法提供该请求的答案。",
 }
+CUSTOMER_ANSWER_MAX_SENTENCES = 3
+
+
 class RAGService:
     def __init__(
         self,
@@ -127,23 +130,186 @@ class RAGService:
         package = self.platform_client.fetch_package(package_id)
         return self.test_knowledge_index.sync(package)
 
-    def build_context(self, results: list[dict[str, Any]]) -> str:
+    @classmethod
+    def _answer_topics(cls, question: str) -> tuple[str, ...]:
+        topics: list[str] = []
+        if cls._question_has(
+            question,
+            r"几岁",
+            r"年龄",
+            r"适龄",
+            r"适合.*(?:儿童|孩子|小朋友)",
+            r"(?:儿童|孩子|小朋友).*适合",
+        ):
+            topics.append("age")
+        if cls._question_has(
+            question, r"包装", r"礼盒", r"礼袋", r"彩盒", r"袋装", r"盒装"
+        ):
+            topics.append("packaging")
+        if cls._question_has(
+            question,
+            r"尺寸",
+            r"长宽高",
+            r"多长",
+            r"多宽",
+            r"多高",
+            r"多少(?:厘米|毫米|cm|mm)",
+            r"(?:成品|包装).*多大",
+        ):
+            topics.append("size")
+        if cls._question_has(question, r"多少颗", r"几颗", r"颗粒数", r"积木数量"):
+            topics.append("count")
+        if cls._question_has(question, r"颜色", r"什么色", r"哪种色"):
+            topics.append("color")
+        return tuple(dict.fromkeys(topics))
+
+    @classmethod
+    def _answer_focus(cls, question: str) -> str:
+        topics = cls._answer_topics(question)
+        labels = {
+            "age": "建议年龄，以及证据中明确写出的必要小颗粒、低龄限制和成人陪同提示",
+            "packaging": "客户询问的包装形式",
+            "size": "客户询问的成品或包装尺寸",
+            "count": "客户询问的颗粒数或数量",
+            "color": "客户询问的颜色或款式颜色",
+        }
+        if not topics:
+            return "客户当前明确询问的事项"
+        return "；".join(labels[topic] for topic in topics)
+
+    @classmethod
+    def _answer_fragments(cls, question: str, content: str) -> list[str]:
+        """Keep only evidence fragments relevant to the customer's question."""
+        topics = cls._answer_topics(question)
+        if not topics:
+            return [content]
+        keywords = {
+            "age": (
+                "岁",
+                "年龄",
+                "儿童",
+                "孩子",
+                "小朋友",
+                "小颗粒",
+                "小零件",
+                "成人",
+                "家长",
+                "陪同",
+                "看护",
+                "监护",
+            ),
+            "packaging": (
+                "包装",
+                "礼盒",
+                "礼袋",
+                "彩盒",
+                "袋装",
+                "盒装",
+                "装箱",
+                "手提",
+                "纪念版",
+            ),
+            "size": ("尺寸", "长", "宽", "高", "厘米", "毫米", "cm", "mm", "×"),
+            "count": ("颗粒", "颗积木", "数量", "共计"),
+            "color": (
+                "颜色",
+                "色款",
+                "蓝",
+                "粉",
+                "红",
+                "白",
+                "黑",
+                "黄",
+                "紫",
+                "绿",
+                "橙",
+                "灰",
+                "棕",
+                "透明",
+            ),
+        }
+        allowed = tuple(
+            keyword
+            for topic in topics
+            for keyword in keywords[topic]
+        )
+        fragments = [
+            fragment.strip()
+            for fragment in re.split(r"[。！？!?；;\n]+", content)
+            if fragment.strip()
+        ]
+        selected = [
+            fragment
+            for fragment in fragments
+            if any(keyword.lower() in fragment.lower() for keyword in allowed)
+        ]
+        return selected or [content]
+
+    def build_context(
+        self,
+        results: list[dict[str, Any]],
+        question: str = "",
+    ) -> str:
+        """Build model-only facts without citation labels or internal identifiers."""
         context: list[str] = []
+        seen: set[str] = set()
         total = 0
-        for index, result in enumerate(results):
-            block = (
-                f"【资料{index + 1}】\n"
-                f"来源：{result.get('source_name', '')} 第{result.get('page', 0)}页\n"
-                f"标题：{result.get('title', '')}\n"
-                f"商品：{result.get('product_id', '')}；SKU：{result.get('sku_id', '')}\n"
-                f"来源标识：{', '.join(result.get('source_ids') or [])}\n"
-                f"内容：{self._answer_content(result)}\n"
-            )
-            if total + len(block) > 2000:
-                break
-            context.append(block)
-            total += len(block)
+        for result in results:
+            content = self._answer_content(result).strip()
+            for fragment in self._answer_fragments(question, content):
+                if not fragment or fragment in seen:
+                    continue
+                block = fragment.rstrip("。") + "。"
+                if total + len(block) > 2000:
+                    return "\n".join(context)
+                context.append(block)
+                seen.add(fragment)
+                total += len(block)
         return "\n".join(context)
+
+    @staticmethod
+    def _sanitize_customer_answer(answer: str) -> str:
+        """Remove internal RAG traces and keep a copy-ready 1-3 sentence reply."""
+        lines = []
+        internal_heading = re.compile(
+            r"^\s*(?:[-*#]+\s*)?"
+            r"(?:依据摘要|来源标识|检索片段|内部评分(?:和距离)?|"
+            r"source[_\s-]?ids?)\s*[:：]",
+            re.IGNORECASE,
+        )
+        for line in str(answer or "").replace("\r", "").split("\n"):
+            if not internal_heading.match(line):
+                lines.append(line)
+        text = " ".join(lines)
+        text = re.sub(r"【\s*资料\s*\d+\s*】", "", text)
+        text = re.sub(r"资料\s*\d+", "", text)
+        text = re.sub(
+            r"(?:根据|依据)(?:提供的|现有的|现有|上述|检索到的)?"
+            r"(?:资料|证据)(?:显示|可知|说明)?[，,:：\s]*",
+            "",
+            text,
+        )
+        text = re.sub(
+            r"(?:依据摘要|来源标识|检索片段|内部评分(?:和距离)?|"
+            r"source[_\s-]?ids?)\s*[:：][^。！？!?]*[。！？!?]?",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(r"\bSRC-[A-Z0-9][A-Z0-9._-]*\b", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bsource[_\s-]?ids?\b", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"内部(?:评分|距离)|检索距离", "", text)
+        text = text.replace("资料中", "当前信息中").replace("资料", "信息")
+        text = text.replace("**", "")
+        text = re.sub(r"\s+", " ", text).strip(" \t，,；;")
+        if not text:
+            return REFUSAL_MESSAGE
+        sentences = [
+            segment.strip()
+            for segment in re.findall(r"[^。！？!?]+[。！？!?]?", text)
+            if segment.strip()
+        ]
+        return "".join(sentences[:CUSTOMER_ANSWER_MAX_SENTENCES]).strip()
 
     @staticmethod
     def _answer_content(result: dict[str, Any]) -> str:
@@ -185,11 +351,28 @@ class RAGService:
             results = self.vector_store.search(question, top_k=limit)
         else:
             results = self.test_knowledge_index.search(question, context, limit)
+        age_question = "age" in self._answer_topics(question)
         accepted_results = [
             result
             for result in results
             if (
                 float(result["distance"]) <= self.settings.rag_distance_threshold
+                or (
+                    context is not None
+                    and age_question
+                    and result.get("knowledge_type") == "SAFETY_RULE"
+                    and self._question_has(
+                        str(result.get("title") or "")
+                        + " "
+                        + str(result.get("content") or ""),
+                        r"\d+\s*岁",
+                        r"儿童",
+                        r"小颗粒",
+                        r"小零件",
+                        r"成人",
+                        r"家长",
+                    )
+                )
                 or (
                     context is not None
                     and self.settings.rag_distance_threshold >= 0.5
@@ -394,7 +577,14 @@ class RAGService:
                 result for result in ordered if result.get("product_id")
             ]
             if product_results:
-                ordered = product_results
+                relevant_store_safety = [
+                    result
+                    for result in ordered
+                    if age_safety
+                    and not result.get("product_id")
+                    and result.get("knowledge_type") == "SAFETY_RULE"
+                ]
+                ordered = product_results + relevant_store_safety
         return {"action": action, "risk_level": risk, "results": ordered}
 
     def _required_fields(
@@ -464,15 +654,16 @@ class RAGService:
         context: str,
         answer_action: str = "DIRECT_ANSWER",
         risk_level: str = "LOW",
+        answer_focus: str | None = None,
     ) -> str:
         if not self.model_configured:
             return MODEL_NOT_CONFIGURED_MESSAGE
 
         prompt = f"""
-你是玩具客服知识助手。
-必须严格基于资料回答，不允许编造；资料不足时明确拒答。
+你负责把已核实的玩具商品事实整理成可直接复制给客户的客服话术。
+只能使用下方事实，不允许编造；事实不足时简短说明暂时无法确认。
 
-资料：
+已核实事实：
 {context[:3000]}
 
 授权动作：{answer_action}
@@ -481,14 +672,25 @@ class RAGService:
 问题：
 {question}
 
-请用中文简洁回答。必须保留资料中的型号、数字、单位、限定语和来源标识；
-若资料存在明确事实，不要改写为“资料未提及”：
+本次回答范围：{answer_focus or self._answer_focus(question)}。
+
+硬性要求：
+1. 只输出给客户看的最终话术，1～3句话，优先直接回答问题。
+2. 只回答本次范围，不附加客户没问的颗粒数、尺寸、包装、玩法等参数。
+3. 不得提及资料、证据、依据摘要、检索、来源编号、source_id、评分或距离。
+4. 不得列出或复述内部上下文，不得把来源信息拼到话术中。
+5. 可自然使用“亲”，但不得夸张承诺。
+6. 安全提示只能来自上方明确事实；年龄问题仅保留建议年龄和必要安全提示，
+   且事实中已有的小颗粒、低龄限制、成人陪同提示必须保留。
 """
         try:
             messages = [
                 {
                     "role": "system",
-                    "content": "你是玩具客服知识助手。只能依据提供的资料回答，禁止补充资料外事实。",
+                    "content": (
+                        "你是简洁的电商玩具客服话术助手。只能使用已核实事实，"
+                        "只输出客户可见话术，禁止暴露任何内部检索或来源信息。"
+                    ),
                 },
                 {"role": "user", "content": prompt},
             ]
@@ -575,31 +777,12 @@ class RAGService:
         else:
             answer = self.call_llm(
                 question,
-                self.build_context(results),
+                self.build_context(results, question),
                 answer_action=answer_action,
                 risk_level=risk_level or "LOW",
+                answer_focus=self._answer_focus(question),
             )
             if context:
-                evidence_results: list[dict[str, Any]] = [results[0]]
-                for knowledge_type in ("PRODUCT_FACT", "SKU_FACT"):
-                    supporting = next(
-                        (
-                            result
-                            for result in results
-                            if result.get("knowledge_type") == knowledge_type
-                            and result not in evidence_results
-                        ),
-                        None,
-                    )
-                    if supporting is not None:
-                        evidence_results.append(supporting)
-                evidence_digest = " ".join(
-                    self._answer_content(result).strip()
-                    for result in evidence_results
-                    if self._answer_content(result).strip()
-                )
-                if evidence_digest:
-                    answer = f"{answer}\n依据摘要：{evidence_digest}"
                 exact_sku_fact = self._result_for(
                     results, knowledge_type="SKU_FACT", exact_sku=True
                 )
@@ -616,9 +799,8 @@ class RAGService:
                     unsupported = asked_numbers - set(fact_numbers)
                     if fact_numbers and unsupported:
                         answer += (
-                            f"\n当前精确SKU证据为{fact_numbers[0]}颗；"
-                            f"问题中的{', '.join(sorted(unsupported))}颗不是当前SKU参数，"
-                            "属于其他商品或SKU，不能跨范围套用。"
+                            f"\n亲，当前选择的款式是{fact_numbers[0]}颗，"
+                            f"{', '.join(sorted(unsupported))}颗不适用于这个款式哦。"
                         )
                 if self._question_has(question, r"同一款", r"另一个链接"):
                     reference = next(
@@ -631,12 +813,12 @@ class RAGService:
                         None,
                     )
                     if reference:
-                        answer += "\n该SKU通过REFERENCE关联P0002标准SKU。"
+                        answer += "\n这个SKU与P0002对应款为同一款。"
                 bundle_name = re.search(r"[A-Z]\d+\+[A-Z0-9]+", question.upper())
                 if bundle_name and any(
                     "组合" in result.get("content", "") for result in results
                 ):
-                    answer += f"\n{bundle_name.group(0)}为BUNDLE组合。"
+                    answer += f"\n{bundle_name.group(0)}是组合款。"
             if context and "SKU" in question.upper():
                 source_skus = {
                     match
@@ -650,7 +832,8 @@ class RAGService:
                     sku for sku in source_skus if sku not in answer.upper()
                 )
                 if missing_skus:
-                    answer = f"{answer}\n来源标识：{', '.join(missing_skus)}"
+                    answer = f"{answer}\n对应SKU为{', '.join(missing_skus)}。"
+            answer = self._sanitize_customer_answer(answer)
         return {
             "answer": answer,
             "action": answer_action,
