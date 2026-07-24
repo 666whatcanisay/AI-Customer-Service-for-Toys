@@ -13,7 +13,7 @@
           <p>{{ systemReady ? '可以开始处理测试问题' : '请稍候或刷新连接状态' }}</p>
         </div>
         <el-button link @click="showConnectionDetails = !showConnectionDetails">
-          {{ showConnectionDetails ? '收起' : '连接详情' }}
+          {{ showConnectionDetails ? '收起' : '技术详情' }}
         </el-button>
       </div>
     </header>
@@ -38,6 +38,13 @@
         <span>C 商品目录</span>
         <el-tag :type="platformHealthTagType" effect="light">{{ platformHealthStatusText }}</el-tag>
         <el-button link :loading="platformHealthLoading" @click="refreshPlatform">刷新</el-button>
+      </div>
+      <div class="runtime-details" data-testid="runtime-details">
+        <span>前端版本</span><code>{{ runtimeDetails.frontendVersion }}</code>
+        <span>Git Commit</span><code>{{ runtimeDetails.gitCommit }}</code>
+        <span>启动模式</span><code>{{ runtimeDetails.startMode }}</code>
+        <span>API 模式</span><code>{{ runtimeDetails.apiMode }}</code>
+        <span>当前客服入口</span><code>{{ runtimeDetails.customerEntry }}</code>
       </div>
     </section>
 
@@ -536,6 +543,14 @@ const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
 let activeCatalogController: AbortController | null = null
+
+const runtimeDetails = {
+  frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'development',
+  gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
+  startMode: import.meta.env.VITE_START_MODE ?? 'LOCAL',
+  apiMode: import.meta.env.VITE_API_MODE ?? 'SAME_ORIGIN_PROXY',
+  customerEntry: import.meta.env.VITE_CUSTOMER_ENTRY_URL ?? `${window.location.origin}/`
+}
 
 const storeKey = (store: CatalogStore) =>
   `${store.tenantId}::${store.platform}::${store.storeCode}`
@@ -1067,6 +1082,17 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   color: #e6edf7;
 }
 .technical-box code { font-size: 12px; }
+.runtime-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+  width: 100%;
+  padding-top: 10px;
+  border-top: 1px solid #dce5f1;
+  color: #52667f;
+  font-size: 12px;
+}
+.runtime-details code { overflow-wrap: anywhere; color: #172033; }
 
 .question-label, .reply-label { display: block; margin: 20px 0 8px; font-weight: 800; }
 .reply-label span { margin-left: 8px; color: #3157c8; font-size: 13px; }
@@ -1417,7 +1443,7 @@ h2 {
 .feedback-actions { margin: 9px 0; }
 .feedback-section > .el-button { margin-top: 8px; }
 
-@media (min-width: 901px) and (min-height: 741px) {
+@media (min-width: 901px) {
   :global(html),
   :global(body),
   :global(#app) {
@@ -1471,11 +1497,33 @@ h2 {
   .context-grid label small { min-height: auto; }
 }
 
-@media (max-width: 900px), (max-height: 740px) {
+@media (max-width: 900px) {
   .workspace-shell { padding-bottom: 32px; }
   .workbench-grid { grid-template-columns: 1fr; }
   .review-pane { min-height: 300px; }
   .answer-card { overflow: visible; }
+}
+
+@media (min-width: 901px) and (max-height: 740px) {
+  :global(html),
+  :global(body),
+  :global(#app) {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  .workspace-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .workbench-grid { min-height: auto; overflow: visible; }
+  .composer-pane { overflow: visible; }
+  .review-pane,
+  .review-pane > .answer-card,
+  .review-pane > .empty-card { height: auto; min-height: 300px; }
 }
 
 @media (max-width: 700px) {

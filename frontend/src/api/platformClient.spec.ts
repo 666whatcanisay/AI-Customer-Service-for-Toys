@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const httpGet = vi.hoisted(() => vi.fn())
+const httpCreate = vi.hoisted(() => vi.fn(() => ({ get: httpGet })))
 
 vi.mock('axios', () => ({
   default: {
-    create: () => ({ get: httpGet }),
+    create: httpCreate,
     isCancel: () => false,
     isAxiosError: () => false
   }
@@ -44,6 +45,12 @@ describe('platformClient frozen paths', () => {
   beforeEach(() => {
     httpGet.mockReset()
     httpGet.mockResolvedValue({ data: { items: [], total: 0 } })
+  })
+
+  it('uses the same-origin platform proxy unless a direct URL is configured', () => {
+    expect(httpCreate).toHaveBeenCalledWith(expect.objectContaining({
+      baseURL: '/platform-api'
+    }))
   })
 
   it('calls only the three frozen test-catalog routes', async () => {

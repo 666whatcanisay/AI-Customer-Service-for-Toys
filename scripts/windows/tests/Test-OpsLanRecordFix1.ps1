@@ -146,6 +146,11 @@ try {
         if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
     }
     if ((Test-Path -LiteralPath $temporaryRoot) -and (Split-Path -Parent $temporaryRoot) -eq [IO.Path]::GetTempPath().TrimEnd([char]92)) {
-        Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
+        # Windows can retain redirected log handles briefly after the verified
+        # child process exits. Retry only inside this test's GUID temp folder.
+        for ($attempt = 0; $attempt -lt 10 -and (Test-Path -LiteralPath $temporaryRoot); $attempt++) {
+            try { Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction Stop } catch { Start-Sleep -Milliseconds 300 }
+        }
+        if (Test-Path -LiteralPath $temporaryRoot) { Write-Warning "Test cleanup could not remove $temporaryRoot because Windows still holds a redirected-log handle." }
     }
 }

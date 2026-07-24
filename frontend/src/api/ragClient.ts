@@ -3,7 +3,9 @@ import { adaptChatResponse, adaptHealthResponse } from './ragAdapter'
 import { toRagClientError } from './errorMapper'
 import type { RagApiClient, RagChatRequest } from './ragTypes'
 
-const configuredBaseUrl = (import.meta.env.VITE_RAG_API_BASE_URL || 'http://127.0.0.1:8000')
+// A supplied URL keeps the explicit direct-debug mode. Normal Vite starts use
+// the same-origin proxy, so a customer browser needs only port 5173.
+const configuredBaseUrl = (import.meta.env.VITE_RAG_API_BASE_URL || '/rag-api')
   .trim()
   .replace(/\/$/, '')
 
