@@ -13,6 +13,12 @@ function Get-LocalConfig([string]$ConfigPath) {
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
         AutoSyncTestKnowledge = $true
+        # The dedicated LAN launcher always resolves this value again at startup.
+        # 'auto' prevents a stale hotspot or office address from being reused.
+        LanAddress = 'auto'
+        PreferredInterfaceAlias = ''
+        EnableLanMode = $false
+        # Legacy keys remain readable so older ignored local files do not fail.
         LanMode = $false
         LanBindAddress = '0.0.0.0'
         LanAdvertisedHost = ''
@@ -51,7 +57,7 @@ function Get-LocalConfig([string]$ConfigPath) {
     foreach ($key in @('PlatformDatabaseUrl', 'TestKnowledgePackageId')) {
         if ([string]::IsNullOrWhiteSpace([string]$config[$key])) { throw "配置项 $key 缺失或为空。" }
     }
-    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'LanMode', 'AllowPublicNetwork')) {
+    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork')) {
         if ($config[$key] -isnot [bool]) {
             $parsed = $false
             if (-not [bool]::TryParse([string]$config[$key], [ref]$parsed)) { throw "配置项 $key 必须为 true 或 false。" }
@@ -82,7 +88,37 @@ function Test-PrivateLanIpv4([string]$Address) {
 function Test-LanAdapterEligible($Adapter) {
     if ([string]$Adapter.Status -ne 'Up') { return $false }
     $description = "{0} {1}" -f [string]$Adapter.Name, [string]$Adapter.InterfaceDescription
-    return $description -notmatch '(?i)(virtual|vmware|hyper-v|vEthernet|wsl|docker|loopback|tunnel|tap|vpn)'
+    if ($description -match '(?i)(virtual|vmware|hyper-v|vethernet|wsl|docker|loopback|bluetooth|tunnel|tap|tun|vpn|wireguard|tailscale|zerotier)') { return $false }
+    if ($Adapter.PSObject.Properties.Match('HardwareInterface').Count -gt 0 -and $null -ne $Adapter.HardwareInterface -and -not [bool]$Adapter.HardwareInterface) { return $false }
+    return $true
+}
+
+function Get-LanAdapterKind($Candidate) {
+    $description = "{0} {1}" -f [string]$Candidate.InterfaceAlias, [string]$Candidate.InterfaceDescription
+    if ($description -match '(?i)(ethernet|以太网)') { return 'Ethernet' }
+    if ($description -match '(?i)(wi-?fi|wlan|wireless|无线)') { return 'WLAN' }
+    return 'Other'
+}
+
+function Get-Ipv4SubnetMask([int]$PrefixLength) {
+    if ($PrefixLength -lt 0 -or $PrefixLength -gt 32) { throw "无效的 IPv4 前缀长度：$PrefixLength" }
+    $mask = [byte[]]@(0, 0, 0, 0)
+    $remaining = $PrefixLength
+    for ($index = 0; $index -lt 4; $index++) {
+        $bits = [Math]::Min(8, $remaining)
+        $mask[$index] = if ($bits -eq 0) { 0 } else { [byte](256 - [Math]::Pow(2, 8 - $bits)) }
+        $remaining -= $bits
+    }
+    return ($mask -join '.')
+}
+
+function Get-LanSubnetCidr($Candidate) {
+    $prefixLength = [int]$Candidate.PrefixLength
+    if ($prefixLength -lt 1 -or $prefixLength -gt 30) { throw "局域网 IPv4 前缀长度必须在 1-30 之间：$prefixLength" }
+    $address = [System.Net.IPAddress]::Parse([string]$Candidate.IPAddress).GetAddressBytes()
+    $mask = (Get-Ipv4SubnetMask $prefixLength).Split('.') | ForEach-Object { [byte]$_ }
+    $network = for ($index = 0; $index -lt 4; $index++) { [byte]($address[$index] -band $mask[$index]) }
+    return "$($network -join '.')/$prefixLength"
 }
 
 function Get-LanIpv4Candidates {
@@ -95,6 +131,10 @@ function Get-LanIpv4Candidates {
     foreach ($adapter in $adapters) {
         if (-not (Test-LanAdapterEligible $adapter)) { continue }
         $interfaceIndex = [int]$adapter.ifIndex
+        $networkConfiguration = Get-NetIPConfiguration -InterfaceIndex $interfaceIndex -ErrorAction SilentlyContinue
+        $gateways = if ($null -eq $networkConfiguration) { @() } else { @($networkConfiguration.IPv4DefaultGateway | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.NextHop) }) }
+        if ($gateways.Count -eq 0) { continue }
+        $gateway = [string]$gateways[0].NextHop
         $addresses = @(Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue)
         foreach ($address in $addresses) {
             $ip = [string]$address.IPAddress
@@ -104,10 +144,13 @@ function Get-LanIpv4Candidates {
                 InterfaceIndex = $interfaceIndex
                 InterfaceAlias = [string]$adapter.Name
                 InterfaceDescription = [string]$adapter.InterfaceDescription
+                PrefixLength = [int]$address.PrefixLength
+                SubnetMask = Get-Ipv4SubnetMask ([int]$address.PrefixLength)
+                DefaultGateway = $gateway
             }
         }
     }
-    return @($candidates | Sort-Object IPAddress -Unique)
+    return @($candidates | Sort-Object InterfaceIndex, IPAddress -Unique)
 }
 
 function Get-LanNetworkProfile($Candidate) {
@@ -144,46 +187,76 @@ function Get-LanCorsAllowedOrigins($Config) {
     return ($origins -join ',')
 }
 
+function Select-LanIpv4Candidate([object[]]$Candidates, [string]$LanAddress, [string]$PreferredInterfaceAlias) {
+    $usable = @($Candidates | Where-Object {
+        (Test-PrivateLanIpv4 ([string]$_.IPAddress)) -and
+        -not [string]::IsNullOrWhiteSpace([string]$_.DefaultGateway) -and
+        [int]$_.PrefixLength -ge 1 -and [int]$_.PrefixLength -le 30
+    })
+    if ($usable.Count -eq 0) {
+        throw '未发现状态为 Up、具有私有 IPv4 和默认网关的物理网卡。请连接公司网络后重试。'
+    }
+
+    $requestedAddress = if ([string]::IsNullOrWhiteSpace($LanAddress)) { 'auto' } else { $LanAddress.Trim() }
+    if ($requestedAddress -ne 'auto') {
+        if (-not (Test-PrivateLanIpv4 $requestedAddress)) { throw "LanAddress 必须为 auto 或有效的私有 IPv4；拒绝地址：$requestedAddress" }
+        $match = @($usable | Where-Object { [string]$_.IPAddress -eq $requestedAddress })
+        if ($match.Count -ne 1) { throw "LanAddress=$requestedAddress 不属于当前有默认网关的有效物理网卡。请改为 auto 或检查网卡。" }
+        return $match[0]
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PreferredInterfaceAlias)) {
+        $preferred = @($usable | Where-Object { [string]$_.InterfaceAlias -ieq $PreferredInterfaceAlias.Trim() })
+        if ($preferred.Count -ne 1) {
+            $available = @($usable | ForEach-Object { "$($_.InterfaceAlias)（$($_.IPAddress)）" }) -join '；'
+            throw "PreferredInterfaceAlias=$PreferredInterfaceAlias 未唯一匹配有效网卡。可用项：$available"
+        }
+        return $preferred[0]
+    }
+
+    $ranked = @($usable | ForEach-Object {
+        [pscustomobject]@{ Candidate = $_; Rank = switch (Get-LanAdapterKind $_) { 'Ethernet' { 0 }; 'WLAN' { 1 }; default { 2 } } }
+    })
+    $bestRank = ($ranked | Measure-Object -Property Rank -Minimum).Minimum
+    $best = @($ranked | Where-Object { $_.Rank -eq $bestRank } | ForEach-Object { $_.Candidate })
+    if ($best.Count -ne 1) {
+        $available = @($best | ForEach-Object { "$($_.IPAddress)（$($_.InterfaceAlias)）" }) -join '；'
+        throw "发现同优先级的多个有效物理网卡：$available。为避免选择错误网段，请在 config.local.ps1 设置 PreferredInterfaceAlias。"
+    }
+    return $best[0]
+}
+
 function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfile, [switch]$SkipPublicNetworkGuard) {
-    if ([string]$Config.LanBindAddress -ne '0.0.0.0') {
-        throw "LanBindAddress 必须为 0.0.0.0；拒绝绑定到指定地址或公网 IP：$($Config.LanBindAddress)"
-    }
     if ($null -eq $Candidates) { $Candidates = @(Get-LanIpv4Candidates) }
-    $configuredHost = [string]$Config.LanAdvertisedHost
-    $selected = $null
-    if (-not [string]::IsNullOrWhiteSpace($configuredHost)) {
-        if (-not (Test-PrivateLanIpv4 $configuredHost)) {
-            throw "LanAdvertisedHost 必须是主电脑有效的私有 IPv4；拒绝地址：$configuredHost"
-        }
-        $selected = @($Candidates | Where-Object { [string]$_.IPAddress -eq $configuredHost } | Select-Object -First 1)
-        if ($selected.Count -ne 1) {
-            throw "LanAdvertisedHost=$configuredHost 不属于已连接的有效物理网络适配器；请检查 IP、网卡状态，或移除虚拟网卡地址。"
-        }
-        $selected = $selected[0]
-    } else {
-        if ($Candidates.Count -eq 0) { throw '未发现有效私有 IPv4。请连接网络后重试，或在 config.local.ps1 中显式设置 LanAdvertisedHost。' }
-        if ($Candidates.Count -gt 1) {
-            $available = @($Candidates | ForEach-Object { "$($_.IPAddress)（$($_.InterfaceAlias)）" }) -join '；'
-            throw "发现多个有效私有 IPv4：$available。为避免猜测，请在 config.local.ps1 中明确设置 LanAdvertisedHost。"
-        }
-        $selected = $Candidates[0]
-    }
+    $selected = Select-LanIpv4Candidate $Candidates ([string]$Config.LanAddress) ([string]$Config.PreferredInterfaceAlias)
     if ($null -eq $NetworkProfile) { $NetworkProfile = Get-LanNetworkProfile $selected }
     if (-not $SkipPublicNetworkGuard) { Assert-LanNetworkSafety $Config $NetworkProfile }
 
     $lanConfig = @{}
     foreach ($entry in $Config.GetEnumerator()) { $lanConfig[$entry.Key] = $entry.Value }
+    $lanConfig.EnableLanMode = $true
     $lanConfig.LanMode = $true
+    $lanConfig.LanAddress = [string]$selected.IPAddress
     $lanConfig.LanAdvertisedHost = [string]$selected.IPAddress
-    $lanConfig.BindAddress = '0.0.0.0'
+    # Only Vite accepts the LAN connection. A and C stay loopback-only and are
+    # reached through Vite's two fixed same-origin proxy prefixes.
+    $lanConfig.BindAddress = '127.0.0.1'
+    $lanConfig.RagBindAddress = '127.0.0.1'
+    $lanConfig.PlatformBindAddress = '127.0.0.1'
+    $lanConfig.CustomerWebBindAddress = [string]$selected.IPAddress
     $lanConfig.CustomerWebUrl = "http://$($lanConfig.LanAdvertisedHost):$($lanConfig.CustomerWebPort)/"
-    $lanConfig.LocalCustomerWebUrl = "http://127.0.0.1:$($lanConfig.CustomerWebPort)/"
+    $lanConfig.LocalCustomerWebUrl = $lanConfig.CustomerWebUrl
     $lanConfig.LanNetworkProfile = $NetworkProfile
+    $lanConfig.LanSelection = $selected
+    $lanConfig.LanSubnet = Get-LanSubnetCidr $selected
     $lanConfig.LanCorsAllowedOrigins = Get-LanCorsAllowedOrigins $lanConfig
     return $lanConfig
 }
 
-function Get-LanServiceListenerAddress($Config, [int]$Port) { "$($Config.BindAddress):$Port" }
+function Get-LanServiceListenerAddress($Config, [int]$Port) {
+    $address = if ($Port -eq [int]$Config.RagPort) { [string]$Config.RagBindAddress } elseif ($Port -eq [int]$Config.PlatformPort) { [string]$Config.PlatformBindAddress } elseif ($Port -eq [int]$Config.CustomerWebPort) { [string]$Config.CustomerWebBindAddress } else { [string]$Config.BindAddress }
+    return "${address}:$Port"
+}
 
 function Get-LanPlatformEnvironment($Config) {
     return @{
@@ -204,8 +277,21 @@ function Get-LanRagEnvironment($Config) {
 
 function Get-LanFrontendEnvironment($Config) {
     return @{
-        VITE_RAG_API_BASE_URL = "http://$($Config.LanAdvertisedHost):$($Config.RagPort)"
-        VITE_PLATFORM_API_BASE_URL = "http://$($Config.LanAdvertisedHost):$($Config.PlatformPort)"
+        VITE_RAG_API_BASE_URL = '/rag-api'
+        VITE_PLATFORM_API_BASE_URL = '/platform-api'
+        VITE_START_MODE = 'LAN'
+        VITE_API_MODE = 'SAME_ORIGIN_PROXY'
+        VITE_CUSTOMER_ENTRY_URL = [string]$Config.CustomerWebUrl
+    }
+}
+
+function Get-LocalFrontendEnvironment($Config) {
+    return @{
+        VITE_RAG_API_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
+        VITE_PLATFORM_API_BASE_URL = "http://127.0.0.1:$($Config.PlatformPort)"
+        VITE_START_MODE = 'LOCAL'
+        VITE_API_MODE = 'DIRECT'
+        VITE_CUSTOMER_ENTRY_URL = [string]$Config.CustomerWebUrl
     }
 }
 
@@ -248,14 +334,89 @@ function Get-LanFirewallStatusMessage($NetworkProfile) {
     try {
         $profile = Get-NetFirewallProfile -Profile $profileName -ErrorAction Stop
         if (-not [bool]$profile.Enabled) { return "Windows 防火墙状态：$profileName 配置文件已关闭（脚本未作任何修改）。" }
-        return "Windows 防火墙状态：$profileName 配置文件已启用，可能阻断笔记本对 5173、8000、8011 的入站访问；脚本未创建规则。仅在受控网络上手动配置 Private 规则。"
+        return "Windows firewall: $profileName profile is enabled and may block inbound TCP 5173. A/C are loopback-only; do not open 8000 or 8011. Use the dedicated firewall tool only on a trusted network."
     } catch {
         return "Windows 防火墙状态：无法读取 $profileName 配置文件（$($_.Exception.Message)）；它仍可能阻断笔记本访问。脚本未修改任何规则。"
     }
 }
 
+function Get-AICustomerFirewallRuleName { return 'AI Customer Service LAN 5173 (Private)' }
+
+function Get-AICustomerFirewallRules {
+    return @(Get-NetFirewallRule -DisplayName (Get-AICustomerFirewallRuleName) -ErrorAction SilentlyContinue)
+}
+
+function Test-AICustomerServiceAdministrator {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Get-ManagedServiceHealthUrl($Config, [string]$Name, [int]$FallbackPort = 0) {
+    $bindAddress = if ($Config.ContainsKey('BindAddress')) { [string]$Config.BindAddress } else { '127.0.0.1' }
+    if ($bindAddress -in @('0.0.0.0', '::', '')) { $bindAddress = '127.0.0.1' }
+    if ($Name -eq 'customer-web') {
+        if ($Config.ContainsKey('CustomerWebUrl') -and -not [string]::IsNullOrWhiteSpace([string]$Config.CustomerWebUrl)) { return [string]$Config.CustomerWebUrl }
+        return "http://${bindAddress}:$FallbackPort/"
+    }
+    if ($Name -eq 'platform') {
+        $port = if ($Config.ContainsKey('PlatformPort')) { [int]$Config.PlatformPort } else { $FallbackPort }
+        $path = if ($Config.ContainsKey('PlatformHealthPath')) { [string]$Config.PlatformHealthPath } else { '/health' }
+        return "http://${bindAddress}:$port$path"
+    }
+    if ($Name -eq 'rag') {
+        $port = if ($Config.ContainsKey('RagPort')) { [int]$Config.RagPort } else { $FallbackPort }
+        $path = if ($Config.ContainsKey('RagHealthPath')) { [string]$Config.RagHealthPath } else { '/api/health' }
+        return "http://${bindAddress}:$port$path"
+    }
+    # Test helpers may register a deliberately unknown service name to verify
+    # that a tampered record cannot stop it. Its record still needs a harmless
+    # loopback URL; normal launchers only use the three standard names above.
+    return "http://${bindAddress}:$FallbackPort/"
+}
+
+function Get-ManagedServiceExpectedListenerAddress($Config, [string]$Name, [int]$Port) {
+    if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) {
+        return Get-LanServiceListenerAddress $Config $Port
+    }
+    $address = if ($Config.ContainsKey('BindAddress')) { [string]$Config.BindAddress } else { '127.0.0.1' }
+    return "${address}:$Port"
+}
+
+function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
+    $record = Test-RecordedProcess $Config $Name
+    if (-not $record -or -not $record.Valid) { return $false }
+    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    if ($listeners.Count -eq 0) { return $false }
+    $owners = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)
+    if (@($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -ne $owners.Count) { return $false }
+    $expected = Get-ManagedServiceExpectedListenerAddress $Config $Name $Port
+    $expectedHost = $expected.Substring(0, $expected.LastIndexOf(':'))
+    if (@($listeners | Where-Object { [string]$_.LocalAddress -eq $expectedHost }).Count -ne $listeners.Count) { return $false }
+    return Test-HttpOk (Get-ManagedServiceHealthUrl $Config $Name $Port)
+}
+
 function Get-ProcessMetadata([int]$Id) {
     Get-CimInstance Win32_Process -Filter "ProcessId = $Id" -ErrorAction SilentlyContinue
+}
+
+function Test-ProcessDescendantOf([int]$ProcessId, [int]$AncestorProcessId) {
+    $currentId = $ProcessId
+    for ($depth = 0; $depth -lt 32; $depth++) {
+        if ($currentId -eq $AncestorProcessId) { return $true }
+        $metadata = Get-ProcessMetadata $currentId
+        if ($null -eq $metadata -or [int]$metadata.ParentProcessId -le 0) { return $false }
+        $currentId = [int]$metadata.ParentProcessId
+    }
+    return $false
+}
+
+function Get-ProcessIdentitySummary([int]$Id) {
+    $metadata = Get-ProcessMetadata $Id
+    if ($null -eq $metadata) { return "PID $Id（无法读取进程信息）" }
+    $path = if ([string]::IsNullOrWhiteSpace([string]$metadata.ExecutablePath)) { '<未知路径>' } else { [string]$metadata.ExecutablePath }
+    $command = if ([string]::IsNullOrWhiteSpace([string]$metadata.CommandLine)) { '<未知命令>' } else { [string]$metadata.CommandLine }
+    return "PID $Id；路径：$path；命令：$command"
 }
 
 function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
@@ -272,16 +433,22 @@ function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
     $hasFeature = $canVerifyCommandLine -and $metadata.CommandLine.IndexOf([string]$record.commandFeature, [StringComparison]::OrdinalIgnoreCase) -ge 0
     $recordedStart = ([datetime]$record.startedUtc).ToUniversalTime().ToString('o')
     $sameStart = $process.StartTime.ToUniversalTime().ToString('o') -eq $recordedStart
-    if ($sameExecutable -and $sameStart -and ($hasFeature -or -not $canVerifyCommandLine)) {
+    $sameParent = $true
+    if ($record.PSObject.Properties.Name -contains 'parentProcessId') {
+        $sameParent = $metadata -and [int]$metadata.ParentProcessId -eq [int]$record.parentProcessId
+    }
+    if ($sameExecutable -and $sameStart -and $sameParent -and ($hasFeature -or -not $canVerifyCommandLine)) {
         $reason = if ($hasFeature) { '已验证' } else { '已验证（系统未公开命令行，使用可执行路径和启动时间）' }
         return [pscustomobject]@{ Valid = $true; Reason = $reason; Record = $record; Process = $process }
     }
-    return [pscustomobject]@{ Valid = $false; Reason = 'PID、可执行路径、启动时间或命令特征不匹配'; Record = $record; Process = $process }
+    return [pscustomobject]@{ Valid = $false; Reason = 'PID、父子关系、可执行路径、启动时间或命令特征不匹配'; Record = $record; Process = $process }
 }
 
 function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$ExecutablePath, [string]$WorkingDirectory, [string]$CommandSummary, [string]$CommandFeature, [int]$Port) {
     New-Item -ItemType Directory -Force -Path $Config.RuntimeDirectory, (Get-ServiceLogDirectory $Config) | Out-Null
-    $record = [ordered]@{ name=$Name; pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; port=$Port; logDirectory=(Get-ServiceLogDirectory $Config) }
+    $metadata = Get-ProcessMetadata $Process.Id
+    $parentProcessId = if ($metadata) { [int]$metadata.ParentProcessId } else { 0 }
+    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config) }
     $record | ConvertTo-Json | Set-Content -LiteralPath (Get-ServiceRecordPath $Config $Name) -Encoding UTF8
 }
 
@@ -296,8 +463,11 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
     $owners = @(Get-PortOwner $Port)
     if ($owners.Count -eq 0) { return }
     $record = Test-RecordedProcess $Config $Name
-    if ($record -and $record.Valid -and $owners -contains $record.Process.Id) { throw "$Name 已由本工具启动（PID $($record.Process.Id)，端口 $Port）。请使用检查脚本，或先停止后再启动。" }
-    throw "端口 $Port 已被未知或未验证进程占用（PID：$($owners -join ', ')）。为避免误杀，启动已停止；请人工处理该进程。"
+    if ($record -and $record.Valid -and @($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $owners.Count) {
+        throw "$Name 已由本工具启动（登记 PID $($record.Process.Id)，监听 PID $($owners -join ', ')，端口 $Port）。请使用检查脚本，或先停止后再启动。"
+    }
+    $identity = @($owners | ForEach-Object { Get-ProcessIdentitySummary $_ }) -join '；'
+    throw "端口 $Port 已被未知或未验证进程占用（$identity）。为避免误杀，启动已停止；请人工处理该进程。"
 }
 
 function Test-HttpOk([string]$Url) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3; return $r.StatusCode -ge 200 -and $r.StatusCode -lt 400 } catch { return $false } }
@@ -345,8 +515,9 @@ function Get-PlatformMigrationStatus($Config) {
 function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl) {
     $record = Test-RecordedProcess $Config $Name
     $serviceProcessId = if ($record -and $record.Process) { $record.Process.Id } else { '-' }
-    $serviceState = if ($record -and $record.Valid) { '运行中' } else { '未运行' }
     $portOwners = @(Get-PortOwner $Port)
+    $ownsPort = $record -and $record.Valid -and $portOwners.Count -gt 0 -and @($portOwners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $portOwners.Count
+    $serviceState = if ($ownsPort) { '运行中' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
     $healthOk = Test-HttpOk $HealthUrl
     $portState = if ($portOwners.Count -gt 0) { "监听（PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（health 已确认；未能读取端口 PID）' } else { '未监听' }
     $healthState = if ($healthOk) { '可用' } else { '不可用' }

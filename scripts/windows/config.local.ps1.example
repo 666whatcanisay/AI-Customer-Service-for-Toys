@@ -16,11 +16,16 @@
     RuntimeDirectory = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path '.runtime')
     TestDataPackagePath = ''
     AutoImportTestData = $false
-    # 本机入口保持本机模式；“启动局域网客服.bat”会显式启用 LAN 模式。
+    # “启动局域网客服.bat”每次会重新选择局域网地址，避免切换网线或手机热点后沿用旧 IP。
+    EnableLanMode = $false
+    # auto：只选状态为 Up、拥有私有 IPv4 和默认网关的物理网卡；以太网优先于 WLAN。
+    # 也可填写当前有效 IPv4；不要填写 VPN、WSL 或虚拟网卡地址。
+    LanAddress = 'auto'
+    # 只有多个同优先级物理网卡时才需要填写，例如 'Ethernet' 或 'Wi-Fi'。
+    PreferredInterfaceAlias = ''
+    # 以下两个字段仅为旧版 ignored config.local.ps1 的兼容保留；新版 LAN 启动不再使用它们。
     LanMode = $false
-    # 局域网模式固定监听所有本机接口，但只公布经校验的私有 IPv4。
     LanBindAddress = '0.0.0.0'
-    # 留空时只在恰好一个有效物理网卡 IPv4 时自动选择；多网卡时必须显式填写。
     LanAdvertisedHost = ''
     # Public 网络默认阻止。仅在明确理解风险后才可改为 $true，脚本不会修改防火墙。
     AllowPublicNetwork = $false

@@ -175,6 +175,18 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.listSkus).toHaveBeenCalledWith(store, product, expect.any(AbortSignal))
   })
 
+  it('keeps version and runtime routing information folded into technical details', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="runtime-details"]').exists()).toBe(false)
+    const detailsButton = wrapper.find('[data-testid="system-summary"]').find('button')
+    await detailsButton.trigger('click')
+
+    expect(wrapper.get('[data-testid="runtime-details"]').text()).toContain('API')
+    expect(wrapper.get('[data-testid="runtime-details"]').text()).toContain('Git')
+  })
+
   it('remembers the last store and restores its product list', async () => {
     window.localStorage.setItem(LAST_STORE_KEY, 'TENANT-PDD-SM-TEST::pdd::PDD-SM')
 

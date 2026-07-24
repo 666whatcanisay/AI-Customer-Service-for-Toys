@@ -8,7 +8,9 @@ import {
 import { toPlatformClientError } from './errorMapper'
 import type { PlatformCatalogClient } from './platformTypes'
 
-const configuredBaseUrl = (import.meta.env.VITE_PLATFORM_API_BASE_URL || 'http://127.0.0.1:8011')
+// A supplied URL keeps the explicit direct-debug mode. Normal Vite starts use
+// the same-origin proxy, so a customer browser needs only port 5173.
+const configuredBaseUrl = (import.meta.env.VITE_PLATFORM_API_BASE_URL || '/platform-api')
   .trim()
   .replace(/\/$/, '')
 
