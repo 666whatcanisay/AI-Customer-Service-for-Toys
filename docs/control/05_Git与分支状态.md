@@ -34,3 +34,8 @@
 - 独立 Worktree `control/ops-lan-record-fix1` 从 `43db576a4fb5997d7937e2125d47af4982e5a40e` 创建。源分支先后提交 `701b537557317d3c0a8f6cd576f169b503e73fd4`（修复和回归）与 `d78ebeb`（使启动失败夹具与真实仓库 `.venv` 隔离），均已推送。
 - 无冲突 squash 提交 `56acf9792bf728eaad12f8025be658a6dcfdbbcc` 已推送至 `origin/develop`。内容仅限 Windows OPS 生命周期脚本及测试；未修改 A/B/C 业务、API、模型、数据包、端口或网络策略。
 - 修复提交后，对旧 LAN 进程重新取证发现 C 的历史标准记录已丢失，故未执行停止、错误记录清理或新版 LAN 重启。正式 `develop` 保持干净。
+
+## 2026-07-24 OPS-LAN-RECOVERY2
+
+- 起始基线 `844dbe6955a659ed525c6a13effe5d0859656ca3` 与 `origin/develop` 一致；本任务未修改业务代码、依赖、数据库、迁移或 `.runtime` 以外的运行数据。
+- 按一次性授权重新核验 PID `21816` 后，没有满足任务规定的 C Worktree 可执行路径条件，且 5173 已存在本地已建立连接。恢复 Gate 阻断，未发生进程停止或 Git 业务提交。

@@ -38,3 +38,9 @@
 - 修复已合并并推送为 `56acf9792bf728eaad12f8025be658a6dcfdbbcc`；后续启动会稳定登记 `platform.json`、`rag.json`、`customer-web.json`。五套正式 OPS 回归和 PowerShell 语法检查均通过。
 - 停止前证据已保存至被忽略的 `.runtime/recovery-backup/`。重新读取后，8000 的错误记录可沿父子进程验证，5173 的错误记录可直接验证；8011 的 `platform` 标准记录已被覆盖而缺失。
 - 8011 health 仍为 200，监听者可沿父进程到正式 C 虚拟环境，但缺少可比对的历史运行记录启动时间。此项不满足 Gate；没有停止任何服务、没有清理任何记录、也没有执行新版 LAN 重启。不要按端口结束、强杀、手工删除记录或关闭防火墙。笔记本人工验收继续等待。
+
+## 2026-07-24 OPS-LAN-RECOVERY2 核验
+
+- `develop` 和 `origin/develop` 均为 `844dbe6`，工作树干净；A/C/B 当前 health 均为 HTTP 200。
+- 核验前发现 5173 有两个本地已建立连接，因此不能确认无人使用。PID `21816` 的命令及 health 关联 C，但实际可执行文件/父进程均不符合任务指定的 `AI-CS-platform-center` C Worktree 路径。
+- 已把无密钥事实写入被忽略的 `.runtime/recovery-backup/old-platform-process-verification.json`。Gate 为 BLOCKED；不要停止、归档或清理现有服务/记录，也不要交给笔记本测试。
