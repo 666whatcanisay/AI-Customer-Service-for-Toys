@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -19,7 +20,11 @@ from app.service.evaluation import (
     render_markdown,
     run_evaluations,
 )
-from app.service.rag_service import RAGService, SAFETY_ACTION_MESSAGES
+from app.service.rag_service import (
+    CUSTOMER_ANSWER_MAX_SENTENCES,
+    RAGService,
+    SAFETY_ACTION_MESSAGES,
+)
 from app.service.test_knowledge import (
     PlatformTestKnowledgeClient,
     TestKnowledgeValidationError as PackageValidationError,
@@ -392,6 +397,159 @@ def test_nearby_high_risk_boundary_prevents_uncontrolled_direct_answer(
         "SRC-Q80-HIGH-CONTROLLED-BOUNDARY" in source["source_ids"]
         for source in result["sources"]
     )
+
+
+def test_age_answer_is_copy_ready_and_sources_remain_structured(
+    scoped_service, monkeypatch
+):
+    service, package = scoped_service
+    captured = {}
+    selected = [
+        (
+            replace(item, content="Q80建议6～12岁儿童在成人看护下使用。")
+            if item.knowledge_id == "K-Q80-FAQ-AGE"
+            else item
+        )
+        for item in package.items
+        if item.knowledge_id in {"K-Q80-FAQ-AGE", "K-Q80-SAFETY"}
+    ]
+    results = [
+        {
+            "source_name": "synthetic-test-package",
+            "page": 0,
+            "chunk_id": item.knowledge_id,
+            "distance": 0.05,
+            "title": item.title,
+            "content": item.content,
+            "knowledge_type": item.knowledge_type,
+            "answer_action": item.answer_action,
+            "risk_level": item.risk_level,
+            "source_ids": list(item.source_ids),
+            "knowledge_version": "V0.3.1",
+            "product_id": item.product_id or "",
+            "sku_id": item.sku_id or "",
+            "_exact_sku": False,
+        }
+        for item in selected
+    ]
+
+    def fixed_retrieval(question, top_k=None, context=None):
+        return {
+            "accepted": True,
+            "threshold": 0.15,
+            "top_distance": 0.05,
+            "sources": service._source_items(results),
+            "results": list(results),
+        }
+
+    def customer_reply(question, model_context, **kwargs):
+        captured["context"] = model_context
+        captured["focus"] = kwargs["answer_focus"]
+        return (
+            "根据【资料2】亲，这款建议6岁及以上的小朋友在成人看护下玩哦。"
+            "产品含小零件，3岁以下儿童不建议使用，建议家长陪同拼装。\n"
+            "请家长陪同拼装，确保安全。\n"
+            "依据摘要：80颗积木；彩袋包装；约17×8×8.2cm。\n"
+            "来源标识：SRC-Q80-FAQ-AGE"
+        )
+
+    monkeypatch.setattr(service, "retrieve", fixed_retrieval)
+    monkeypatch.setattr(service, "call_llm", customer_reply)
+    result = service.query("这个款式适合几岁的小朋友？", context())
+
+    assert result["action"] == "CONTROLLED_ANSWER"
+    assert "6～12岁" in result["answer"]
+    assert "6岁及以上" not in result["answer"]
+    assert "3岁以下" in result["answer"]
+    assert len(
+        re.findall(
+            r"(?:成人|家长|大人).{0,12}(?:陪同|看护|监护|陪伴)",
+            result["answer"],
+        )
+    ) == 1
+    assert "确保安全" not in result["answer"]
+    assert all(term not in result["answer"] for term in ("资料", "依据摘要", "SRC-"))
+    assert all(term not in captured["context"] for term in ("80颗", "彩袋", "17×8"))
+    assert "建议年龄" in captured["focus"]
+    assert any("SRC-Q80-FAQ-AGE" in source["source_ids"] for source in result["sources"])
+    assert any("SRC-Q80-SAFETY" in source["source_ids"] for source in result["sources"])
+
+
+@pytest.mark.parametrize(
+    ("question", "expected", "excluded"),
+    [
+        ("这款是什么包装？", "大彩盒包装", ("6～12岁", "26×17×16cm")),
+        ("成品尺寸多大？", "26×17×16cm", ("1000颗", "大彩盒包装")),
+    ],
+)
+def test_model_context_only_contains_facts_for_current_question(
+    scoped_service, monkeypatch, question, expected, excluded
+):
+    service, _ = scoped_service
+    results = [
+        {
+            "source_name": "synthetic-multi-fact",
+            "page": 1,
+            "chunk_id": "K-MULTI-FACT",
+            "distance": 0.05,
+            "title": "多事实商品信息",
+            "content": (
+                "这款含1000颗积木；采用大彩盒包装；成品约26×17×16cm；"
+                "建议6～12岁儿童使用；含小颗粒。"
+            ),
+            "knowledge_type": "PRODUCT_FACT",
+            "answer_action": "DIRECT_ANSWER",
+            "risk_level": "LOW",
+            "source_ids": ["SRC-MULTI-FACT"],
+            "knowledge_version": "V0.3.1",
+            "product_id": "P-Q80",
+            "sku_id": "",
+            "_exact_sku": False,
+        }
+    ]
+
+    def fixed_retrieval(question, top_k=None, context=None):
+        return {
+            "accepted": True,
+            "threshold": 0.15,
+            "top_distance": 0.05,
+            "sources": service._source_items(results),
+            "results": list(results),
+        }
+
+    captured = {}
+
+    def focused_reply(question, model_context, **kwargs):
+        captured["context"] = model_context
+        return f"亲，{model_context}"
+
+    monkeypatch.setattr(service, "retrieve", fixed_retrieval)
+    monkeypatch.setattr(service, "call_llm", focused_reply)
+    result = service.query(question, context())
+
+    assert expected in result["answer"]
+    assert all(term not in result["answer"] for term in excluded)
+    assert all(term not in captured["context"] for term in excluded)
+    assert result["sources"][0]["source_ids"] == ["SRC-MULTI-FACT"]
+
+
+def test_customer_answer_sanitizer_removes_internal_traces_and_limits_length():
+    answer = RAGService._sanitize_customer_answer(
+        "根据【资料1】亲，这款是礼盒装哦。第二句补充说明。第三句说明。"
+        "第四句不应保留。\n依据摘要：内部原文。\n"
+        "来源标识：SRC-PDD-SM-001\nsource_id: SRC-PDD-SM-002"
+    )
+
+    assert all(
+        term not in answer
+        for term in ("资料", "依据摘要", "来源标识", "source_id", "SRC-")
+    )
+    sentences = [
+        value
+        for value in re.findall(r"[^。！？!?]+[。！？!?]?", answer)
+        if value.strip()
+    ]
+    assert len(sentences) == CUSTOMER_ANSWER_MAX_SENTENCES
 
 
 def test_no_hit_refuses_without_sources(scoped_service):

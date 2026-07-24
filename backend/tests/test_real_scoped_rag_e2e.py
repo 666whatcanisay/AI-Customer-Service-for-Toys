@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -70,6 +71,22 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
             ),
             PACKAGE_ID,
         )
+        # Keep the frozen fixture untouched. This test-local evidence mirrors
+        # the bounded age fact returned by the real C V0.3.1 package.
+        package = replace(
+            package,
+            items=tuple(
+                (
+                    replace(
+                        item,
+                        content="Q80建议6～12岁儿童在成人看护下使用。",
+                    )
+                    if item.knowledge_id == "K-Q80-FAQ-AGE"
+                    else item
+                )
+                for item in package.items
+            ),
+        )
         service.test_knowledge_index.sync(package)
         chat_context = FrozenChatContext(
             tenant_id="TENANT-PDD-SM-TEST",
@@ -86,6 +103,45 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
         assert result["sources"]
         assert all(source["product_id"] == "P-Q80" for source in result["sources"])
         assert all("SRC-1688-PRODUCT" not in source["source_ids"] for source in result["sources"])
+
+        age_result = service.query("这个款式适合几岁的小朋友？", chat_context)
+        assert "6～12岁" in age_result["answer"]
+        assert not re.search(r"6\s*岁\s*(?:及\s*)?以上", age_result["answer"])
+        assert re.search(r"3\s*岁以下", age_result["answer"])
+        assert len(
+            re.findall(
+                r"(?:成人|家长|大人).{0,12}(?:陪同|看护|监护|陪伴)",
+                age_result["answer"],
+            )
+        ) == 1
+        assert all(
+            term not in age_result["answer"]
+            for term in ("资料", "依据摘要", "source_id", "SRC-")
+        )
+        assert "80颗" not in age_result["answer"]
+        assert any(
+            "SRC-Q80-SAFETY" in source["source_ids"]
+            for source in age_result["sources"]
+        )
+        print(
+            "REPLY_QUALITY_SMOKE="
+            + json.dumps(
+                {
+                    "question": "这个款式适合几岁的小朋友？",
+                    "answer": age_result["answer"],
+                    "action": age_result["action"],
+                    "risk_level": age_result["risk_level"],
+                    "source_ids": [
+                        source_id
+                        for source in age_result["sources"]
+                        for source_id in source["source_ids"]
+                    ],
+                    "model": age_result["model"],
+                    "latency_ms": age_result["latency_ms"],
+                },
+                ensure_ascii=False,
+            )
+        )
 
         def factory(active_settings: Settings) -> RAGService:
             return service
