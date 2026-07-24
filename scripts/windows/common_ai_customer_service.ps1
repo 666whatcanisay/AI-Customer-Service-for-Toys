@@ -132,7 +132,7 @@ function Get-LanIpv4Candidates {
         if (-not (Test-LanAdapterEligible $adapter)) { continue }
         $interfaceIndex = [int]$adapter.ifIndex
         $networkConfiguration = Get-NetIPConfiguration -InterfaceIndex $interfaceIndex -ErrorAction SilentlyContinue
-        $gateways = if ($null -eq $networkConfiguration) { @() } else { @($networkConfiguration.IPv4DefaultGateway | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.NextHop) }) }
+        [array]$gateways = if ($null -eq $networkConfiguration) { @() } else { @($networkConfiguration.IPv4DefaultGateway | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.NextHop) }) }
         if ($gateways.Count -eq 0) { continue }
         $gateway = [string]$gateways[0].NextHop
         $addresses = @(Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue)
