@@ -71,6 +71,8 @@ LanAddress = 'auto'; PreferredInterfaceAlias = ''; EnableLanMode = `$false
     if ($ui -notmatch '@media \(min-width: 901px\)') { throw 'Desktop two-column media rule is missing.' }
     $firewallScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\configure_ai_customer_firewall.ps1') -Raw
     foreach ($required in @('Test-AICustomerServiceAdministrator','-LocalPort 5173','-Profile Private','-RemoteAddress $config.LanSubnet','CONFIGURE')) { if ($firewallScript.IndexOf($required, [StringComparison]::Ordinal) -lt 0) { throw "Firewall safeguard is missing: $required" } }
+    $diagnosticScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\diagnose_lan_ai_customer_service.ps1') -Raw
+    if ($diagnosticScript -match '=\(if\s*\(') { throw 'LAN diagnostic report values must not invoke if as a command.' }
     foreach ($startScript in @('start_ai_customer_service.ps1','start_lan_ai_customer_service.ps1')) {
         $content = Get-Content -LiteralPath (Join-Path $repositoryRoot "scripts\windows\$startScript") -Raw
         if ($content.IndexOf('Test-ManagedServiceRunning', [StringComparison]::Ordinal) -lt 0) { throw "Trusted repeat-start protection is missing from $startScript" }

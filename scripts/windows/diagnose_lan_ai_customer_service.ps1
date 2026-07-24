@@ -44,9 +44,11 @@ try {
         $rules += [pscustomobject]@{ displayName=$rule.DisplayName; enabled=$rule.Enabled; profile=$rule.Profile; direction=$rule.Direction; action=$rule.Action; localPort=(Get-NetFirewallPortFilter -AssociatedNetFirewallRule $rule).LocalPort; remoteAddress=(Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $rule).RemoteAddress }
     }
     $hasLanSelection = $config.ContainsKey('LanSelection')
+    $selectedAdapter = if ($hasLanSelection) { $config.LanSelection } else { $null }
     $customerUrl = if ($hasLanSelection) { [string]$config.CustomerWebUrl } else { '' }
+    $clientTestCommand = if ($customerUrl) { "Test-NetConnection $($config.LanAdvertisedHost) -Port 5173" } else { '' }
     $report = [ordered]@{
-        generatedUtc=[DateTime]::UtcNow.ToString('o'); diagnosticMode='read-only'; lanResolutionError=$resolutionError; selectedAdapter=(if ($hasLanSelection) { $config.LanSelection } else { $null }); eligiblePhysicalAdapters=$candidates; vpnOrVirtualAdapters=$vpnOrVirtualAdapters; defaultRoutes=$defaultRoutes; customerUrl=$customerUrl; clientTestCommand=(if ($customerUrl) { "Test-NetConnection $($config.LanAdvertisedHost) -Port 5173" } else { '' }); services=@((Get-ServiceDiagnostic $config 'platform' $config.PlatformPort), (Get-ServiceDiagnostic $config 'rag' $config.RagPort), (Get-ServiceDiagnostic $config 'customer-web' $config.CustomerWebPort)); firewallRules=$rules
+        generatedUtc=[DateTime]::UtcNow.ToString('o'); diagnosticMode='read-only'; lanResolutionError=$resolutionError; selectedAdapter=$selectedAdapter; eligiblePhysicalAdapters=$candidates; vpnOrVirtualAdapters=$vpnOrVirtualAdapters; defaultRoutes=$defaultRoutes; customerUrl=$customerUrl; clientTestCommand=$clientTestCommand; services=@((Get-ServiceDiagnostic $config 'platform' $config.PlatformPort), (Get-ServiceDiagnostic $config 'rag' $config.RagPort), (Get-ServiceDiagnostic $config 'customer-web' $config.CustomerWebPort)); firewallRules=$rules
     }
     $directory = Join-Path $config.RuntimeDirectory 'diagnostics'; New-Item -ItemType Directory -Force -Path $directory | Out-Null
     $path = Join-Path $directory ("lan-diagnostic-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
