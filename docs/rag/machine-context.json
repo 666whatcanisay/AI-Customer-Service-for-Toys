@@ -4,12 +4,12 @@
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "blocked",
-  "current_task": "A-REPLY-QUALITY-FIX1-FINAL",
-  "next_recommended_task": "Review and merge the A-REPLY-QUALITY-FIX1 Draft PR after confirming customer wording and sources compatibility; do not auto-start another task.",
-  "current_stage": "Frozen fixture restored; bounded age evidence moved into tests; live C-to-A-to-Ollama delivery validation complete",
-  "current_gate": "Functional PASS pending PR #24 review: frozen package unchanged, 6-12 age range retained, one supervision reminder, sources preserved",
-  "last_test_result": "Focused reply-quality tests: 27 passed. Full pytest: 56 passed, 2 skipped, 21 warnings. Explicit test-local scoped BGE/Chroma/qwen3.5:9b E2E: 1 passed, 1 warning. Live C V0.3.1 import and strict A sync: 47 items; qwen3.5:9b reply contained 6～12岁, omitted 6岁及以上 and internal evidence, and contained one adult-supervision reminder.",
+  "status": "in_progress",
+  "current_task": "A-T04-LONG",
+  "next_recommended_task": "Review and merge the A-T04-LONG Draft PR after confirming the AI admin API uses only process-local aggregates and no prompt/customer-content disclosure; do not auto-start another task.",
+  "current_stage": "AI capability registry, process-local runtime metrics, read-only prompt/evaluation metadata, and real online test API implemented",
+  "current_gate": "Functional PASS pending Draft PR: 63 backend tests pass; a real scoped qwen3.5:9b admin online test passes; A-T03 historical 19/28 data-quality Gate remains independent and BLOCKED",
+  "last_test_result": "A-T04 API tests: 19 passed. Full pytest: 63 passed, 2 skipped, 28 warnings. Explicit test-local scoped BGE/Chroma/qwen3.5:9b E2E, including POST /api/admin/ai/modules/ai_customer_service/test: 1 passed, 1 warning. Saved latest live evaluation remains 19/28 and was read only, not rerun.",
   "blockers": [],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -22,21 +22,25 @@
     "Future C package changes may require recalibration of intent and metadata-based structured decisions",
     "Test package withdrawal, expiry and cross-version cleanup are not implemented",
     "A-T03 remains historically blocked at 19/28 frozen fact/source attribution quality; A-REPLY-QUALITY-FIX1 does not alter that Gate",
-    "The reply-quality smoke and live C integration use frozen non-production test knowledge and do not establish production knowledge quality"
+    "The reply-quality smoke and live C integration use frozen non-production test knowledge and do not establish production knowledge quality",
+    "AI capability metrics are intentionally process-local and reset on restart; they are not historical monitoring or an audit store",
+    "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
   ],
   "git": {
-    "branch": "agent/rag-reply-quality-fix1",
-    "clean": true,
-    "baseline_commit": "2b8a727df624622bc0f590077d9cc79c8071eeaa",
-    "commit": "54808fafc0482891cd9d058af2fad2a8c5adc9f0",
-    "task_commit": "54808fafc0482891cd9d058af2fad2a8c5adc9f0",
+    "branch": "agent/rag-ai-center-t04",
+    "clean": false,
+    "baseline_commit": "36ec2d326d1613f62cb647ad9ef5835315e4db21",
+    "commit": "36ec2d326d1613f62cb647ad9ef5835315e4db21",
+    "task_commit": null,
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-24T17:31:09+08:00",
+  "checked_at": "2026-07-24T18:29:45+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/service/rag_service.py",
-    "backend/app/api/routes.py"
+    "backend/app/service/ai_capability.py",
+    "backend/app/api/routes.py",
+    "backend/app/models/chat.py"
   ],
   "owned_paths": ["backend/**", "docs/rag/**"],
   "forbidden_paths": [
@@ -62,7 +66,8 @@
     "A-T04-LAN-CORS explicit browser Origin configuration and CORS regression coverage",
     "A-REPLY-QUALITY-FIX1 customer reply and internal evidence separation",
     "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
-    "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation"
+    "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
+    "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -75,7 +80,11 @@
     "GET /api/health",
     "GET /api/status",
     "Explicit CORS policy configured by CORS_ALLOWED_ORIGINS (no shared contract change)",
-    "POST /api/chat answer remains field-compatible while sources retain internal evidence"
+    "POST /api/chat answer remains field-compatible while sources retain internal evidence",
+    "GET /api/admin/ai/modules and GET /api/admin/ai/modules/{module_id}",
+    "GET /api/admin/ai/modules/{module_id}/prompt",
+    "POST /api/admin/ai/modules/{module_id}/test",
+    "GET /api/admin/ai/modules/{module_id}/evaluations/latest"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }
