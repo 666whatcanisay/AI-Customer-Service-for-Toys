@@ -18,8 +18,8 @@ const http = axios.create({
 
 const endpoint = '/api/v1/customer-experience-cases'
 
-// C has not yet published the final experience-case contract. This client has
-// no production fallback: only an actual response with a recognized status is accepted.
+// This client has no production fallback: only a real response with the frozen
+// case_id and review_status fields is accepted.
 export const experienceCaseClient: ExperienceCaseApiClient = {
   async submit(draft, signal) {
     try {

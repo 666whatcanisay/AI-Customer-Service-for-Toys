@@ -367,7 +367,7 @@
       <details class="feedback-section" data-testid="feedback-section">
         <summary>记录这条建议有没有用（可选）</summary>
         <div class="feedback-body">
-          <p>当前反馈只记录在本页，反馈 API 尚未发布。</p>
+          <p>当前采用反馈只记录在本页。保存经验案例时必须在表单中明确选择冻结的经验类型。</p>
           <div class="feedback-actions">
             <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
               直接采用
@@ -384,7 +384,7 @@
               :disabled="!adoption || experienceCaseSubmitting"
               @click="openExperienceCaseCapture"
             >
-              ⭐ 保存优秀案例
+              ⭐ 保存经验案例
             </el-button>
           </div>
           <p v-if="adoptionMessage" class="feedback-result" data-testid="adoption-result">
@@ -402,7 +402,7 @@
         data-testid="experience-case-dialog"
       >
         <header class="experience-case-dialog-header">
-          <h3 id="experience-case-dialog-title">沉淀优秀案例</h3>
+          <h3 id="experience-case-dialog-title">沉淀客服经验案例</h3>
           <el-button text aria-label="关闭案例表单" @click="experienceCaseDialogOpen = false">关闭</el-button>
         </header>
         <el-alert
@@ -416,8 +416,24 @@
           <div><dt>店铺</dt><dd>{{ result.context.store_code }}</dd></div>
           <div><dt>商品</dt><dd>{{ result.context.product_id }}</dd></div>
           <div><dt>SKU</dt><dd>{{ result.context.sku_id || '未选择' }}</dd></div>
-          <div><dt>采用方式</dt><dd>{{ adoption ? adoptionLabels[adoption.type] : '未选择' }}</dd></div>
+          <div><dt>本页反馈</dt><dd>{{ adoption ? adoptionLabels[adoption.type] : '未选择' }}</dd></div>
         </dl>
+        <p class="experience-case-type-hint">本页反馈不会自动映射为经验类型，请按实际案例明确选择。</p>
+        <label class="experience-case-field">
+          <span>经验类型 <em>必选</em></span>
+          <el-select
+            v-model="experienceCaseFeedbackType"
+            data-testid="experience-case-feedback-type"
+            placeholder="请选择经验类型"
+          >
+            <el-option
+              v-for="option in experienceCaseFeedbackOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </label>
         <label class="experience-case-field">
           <span>最终回复</span>
           <el-input
@@ -489,6 +505,10 @@ import type {
   RagHealth,
   RiskLevel
 } from '@/api/ragTypes'
+import {
+  EXPERIENCE_CASE_FEEDBACK_TYPES,
+  type ExperienceCaseFeedbackType
+} from '@/api/experienceCaseTypes'
 import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
 import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
 import { useTesterIdentity } from '@/workspace/testerIdentity'
@@ -515,6 +535,18 @@ const adoptionLabels: Record<AdoptionType, string> = {
   EDITED_ACCEPT: '修改后采用',
   REJECTED: '未采用'
 }
+
+const experienceCaseFeedbackLabels: Record<ExperienceCaseFeedbackType, string> = {
+  ADOPTED: '采用 AI 建议',
+  EDITED_ADOPTED: '修改后采用',
+  CORRECTION: '人工纠正 AI 建议',
+  ESCALATED: '需升级人工处理'
+}
+
+const experienceCaseFeedbackOptions = EXPERIENCE_CASE_FEEDBACK_TYPES.map((value) => ({
+  value,
+  label: experienceCaseFeedbackLabels[value]
+}))
 
 const platformLabels: Record<string, string> = {
   pdd: '拼多多',
@@ -613,6 +645,7 @@ const experienceCaseSubmitting = ref(false)
 const experienceCaseError = ref('')
 const experienceCaseStatus = ref('')
 const experienceCaseFinalAnswer = ref('')
+const experienceCaseFeedbackType = ref<ExperienceCaseFeedbackType | ''>('')
 const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
@@ -1008,12 +1041,13 @@ const recordAdoption = (type: AdoptionType) => {
 
 const openExperienceCaseCapture = () => {
   if (!result.value || !adoption.value) {
-    ElMessage.warning('请先选择直接采用、修改后采用或未采用')
+    ElMessage.warning('请先选择本页反馈后再打开经验案例表单')
     return
   }
   experienceCaseError.value = ''
   experienceCaseStatus.value = ''
   experienceCaseFinalAnswer.value = adoption.value.finalAnswer
+  experienceCaseFeedbackType.value = ''
   experienceCaseDialogOpen.value = true
 }
 
@@ -1024,6 +1058,10 @@ const submitExperienceCase = async () => {
   const aiAnswer = result.value.answer.trim()
   if (!question || !aiAnswer) {
     experienceCaseError.value = '缺少当前问题或 AI 回复，无法沉淀案例。'
+    return
+  }
+  if (!experienceCaseFeedbackType.value) {
+    experienceCaseError.value = '请选择经验类型后再提交。'
     return
   }
 
@@ -1038,19 +1076,20 @@ const submitExperienceCase = async () => {
       question,
       aiAnswer,
       finalAnswer: experienceCaseFinalAnswer.value.trim(),
-      feedbackType: adoption.value.type,
+      feedbackType: experienceCaseFeedbackType.value,
       createdBy: identity.value.reporterId
     })
     recordExperienceCaseSubmission({
       storeCode: result.value.context.store_code,
       productId: result.value.context.product_id,
       skuId: result.value.context.sku_id,
-      feedbackType: adoption.value.type,
+      caseId: receipt.caseId,
+      feedbackType: experienceCaseFeedbackType.value,
       createdBy: identity.value.reporterId,
-      status: receipt.status,
+      reviewStatus: receipt.reviewStatus,
       submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
     })
-    experienceCaseStatus.value = `案例已提交，当前状态：${EXPERIENCE_CASE_STATUS_LABELS[receipt.status]}。`
+    experienceCaseStatus.value = `案例已提交，当前状态：${EXPERIENCE_CASE_STATUS_LABELS[receipt.reviewStatus]}。`
   } catch (error) {
     experienceCaseError.value = error instanceof Error ? error.message : '案例服务当前不可用。'
   } finally {

@@ -17,7 +17,7 @@ describe('ExperienceCases', () => {
   afterEach(clearExperienceCaseSubmissions)
 
   it('shows only a successful session summary and its Chinese status', () => {
-    recordExperienceCaseSubmission({ storeCode: 'PDD-SM', productId: 'PROD-1', skuId: 'SKU-1', feedbackType: 'EDITED_ACCEPT', createdBy: 'TESTER-ONE', status: 'REVIEWING', submittedAt: '2026-07-25 12:00' })
+    recordExperienceCaseSubmission({ caseId: 'CEC-001', storeCode: 'PDD-SM', productId: 'PROD-1', skuId: 'SKU-1', feedbackType: 'EDITED_ADOPTED', createdBy: 'TESTER-ONE', reviewStatus: 'REVIEWING', submittedAt: '2026-07-25 12:00' })
     const wrapper = mountPage()
     expect(wrapper.get('[data-testid="experience-case-list"]').text()).toContain('审核中')
     expect(wrapper.text()).toContain('修改后采用')

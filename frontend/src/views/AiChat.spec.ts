@@ -151,6 +151,14 @@ const selectContext = async (wrapper: VueWrapper, withSku = true) => {
   if (withSku) await selectAt(wrapper, 2, 'SKU-RED')
 }
 
+const selectExperienceCaseFeedbackType = async (wrapper: VueWrapper, value: string) => {
+  const selects = wrapper.findAllComponents({ name: 'ElSelect' })
+  const feedbackSelect = selects.at(-1)
+  if (!feedbackSelect) throw new Error('Missing experience-case feedback type selector')
+  feedbackSelect.vm.$emit('update:modelValue', value)
+  await flushPromises()
+}
+
 const submit = async (wrapper: VueWrapper, withSku = true) => {
   await selectContext(wrapper, withSku)
   await wrapper.get('[data-testid="question-input"]').setValue('这个款式适合几岁？')
@@ -177,7 +185,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     )
     apiMocks.listSkus.mockResolvedValue([sku])
     apiMocks.chat.mockResolvedValue(resultFor())
-    apiMocks.submitExperienceCase.mockResolvedValue({ status: 'NEW' })
+    apiMocks.submitExperienceCase.mockResolvedValue({ caseId: 'CEC-001', reviewStatus: 'NEW' })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) }
@@ -343,7 +351,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
   })
 
-  it('captures an excellent case only after a feedback choice and shows the actual returned status', async () => {
+  it('requires an explicit frozen experience type and shows the actual returned review status', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
@@ -356,10 +364,17 @@ describe('AiChat B-T04 three-step workbench', () => {
     await wrapper.get('[data-testid="experience-case-submit"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.get('[data-testid="experience-case-error"]').text()).toContain('请选择经验类型')
+    expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
+
+    await selectExperienceCaseFeedbackType(wrapper, 'EDITED_ADOPTED')
+    await wrapper.get('[data-testid="experience-case-submit"]').trigger('click')
+    await flushPromises()
+
     expect(apiMocks.submitExperienceCase).toHaveBeenCalledWith({
       storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
       aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', finalAnswer: '客服审核后的测试回复',
-      feedbackType: 'EDITED_ACCEPT', createdBy: 'TESTER-ONE'
+      feedbackType: 'EDITED_ADOPTED', createdBy: 'TESTER-ONE'
     })
     expect(wrapper.get('[data-testid="experience-case-success"]').text()).toContain('新建')
   })
@@ -372,6 +387,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     await wrapper.get('[data-testid="direct-accept"]').trigger('click')
     await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
     await flushPromises()
+    await selectExperienceCaseFeedbackType(wrapper, 'ADOPTED')
     await wrapper.get('[data-testid="experience-case-submit"]').trigger('click')
     await flushPromises()
 

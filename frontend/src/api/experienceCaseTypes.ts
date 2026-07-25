@@ -1,8 +1,13 @@
-import type { AdoptionType } from './ragTypes'
-
 export const EXPERIENCE_CASE_STATUSES = ['NEW', 'REVIEWING', 'APPROVED', 'REJECTED'] as const
+export const EXPERIENCE_CASE_FEEDBACK_TYPES = [
+  'ADOPTED',
+  'EDITED_ADOPTED',
+  'CORRECTION',
+  'ESCALATED'
+] as const
 
 export type ExperienceCaseStatus = (typeof EXPERIENCE_CASE_STATUSES)[number]
+export type ExperienceCaseFeedbackType = (typeof EXPERIENCE_CASE_FEEDBACK_TYPES)[number]
 
 export interface ExperienceCaseDraft {
   storeCode: string
@@ -11,21 +16,23 @@ export interface ExperienceCaseDraft {
   question: string
   aiAnswer: string
   finalAnswer: string
-  feedbackType: AdoptionType
+  feedbackType: ExperienceCaseFeedbackType
   createdBy: string
 }
 
 export interface ExperienceCaseReceipt {
-  status: ExperienceCaseStatus
+  caseId: string
+  reviewStatus: ExperienceCaseStatus
 }
 
 export interface ExperienceCaseSubmission {
+  caseId: string
   storeCode: string
   productId: string
   skuId: string | null
-  feedbackType: AdoptionType
+  feedbackType: ExperienceCaseFeedbackType
   createdBy: string
-  status: ExperienceCaseStatus
+  reviewStatus: ExperienceCaseStatus
   submittedAt: string
 }
 

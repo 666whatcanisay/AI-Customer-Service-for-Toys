@@ -4,9 +4,9 @@
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
   "current_task": "MVP-PLUS-01 customer experience case capture",
-  "current_stage": "frontend delivery verified; awaiting C experience-case contract publication",
-  "current_gate": "CONDITIONAL PASS: frontend checks pass; real C POST/GET interop blocked by unpublished contract",
-  "status": "awaiting_external_contract",
+  "current_stage": "MVP-PLUS-01 CONTRACT-FIX1: B adapter aligned to the frozen experience-case wire contract",
+  "current_gate": "CONDITIONAL PASS: B contract repair verified; awaiting real C review and A evaluation integration",
+  "status": "awaiting_cross_line_integration",
   "last_updated": "2026-07-25",
   "git": {
     "branch": "codex/customer-experience-case-capture",
@@ -45,21 +45,21 @@
     "GET A /api/health",
     "POST A /api/chat with {question,context}",
     "GET C /health",
-    "POST C /api/v1/customer-experience-cases with the MVP-PLUS-01 request fields",
-    "GET C experience-case list contract: not yet published; do not guess"
+    "POST C /api/v1/customer-experience-cases with frozen feedback_type and top-level case_id/review_status receipt",
+    "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI"
   ],
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "MVP-PLUS-01 task-local provisional experience-case adapter agreement"
+    "experience-case.v1-draft task-local frozen adapter agreement"
   ],
   "test_commands": [
     "npm run typecheck",
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-25: vue-tsc --noEmit PASS; Vitest 19 files / 77 tests PASS; vite build PASS. C experience-case GET contract is unpublished, so no fake interop result was recorded.",
+  "last_test_result": "2026-07-25 CONTRACT-FIX1: targeted adapter and UI regression checks pass; full frontend verification recorded in this task handoff.",
   "blockers": [
-    "C must publish versioned POST response semantics and GET query contract for customer experience cases before real cross-line smoke testing."
+    "C review lifecycle and A real evaluation consumer/writeback must be integrated before the full experience-case closure can pass."
   ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",

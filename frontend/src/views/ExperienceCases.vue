@@ -16,7 +16,7 @@
 
     <section v-if="submissions.length" class="case-list" data-testid="experience-case-list">
       <article v-for="item in submissions" :key="`${item.submittedAt}-${item.productId}`">
-        <div class="case-title"><strong>{{ item.productId }}</strong><span>{{ EXPERIENCE_CASE_STATUS_LABELS[item.status] }}</span></div>
+        <div class="case-title"><strong>{{ item.productId }}</strong><span>{{ EXPERIENCE_CASE_STATUS_LABELS[item.reviewStatus] }}</span></div>
         <dl>
           <div><dt>店铺</dt><dd>{{ item.storeCode }}</dd></div>
           <div><dt>SKU</dt><dd>{{ item.skuId || '未选择' }}</dd></div>
