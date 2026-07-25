@@ -113,6 +113,23 @@ class AIOnlineTestRequest(BaseModel):
         return value
 
 
+class ExperienceEvaluationRunRequest(BaseModel):
+    """An explicit operator request to evaluate one approved case snapshot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str = Field(..., min_length=1, max_length=64)
+    revision: int = Field(..., ge=1)
+
+    @field_validator("case_id")
+    @classmethod
+    def case_id_must_be_safe(cls, value: str) -> str:
+        value = value.strip()
+        if not value or "\r" in value or "\n" in value:
+            raise ValueError("case_id must be a single non-empty line")
+        return value
+
+
 class ModelConfigUpdate(BaseModel):
     provider: str = Field(default="ollama", min_length=1, max_length=40)
     model: str = Field(default="qwen3.5:9b", min_length=1, max_length=100)
