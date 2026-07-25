@@ -1,6 +1,6 @@
 # MVP-PLUS-01 customer experience case center
 
-Status: C-line implementation ready for review on `agent/platform-mvp-plus-01`, based on `origin/develop@271c15520dd7bf91ad8bfa26cad784d3b780e376`.
+Status: C-line implementation ready for review on `agent/platform-mvp-plus-01`, based on `origin/develop@271c15520dd7bf91ad8bfa26cad784d3b780e376`. Draft PR #30 targets `develop`.
 
 The implementation follows the frozen task interface in `docs/control/interfaces/experience-case.v1-draft.md`. This document records the C-owned implementation and does not alter `contracts/**` or re-specify the frozen contract.
 
