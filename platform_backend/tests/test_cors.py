@@ -69,6 +69,7 @@ def test_allowed_origin_receives_preflight_and_actual_cors_headers(
     assert preflight.status_code == 200
     assert preflight.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
     assert "GET" in preflight.headers["access-control-allow-methods"]
+    assert "PATCH" in preflight.headers["access-control-allow-methods"]
     assert actual.status_code == 200
     assert actual.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
     assert actual.headers["access-control-expose-headers"] == "X-Request-ID"
