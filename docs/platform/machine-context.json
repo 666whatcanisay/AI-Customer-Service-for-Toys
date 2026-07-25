@@ -4,15 +4,15 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "MVP-PLUS-02-FEEDBACK-CONTRACT-FIX",
-  "current_stage": "Versioned AI feedback-case export and idempotent analysis-evidence writeback",
-  "current_gate": "C local implementation and verification PASS; feature commit 078482c created locally, not pushed by task scope",
+  "current_task": "MVP-PLUS-02-FEEDBACK-CONTRACT-CONVERGE",
+  "current_stage": "Frozen B create/history and A badcase export/writeback Provider convergence",
+  "current_gate": "C local implementation, migration round trip, and backend verification PASS; convergence commit and Draft PR pending",
   "status": "ready_for_review",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
     "Frozen feedback supplement: docs/control/interfaces/ai-feedback.v1-draft.md (not modified in this worktree)",
-    "C implementation note: docs/platform/13_AI反馈接口说明.md; additive A/C paths only, with affected-line review required before any shared-contract promotion."
+    "C implementation note: docs/platform/13_AI反馈接口说明.md; frozen B/C/A Provider paths with affected-line review required before any shared-contract promotion."
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -34,8 +34,10 @@
     "admin_web/src/views/CustomerExperienceCasesView.vue",
     "admin_web/src/views/AiOptimizationPoolView.vue",
     "platform_backend/app/ai_feedback/models.py",
+    "platform_backend/app/api/customer_ai_feedback_routes.py",
     "platform_backend/app/api/admin_ai_feedback_routes.py",
     "platform_backend/migrations/versions/0005_mvp_plus_02_ai_response_feedback.py",
+    "platform_backend/migrations/versions/0006_mvp_plus_02_ai_feedback_idempotency.py",
     "docs/platform/13_AI反馈接口说明.md"
   ],
   "provided_interfaces": [
@@ -43,22 +45,23 @@
     "GET /api/v1/admin/ai-optimization/cases/export",
     "POST /api/v1/admin/ai-optimization/evaluation-results",
     "C-owned internal Admin review/list/detail and AI optimization pool endpoints",
-    "GET /api/v1/admin/ai-quality/feedback-cases",
+    "POST/GET /api/v1/ai-response-feedback",
+    "GET /api/v1/admin/ai-quality/badcases",
     "POST /api/v1/admin/ai-quality/analysis-results",
     "C-owned internal POST /api/v1/admin/ai-response-feedback/{feedback_id}/confirm",
     "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
   "required_interfaces": [
-    "A consumes only manually confirmed C feedback snapshots and posts revision-matching analysis evidence",
-    "B feedback-entry development remains outside this change",
+    "B submits with Idempotency-Key and consumes only its minimum status projection",
+    "A consumes only manually confirmed C feedback snapshots and posts matching revision/hash/type analysis evidence",
     "No direct A/C database access, A model call, or cross-line automatic action"
   ],
   "cross_line_compatibility": {
     "affected_lines": ["A", "B"],
-    "change": "MVP-PLUS-02 feedback contract supplement adds versioned A/C paths only; B entry code remains untouched and existing paths are unchanged.",
+    "change": "MVP-PLUS-02 Provider convergence implements frozen B create/history and A badcases/writeback paths; unpublished local feedback-cases is removed and existing non-feedback paths are unchanged.",
     "shared_contract_version": "0.1.0 unchanged",
     "database_change": true,
-    "verified": "C focused export/revision/idempotency API tests; B/A integration remains consumer-owned follow-up."
+    "verified": "C real TestClient B create/history, A badcases/snapshot, and analysis idempotency tests; B/A integration remains consumer-owned follow-up."
   },
   "data_boundaries": {
     "source": "Synthetic local test values only",
@@ -76,16 +79,17 @@
     "customer_message_enabled": false,
     "order_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-25 MVP-PLUS-02 feedback contract fix: focused export/revision/idempotency tests passed and full platform backend pytest passed (69 passed; one existing upstream TestClient deprecation warning). Isolated SQLite Alembic upgrade -> downgrade 0004_mvp_plus_01_experience_cases -> upgrade reached 0005_mvp_plus_02_ai_response_feedback; temporary database was removed.",
+  "last_test_result": "2026-07-25 MVP-PLUS-02 feedback contract convergence: real TestClient B create/history plus A badcases/snapshot/writeback idempotency tests passed and full platform backend pytest passed (69 passed; one existing upstream TestClient deprecation warning). Isolated SQLite Alembic upgrade -> downgrade 0005_mvp_plus_02_ai_response_feedback -> upgrade reached 0006_mvp_plus_02_ai_feedback_idempotency; temporary database was removed.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
-    "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0004_mvp_plus_01_experience_cases; upgrade head",
+    "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q"
   ],
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
     "AI feedback text is not logged by the new modules, but v1-reminder-only is a reminder and not automatic redaction.",
-    "A analysis evidence is stored only after C confirmation and matching revision; C does not verify an A identity in this baseline.",
+    "Idempotency-Key and created_by scope B replay/history but do not verify an identity or grant authorization.",
+    "A analysis evidence is stored only after C confirmation and matching revision/hash/type; C does not verify an A identity in this baseline.",
     "CORS is not authentication or authorization."
   ],
   "out_of_scope": [
@@ -97,9 +101,9 @@
   "git": {
     "branch": "agent/platform-ai-feedback-center",
     "base": "origin/develop ea69c5f24c897b68b4cbd0eb0f96da3de8a6dfc1",
-    "commit": "078482ce83a038d008b38068036b47ecd5e06ec6",
+    "commit": "pending convergence delivery",
     "draft_pr": null
   },
-  "next_recommended_task": "A may consume the versioned feedback-case interface and run its controlled integration verification. Do not enable automatic actions or change B entry behavior without separate approval.",
+  "next_recommended_task": "Push the convergence branch and create the requested Draft PR. B and A may then run their controlled integration verification; do not enable automatic actions.",
   "last_updated": "2026-07-25"
 }

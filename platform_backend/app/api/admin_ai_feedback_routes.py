@@ -17,6 +17,7 @@ from app.ai_feedback.schemas import (
     AIResponseFeedbackExportItem,
     AIResponseFeedbackExportResponse,
     AIResponseFeedbackStatus,
+    FeedbackContext,
 )
 from app.database import get_db
 from app.errors import AppError
@@ -92,6 +93,8 @@ def _same_analysis_payload(
 ) -> bool:
     return (
         analysis.feedback_id == payload.feedback_id
+        and analysis.content_hash == payload.content_hash
+        and analysis.feedback_type == payload.feedback_type
         and analysis.analysis_run_id == payload.analysis_run_id
         and analysis.model_version == payload.model_version
         and analysis.prompt_version == payload.prompt_version
@@ -127,8 +130,8 @@ def confirm_ai_response_feedback(
     return _confirmation_response(item)
 
 
-@ai_quality_router.get("/feedback-cases", response_model=AIResponseFeedbackExportResponse)
-def export_confirmed_feedback_cases(
+@ai_quality_router.get("/badcases", response_model=AIResponseFeedbackExportResponse)
+def export_confirmed_ai_badcases(
     cursor: str | None = Query(default=None, max_length=64),
     size: int = Query(default=20, ge=1, le=100),
     session: Session = Depends(get_db),
@@ -148,12 +151,21 @@ def export_confirmed_feedback_cases(
         AIResponseFeedbackExportItem(
             feedback_id=item.feedback_id,
             revision=item.revision,
+            store_code=item.store_code,
+            product_id=item.product_id,
+            sku_id=item.sku_id,
             question=item.question,
             ai_answer=item.ai_answer,
             final_answer=item.final_answer,
             feedback_type=item.feedback_type,
+            feedback_note=item.feedback_note,
+            context=FeedbackContext(
+                store_code=item.store_code,
+                product_id=item.product_id,
+                sku_id=item.sku_id,
+            ),
             content_hash=item.content_hash or "",
-            created_at=item.created_at,
+            redaction_version=item.redaction_version,
         )
         for item in page_rows
     ]
@@ -172,8 +184,8 @@ def record_ai_response_feedback_analysis(
     item = _feedback_or_404(session, payload.feedback_id)
     if item.revision != payload.revision:
         raise AppError(
-            "AI_RESPONSE_FEEDBACK_REVISION_MISMATCH",
-            "The analysis revision does not match the controlled feedback revision.",
+            "AI_RESPONSE_FEEDBACK_EXPORT_SNAPSHOT_MISMATCH",
+            "The analysis revision does not match the controlled feedback snapshot.",
             status_code=409,
         )
 
@@ -213,6 +225,18 @@ def record_ai_response_feedback_analysis(
         raise AppError(
             "AI_RESPONSE_FEEDBACK_NOT_EXPORTABLE",
             "The confirmed feedback does not have a controlled content hash.",
+            status_code=409,
+        )
+    if payload.content_hash != item.content_hash:
+        raise AppError(
+            "AI_RESPONSE_FEEDBACK_EXPORT_SNAPSHOT_MISMATCH",
+            "The analysis content_hash does not match the controlled feedback snapshot.",
+            status_code=409,
+        )
+    if payload.feedback_type != item.feedback_type:
+        raise AppError(
+            "AI_RESPONSE_FEEDBACK_TYPE_MISMATCH",
+            "The analysis feedback_type must match the submitted feedback_type.",
             status_code=409,
         )
 

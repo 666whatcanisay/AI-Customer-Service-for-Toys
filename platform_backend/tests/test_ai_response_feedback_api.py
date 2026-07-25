@@ -1,35 +1,40 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from app.ai_feedback.models import AIResponseFeedback, AIResponseFeedbackAnalysis
+from fastapi.testclient import TestClient
 
 
-def _seed_feedback(session: Session, **overrides: object) -> AIResponseFeedback:
-    values: dict[str, object] = {
-        "feedback_id": "ARF-20260725-000001",
-        "revision": 1,
+def _payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
         "store_code": "STORE-ONE",
         "product_id": "PRODUCT-ONE",
         "sku_id": "SKU-ONE",
         "question": "What safety information is missing?",
         "ai_answer": "This toy is suitable for children aged six to twelve.",
-        "final_answer": "It is for ages six to twelve with adult supervision and not for children under three.",
         "feedback_type": "MISSING_INFO",
         "feedback_note": None,
+        "final_answer": "It is for ages six to twelve with adult supervision and not for children under three.",
         "created_by": "support-tester",
-        "status": "NEW",
-        "analysis_status": "NEW",
-        "redaction_version": "v1-reminder-only",
+        "context": {
+            "store_code": "STORE-ONE",
+            "product_id": "PRODUCT-ONE",
+            "sku_id": "SKU-ONE",
+        },
     }
-    values.update(overrides)
-    item = AIResponseFeedback(**values)
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    return item
+    payload.update(overrides)
+    return payload
 
 
-def _confirm(client, feedback_id: str) -> dict[str, object]:
+def _create(
+    client: TestClient, *, idempotency_key: str = "feedback-submit-001", **overrides: object
+) -> dict[str, object]:
+    response = client.post(
+        "/api/v1/ai-response-feedback",
+        json=_payload(**overrides),
+        headers={"Idempotency-Key": idempotency_key},
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def _confirm(client: TestClient, feedback_id: str) -> dict[str, object]:
     response = client.post(
         f"/api/v1/admin/ai-response-feedback/{feedback_id}/confirm",
         json={
@@ -41,10 +46,12 @@ def _confirm(client, feedback_id: str) -> dict[str, object]:
     return response.json()
 
 
-def _analysis_payload(feedback_id: str, **overrides: object) -> dict[str, object]:
+def _analysis_payload(snapshot: dict[str, object], **overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "feedback_id": feedback_id,
-        "revision": 1,
+        "feedback_id": snapshot["feedback_id"],
+        "revision": snapshot["revision"],
+        "content_hash": snapshot["content_hash"],
+        "feedback_type": snapshot["feedback_type"],
         "analysis_run_id": "AQR-test-001",
         "model_version": "synthetic-model-v1",
         "prompt_version": "ai-quality-feedback-v1",
@@ -64,89 +71,119 @@ def _analysis_payload(feedback_id: str, **overrides: object) -> dict[str, object
     return payload
 
 
-def test_only_c_confirmed_feedback_has_a_versioned_export_snapshot(client, session: Session) -> None:
-    new_feedback = _seed_feedback(session)
-    second_feedback = _seed_feedback(session, feedback_id="ARF-20260725-000002")
+def test_b_create_requires_idempotency_and_returns_personal_history_projection(client: TestClient) -> None:
+    missing_key = client.post("/api/v1/ai-response-feedback", json=_payload())
+    assert missing_key.status_code == 422
+    assert missing_key.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
 
-    empty = client.get("/api/v1/admin/ai-quality/feedback-cases")
+    forbidden_lifecycle = client.post(
+        "/api/v1/ai-response-feedback",
+        json={**_payload(), "status": "ANALYZED", "analysis_status": "ANALYZED"},
+        headers={"Idempotency-Key": "forbidden-lifecycle"},
+    )
+    assert forbidden_lifecycle.status_code == 422
+    assert forbidden_lifecycle.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
+
+    created = _create(client)
+    assert set(created) == {"feedback_id", "status"}
+    assert str(created["feedback_id"]).startswith("ARF-")
+    assert created["status"] == "NEW"
+
+    replay = _create(client)
+    assert replay == created
+
+    key_conflict = client.post(
+        "/api/v1/ai-response-feedback",
+        json=_payload(question="A different synthetic question."),
+        headers={"Idempotency-Key": "feedback-submit-001"},
+    )
+    assert key_conflict.status_code == 409
+    assert key_conflict.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_IDEMPOTENCY_CONFLICT"
+
+    other = _create(
+        client,
+        idempotency_key="feedback-submit-002",
+        feedback_type="RISK_ISSUE",
+        created_by="support-other",
+    )
+    history = client.get(
+        "/api/v1/ai-response-feedback",
+        params={"created_by": "support-tester", "feedback_type": "MISSING_INFO", "status": "NEW"},
+    )
+    assert history.status_code == 200
+    assert history.json()["total"] == 1
+    projection = history.json()["items"][0]
+    assert projection["feedback_id"] == created["feedback_id"]
+    assert projection["revision"] == 1
+    assert projection["status"] == "NEW"
+    assert "question" not in projection
+    assert "confirmed_by" not in projection
+    assert other["feedback_id"] not in str(history.json())
+
+
+def test_a_badcases_export_and_writeback_validate_frozen_snapshot_idempotently(client: TestClient) -> None:
+    created = _create(client)
+    feedback_id = str(created["feedback_id"])
+
+    empty = client.get("/api/v1/admin/ai-quality/badcases")
     assert empty.status_code == 200
     assert empty.json() == {"items": [], "next_cursor": None}
+    old_path = client.get("/api/v1/admin/ai-quality/feedback-cases")
+    assert old_path.status_code == 404
 
-    confirmed = _confirm(client, new_feedback.feedback_id)
-    assert confirmed["revision"] == 1
+    confirmed = _confirm(client, feedback_id)
     assert confirmed["status"] == "ANALYZING"
     assert confirmed["analysis_status"] == "ANALYZING"
     assert confirmed["content_hash"].startswith("sha256:")
 
-    exported = client.get("/api/v1/admin/ai-quality/feedback-cases")
+    exported = client.get("/api/v1/admin/ai-quality/badcases")
     assert exported.status_code == 200
-    assert [item["feedback_id"] for item in exported.json()["items"]] == [new_feedback.feedback_id]
-    item = exported.json()["items"][0]
-    assert item["revision"] == 1
-    assert item["content_hash"] == confirmed["content_hash"]
-    assert item["question"] == "What safety information is missing?"
-    assert set(item) == {
-        "feedback_id", "revision", "question", "ai_answer", "final_answer",
-        "feedback_type", "content_hash", "created_at",
+    assert [item["feedback_id"] for item in exported.json()["items"]] == [feedback_id]
+    snapshot = exported.json()["items"][0]
+    assert snapshot["revision"] == 1
+    assert snapshot["content_hash"] == confirmed["content_hash"]
+    assert snapshot["feedback_type"] == "MISSING_INFO"
+    assert snapshot["context"] == {
+        "store_code": "STORE-ONE", "product_id": "PRODUCT-ONE", "sku_id": "SKU-ONE"
     }
-    assert second_feedback.feedback_id not in str(exported.json())
+    assert snapshot["redaction_version"] == "v1-reminder-only"
 
-
-def test_analysis_writeback_checks_revision_and_is_idempotent(client, session: Session) -> None:
-    feedback = _seed_feedback(session)
-
-    blocked = client.post(
+    wrong_hash = client.post(
         "/api/v1/admin/ai-quality/analysis-results",
-        json=_analysis_payload(feedback.feedback_id),
+        json=_analysis_payload(snapshot, content_hash="sha256:wrong"),
     )
-    assert blocked.status_code == 409
-    assert blocked.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_NOT_EXPORTABLE"
+    assert wrong_hash.status_code == 409
+    assert wrong_hash.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_EXPORT_SNAPSHOT_MISMATCH"
 
-    confirmed = _confirm(client, feedback.feedback_id)
-
-    stale = client.post(
+    wrong_type = client.post(
         "/api/v1/admin/ai-quality/analysis-results",
-        json=_analysis_payload(feedback.feedback_id, revision=2),
+        json=_analysis_payload(snapshot, feedback_type="FACT_ERROR"),
     )
-    assert stale.status_code == 409
-    assert stale.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_REVISION_MISMATCH"
-
-    malformed_analysis = client.post(
-        "/api/v1/admin/ai-quality/analysis-results",
-        json=_analysis_payload(feedback.feedback_id, analysis=[]),
-    )
-    assert malformed_analysis.status_code == 422
-    assert malformed_analysis.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_ANALYSIS_OUTPUT_INVALID"
+    assert wrong_type.status_code == 409
+    assert wrong_type.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_TYPE_MISMATCH"
 
     recorded = client.post(
         "/api/v1/admin/ai-quality/analysis-results",
-        json=_analysis_payload(feedback.feedback_id),
+        json=_analysis_payload(snapshot),
     )
     assert recorded.status_code == 201
     assert recorded.json()["status"] == "ANALYZED"
     assert recorded.json()["analysis_run_id"] == "AQR-test-001"
-    stored = session.scalar(
-        select(AIResponseFeedbackAnalysis).where(
-            AIResponseFeedbackAnalysis.feedback_id == feedback.feedback_id
-        )
-    )
-    assert stored is not None
-    assert stored.content_hash == confirmed["content_hash"]
 
-    retry = client.post(
+    replay = client.post(
         "/api/v1/admin/ai-quality/analysis-results",
-        json=_analysis_payload(feedback.feedback_id),
+        json=_analysis_payload(snapshot),
     )
-    assert retry.status_code == 200
-    assert retry.json() == recorded.json()
+    assert replay.status_code == 200
+    assert replay.json() == recorded.json()
 
-    conflicting_retry = client.post(
+    conflict = client.post(
         "/api/v1/admin/ai-quality/analysis-results",
-        json=_analysis_payload(feedback.feedback_id, analysis={"summary": "Different evidence"}),
+        json=_analysis_payload(snapshot, analysis={"summary": "Different synthetic evidence."}),
     )
-    assert conflicting_retry.status_code == 409
-    assert conflicting_retry.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_ANALYSIS_CONFLICT"
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "AI_RESPONSE_FEEDBACK_ANALYSIS_CONFLICT"
 
-    no_longer_exported = client.get("/api/v1/admin/ai-quality/feedback-cases")
-    assert no_longer_exported.status_code == 200
-    assert no_longer_exported.json() == {"items": [], "next_cursor": None}
+    after_analysis = client.get("/api/v1/admin/ai-quality/badcases")
+    assert after_analysis.status_code == 200
+    assert after_analysis.json() == {"items": [], "next_cursor": None}

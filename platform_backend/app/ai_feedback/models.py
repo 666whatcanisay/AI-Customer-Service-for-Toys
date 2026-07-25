@@ -93,3 +93,31 @@ class AIResponseFeedbackAnalysis(Base):
     analysis_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     suggestions_json: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class AIResponseFeedbackIdempotency(Base):
+    """A B submission receipt keyed by the frozen request idempotency scope."""
+
+    __tablename__ = "ai_response_feedback_idempotency"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_method",
+            "request_path",
+            "created_by",
+            "idempotency_key",
+            name="uq_ai_response_feedback_idempotency_scope",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    request_method: Mapped[str] = mapped_column(String(8), nullable=False)
+    request_path: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(80), nullable=False)
+    feedback_record_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("ai_response_feedback.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
