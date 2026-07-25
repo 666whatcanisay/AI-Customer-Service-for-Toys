@@ -4,13 +4,14 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "C-T05-LONG",
-  "current_stage": "C1-C7 operations and AI management portal v1",
-  "current_gate": "L2 local implementation and verification PASS; Draft PR #27 open; additive B-T05 suggestion_id compatibility patch verified",
+  "current_task": "MVP-PLUS-01",
+  "current_stage": "Customer experience case center and human review workflow",
+  "current_gate": "C local implementation and verification PASS; Draft PR #30 open against develop",
   "status": "ready_for_review",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "C-owned additive customer-suggestion response alias: suggestion_id equals retained id; B-T05 is the affected adapter consumer; no shared-contract version, error-code, or database change."
+    "Frozen task interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
+    "Additive B submission/status projection and A approved-snapshot/evaluation-evidence paths; affected-line review required before any later shared-contract promotion."
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -25,67 +26,72 @@
   ],
   "entrypoints": [
     "platform_backend/app/main.py:app",
-    "platform_backend/app/api/customer_suggestion_routes.py",
-    "platform_backend/app/api/admin_suggestion_routes.py",
-    "platform_backend/app/api/admin_routes.py",
-    "admin_web/src/main.ts",
-    "admin_web routes: /overview, /ai-capabilities, /stores, /products, /faqs, /safety-rules, /sources, /conflicts, /imports, /suggestions",
-    "platform_backend migrations: alembic upgrade head"
+    "platform_backend/app/api/customer_experience_case_routes.py",
+    "platform_backend/app/api/admin_experience_case_routes.py",
+    "platform_backend/app/experience_cases/models.py",
+    "platform_backend/migrations/versions/0004_mvp_plus_01_experience_cases.py",
+    "admin_web/src/views/CustomerExperienceCasesView.vue",
+    "admin_web/src/views/AiOptimizationPoolView.vue"
   ],
   "provided_interfaces": [
-    "GET /health",
-    "Existing C-line import and frozen test-catalog endpoints (unchanged)",
-    "POST/GET /api/v1/customer-suggestions (retains id and returns same-value suggestion_id for B-T05 compatibility)",
-    "GET/PATCH /api/v1/admin/customer-suggestions",
-    "GET /api/v1/admin/overview, stores, products, product detail/SKUs, faqs, safety-rules, sources, conflicts, import-batches"
+    "POST/GET /api/v1/customer-experience-cases",
+    "GET /api/v1/admin/ai-optimization/cases/export",
+    "POST /api/v1/admin/ai-optimization/evaluation-results",
+    "C-owned internal Admin review/list/detail and AI optimization pool endpoints",
+    "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
   "required_interfaces": [
-    "Existing five frozen test-catalog and knowledge-package GET interfaces",
-    "Task-declared A-line probe: /ai-api/api/admin/ai/modules (not implemented in this baseline)"
+    "B consumes only the frozen C submission/status projection",
+    "A consumes only C-approved snapshots and posts structured matching evaluation evidence",
+    "No direct A/C database access or cross-line automatic action"
   ],
   "cross_line_compatibility": {
-    "affected_line": "B-T05",
-    "change": "Customer-suggestion POST and reporter-history GET retain id and add same-value suggestion_id.",
+    "affected_lines": ["B", "A"],
+    "change": "MVP-PLUS-01 additive frozen paths only; existing paths and shared contract version remain unchanged.",
     "shared_contract_version": "0.1.0 unchanged",
-    "database_change": false,
-    "verified": "C API tests plus isolated real B suggestionClient POST/GET smoke"
+    "database_change": true,
+    "verified": "C API lifecycle/export/evidence tests; B/A integration remains consumer-owned follow-up."
   },
   "data_boundaries": {
-    "source": "Validated V0.3.1 test baseline only; source packages remain out of Git",
+    "source": "Synthetic local test values only",
     "production_data_imported": false,
     "attachment_binary_stored": false,
+    "case_content_logged": false,
+    "automatic_redaction_enabled": false,
     "raw_rtf_returned": false,
     "published_to_a_line": false,
     "a_b_live_integration_claimed": false,
     "formal_permissions_enabled": false,
-    "automatic_send_enabled": false
+    "automatic_training_enabled": false,
+    "prompt_change_enabled": false,
+    "knowledge_publication_enabled": false,
+    "customer_message_enabled": false,
+    "order_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-25 C-T05: backend pytest 64 passed (one existing upstream TestClient deprecation warning); Alembic upgrade -> downgrade -> upgrade reached 0003_ct05_customer_suggestions on an isolated temporary SQLite database; admin_web vue-tsc typecheck, 25 Vitest tests, and Vite production build passed. Isolated live Uvicorn smoke on port 8013 returned /health with the caller request ID, created SUBMITTED suggestion, listed it, transitioned it to REVIEWING, and updated overview counts; process and SQLite file were removed. Port 8011 was already served by a non-task process and was not modified.",
+  "last_test_result": "2026-07-25 MVP-PLUS-01: backend pytest 67 passed (one existing upstream TestClient deprecation warning); isolated SQLite Alembic upgrade -> downgrade 0003_ct05_customer_suggestions -> upgrade reached 0004_mvp_plus_01_experience_cases; admin_web Vitest 27 passed and Vite production build/typecheck passed. Temporary SQLite database and pnpm cache artifacts were removed.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
-    "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0002_ct02b_test_catalog; upgrade head",
-    "cd admin_web; pnpm typecheck; pnpm test; pnpm build"
+    "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0003_ct05_customer_suggestions; upgrade head",
+    "cd admin_web; pnpm test; pnpm build"
   ],
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
-    "CORS is not authentication or authorization.",
-    "Source projections suppress absolute paths and raw files but are not a full privacy/security system.",
-    "A-line AI module detail and online-test contract is not available; UI keeps those controls unavailable with no mock fallback."
+    "Experience-case text is not logged by the new modules, but v1-reminder-only is a pre-submission reminder and not automatic redaction.",
+    "A evaluation evidence is stored only after snapshot matching; C does not verify an A identity in this baseline.",
+    "CORS is not authentication or authorization."
   ],
   "out_of_scope": [
-    "Formal product/knowledge publication or editing",
-    "Prompt editing, publishing, or rollback",
-    "Kingdee, marketplace, payment, order, refund, or resend integrations",
-    "Formal login/roles",
+    "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes",
+    "Formal login, roles, retention, access audit, and production data",
     "A/B business code and shared contract changes"
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-admin-v1-t05",
-    "base": "origin/develop 326658d",
-    "commit": null,
-    "draft_pr": "#27 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/27"
+    "branch": "agent/platform-mvp-plus-01",
+    "base": "origin/develop 271c15520dd7bf91ad8bfa26cad784d3b780e376",
+    "commit": "5394dbe6c66a3c39324d39f9326f310317f4ff0c",
+    "draft_pr": "#30 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/30"
   },
-  "next_recommended_task": "Review C-T05 and publish a Draft PR against develop. Do not enable AI detail/test calls without an approved versioned A-line contract.",
+  "next_recommended_task": "Review Draft PR #30. Do not enable consumer integration, formal security claims, or automatic actions without separate approval.",
   "last_updated": "2026-07-25"
 }
