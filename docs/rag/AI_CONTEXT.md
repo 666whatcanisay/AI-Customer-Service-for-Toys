@@ -4,7 +4,7 @@
 
 - Owner: A line (`backend/**`, `docs/rag/**`). Do not modify shared contracts, B/C code, knowledge sources, vectors, logs, or models.
 - Current task: `A-T04-LONG`, the backend baseline for an AI capability center.
-- Base: `origin/develop` at `36ec2d3`; PR #24 is already included in that base.
+- Base: `origin/develop` at `326658d`; PR #24 is already included in that base.
 - Working branch: `agent/rag-ai-center-t04`.
 
 ## Implemented AI customer-service capability
