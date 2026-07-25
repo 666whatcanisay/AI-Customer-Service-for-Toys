@@ -367,7 +367,7 @@
       <details class="feedback-section" data-testid="feedback-section">
         <summary>记录这条建议有没有用（可选）</summary>
         <div class="feedback-body">
-          <p>当前反馈只记录在本页，反馈 API 尚未发布。</p>
+          <p>当前采用反馈只记录在本页。保存经验案例时必须在表单中明确选择冻结的经验类型。</p>
           <div class="feedback-actions">
             <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
               直接采用
@@ -378,12 +378,93 @@
             <el-button data-testid="reject" text @click="recordAdoption('REJECTED')">
               未采用
             </el-button>
+            <el-button
+              data-testid="save-experience-case"
+              text
+              :disabled="!adoption || experienceCaseSubmitting"
+              @click="openExperienceCaseCapture"
+            >
+              ⭐ 保存经验案例
+            </el-button>
           </div>
           <p v-if="adoptionMessage" class="feedback-result" data-testid="adoption-result">
             {{ adoptionMessage }}
           </p>
         </div>
       </details>
+
+      <section
+        v-if="experienceCaseDialogOpen"
+        class="experience-case-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="experience-case-dialog-title"
+        data-testid="experience-case-dialog"
+      >
+        <header class="experience-case-dialog-header">
+          <h3 id="experience-case-dialog-title">沉淀客服经验案例</h3>
+          <el-button text aria-label="关闭案例表单" @click="experienceCaseDialogOpen = false">关闭</el-button>
+        </header>
+        <el-alert
+          title="隐私提醒"
+          description="仅沉淀测试案例。请确认问题和回复中没有客户姓名、电话、地址、完整订单号或隐私截图。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+        <dl class="experience-case-meta">
+          <div><dt>店铺</dt><dd>{{ result.context.store_code }}</dd></div>
+          <div><dt>商品</dt><dd>{{ result.context.product_id }}</dd></div>
+          <div><dt>SKU</dt><dd>{{ result.context.sku_id || '未选择' }}</dd></div>
+          <div><dt>本页反馈</dt><dd>{{ adoption ? adoptionLabels[adoption.type] : '未选择' }}</dd></div>
+        </dl>
+        <p class="experience-case-type-hint">本页反馈不会自动映射为经验类型，请按实际案例明确选择。</p>
+        <label class="experience-case-field">
+          <span>经验类型 <em>必选</em></span>
+          <el-select
+            v-model="experienceCaseFeedbackType"
+            data-testid="experience-case-feedback-type"
+            placeholder="请选择经验类型"
+          >
+            <el-option
+              v-for="option in experienceCaseFeedbackOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </label>
+        <label class="experience-case-field">
+          <span>最终回复</span>
+          <el-input
+            v-model="experienceCaseFinalAnswer"
+            type="textarea"
+            :rows="5"
+            maxlength="2000"
+            show-word-limit
+            data-testid="experience-case-final-answer"
+          />
+        </label>
+        <p v-if="experienceCaseError" class="experience-case-error" data-testid="experience-case-error">
+          {{ experienceCaseError }} 未保存本地成功记录，请检查中台服务后重试。
+        </p>
+        <p v-if="experienceCaseStatus" class="experience-case-success" data-testid="experience-case-success">
+          {{ experienceCaseStatus }}
+        </p>
+        <footer class="experience-case-dialog-footer">
+          <el-button @click="experienceCaseDialogOpen = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="experienceCaseSubmitting"
+            :disabled="experienceCaseSubmitting"
+            data-testid="experience-case-submit"
+            @click="submitExperienceCase"
+          >
+            {{ experienceCaseSubmitting ? '正在保存' : '保存优秀案例' }}
+          </el-button>
+        </footer>
+      </section>
+
     </section>
 
     <section v-else-if="!loading" class="empty-card">
@@ -403,6 +484,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ragClient } from '@/api/ragClient'
 import { platformClient } from '@/api/platformClient'
+import { experienceCaseClient } from '@/api/experienceCaseClient'
 import {
   PlatformClientError,
   toPlatformClientError,
@@ -423,6 +505,13 @@ import type {
   RagHealth,
   RiskLevel
 } from '@/api/ragTypes'
+import {
+  EXPERIENCE_CASE_FEEDBACK_TYPES,
+  type ExperienceCaseFeedbackType
+} from '@/api/experienceCaseTypes'
+import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
+import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
+import { useTesterIdentity } from '@/workspace/testerIdentity'
 
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
 
@@ -446,6 +535,18 @@ const adoptionLabels: Record<AdoptionType, string> = {
   EDITED_ACCEPT: '修改后采用',
   REJECTED: '未采用'
 }
+
+const experienceCaseFeedbackLabels: Record<ExperienceCaseFeedbackType, string> = {
+  ADOPTED: '采用 AI 建议',
+  EDITED_ADOPTED: '修改后采用',
+  CORRECTION: '人工纠正 AI 建议',
+  ESCALATED: '需升级人工处理'
+}
+
+const experienceCaseFeedbackOptions = EXPERIENCE_CASE_FEEDBACK_TYPES.map((value) => ({
+  value,
+  label: experienceCaseFeedbackLabels[value]
+}))
 
 const platformLabels: Record<string, string> = {
   pdd: '拼多多',
@@ -539,10 +640,17 @@ const result = ref<RagChatResult | null>(null)
 const replyDraft = ref('')
 const copyStatus = ref<'idle' | 'copied'>('idle')
 const adoption = ref<AdoptionRecord | null>(null)
+const experienceCaseDialogOpen = ref(false)
+const experienceCaseSubmitting = ref(false)
+const experienceCaseError = ref('')
+const experienceCaseStatus = ref('')
+const experienceCaseFinalAnswer = ref('')
+const experienceCaseFeedbackType = ref<ExperienceCaseFeedbackType | ''>('')
 const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
 let activeCatalogController: AbortController | null = null
+const { identity } = useTesterIdentity()
 
 const runtimeDetails = {
   frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'development',
@@ -929,6 +1037,64 @@ const recordAdoption = (type: AdoptionType) => {
     finalAnswer
   }
   ElMessage.success('已记录本页反馈')
+}
+
+const openExperienceCaseCapture = () => {
+  if (!result.value || !adoption.value) {
+    ElMessage.warning('请先选择本页反馈后再打开经验案例表单')
+    return
+  }
+  experienceCaseError.value = ''
+  experienceCaseStatus.value = ''
+  experienceCaseFinalAnswer.value = adoption.value.finalAnswer
+  experienceCaseFeedbackType.value = ''
+  experienceCaseDialogOpen.value = true
+}
+
+const submitExperienceCase = async () => {
+  if (!result.value || !adoption.value || experienceCaseSubmitting.value) return
+
+  const question = customerQuestion.value.trim()
+  const aiAnswer = result.value.answer.trim()
+  if (!question || !aiAnswer) {
+    experienceCaseError.value = '缺少当前问题或 AI 回复，无法沉淀案例。'
+    return
+  }
+  if (!experienceCaseFeedbackType.value) {
+    experienceCaseError.value = '请选择经验类型后再提交。'
+    return
+  }
+
+  experienceCaseSubmitting.value = true
+  experienceCaseError.value = ''
+  experienceCaseStatus.value = ''
+  try {
+    const receipt = await experienceCaseClient.submit({
+      storeCode: result.value.context.store_code,
+      productId: result.value.context.product_id,
+      skuId: result.value.context.sku_id,
+      question,
+      aiAnswer,
+      finalAnswer: experienceCaseFinalAnswer.value.trim(),
+      feedbackType: experienceCaseFeedbackType.value,
+      createdBy: identity.value.reporterId
+    })
+    recordExperienceCaseSubmission({
+      storeCode: result.value.context.store_code,
+      productId: result.value.context.product_id,
+      skuId: result.value.context.sku_id,
+      caseId: receipt.caseId,
+      feedbackType: experienceCaseFeedbackType.value,
+      createdBy: identity.value.reporterId,
+      reviewStatus: receipt.reviewStatus,
+      submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
+    })
+    experienceCaseStatus.value = `案例已提交，当前状态：${EXPERIENCE_CASE_STATUS_LABELS[receipt.reviewStatus]}。`
+  } catch (error) {
+    experienceCaseError.value = error instanceof Error ? error.message : '案例服务当前不可用。'
+  } finally {
+    experienceCaseSubmitting.value = false
+  }
 }
 
 onMounted(() => {
@@ -1574,4 +1740,15 @@ h2 {
 .feedback-body { padding-top: 8px; }
 .feedback-section p { margin-bottom: 0; font-size: 12px; }
 .feedback-actions { margin: 6px 0; }
+
+.experience-case-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; margin: 18px 0; }
+.experience-case-dialog { margin-top: 16px; padding: 20px; border: 1px solid #b9c7d8; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgb(33 55 85 / 12%); }
+.experience-case-dialog-header, .experience-case-dialog-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.experience-case-dialog-header h3 { margin: 0; font-size: 18px; }
+.experience-case-dialog-footer { justify-content: flex-end; margin-top: 18px; }
+.experience-case-meta dt { color: #7a8799; font-size: 12px; }
+.experience-case-meta dd { margin: 4px 0 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 700; }
+.experience-case-field { display: grid; gap: 7px; font-size: 13px; font-weight: 700; }
+.experience-case-error { margin-top: 14px; color: #b83b32 !important; }
+.experience-case-success { margin-top: 14px; color: #1c6a49 !important; font-weight: 700; }
 </style>

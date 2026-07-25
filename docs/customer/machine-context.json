@@ -3,17 +3,23 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "B-T05-FINAL-INTEROP",
-  "current_stage": "C-T05 real suggestion response compatibility verified",
-  "current_gate": "PASS: POST and GET provide B-required suggestion_id with SUBMITTED status",
-  "status": "verified",
+  "current_task": "MVP-PLUS-01 customer experience case capture",
+  "current_stage": "MVP-PLUS-01 CONTRACT-FIX1: B adapter aligned to the frozen experience-case wire contract",
+  "current_gate": "CONDITIONAL PASS: B contract repair verified; awaiting real C review and A evaluation integration",
+  "status": "awaiting_cross_line_integration",
   "last_updated": "2026-07-25",
   "git": {
-    "branch": "agent/customer-platform-shell-t05",
-    "base_commit": "36ec2d326d1613f62cb647ad9ef5835315e4db21",
+    "branch": "codex/customer-experience-case-capture",
+    "base_commit": "271c155",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "clean": true,
-    "task_commit": "0e929f559c02f20a1be690c6ef377bd9db3b0695"
+    "pull_request": {
+      "number": 29,
+      "url": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/29",
+      "draft": true,
+      "base": "develop"
+    },
+    "clean": false,
+    "task_commit": "HEAD (this commit)"
   },
   "owned_paths": [
     "frontend/**",
@@ -30,42 +36,43 @@
     "frontend/src/main.ts",
     "frontend/src/router/index.ts",
     "frontend/src/layouts/CustomerWorkbenchLayout.vue",
-    "frontend/src/views/WorkspaceHome.vue",
     "frontend/src/views/AiChat.vue",
-    "frontend/src/views/SuggestionForm.vue",
-    "frontend/src/views/MySuggestions.vue"
+    "frontend/src/views/ExperienceCases.vue",
+    "frontend/src/api/experienceCaseClient.ts",
+    "frontend/src/api/experienceCaseAdapter.ts"
   ],
   "required_interfaces": [
     "GET A /api/health",
     "POST A /api/chat with {question,context}",
     "GET C /health",
-    "GET C /api/v1/test-catalog/stores",
-    "GET C /api/v1/test-catalog/products?store_code=",
-    "GET C /api/v1/test-catalog/products/{product_id}/skus",
-    "POST C /api/v1/customer-suggestions",
-    "GET C /api/v1/customer-suggestions?reporter_id="
+    "POST C /api/v1/customer-experience-cases with frozen feedback_type and top-level case_id/review_status receipt",
+    "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI"
   ],
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "B-T05 task-local customer-suggestion request agreement"
+    "experience-case.v1-draft task-local frozen adapter agreement"
   ],
   "test_commands": [
     "npm run typecheck",
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-25 B-T05-FINAL-INTEROP: C-T05 compatibility commit 327a765 ran with an isolated temporary SQLite database on loopback port 8013; POST returned HTTP 201 with non-empty suggestion_id and SUBMITTED; GET returned HTTP 200 with items, total=1, and the same non-empty suggestion_id/SUBMITTED item. Test process and temporary database were removed; frontend/C/contracts unchanged.",
-  "blockers": [],
+  "last_test_result": "2026-07-25 CONTRACT-FIX1: targeted adapter and UI regression checks pass; full frontend verification recorded in this task handoff.",
+  "blockers": [
+    "C review lifecycle and A real evaluation consumer/writeback must be integrated before the full experience-case closure can pass."
+  ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
-    "Tester identity is local browser state and is not authentication or authorization"
+    "Tester identity is local browser state and is not authentication or authorization",
+    "Experience-case session summaries disappear on refresh until C publishes the GET contract"
   ],
   "completed_tasks": [
     "B-T01 frontend baseline audit",
     "B-T02 real RAG client workflow",
     "B-T03 catalog selection workflow",
     "B-T04 simplified three-step AI workbench",
-    "B-T05 modular shell, module registry, local tester identity, suggestion client/pages and regression tests"
+    "B-T05 modular shell, local tester identity and suggestion client/pages",
+    "MVP-PLUS-01 customer experience case capture frontend"
   ],
   "out_of_scope": [
     "Automatic customer message sending",

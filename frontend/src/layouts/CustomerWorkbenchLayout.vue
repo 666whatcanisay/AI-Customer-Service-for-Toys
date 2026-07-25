@@ -22,6 +22,9 @@
         <RouterLink to="/suggestions/mine" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>☷</span><span>我的建议</span>
         </RouterLink>
+        <RouterLink to="/experience-cases" class="nav-link" active-class="active" @click="closeMobileMenu">
+          <span>☆</span><span>我的案例</span>
+        </RouterLink>
       </nav>
 
       <div class="sidebar-boundary">
