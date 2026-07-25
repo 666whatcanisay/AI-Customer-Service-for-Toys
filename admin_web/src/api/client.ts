@@ -361,6 +361,107 @@ export async function updateAdminSuggestion(
   return response.data
 }
 
+export type ExperienceCaseReviewStatus = 'NEW' | 'REVIEWING' | 'APPROVED' | 'REJECTED'
+export type ExperienceCaseFeedbackType = 'ADOPTED' | 'EDITED_ADOPTED' | 'CORRECTION' | 'ESCALATED'
+export type ExperienceCaseEvaluationStatus = 'NOT_EXPORTED' | 'EXPORTED' | 'EVALUATED' | 'WRITEBACK_REJECTED'
+
+export interface AdminExperienceCase {
+  case_id: string
+  revision: number
+  source_type: string
+  store_code: string
+  product_id: string | null
+  sku_id: string | null
+  question: string
+  ai_answer: string
+  final_answer: string
+  feedback_type: ExperienceCaseFeedbackType
+  created_by: string
+  review_status: ExperienceCaseReviewStatus
+  review_note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  export_revision: string | null
+  content_hash: string | null
+  redaction_version: string
+  evaluation_status: ExperienceCaseEvaluationStatus
+  latest_evaluation_run_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ExperienceCaseEvaluation {
+  evaluation_run_id: string
+  case_id: string
+  revision: number
+  export_revision: string
+  evaluation_status: ExperienceCaseEvaluationStatus
+  model_version: string
+  prompt_version: string
+  result: Record<string, unknown>
+  suggestions: Array<Record<string, unknown>>
+  recorded_at: string
+}
+
+export interface AiOptimizationCase {
+  case_id: string
+  revision: number
+  store_code: string
+  product_id: string | null
+  sku_id: string | null
+  question: string
+  ai_answer: string
+  final_answer: string
+  feedback_type: ExperienceCaseFeedbackType
+  export_revision: string
+  content_hash: string
+  evaluation_status: ExperienceCaseEvaluationStatus
+  latest_evaluation_run_id: string | null
+  latest_evaluation: ExperienceCaseEvaluation | null
+}
+
+export async function listAdminExperienceCases(
+  params?: Record<string, string | number | undefined>,
+): Promise<AdminPage<AdminExperienceCase>> {
+  const response = await apiClient.get<AdminPage<AdminExperienceCase>>(
+    '/api/v1/admin/customer-experience-cases',
+    { params },
+  )
+  return response.data
+}
+
+export async function getAdminExperienceCase(caseId: string): Promise<AdminExperienceCase> {
+  const response = await apiClient.get<AdminExperienceCase>(
+    `/api/v1/admin/customer-experience-cases/${encodeURIComponent(caseId)}`,
+  )
+  return response.data
+}
+
+export async function updateAdminExperienceCaseReview(
+  caseId: string,
+  update: {
+    review_status: ExperienceCaseReviewStatus
+    review_note?: string | null
+    reviewed_by?: string | null
+  },
+): Promise<AdminExperienceCase> {
+  const response = await apiClient.patch<AdminExperienceCase>(
+    `/api/v1/admin/customer-experience-cases/${encodeURIComponent(caseId)}/review`,
+    update,
+  )
+  return response.data
+}
+
+export async function listAiOptimizationCases(
+  params?: Record<string, string | number | undefined>,
+): Promise<AdminPage<AiOptimizationCase>> {
+  const response = await apiClient.get<AdminPage<AiOptimizationCase>>(
+    '/api/v1/admin/ai-optimization/cases',
+    { params },
+  )
+  return response.data
+}
+
 export interface AiModule {
   id: string
   name: string
