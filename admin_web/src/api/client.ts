@@ -141,12 +141,264 @@ export interface ItemList<T> {
   total: number
 }
 
-export const API_BASE_URL = import.meta.env.VITE_PLATFORM_API_BASE_URL || '/api/platform'
+export const API_BASE_URL = import.meta.env.VITE_PLATFORM_API_BASE_URL || '/platform-api'
+export const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || '/ai-api'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
 })
+
+const aiClient = axios.create({
+  baseURL: AI_API_BASE_URL,
+  timeout: 30000,
+})
+
+export interface AdminPage<T> {
+  items: T[]
+  page: number
+  size: number
+  total: number
+}
+
+export interface AdminOverview {
+  counts: {
+    stores: number
+    products: number
+    skus: number
+    faqs: number
+    safety_rules: number
+    sources: number
+    conflicts: number
+    import_batches: number
+    suggestions: Record<'submitted' | 'reviewing' | 'planned' | 'done' | 'rejected', number>
+  }
+  recent_imported_at: string | null
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminStore {
+  store_code: string
+  store_name: string
+  platform: string
+  test_data_mode: boolean
+  product_count: number
+}
+
+export interface AdminProduct {
+  product_id: string
+  store_code: string
+  platform: string
+  product_name_official: string
+  product_name_display: string
+  sales_status: string
+  age_min: number | null
+  age_max: number | null
+  safety_summary: string | null
+  review_status: string
+  publishable: boolean
+  source_ids: string[]
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminProductDetail extends AdminProduct {
+  sku_count: number
+}
+
+export interface AdminSku {
+  sku_id: string
+  product_id: string
+  sku_code: string
+  sku_name_official: string
+  sku_name_display: string
+  relation_type: string
+  canonical_sku_id: string | null
+  reference_sku_id: string | null
+  component_sku_refs: string[]
+  publishable: boolean
+  source_ids: string[]
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminFaq {
+  faq_id: string
+  store_code: string
+  product_id: string | null
+  sku_id: string | null
+  question: string
+  recommended_reply: string
+  answer_action: string
+  risk_level: string
+  source_ids: string[]
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminSafetyRule {
+  rule_id: string
+  store_code: string
+  scenario: string
+  risk_level: string
+  action: string | null
+  forbidden_claim: string | null
+  source_ids: string[]
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminSource {
+  source_id: string
+  source_type: string
+  file_name: string | null
+  file_sha256: string | null
+  relative_path: string | null
+  product_id: string | null
+  sku_id: string | null
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminConflict {
+  issue_id: string
+  entity_type: string
+  entity_id: string
+  field_name: string
+  value_a: string | null
+  value_b: string | null
+  source_ids: string[]
+  status: string
+  decision: string | null
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface AdminImportBatch {
+  id: string
+  import_type: string
+  original_filename: string
+  status: string
+  created_at: string
+  completed_at: string | null
+  test_data_mode: boolean
+}
+
+export type SuggestionStatus = 'SUBMITTED' | 'REVIEWING' | 'PLANNED' | 'DONE' | 'REJECTED'
+
+export interface AdminSuggestion {
+  id: string
+  reporter_id: string
+  reporter_name: string | null
+  store_code: string | null
+  module_key: string | null
+  category: string | null
+  title: string
+  description: string
+  frequency: string | null
+  urgency: string | null
+  status: SuggestionStatus
+  internal_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AdminResource =
+  | 'stores'
+  | 'products'
+  | 'faqs'
+  | 'safety-rules'
+  | 'sources'
+  | 'conflicts'
+  | 'import-batches'
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const response = await apiClient.get<AdminOverview>('/api/v1/admin/overview')
+  return response.data
+}
+
+export async function listAdminResource<T>(
+  resource: AdminResource,
+  params?: Record<string, string | number | undefined>,
+): Promise<AdminPage<T>> {
+  const response = await apiClient.get<AdminPage<T>>(`/api/v1/admin/${resource}`, { params })
+  return response.data
+}
+
+export async function getAdminProduct(productId: string): Promise<AdminProductDetail> {
+  const response = await apiClient.get<AdminProductDetail>(
+    `/api/v1/admin/products/${encodeURIComponent(productId)}`,
+  )
+  return response.data
+}
+
+export async function listAdminProductSkus(productId: string): Promise<AdminPage<AdminSku>> {
+  const response = await apiClient.get<AdminPage<AdminSku>>(
+    `/api/v1/admin/products/${encodeURIComponent(productId)}/skus`,
+  )
+  return response.data
+}
+
+export async function listAdminSuggestions(
+  params?: Record<string, string | number | undefined>,
+): Promise<AdminPage<AdminSuggestion>> {
+  const response = await apiClient.get<AdminPage<AdminSuggestion>>(
+    '/api/v1/admin/customer-suggestions',
+    { params },
+  )
+  return response.data
+}
+
+export async function updateAdminSuggestion(
+  suggestionId: string,
+  update: { status?: SuggestionStatus; internal_note?: string | null },
+): Promise<AdminSuggestion> {
+  const response = await apiClient.patch<AdminSuggestion>(
+    `/api/v1/admin/customer-suggestions/${encodeURIComponent(suggestionId)}`,
+    update,
+  )
+  return response.data
+}
+
+export interface AiModule {
+  id: string
+  name: string
+  status: string
+  description: string | null
+  promptMetadata: Record<string, unknown> | null
+  recentEvaluations: unknown[]
+}
+
+function normalizeAiModule(value: unknown, index: number): AiModule {
+  const row = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
+  const text = (key: string, fallback: string): string => typeof row[key] === 'string' ? row[key] : fallback
+  return {
+    id: text('module_id', text('id', `module-${index + 1}`)),
+    name: text('display_name', text('name', text('module_key', `Module ${index + 1}`))),
+    status: text('status', 'UNKNOWN'),
+    description: typeof row.description === 'string' ? row.description : null,
+    promptMetadata: typeof row.prompt_metadata === 'object' && row.prompt_metadata !== null
+      ? row.prompt_metadata as Record<string, unknown>
+      : null,
+    recentEvaluations: Array.isArray(row.recent_evaluations) ? row.recent_evaluations : [],
+  }
+}
+
+/**
+ * The sole A-line path declared by the task card.  This adapter never
+ * fabricates module data when the A branch has not yet been integrated.
+ */
+export async function listAiModules(): Promise<AiModule[]> {
+  const response = await aiClient.get<unknown>('/api/admin/ai/modules')
+  const payload = response.data
+  const rows = Array.isArray(payload)
+    ? payload
+    : typeof payload === 'object' && payload !== null && Array.isArray((payload as { items?: unknown }).items)
+      ? (payload as { items: unknown[] }).items
+      : []
+  return rows.map(normalizeAiModule)
+}
 
 export async function getHealth(): Promise<HealthResponse> {
   const response = await apiClient.get<HealthResponse>('/health')
