@@ -10,8 +10,13 @@ from app.config.settings import update_env_values
 from app.models.chat import (
     AIOnlineTestRequest,
     ChatRequest,
+    ExperienceEvaluationRunRequest,
     ModelConfigUpdate,
     SearchRequest,
+)
+from app.service.experience_evaluation import (
+    ExperienceEvaluationError,
+    ExperienceEvaluationService,
 )
 from app.service.ai_capability import (
     MODULE_DEFINITIONS,
@@ -50,6 +55,14 @@ def get_rag(request: Request):
             detail=message,
         )
     return request.app.state.rag_service
+
+
+def get_experience_evaluation_service(request: Request) -> ExperienceEvaluationService:
+    service = getattr(request.app.state, "experience_evaluation_service", None)
+    if service is None:
+        service = ExperienceEvaluationService(request.app.state.settings)
+        request.app.state.experience_evaluation_service = service
+    return service
 
 
 def require_loopback_client(request: Request) -> None:
@@ -345,6 +358,29 @@ def run_ai_module_test(
             "required_fields": result.get("required_fields") or [],
         }
     return envelope(data)
+
+
+@router.post(
+    "/admin/ai/experience-evaluations/run",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_experience_evaluation(
+    request: Request,
+    evaluation_request: ExperienceEvaluationRunRequest,
+):
+    """Evaluate one C-approved immutable snapshot on explicit operator request."""
+    try:
+        recorded = get_experience_evaluation_service(request).run(
+            evaluation_request.case_id,
+            evaluation_request.revision,
+        )
+    except ExperienceEvaluationError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=envelope({"code": exc.code}, message=exc.message, success=False),
+        )
+    return envelope(recorded, message="Experience evaluation recorded")
 
 
 @router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])

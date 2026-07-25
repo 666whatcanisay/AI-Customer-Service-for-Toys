@@ -178,6 +178,7 @@ class Settings:
     test_knowledge_collection_name: str
     platform_api_base_url: str
     platform_api_timeout_seconds: float
+    experience_evaluation_prompt_version: str
     rag_distance_threshold: float
     top_k: int
     cors_allowed_origins: tuple[str, ...]
@@ -224,6 +225,11 @@ class Settings:
             platform_api_timeout_seconds=float(
                 os.getenv("PLATFORM_API_TIMEOUT_SECONDS", "30")
             ),
+            experience_evaluation_prompt_version=os.getenv(
+                "EXPERIENCE_EVALUATION_PROMPT_VERSION",
+                "experience-evaluation-v1",
+            ).strip()
+            or "experience-evaluation-v1",
             rag_distance_threshold=float(
                 os.getenv(
                     "RAG_DISTANCE_THRESHOLD",
