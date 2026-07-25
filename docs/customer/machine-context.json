@@ -1,27 +1,40 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\666whatcanisay-ai-customer-service-for-toys",
-  "current_task": "Customer workbench single-screen UI refinement; frontend-only",
-  "contracts": [
-    "contracts/version.json 0.1.0 (unchanged)",
-    "B-T03 task-local A/C compatibility agreement"
-  ],
-  "entrypoints": [
-    "frontend/index.html",
-    "frontend/src/main.ts",
-    "frontend/src/views/AiChat.vue",
-    "frontend/src/api/platformClient.ts",
-    "frontend/src/api/ragClient.ts"
-  ],
-  "version": "0.1.0",
   "project_id": "mumu-B",
-  "last_test_result": "2026-07-23 UI refinement: existing local vue-tsc --noEmit PASS; Vitest 4 files 30/30 PASS; production build PASS; 1273x912 browser checks passed for empty, selection, and real-answer states with no document scroll.",
-  "known_risks": [
-    "A feedback endpoint is not published; adoption state is page-local",
-    "npm reported 7 dependency vulnerabilities (5 moderate, 1 high, 1 critical)",
-    "Production JavaScript chunk exceeds 500 kB warning threshold"
-  ],
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
+  "current_task": "B-T05-FINAL-INTEROP",
+  "current_stage": "C-T05 real suggestion response compatibility verified",
+  "current_gate": "PASS: POST and GET provide B-required suggestion_id with SUBMITTED status",
+  "status": "verified",
+  "last_updated": "2026-07-25",
+  "git": {
+    "branch": "agent/customer-platform-shell-t05",
+    "base_commit": "36ec2d326d1613f62cb647ad9ef5835315e4db21",
+    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
+    "clean": true,
+    "task_commit": "0e929f559c02f20a1be690c6ef377bd9db3b0695"
+  },
+  "owned_paths": [
+    "frontend/**",
+    "docs/customer/**"
+  ],
+  "forbidden_paths": [
+    "backend/**",
+    "platform_backend/**",
+    "admin_web/**",
+    "contracts/**",
+    "extension/**"
+  ],
+  "entrypoints": [
+    "frontend/src/main.ts",
+    "frontend/src/router/index.ts",
+    "frontend/src/layouts/CustomerWorkbenchLayout.vue",
+    "frontend/src/views/WorkspaceHome.vue",
+    "frontend/src/views/AiChat.vue",
+    "frontend/src/views/SuggestionForm.vue",
+    "frontend/src/views/MySuggestions.vue"
+  ],
   "required_interfaces": [
     "GET A /api/health",
     "POST A /api/chat with {question,context}",
@@ -29,53 +42,36 @@
     "GET C /api/v1/test-catalog/stores",
     "GET C /api/v1/test-catalog/products?store_code=",
     "GET C /api/v1/test-catalog/products/{product_id}/skus",
-    "Feedback endpoint pending"
+    "POST C /api/v1/customer-suggestions",
+    "GET C /api/v1/customer-suggestions?reporter_id="
   ],
-  "current_gate": "UI refinement PASS; ready for review",
-  "current_stage": "Desktop single-screen three-step customer-service workbench",
-  "git": {
-    "branch": "develop",
-    "base_commit": "00e2bde68aee523d2d53379ac1775959e8eec4ef",
-    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
-  },
-  "forbidden_paths": [
-    "backend/**",
-    "platform_backend/**",
-    "admin_web/**",
-    "contracts/**"
+  "contracts": [
+    "contracts/version.json 0.1.0 (unchanged)",
+    "B-T05 task-local customer-suggestion request agreement"
   ],
-  "blockers": [],
   "test_commands": [
     "npm run typecheck",
     "npm run test",
     "npm run build"
   ],
-  "status": "ready_for_review",
-  "owned_paths": [
-    "frontend/**",
-    "extension/**",
-    "docs/customer/**"
+  "last_test_result": "2026-07-25 B-T05-FINAL-INTEROP: C-T05 compatibility commit 327a765 ran with an isolated temporary SQLite database on loopback port 8013; POST returned HTTP 201 with non-empty suggestion_id and SUBMITTED; GET returned HTTP 200 with items, total=1, and the same non-empty suggestion_id/SUBMITTED item. Test process and temporary database were removed; frontend/C/contracts unchanged.",
+  "blockers": [],
+  "known_risks": [
+    "Production JavaScript chunk exceeds 500 kB warning threshold",
+    "Tester identity is local browser state and is not authentication or authorization"
   ],
-  "responsibilities": [
-    "B line delivery"
-  ],
-  "last_updated": "2026-07-23",
-  "out_of_scope": [
-    "Other-line business code",
-    "Shared contract changes",
-    "Browser extension",
-    "Automatic customer message sending",
-    "Real customer use"
-  ],
-  "provided_interfaces": [],
   "completed_tasks": [
-    "Governance documentation initialized",
-    "B-T01 frontend baseline audit completed",
-    "B-G1-FIX1 dependency install, typecheck, and production build verified",
-    "B-T02 real RAG client, adapter, page workflow, tests, build, and smoke completed",
-    "B-T03 manual store/product/SKU workflow, strict adapters, context request, safety UI, tests, and build completed",
-    "B-T03-FIX1 corrected C catalog calls to the three frozen test-catalog paths in Draft PR #11",
-    "B-T04 simplified the workbench into a three-step workflow with store memory, editable copy, Chinese guidance, folded sources/technical fields, and actionable errors",
-    "2026-07-23 frontend-only single-screen UI refinement with real local browser validation"
+    "B-T01 frontend baseline audit",
+    "B-T02 real RAG client workflow",
+    "B-T03 catalog selection workflow",
+    "B-T04 simplified three-step AI workbench",
+    "B-T05 modular shell, module registry, local tester identity, suggestion client/pages and regression tests"
+  ],
+  "out_of_scope": [
+    "Automatic customer message sending",
+    "Refund, replacement, appeal or order execution",
+    "Browser extension and Kuaimai integration",
+    "Shared contract changes",
+    "Real customer use"
   ]
 }
