@@ -48,7 +48,7 @@ try {
     Start-Sleep -Milliseconds 300
     Save-ServiceRecord $config 'platform' $fakeProcess $shellPath $testRoot 'test C listener' 'TcpListener' 65403
     $onlyCOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($onlyCOutput -join "`n") -notmatch 'C：运行中' -or ($onlyCOutput -join "`n") -notmatch '端口 65403：监听') { throw '只有 C 运行时未正确展示。' }
+    if ($LASTEXITCODE -ne 0 -or ($onlyCOutput -join "`n") -notmatch 'C：RUNNING' -or ($onlyCOutput -join "`n") -notmatch '端口 65403：LISTENING') { throw '只有 C 运行时未正确展示。' }
     if (Get-Process -Id $fakeProcess.Id -ErrorAction SilentlyContinue) { Stop-Process -Id $fakeProcess.Id -Force }
     $fakeProcess = $null
 

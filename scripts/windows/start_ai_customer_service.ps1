@@ -27,12 +27,14 @@ try {
     Start-ManagedServiceWithEnvironment $config 'platform' $config.PlatformPythonPath @('-m','uvicorn','app.main:app','--host',$config.BindAddress,'--port',$config.PlatformPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'platform_backend') 'app.main:app' $config.PlatformPort $platformEnvironment | Out-Null
     $startedServices += 'platform'
     Wait-HttpOk (Get-ServiceUrl $config $config.PlatformPort $config.PlatformHealthPath) 60 '平台服务'
+    Update-ManagedServiceListenerRecord $config 'platform' | Out-Null
 
     Import-TestDataPackage $config | Out-Null
     $ragEnvironment = @{ CORS_ALLOWED_ORIGINS = (@($config.CorsAllowedOrigins) -join ','); LLM_PROVIDER = 'ollama'; LLM_MODEL = [string]$config.OllamaModel; LLM_BASE_URL = [string]$config.OllamaBaseUrl; PLATFORM_API_BASE_URL = "http://127.0.0.1:$($config.PlatformPort)" }
     Start-ManagedServiceWithEnvironment $config 'rag' $config.RagPythonPath @('-m','uvicorn','app.main:app','--host',$config.BindAddress,'--port',$config.RagPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'backend') 'app.main:app' $config.RagPort $ragEnvironment | Out-Null
     $startedServices += 'rag'
     Wait-HttpOk (Get-ServiceUrl $config $config.RagPort $config.RagHealthPath) 120 'RAG 服务'
+    Update-ManagedServiceListenerRecord $config 'rag' | Out-Null
     Wait-RagRuntimeReady $config 120 | Out-Null
     Sync-TestKnowledge $config | Out-Null
     Invoke-RagChatSmoke $config | Out-Null
@@ -42,6 +44,7 @@ try {
     Start-ManagedServiceWithEnvironment $config 'customer-web' (Get-Command node.exe).Source @($vite,'--host',$config.BindAddress,'--port',$config.CustomerWebPort,'--strictPort') (Join-Path $config.RepositoryRoot 'frontend') 'vite.js' $config.CustomerWebPort $frontendEnvironment | Out-Null
     $startedServices += 'customer-web'
     Wait-HttpOk $config.CustomerWebUrl 45 '客服页面'
+    Update-ManagedServiceListenerRecord $config 'customer-web' | Out-Null
     Start-AdminWebService $config | Out-Null
     $startedServices += 'admin-web'
     Write-Host "AI 客服已启动：$($config.CustomerWebUrl)" -ForegroundColor Green

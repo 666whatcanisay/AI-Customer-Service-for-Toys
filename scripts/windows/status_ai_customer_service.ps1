@@ -20,7 +20,7 @@ try {
         @{Label='Admin';Name='admin-web';Port=$config.AdminWebPort;Url=(Get-ManagedServiceHealthUrl $config 'admin-web')}
     )) {
         $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url
-        Write-Host "$($item.Label)：$($serviceStatus.State)；PID $($serviceStatus.ProcessId)；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
+        Write-Host "$($item.Label)：$($serviceStatus.State)；受管 PID $($serviceStatus.ManagedProcessId)；监听 PID $($serviceStatus.ListenerProcessId)；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
     }
     $adminCheck = Test-RecordedProcess $config 'admin-web'
     $adminRecord = if ($adminCheck) { $adminCheck.Record } else { $null }

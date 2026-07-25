@@ -423,23 +423,16 @@ function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
     $record = Test-RecordedProcess $Config $Name
     if (-not $record -or -not $record.Valid) { return $false }
     $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
-    if ($Name -eq 'admin-web') {
-        $owners = @(if ($listeners.Count -gt 0) { @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) } else { @(Get-PortOwner $Port) })
-        $listenerPid = if ($record.Record.PSObject.Properties.Name -contains 'listener_pid') { [int]$record.Record.listener_pid } else { 0 }
+    $owners = @(if ($listeners.Count -gt 0) { @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) } else { @(Get-PortOwner $Port) })
+    $listenerPid = if ($record.ListenerProcess) { [int]$record.ListenerProcess.Id } else { 0 }
+    if ($listenerPid -gt 0) {
         if ($owners.Count -ne 1 -or $owners[0] -ne $listenerPid) { return $false }
-        if ($listeners.Count -gt 0) {
-            $expected = Get-ManagedServiceExpectedListenerAddress $Config $Name $Port
-            $expectedHost = $expected.Substring(0, $expected.LastIndexOf(':'))
-            if (@($listeners | Where-Object { [string]$_.LocalAddress -eq $expectedHost }).Count -ne $listeners.Count) { return $false }
-        }
-        return Test-HttpOk (Get-ManagedServiceHealthUrl $Config $Name $Port)
+    } elseif ($listeners.Count -eq 0 -or -not $record.Process -or @($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -ne $owners.Count) {
+        return $false
     }
-    if ($listeners.Count -eq 0) { return $false }
-    $owners = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)
-    if (@($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -ne $owners.Count) { return $false }
     $expected = Get-ManagedServiceExpectedListenerAddress $Config $Name $Port
     $expectedHost = $expected.Substring(0, $expected.LastIndexOf(':'))
-    if (@($listeners | Where-Object { [string]$_.LocalAddress -eq $expectedHost }).Count -ne $listeners.Count) { return $false }
+    if ($listeners.Count -gt 0 -and @($listeners | Where-Object { [string]$_.LocalAddress -eq $expectedHost }).Count -ne $listeners.Count) { return $false }
     return Test-HttpOk (Get-ManagedServiceHealthUrl $Config $Name $Port)
 }
 
@@ -476,20 +469,44 @@ function Get-CommandFeatureSha256([string]$Value) {
     }
 }
 
+function Get-RecordedListenerCheck($Config, $Record) {
+    $requiredFields = @('managed_pid','listener_pid','listener_executable_path','listener_started_at','listener_parent_pid')
+    if (@($requiredFields | Where-Object { $Record.PSObject.Properties.Name -notcontains $_ }).Count -gt 0) {
+        return [pscustomobject]@{ Present = $false; Valid = $false; Reason = '记录未包含监听 PID 身份字段'; Process = $null }
+    }
+    $listenerPid = 0
+    if (-not [int]::TryParse([string]$Record.listener_pid, [ref]$listenerPid) -or $listenerPid -le 0) {
+        return [pscustomobject]@{ Present = $true; Valid = $false; Reason = '监听 PID 无效'; Process = $null }
+    }
+    $listenerProcess = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
+    if (-not $listenerProcess) { return [pscustomobject]@{ Present = $true; Valid = $false; Reason = '监听 PID 已退出'; Process = $null } }
+    $metadata = Get-ProcessMetadata $listenerPid
+    $listenerPath = if ($metadata -and -not [string]::IsNullOrWhiteSpace([string]$metadata.ExecutablePath)) { [string]$metadata.ExecutablePath } else { [string]$listenerProcess.Path }
+    $samePath = -not [string]::IsNullOrWhiteSpace($listenerPath) -and [string]::Equals([IO.Path]::GetFullPath($listenerPath), [IO.Path]::GetFullPath([string]$Record.listener_executable_path), [StringComparison]::OrdinalIgnoreCase)
+    $sameStart = $listenerProcess.StartTime.ToUniversalTime().ToString('o') -eq [string]$Record.listener_started_at
+    $sameParent = [int]$Record.listener_parent_pid -eq 0 -or ($metadata -and [int]$metadata.ParentProcessId -eq [int]$Record.listener_parent_pid)
+    $commandLineVisible = $metadata -and -not [string]::IsNullOrWhiteSpace([string]$metadata.CommandLine)
+    $hasFeature = $commandLineVisible -and $metadata.CommandLine.IndexOf([string]$Record.commandFeature, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $listenerCommandValid = [string]$Record.name -eq 'admin-web' -or -not $commandLineVisible -or $hasFeature
+    $owners = @(Get-PortOwner ([int]$Record.port))
+    $ownsPort = $owners.Count -eq 1 -and [int]$owners[0] -eq $listenerPid
+    $valid = $samePath -and $sameStart -and $sameParent -and $listenerCommandValid -and $ownsPort
+    $reason = if ($valid) { '监听 PID 已验证' } else { "listenerPath=$samePath; listenerStarted=$sameStart; listenerParent=$sameParent; listenerCommand=$listenerCommandValid; listenerPort=$ownsPort" }
+    return [pscustomobject]@{ Present = $true; Valid = $valid; Reason = $reason; Process = $listenerProcess }
+}
+
 function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
     $path = Get-ServiceRecordPath $Config $Name
     if (-not (Test-Path -LiteralPath $path)) { return $null }
-    try { $record = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return [pscustomobject]@{ Valid = $false; Reason = '运行记录无法解析'; Record = $null; Process = $null } }
+    try { $record = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return [pscustomobject]@{ Valid = $false; Reason = '运行记录无法解析'; Record = $null; Process = $null; ListenerProcess = $null } }
     $process = Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue
-    if (-not $process) { return [pscustomobject]@{ Valid = $false; Reason = 'PID 已退出'; Record = $record; Process = $null } }
-    $metadata = Get-ProcessMetadata $process.Id
-    $actualExecutablePath = if ($metadata -and -not [string]::IsNullOrWhiteSpace($metadata.ExecutablePath)) { [string]$metadata.ExecutablePath } else { [string]$process.Path }
-    if ([string]::IsNullOrWhiteSpace($actualExecutablePath)) { return [pscustomobject]@{ Valid = $false; Reason = '无法读取进程可执行路径'; Record = $record; Process = $process } }
-    $sameExecutable = [string]::Equals([IO.Path]::GetFullPath($actualExecutablePath), [IO.Path]::GetFullPath($record.executablePath), [StringComparison]::OrdinalIgnoreCase)
+    $metadata = if ($process) { Get-ProcessMetadata $process.Id } else { $null }
+    $actualExecutablePath = if ($metadata -and -not [string]::IsNullOrWhiteSpace($metadata.ExecutablePath)) { [string]$metadata.ExecutablePath } elseif ($process) { [string]$process.Path } else { '' }
+    $sameExecutable = $process -and -not [string]::IsNullOrWhiteSpace($actualExecutablePath) -and [string]::Equals([IO.Path]::GetFullPath($actualExecutablePath), [IO.Path]::GetFullPath($record.executablePath), [StringComparison]::OrdinalIgnoreCase)
     $canVerifyCommandLine = $metadata -and -not [string]::IsNullOrWhiteSpace($metadata.CommandLine)
     $hasFeature = $canVerifyCommandLine -and $metadata.CommandLine.IndexOf([string]$record.commandFeature, [StringComparison]::OrdinalIgnoreCase) -ge 0
     $recordedStart = ([datetime]$record.startedUtc).ToUniversalTime().ToString('o')
-    $sameStart = $process.StartTime.ToUniversalTime().ToString('o') -eq $recordedStart
+    $sameStart = $process -and $process.StartTime.ToUniversalTime().ToString('o') -eq $recordedStart
     $sameParent = $true
     if ($record.PSObject.Properties.Name -contains 'parentProcessId' -and [int]$record.parentProcessId -gt 0) {
         $sameParent = $metadata -and [int]$metadata.ParentProcessId -eq [int]$record.parentProcessId
@@ -525,46 +542,63 @@ function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
             }
         }
     }
-    if ($sameExecutable -and $sameStart -and $sameParent -and ($hasFeature -or -not $canVerifyCommandLine) -and $featureIntegrity -and $adminRecordValid) {
-        $reason = if ($hasFeature) { '已验证' } else { '已验证（系统未公开命令行，使用可执行路径和启动时间）' }
-        return [pscustomobject]@{ Valid = $true; Reason = $reason; Record = $record; Process = $process }
+    $listenerCheck = Get-RecordedListenerCheck $Config $record
+    $managedValid = $sameExecutable -and $sameStart -and $sameParent -and ($hasFeature -or -not $canVerifyCommandLine) -and $featureIntegrity
+    if ($listenerCheck.Present -and $listenerCheck.Valid -and $featureIntegrity -and $adminRecordValid -and ((-not $process) -or $managedValid)) {
+        $reason = if ($process) { '受管 PID 与监听 PID 已验证' } else { '受管启动包装层已退出，监听 PID 已验证' }
+        return [pscustomobject]@{ Valid = $true; Reason = $reason; Record = $record; Process = $process; ListenerProcess = $listenerCheck.Process }
     }
-    $details = "executable=$sameExecutable; started=$sameStart; parent=$sameParent; command=$($hasFeature -or -not $canVerifyCommandLine); featureIntegrity=$featureIntegrity; admin=$adminRecordValid"
-    return [pscustomobject]@{ Valid = $false; Reason = "PID、父子关系、可执行路径、启动时间或命令特征不匹配（$details）"; Record = $record; Process = $process }
+    if ($managedValid -and $adminRecordValid -and -not $listenerCheck.Present) {
+        $reason = if ($hasFeature) { '已验证' } else { '已验证（系统未公开命令行，使用可执行路径和启动时间）' }
+        return [pscustomobject]@{ Valid = $true; Reason = $reason; Record = $record; Process = $process; ListenerProcess = $null }
+    }
+    $details = "managedPresent=$($null -ne $process); executable=$sameExecutable; started=$sameStart; parent=$sameParent; command=$($hasFeature -or -not $canVerifyCommandLine); featureIntegrity=$featureIntegrity; listener=$($listenerCheck.Reason); admin=$adminRecordValid"
+    return [pscustomobject]@{ Valid = $false; Reason = "PID、父子关系、可执行路径、启动时间或命令特征不匹配（$details）"; Record = $record; Process = $process; ListenerProcess = $listenerCheck.Process }
 }
 
 function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$ExecutablePath, [string]$WorkingDirectory, [string]$CommandSummary, [string]$CommandFeature, [int]$Port) {
     New-Item -ItemType Directory -Force -Path $Config.RuntimeDirectory, (Get-ServiceLogDirectory $Config) | Out-Null
     $metadata = Get-ProcessMetadata $Process.Id
     $parentProcessId = if ($metadata) { [int]$metadata.ParentProcessId } else { 0 }
-    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config) }
+    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config) }
     $record | ConvertTo-Json | Set-Content -LiteralPath (Get-ServiceRecordPath $Config $Name) -Encoding UTF8
 }
 
-function Update-AdminWebServiceRecord($Config, $Process) {
-    $recordPath = Get-ServiceRecordPath $Config 'admin-web'
+function Update-ManagedServiceListenerRecord($Config, [string]$Name) {
+    $recordPath = Get-ServiceRecordPath $Config $Name
     $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $managedMetadata = Get-ProcessMetadata $Process.Id
-    $managedPath = if ($managedMetadata -and -not [string]::IsNullOrWhiteSpace([string]$managedMetadata.ExecutablePath)) { [string]$managedMetadata.ExecutablePath } else { [string]$Process.Path }
-    if ([string]::IsNullOrWhiteSpace($managedPath)) { throw "无法读取 Admin 后台受管 PID $($Process.Id) 的可执行路径，拒绝建立运行记录。" }
-    $owners = @(Get-PortOwner ([int]$Config.AdminWebPort))
-    if ($owners.Count -ne 1) {
-        throw "Admin 后台端口 $($Config.AdminWebPort) 的监听 PID 数量异常：$($owners -join ', ')。"
-    }
+    $owners = @(Get-PortOwner ([int]$record.port))
+    if ($owners.Count -ne 1) { throw "$Name 端口 $($record.port) 的监听 PID 数量异常：$($owners -join ', ')。" }
     $listenerPid = [int]$owners[0]
     $listenerProcess = Get-Process -Id $listenerPid -ErrorAction Stop
     $listenerMetadata = Get-ProcessMetadata $listenerPid
     $listenerPath = if ($listenerMetadata -and -not [string]::IsNullOrWhiteSpace([string]$listenerMetadata.ExecutablePath)) { [string]$listenerMetadata.ExecutablePath } else { [string]$listenerProcess.Path }
-    if ([string]::IsNullOrWhiteSpace($listenerPath)) { throw "无法读取 Admin 后台监听 PID $listenerPid 的可执行路径，拒绝建立运行记录。" }
-    $record | Add-Member -NotePropertyName service_name -NotePropertyValue 'admin-web' -Force
-    $record | Add-Member -NotePropertyName managed_pid -NotePropertyValue ([int]$Process.Id) -Force
+    if ([string]::IsNullOrWhiteSpace($listenerPath)) { throw "$Name 无法读取监听 PID $listenerPid 的可执行路径，拒绝建立运行记录。" }
+    if ($Name -ne 'admin-web' -and $listenerMetadata -and -not [string]::IsNullOrWhiteSpace([string]$listenerMetadata.CommandLine) -and $listenerMetadata.CommandLine.IndexOf([string]$record.commandFeature, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+        throw "$Name 监听 PID $listenerPid 的命令特征无法验证，拒绝建立运行记录。"
+    }
     $record | Add-Member -NotePropertyName listener_pid -NotePropertyValue $listenerPid -Force
     $record | Add-Member -NotePropertyName listener_executable_path -NotePropertyValue ([IO.Path]::GetFullPath($listenerPath)) -Force
     $record | Add-Member -NotePropertyName listener_started_at -NotePropertyValue ($listenerProcess.StartTime.ToUniversalTime().ToString('o')) -Force
-    $record | Add-Member -NotePropertyName executablePath -NotePropertyValue ([IO.Path]::GetFullPath($managedPath)) -Force
+    $listenerParentPid = if ($listenerMetadata) { [int]$listenerMetadata.ParentProcessId } else { 0 }
+    $record | Add-Member -NotePropertyName listener_parent_pid -NotePropertyValue $listenerParentPid -Force
+    $record | ConvertTo-Json | Set-Content -LiteralPath $recordPath -Encoding UTF8
+    return $record
+}
+
+function Update-AdminWebServiceRecord($Config, $Process) {
+    $recordPath = Get-ServiceRecordPath $Config 'admin-web'
+    $record = Update-ManagedServiceListenerRecord $Config 'admin-web'
+    $managedMetadata = Get-ProcessMetadata $Process.Id
+    $managedPath = if ($managedMetadata -and -not [string]::IsNullOrWhiteSpace([string]$managedMetadata.ExecutablePath)) { [string]$managedMetadata.ExecutablePath } else { [string]$Process.Path }
+    if ([string]::IsNullOrWhiteSpace($managedPath)) { throw "无法读取 Admin 后台受管 PID $($Process.Id) 的可执行路径，拒绝建立运行记录。" }
+    $managedPath = [IO.Path]::GetFullPath($managedPath)
+    $record | Add-Member -NotePropertyName service_name -NotePropertyValue 'admin-web' -Force
+    $record | Add-Member -NotePropertyName managed_pid -NotePropertyValue ([int]$record.pid) -Force
+    $record | Add-Member -NotePropertyName executablePath -NotePropertyValue $managedPath -Force
     $record | Add-Member -NotePropertyName parent_pid -NotePropertyValue ([int]$record.parentProcessId) -Force
     $record | Add-Member -NotePropertyName creation_time -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
-    $record | Add-Member -NotePropertyName executable_path -NotePropertyValue ([IO.Path]::GetFullPath($managedPath)) -Force
+    $record | Add-Member -NotePropertyName executable_path -NotePropertyValue $managedPath -Force
     $record | Add-Member -NotePropertyName command_summary -NotePropertyValue ([string]$record.commandSummary) -Force
     $record | Add-Member -NotePropertyName working_directory -NotePropertyValue ([string]$record.workingDirectory) -Force
     $record | Add-Member -NotePropertyName bind_address -NotePropertyValue ([string]$Config.AdminWebBindAddress) -Force
@@ -613,10 +647,10 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
     $owners = @(Get-PortOwner $Port)
     if ($owners.Count -eq 0) { return }
     $record = Test-RecordedProcess $Config $Name
-    if ($Name -eq 'admin-web' -and $record -and $record.Valid -and $record.Record.PSObject.Properties.Name -contains 'listener_pid' -and $owners.Count -eq 1 -and [int]$owners[0] -eq [int]$record.Record.listener_pid) {
+    if ($record -and $record.Valid -and $record.ListenerProcess -and $owners.Count -eq 1 -and [int]$owners[0] -eq [int]$record.ListenerProcess.Id) {
         throw "$Name 已由本工具启动（登记 PID $($record.Process.Id)，监听 PID $($owners -join ', ')，端口 $Port）。请使用检查脚本，或先停止后再启动。"
     }
-    if ($record -and $record.Valid -and @($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $owners.Count) {
+    if ($record -and $record.Valid -and $record.Process -and @($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $owners.Count) {
         throw "$Name 已由本工具启动（登记 PID $($record.Process.Id)，监听 PID $($owners -join ', ')，端口 $Port）。请使用检查脚本，或先停止后再启动。"
     }
     $identity = @($owners | ForEach-Object { Get-ProcessIdentitySummary $_ }) -join '；'
@@ -705,14 +739,15 @@ function Get-PlatformMigrationStatus($Config) {
 
 function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl) {
     $record = Test-RecordedProcess $Config $Name
-    $serviceProcessId = if ($record -and $record.Process) { $record.Process.Id } else { '-' }
+    $serviceProcessId = if ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'managed_pid')) { [string]$record.Record.managed_pid } elseif ($record -and $record.Process) { [string]$record.Process.Id } else { '-' }
+    $listenerProcessId = if ($record -and $record.ListenerProcess) { [string]$record.ListenerProcess.Id } else { '-' }
     $portOwners = @(Get-PortOwner $Port)
-    $ownsPort = $record -and $record.Valid -and $portOwners.Count -gt 0 -and @($portOwners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $portOwners.Count
-    $serviceState = if ($ownsPort) { '运行中' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
+    $ownsPort = $record -and $record.Valid -and (($record.ListenerProcess -and $portOwners.Count -eq 1 -and [int]$portOwners[0] -eq [int]$record.ListenerProcess.Id) -or ($record.Process -and $portOwners.Count -gt 0 -and @($portOwners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $portOwners.Count))
+    $serviceState = if ($ownsPort) { 'RUNNING' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
     $healthOk = Test-HttpOk $HealthUrl
-    $portState = if ($portOwners.Count -gt 0) { "监听（PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（health 已确认；未能读取端口 PID）' } else { '未监听' }
+    $portState = if ($portOwners.Count -gt 0) { "LISTENING（PID $($portOwners -join ', ')）" } elseif ($healthOk) { 'LISTENING（health 已确认；未能读取端口 PID）' } else { '未监听' }
     $healthState = if ($healthOk) { '可用' } else { '不可用' }
-    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; Record=$record }
+    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; Record=$record }
 }
 
 function Assert-Dependencies($Config) {
@@ -763,10 +798,22 @@ function Stop-ManagedService($Config, [string]$Name) {
     $path = Get-ServiceRecordPath $Config $Name
     if (-not (Test-Path -LiteralPath $path)) { Write-Host "$Name：没有本工具的运行记录。"; return }
     $check = Test-RecordedProcess $Config $Name
-    if (-not $check.Process) { Remove-Item -LiteralPath $path -Force; Write-Host "$Name：记录的进程已退出，已清理记录。"; return }
+    if (-not $check.Process -and -not $check.ListenerProcess) {
+        $owners = @(Get-PortOwner ([int]$check.Record.port))
+        if ($owners.Count -gt 0) { Write-Warning "$Name：记录的受管 PID 已退出，但端口仍由 PID $($owners -join ', ') 监听；拒绝清理记录或按端口停止。"; return }
+        Remove-Item -LiteralPath $path -Force
+        Write-Host "$Name：记录的进程已退出，端口未监听，已清理记录。"
+        return
+    }
     if (-not $check.Valid) { Write-Warning "$Name：拒绝停止 PID $($check.Process.Id)，原因：$($check.Reason)。请人工核对后处理。"; return }
-    if ($Name -eq 'admin-web') {
-        $remaining = @(Stop-VerifiedProcessTree $check.Process.Id ([int]$check.Record.listener_pid))
+    if ($check.ListenerProcess) {
+        if ($check.Process) {
+            $remaining = @(Stop-VerifiedProcessTree $check.Process.Id $check.ListenerProcess.Id)
+        } else {
+            Stop-Process -Id $check.ListenerProcess.Id -ErrorAction Stop
+            Start-Sleep -Milliseconds 500
+            $remaining = @(Get-Process -Id $check.ListenerProcess.Id -ErrorAction SilentlyContinue)
+        }
         if ($remaining.Count -gt 0) { throw "$Name 的已验证进程树未能停止（PID $($remaining -join ', ')），请人工处理。" }
         $owners = @(Get-PortOwner ([int]$check.Record.port))
         if ($owners.Count -gt 0) { throw "$Name 的端口 $($check.Record.port) 仍由 PID $($owners -join ', ') 监听；不会按端口强杀。" }
@@ -776,7 +823,8 @@ function Stop-ManagedService($Config, [string]$Name) {
         if (Get-Process -Id $check.Process.Id -ErrorAction SilentlyContinue) { throw "$Name（PID $($check.Process.Id)）未能停止，请人工处理。" }
     }
     Remove-Item -LiteralPath $path -Force
-    Write-Host "$Name 已停止（PID $($check.Record.pid)）。"
+    $listenerDescription = if ($check.ListenerProcess) { "；监听 PID $($check.ListenerProcess.Id)" } else { '' }
+    Write-Host "$Name 已停止（受管 PID $($check.Record.pid)$listenerDescription）。"
 }
 
 function Get-NormalizedTestDataPackagePath($Config) {

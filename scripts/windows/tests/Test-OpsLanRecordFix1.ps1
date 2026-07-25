@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) ('ops-lan-record-fix1-' + [Guid]::NewGuid().ToString('N'))
 $script:fakeProcesses = @()
+$script:detachedListenerPids = @()
 
 function Assert-Throws([scriptblock]$Action, [string]$Label) {
     try {
@@ -33,6 +34,7 @@ function Start-TestManagedService([hashtable]$Config, [string]$ServiceName, [int
     $process = Start-ManagedServiceWithEnvironment -Config $Config -Name $ServiceName -ExecutablePath $ShellPath -Arguments @('-NoProfile', '-Command', $listenerCommand) -WorkingDirectory $WorkingDirectory -CommandFeature 'TcpListener' -Port $Port -Environment $Environment
     $script:fakeProcesses += $process
     Start-Sleep -Milliseconds 300
+    Update-ManagedServiceListenerRecord $Config $ServiceName | Out-Null
     return $process
 }
 
@@ -88,9 +90,13 @@ try {
         Assert-Equal ([IO.Path]::GetFullPath($record.executablePath)) ([IO.Path]::GetFullPath($shellPath)) "$($definition.ServiceName) executable path"
         Assert-Equal ([IO.Path]::GetFullPath($record.workingDirectory)) ([IO.Path]::GetFullPath($temporaryRoot)) "$($definition.ServiceName) working directory"
         Assert-Equal $record.commandFeature 'TcpListener' "$($definition.ServiceName) command feature"
+        Assert-Equal ([int]$record.managed_pid) $process.Id "$($definition.ServiceName) managed pid"
+        Assert-Equal ([int]$record.listener_pid) $process.Id "$($definition.ServiceName) listener pid"
+        if ([string]::IsNullOrWhiteSpace([string]$record.listener_executable_path) -or [string]::IsNullOrWhiteSpace([string]$record.listener_started_at)) { throw "$($definition.ServiceName) listener identity fields are incomplete." }
         $status = Get-ServiceStatus $config $definition.ServiceName $definition.Port 'http://127.0.0.1:1'
         if (-not $status.Record.Valid) { throw "$($definition.ServiceName) managed status did not accept its valid record." }
         Assert-Equal ([int]$status.ProcessId) $process.Id "$($definition.ServiceName) managed status pid"
+        Assert-Equal ([int]$status.ListenerProcessId) $process.Id "$($definition.ServiceName) listener status pid"
     }
 
     $expectedRecordFiles = @('customer-web.json', 'platform.json', 'rag.json')
@@ -99,6 +105,35 @@ try {
     foreach ($environmentVariableName in $environmentNames) {
         if (Test-Path -LiteralPath (Join-Path $runtimeDirectory "$environmentVariableName.json")) { throw "Environment variable leaked into a record filename: $environmentVariableName.json" }
     }
+
+    # Windows launchers may exit after creating the actual listener. The record
+    # must retain both identities and stop only the verified listener when its
+    # original wrapper has already exited.
+    $detachedPort = Get-AvailableLoopbackPort
+    $listenerScriptPath = Join-Path $temporaryRoot 'listener-wrapper.ps1'
+    @"
+`$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $detachedPort)
+`$listener.Start()
+Start-Sleep -Seconds 90
+"@ | Set-Content -LiteralPath $listenerScriptPath -Encoding UTF8
+    $escapedShellPath = $shellPath.Replace("'", "''")
+    $escapedListenerScriptPath = $listenerScriptPath.Replace("'", "''")
+    $wrapperCommand = "Start-Process -FilePath '$escapedShellPath' -ArgumentList @('-NoProfile','-File','$escapedListenerScriptPath') -WindowStyle Hidden; Start-Sleep -Milliseconds 300"
+    $detachedWrapper = Start-ManagedServiceWithEnvironment -Config $config -Name 'detached-wrapper' -ExecutablePath $shellPath -Arguments @('-NoProfile','-Command',$wrapperCommand) -WorkingDirectory $temporaryRoot -CommandFeature 'listener-wrapper.ps1' -Port $detachedPort -Environment @{}
+    $script:fakeProcesses += $detachedWrapper
+    for ($attempt = 0; $attempt -lt 30 -and @(Get-PortOwner $detachedPort).Count -ne 1; $attempt++) { Start-Sleep -Milliseconds 100 }
+    Update-ManagedServiceListenerRecord $config 'detached-wrapper' | Out-Null
+    for ($attempt = 0; $attempt -lt 30 -and (Get-Process -Id $detachedWrapper.Id -ErrorAction SilentlyContinue); $attempt++) { Start-Sleep -Milliseconds 100 }
+    $detachedRecordPath = Get-ServiceRecordPath $config 'detached-wrapper'
+    $detachedRecord = Get-Content -LiteralPath $detachedRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ((Get-Process -Id $detachedWrapper.Id -ErrorAction SilentlyContinue)) { throw 'Detached listener wrapper did not exit.' }
+    if ([int]$detachedRecord.managed_pid -ne $detachedWrapper.Id -or [int]$detachedRecord.listener_pid -eq $detachedWrapper.Id) { throw 'Detached listener record did not preserve separate managed and listener PIDs.' }
+    $script:detachedListenerPids += [int]$detachedRecord.listener_pid
+    $detachedCheck = Test-RecordedProcess $config 'detached-wrapper'
+    if (-not $detachedCheck.Valid -or $detachedCheck.Process -or -not $detachedCheck.ListenerProcess) { throw "Detached listener record was not safely accepted: $($detachedCheck.Reason)" }
+    Stop-ManagedService $config 'detached-wrapper' | Out-Null
+    if (@(Get-PortOwner $detachedPort).Count -ne 0 -or (Test-Path -LiteralPath $detachedRecordPath)) { throw 'Verified detached listener stop left a listener or record.' }
+    $script:detachedListenerPids = @($script:detachedListenerPids | Where-Object { $_ -ne [int]$detachedRecord.listener_pid })
 
     $mismatchPort = Get-AvailableLoopbackPort
     $mismatchProcess = Start-TestManagedService $config 'mismatch' $mismatchPort @{} $shellPath $temporaryRoot
@@ -144,6 +179,9 @@ try {
 } finally {
     foreach ($process in $script:fakeProcesses) {
         if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+    }
+    foreach ($listenerPid in $script:detachedListenerPids) {
+        if (Get-Process -Id $listenerPid -ErrorAction SilentlyContinue) { Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue }
     }
     if ((Test-Path -LiteralPath $temporaryRoot) -and (Split-Path -Parent $temporaryRoot) -eq [IO.Path]::GetTempPath().TrimEnd([char]92)) {
         # Windows can retain redirected log handles briefly after the verified

@@ -44,3 +44,8 @@
 
 - 独立 Worktree `C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS-admin-runtime-t05` 从最新 `origin/develop` 的 `36ec2d326d1613f62cb647ad9ef5835315e4db21` 创建，分支为 `control/admin-runtime-t05`。
 - 变更只限 `scripts/windows/**`、`docs/control/**`；未修改 `.env`、运行记录、依赖、A/B/C 业务代码或共享 contracts。Draft PR 与合并均尚未执行。
+
+## 2026-07-25 OPS 生命周期记录恢复
+
+- `control/admin-runtime-t05` 保持基于 `develop` 的 `36ec2d326d1613f62cb647ad9ef5835315e4db21`；PR #26 继续使用同一分支，不创建重复 PR。
+- 为修复实际 Windows 启动包装层 PID 与监听子进程 PID 分离的阻塞，分支将标准服务记录扩展为受管 PID 与监听 PID 的双身份记录，并将相同身份验证用于 C、A、B、Admin 的启动、状态、重复启动保护和安全停止。
