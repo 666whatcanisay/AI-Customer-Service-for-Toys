@@ -1,3 +1,5 @@
 # Platform documentation (C line)
 
-C-T01 的可运行骨架、边界、安全设计、测试证据、已知债务和回滚说明位于 `baseline/`。当前只实现健康检查与系统状态页；后续业务和跨线契约必须由新的任务卡授权。
+The C line owns `platform_backend/**`, `admin_web/**`, and this directory. The current C-T05 baseline is documented in [11_C-T05_运营与AI管理后台.md](11_C-T05_运营与AI管理后台.md).
+
+This remains an internal-test, local-development platform. It has no formal authorization, production data, publication, order automation, or cross-line AI detail/test contract.

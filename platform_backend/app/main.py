@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import Settings, get_settings
+from app.api.admin_routes import router as admin_router
+from app.api.admin_suggestion_routes import router as admin_suggestion_router
+from app.api.customer_suggestion_routes import router as customer_suggestion_router
 from app.api.import_routes import router as import_router
 from app.api.test_catalog_routes import router as test_catalog_router
 from app.errors import (
@@ -30,7 +33,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=list(settings.cors_allowed_origins),
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH"],
         allow_headers=["Accept", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
@@ -40,6 +43,9 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.add_exception_handler(AppError, app_exception_handler)
     application.include_router(import_router)
     application.include_router(test_catalog_router)
+    application.include_router(customer_suggestion_router)
+    application.include_router(admin_suggestion_router)
+    application.include_router(admin_router)
 
     @application.get("/health")
     async def health(request: Request) -> dict[str, str]:
