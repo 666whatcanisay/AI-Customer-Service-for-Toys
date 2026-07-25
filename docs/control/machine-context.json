@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "verified",
-  "current_task": "MVP-BATCH-05",
-  "current_stage": "MVP-BATCH-05 is merged to develop and has completed a real Windows LAN host smoke: fixed same-origin Vite proxies, automatic physical-adapter selection, loopback-only A/C, selected-IP B, diagnostics, safe restart, and responsive desktop layout are verified.",
-  "current_gate": "MVP-BATCH-05 L2: PASS on the server host. A second company computer still needs manual access verification; a Wi-Fi-to-wired routing failure is NETWORK_SEGMENTED, not an application failure.",
+  "status": "environment_blocked",
+  "current_task": "OPS-T05 local admin web runtime management",
+  "current_stage": "Admin Web is integrated into the Windows C → A → B → Admin lifecycle with loopback-safe defaults, diagnostics, and PID-safe stop. OPS recovery extends managed/listener PID records to C, A, B, and Admin because Windows launch wrappers can exit before the listener.",
+  "current_gate": "OPS recovery L2: core isolated lifecycle and Admin checks pass. A formal main-repository start/stop/restart remains pending PR #26 update, review, merge, and real host closure. Admin remains loopback-only by default and no 5174 firewall rule was created.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -18,7 +18,9 @@
     "lan_cors_squash_commit": "3f20686c48dbec4dd7d389e6eac7dcfe16eeb28f",
     "ops_lan_squash_commit": "978f884b41b8a1ea0c0f42ac5e5e319516f0cac",
     "ops_lan_record_fix1_squash_commit": "56acf9792bf728eaad12f8025be658a6dcfdbbcc",
-    "origin_develop_after_feature_push": "56acf9792bf728eaad12f8025be658a6dcfdbbcc"
+    "origin_develop_after_feature_push": "56acf9792bf728eaad12f8025be658a6dcfdbbcc",
+    "ops_admin_runtime_t05_branch": "control/admin-runtime-t05",
+    "ops_admin_runtime_t05_base": "36ec2d326d1613f62cb647ad9ef5835315e4db21"
   },
   "pull_requests": {
     "3": {
@@ -61,7 +63,9 @@
     "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. After the user changed Ethernet to Private, official LAN startup completed migration, imported-test-only package validation, 47/47 sync, real Ollama smoke, LAN CORS, C catalog 1/5/18, and B LAN HTTP 200. A scope collision in Invoke-WithProcessEnvironment overwrote service names with environment variable names.",
     "OPS_LAN_RECORD_FIX1": "The scope repair was squash merged as 56acf97 and five formal OPS script suites, PowerShell syntax and diff checks passed. Stop-time evidence was retained. A and B legacy processes can be tied to wrong records, but the C standard record was overwritten and no historical start-time record exists for 8011. The live services and records were intentionally left untouched; LAN lifecycle closure and laptop acceptance remain blocked.",
     "OPS_LAN_RECOVERY2": "At the 844dbe6 baseline, A/C/B health checks passed and the repaired OPS code was present. Two established local connections to 5173 preceded health probes. PID 21816 listened on 8011 and had the expected uvicorn command, but its executable and parent paths did not match the task-specified AI-CS-platform-center C worktree. A no-secret verification record was written under ignored .runtime/recovery-backup; no process, existing service record, database or code was changed.",
-    "MVP_BATCH_05": "PR #20 was squash merged as dc48646. Real Windows host smoke discovered and repaired a one-default-gateway collection issue (PR #21, f21eed9) and a diagnostic-report PowerShell expression issue (PR #22, ca587d9). On Private Ethernet 192.168.1.11/24, iKuuuVPN was detected but excluded; A/C/B listened on 127.0.0.1:8000, 127.0.0.1:8011, and 192.168.1.11:5173. Page and fixed proxies returned HTTP 200; catalog 1/5, 47/47 sync, sourced qwen3.5:9b CONTROLLED_ANSWER, 1366x768 two-pane UI, diagnostics, safe stop/restart, and Ollama preservation passed. Second-computer manual verification remains pending."
+    "MVP_BATCH_05": "PR #20 was squash merged as dc48646. Real Windows host smoke discovered and repaired a one-default-gateway collection issue (PR #21, f21eed9) and a diagnostic-report PowerShell expression issue (PR #22, ca587d9). On Private Ethernet 192.168.1.11/24, iKuuuVPN was detected but excluded; A/C/B listened on 127.0.0.1:8000, 127.0.0.1:8011, and 192.168.1.11:5173. Page and fixed proxies returned HTTP 200; catalog 1/5, 47/47 sync, sourced qwen3.5:9b CONTROLLED_ANSWER, 1366x768 two-pane UI, diagnostics, safe stop/restart, and Ollama preservation passed. Second-computer manual verification remains pending.",
+    "OPS_T05_ADMIN_RUNTIME": "Configuration compatibility, real-package-script isolated start/status/open/stop/restart tests, PID-tamper refusal, unknown-port protection, PowerShell syntax, and diff checks passed. No real host closure was run because admin_web/node_modules is absent in this worktree and OPS-T05 does not permit dependency installation.",
+    "CONTROL_MVP_BATCH_06_OPS_RECOVERY": "PR #26 originally added Admin dual-PID lifecycle handling. Review found that A/C/B still recorded only an exiting Windows launcher PID, so the same branch now records and verifies managed_pid plus listener_pid, listener path, start time and parent PID for all four services. A detached-wrapper regression verifies exact listener stop after the wrapper exits; unknown and tampered records remain rejected."
   },
   "agent_worktrees": {
     "A": {
@@ -91,7 +95,8 @@
     "CONTROL-G1-MERGE",
     "CONTROL-LAN-BATCH-05-PREP",
     "CONTROL-LAN-BATCH-05-INTEGRATION",
-    "MVP-BATCH-05"
+    "MVP-BATCH-05",
+    "OPS-T05 local admin web runtime management (script and isolated lifecycle verification)"
   ],
   "next_tasks": {
     "A": "May be dispatched separately; preserve the runtime and real-test blockers",
@@ -100,7 +105,8 @@
   },
   "t02_executed": false,
   "blockers": [
-    "Second-computer manual acceptance remains pending. If company Wi-Fi and wired clients cannot route to the selected 5173 address after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure."
+    "Second-computer manual acceptance remains pending. If company Wi-Fi and wired clients cannot route to the selected 5173 address after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure.",
+    "OPS-T05 real lifecycle closure requires a pre-existing admin_web/node_modules in the target worktree; dependency installation is outside this task's authority."
   ],
   "last_updated": "2026-07-24"
 }

@@ -5,6 +5,12 @@
     PnpmCommand = 'pnpm.cmd'
     RagPort = 8000; CustomerWebPort = 5173; PlatformPort = 8011; BindAddress = '127.0.0.1'
     CustomerWebUrl = 'http://127.0.0.1:5173/'
+    # 管理后台默认只绑定服务器本机。即使显式开启 LAN 模式，本轮也不会修改防火墙。
+    AdminWebPort = 5174
+    AdminWebBindAddress = '127.0.0.1'
+    AdminWebUrl = 'http://127.0.0.1:5174/'
+    AdminEnableLanMode = $false
+    AdminOpenBrowser = $false
     RagHealthPath = '/api/health'; PlatformHealthPath = '/health'
     OllamaModel = 'qwen3.5:9b'
     OllamaBaseUrl = 'http://127.0.0.1:11434'
