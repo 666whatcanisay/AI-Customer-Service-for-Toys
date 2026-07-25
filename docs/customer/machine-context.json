@@ -3,10 +3,10 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "B-T05-C-INTEROP-VERIFY",
-  "current_stage": "C-T05 real suggestion endpoint verified; response field compatibility blocked",
-  "current_gate": "BLOCKED: C-T05 returns id while B frozen adapter requires suggestion_id",
-  "status": "contract_blocked",
+  "current_task": "B-T05-FINAL-INTEROP",
+  "current_stage": "C-T05 real suggestion response compatibility verified",
+  "current_gate": "PASS: POST and GET provide B-required suggestion_id with SUBMITTED status",
+  "status": "verified",
   "last_updated": "2026-07-25",
   "git": {
     "branch": "agent/customer-platform-shell-t05",
@@ -54,10 +54,8 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-25 B-T05-C-INTEROP-VERIFY: C-T05 commit cb8f8bc ran with an isolated temporary SQLite database on loopback port 8013; POST returned HTTP 201, id, and SUBMITTED; GET returned HTTP 200 with items and total. Both POST and list items omitted B-required suggestion_id, so the strict B adapter rejects the real response. Test process and temporary database were removed; frontend/C/contracts unchanged.",
-  "blockers": [
-    "C-T05 POST and GET list items return id instead of the frozen B suggestion_id field; real B suggestion submission/history cannot be consumed until C provides compatibility or an approved versioned cross-line contract changes B."
-  ],
+  "last_test_result": "2026-07-25 B-T05-FINAL-INTEROP: C-T05 compatibility commit 327a765 ran with an isolated temporary SQLite database on loopback port 8013; POST returned HTTP 201 with non-empty suggestion_id and SUBMITTED; GET returned HTTP 200 with items, total=1, and the same non-empty suggestion_id/SUBMITTED item. Test process and temporary database were removed; frontend/C/contracts unchanged.",
+  "blockers": [],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
     "Tester identity is local browser state and is not authentication or authorization"
