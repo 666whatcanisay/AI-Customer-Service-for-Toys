@@ -1,6 +1,6 @@
 # MVP-PLUS-02 customer-service pilot operations dashboard
 
-Status: C-line implementation and local verification passed on `agent/platform-mvp-plus-02`. This is a stacked branch based on `agent/platform-mvp-plus-01` because the experience-case persistence in Draft PR #30 is the required data source.
+Status: C-line implementation and local verification passed on `agent/platform-mvp-plus-02`. Draft PR #32 targets `agent/platform-mvp-plus-01` because the experience-case persistence in parent Draft PR #30 is the required data source.
 
 ## Purpose and boundary
 

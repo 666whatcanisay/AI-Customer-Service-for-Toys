@@ -6,7 +6,7 @@
   "version": "0.1.0",
   "current_task": "MVP-PLUS-02",
   "current_stage": "Customer-service pilot operations observation dashboard",
-  "current_gate": "C local implementation and verification PASS; stacked Draft PR pending",
+  "current_gate": "C local implementation and verification PASS; stacked Draft PR #32 open against agent/platform-mvp-plus-01",
   "status": "ready_for_review",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
@@ -84,9 +84,9 @@
     "branch": "agent/platform-mvp-plus-02",
     "base": "agent/platform-mvp-plus-01 4cc48e0d6b269b7897386c2e53805f336af62f95",
     "parent_draft_pr": "#30 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/30",
-    "commit": null,
-    "draft_pr": null
+    "commit": "8790ee29e65cfe15da50771b4d224a027a9b4a62",
+    "draft_pr": "#32 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/32"
   },
-  "next_recommended_task": "Create a stacked Draft PR targeting agent/platform-mvp-plus-01. Retarget after PR #30 merges.",
+  "next_recommended_task": "Review stacked Draft PR #32 after parent PR #30. Retarget PR #32 to develop after the parent merges.",
   "last_updated": "2026-07-25"
 }
