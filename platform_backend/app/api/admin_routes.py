@@ -5,7 +5,7 @@ import tables.  They never expose raw workbook payloads, attachment bytes, or
 local absolute paths.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from pathlib import PurePosixPath
 
@@ -22,6 +22,9 @@ from app.admin.schemas import (
     FaqItem,
     FaqListResponse,
     OverviewCounts,
+    PilotExperienceCaseCounts,
+    PilotOperationDashboardResponse,
+    PilotTodayCounts,
     ProductDetailResponse,
     ProductItem,
     ProductListResponse,
@@ -34,9 +37,12 @@ from app.admin.schemas import (
     StoreItem,
     StoreListResponse,
     SuggestionStatusCounts,
+    FrequentQuestionItem,
 )
 from app.database import get_db
 from app.errors import AppError
+from app.experience_cases.models import CustomerExperienceCase
+from app.experience_cases.schemas import EvaluationStatus, ExperienceCaseReviewStatus
 from app.ingestion.models import ImportBatch
 from app.suggestions.models import CustomerSuggestion
 from app.test_catalog.models import (
@@ -152,6 +158,92 @@ def get_overview(session: Session = Depends(get_db)) -> AdminOverviewResponse:
         recent_imported_at=max(dates) if dates else None,
         test_data_mode=True,
         production_usable=False,
+    )
+
+
+@router.get("/pilot-operation-dashboard", response_model=PilotOperationDashboardResponse)
+def get_pilot_operation_dashboard(
+    session: Session = Depends(get_db),
+) -> PilotOperationDashboardResponse:
+    """Return a deliberately simple, case-observed pilot dashboard.
+
+    The project has no AI request telemetry table.  The displayed AI-call
+    value is therefore limited to today's submitted cases containing their
+    required AI answer, not a production call-volume assertion.
+    """
+    generated_at = datetime.now(timezone.utc)
+    today_start = generated_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_statement = select(CustomerExperienceCase).where(CustomerExperienceCase.created_at >= today_start)
+    case_submission_count = session.scalar(select(func.count()).select_from(today_statement.subquery())) or 0
+    ai_call_count = session.scalar(
+        select(func.count()).select_from(
+            today_statement.where(CustomerExperienceCase.ai_answer != "").subquery()
+        )
+    ) or 0
+
+    pending_review_count = session.scalar(
+        select(func.count()).select_from(CustomerExperienceCase).where(
+            CustomerExperienceCase.review_status.in_(
+                (ExperienceCaseReviewStatus.NEW, ExperienceCaseReviewStatus.REVIEWING)
+            )
+        )
+    ) or 0
+    approved_case_count = session.scalar(
+        select(func.count()).select_from(CustomerExperienceCase).where(
+            CustomerExperienceCase.review_status == ExperienceCaseReviewStatus.APPROVED
+        )
+    ) or 0
+    evaluated_case_count = session.scalar(
+        select(func.count()).select_from(CustomerExperienceCase).where(
+            CustomerExperienceCase.evaluation_status == EvaluationStatus.EVALUATED
+        )
+    ) or 0
+
+    status_counts = {
+        status: 0
+        for status in (
+            ExperienceCaseReviewStatus.NEW,
+            ExperienceCaseReviewStatus.REVIEWING,
+            ExperienceCaseReviewStatus.APPROVED,
+        )
+    }
+    for status, count in session.execute(
+        select(CustomerExperienceCase.review_status, func.count(CustomerExperienceCase.id)).group_by(
+            CustomerExperienceCase.review_status
+        )
+    ):
+        if status in status_counts:
+            status_counts[status] = count
+
+    frequent_questions = session.execute(
+        select(CustomerExperienceCase.question, func.count(CustomerExperienceCase.id).label("case_count"))
+        .group_by(CustomerExperienceCase.question)
+        .order_by(func.count(CustomerExperienceCase.id).desc(), CustomerExperienceCase.question.asc())
+        .limit(10)
+    ).all()
+
+    return PilotOperationDashboardResponse(
+        generated_at=generated_at,
+        data_mode="TEST_OR_PILOT",
+        official_operation_report=False,
+        ai_call_measurement="CASE_AI_ANSWER_PROXY",
+        today=PilotTodayCounts(
+            ai_call_count=ai_call_count,
+            case_submission_count=case_submission_count,
+            pending_review_count=pending_review_count,
+            approved_case_count=approved_case_count,
+            evaluated_case_count=evaluated_case_count,
+        ),
+        experience_cases=PilotExperienceCaseCounts(
+            new=status_counts[ExperienceCaseReviewStatus.NEW],
+            reviewing=status_counts[ExperienceCaseReviewStatus.REVIEWING],
+            approved=status_counts[ExperienceCaseReviewStatus.APPROVED],
+            evaluated=evaluated_case_count,
+        ),
+        frequent_questions=[
+            FrequentQuestionItem(question=question, case_count=count)
+            for question, count in frequent_questions
+        ],
     )
 
 

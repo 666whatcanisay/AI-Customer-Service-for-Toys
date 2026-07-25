@@ -14,6 +14,7 @@
       <RouterLink to="/suggestions">Customer suggestions</RouterLink>
       <RouterLink to="/experience-cases">Experience cases</RouterLink>
       <RouterLink to="/ai-optimization-pool">AI optimization pool</RouterLink>
+      <RouterLink to="/pilot-operation-dashboard">Pilot operations</RouterLink>
     </nav>
   </header>
   <p class="test-banner">Internal test administration portal. Formal permissions are not enabled.</p>
