@@ -28,6 +28,17 @@
       show-icon
     />
 
+    <section class="customer-friendly-notice" data-testid="customer-friendly-notice">
+      <strong>测试环境提示</strong>
+      <ul>
+        <li>AI 辅助客服</li>
+        <li>需要人工确认</li>
+        <li>不自动发送</li>
+        <li>不自动退款</li>
+        <li>不修改订单</li>
+      </ul>
+    </section>
+
     <section v-if="showConnectionDetails" class="connection-card" data-testid="connection-details">
       <div data-testid="rag-health-status">
         <span>A 问答服务</span>
@@ -379,14 +390,27 @@
               未采用
             </el-button>
             <el-button
+              v-if="adoption?.type === 'REJECTED'"
+              data-testid="open-ai-feedback"
+              text
+              :disabled="aiFeedbackSubmitting"
+              @click="openAiFeedbackCapture"
+            >
+              ⚑ AI 问题反馈
+            </el-button>
+            <el-button
               data-testid="save-experience-case"
               text
-              :disabled="!adoption || experienceCaseSubmitting"
+              :disabled="!adoption || adoption.type === 'REJECTED' || experienceCaseSubmitting"
               @click="openExperienceCaseCapture"
             >
-              ⭐ 保存经验案例
+              ⭐ 收藏为优秀案例
             </el-button>
           </div>
+          <p class="experience-case-entry-hint">优秀回复用于经验沉淀，帮助系统持续优化。</p>
+          <p v-if="adoption?.type === 'REJECTED'" class="ai-feedback-entry-hint">
+            未采用请通过“AI 问题反馈”单独记录原因，不会进入优秀案例。
+          </p>
           <p v-if="adoptionMessage" class="feedback-result" data-testid="adoption-result">
             {{ adoptionMessage }}
           </p>
@@ -465,6 +489,82 @@
         </footer>
       </section>
 
+      <el-dialog
+        v-model="aiFeedbackDialogOpen"
+        class="ai-feedback-dialog"
+        title="为什么未采用？"
+        width="min(600px, calc(100vw - 32px))"
+        :teleported="false"
+        data-testid="ai-feedback-dialog"
+      >
+        <el-alert
+          title="仅提交去标识化测试反馈"
+          description="请勿填写客户姓名、电话、地址、完整订单号、账号信息或聊天截图。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+        <label class="ai-feedback-field">
+          <span>未采用原因 <em>必选</em></span>
+          <el-select
+            v-model="aiFeedbackType"
+            data-testid="ai-feedback-type"
+            placeholder="请选择原因"
+          >
+            <el-option
+              v-for="option in notAdoptedReasonOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </label>
+        <label v-if="aiFeedbackType === 'OTHER'" class="ai-feedback-field">
+          <span>其他说明 <em>必填</em></span>
+          <el-input
+            v-model="aiFeedbackNote"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            data-testid="ai-feedback-note"
+            placeholder="请填写去标识化、可复现的最小说明"
+          />
+        </label>
+        <label class="ai-feedback-field">
+          <span>最终人工回复 <small>可选；未发送时请留空</small></span>
+          <el-input
+            v-model="aiFeedbackFinalAnswer"
+            type="textarea"
+            :rows="3"
+            maxlength="2000"
+            show-word-limit
+            data-testid="ai-feedback-final-answer"
+            placeholder="只填写实际使用的去标识化人工回复"
+          />
+        </label>
+        <p v-if="aiFeedbackError" class="ai-feedback-error" data-testid="ai-feedback-error">
+          {{ aiFeedbackError }} 未生成本地成功反馈，请检查中台服务后重试。
+        </p>
+        <p v-if="aiFeedbackStatus" class="ai-feedback-success" data-testid="ai-feedback-success">
+          {{ aiFeedbackStatus }}
+        </p>
+        <template #footer>
+          <div class="ai-feedback-dialog-footer">
+            <el-button @click="aiFeedbackDialogOpen = false">取消</el-button>
+            <el-button
+              type="primary"
+              :loading="aiFeedbackSubmitting"
+              :disabled="aiFeedbackSubmitting"
+              data-testid="ai-feedback-submit"
+              @click="submitAiFeedback"
+            >
+              {{ aiFeedbackSubmitting ? '正在提交' : '提交反馈' }}
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
+
     </section>
 
     <section v-else-if="!loading" class="empty-card">
@@ -485,6 +585,7 @@ import { ElMessage } from 'element-plus'
 import { ragClient } from '@/api/ragClient'
 import { platformClient } from '@/api/platformClient'
 import { experienceCaseClient } from '@/api/experienceCaseClient'
+import { aiResponseFeedbackClient } from '@/api/aiResponseFeedbackClient'
 import {
   PlatformClientError,
   toPlatformClientError,
@@ -509,6 +610,11 @@ import {
   EXPERIENCE_CASE_FEEDBACK_TYPES,
   type ExperienceCaseFeedbackType
 } from '@/api/experienceCaseTypes'
+import {
+  NOT_ADOPTED_REASONS,
+  NOT_ADOPTED_REASON_LABELS,
+  type NotAdoptedReason
+} from '@/workspace/adoptionFeedback'
 import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
 import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
 import { useTesterIdentity } from '@/workspace/testerIdentity'
@@ -516,11 +622,11 @@ import { useTesterIdentity } from '@/workspace/testerIdentity'
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
 
 const actionLabels: Record<RagAction, string> = {
-  DIRECT_ANSWER: '可以直接参考',
-  CONTROLLED_ANSWER: '请核对后使用',
+  DIRECT_ANSWER: '🟢 可以参考',
+  CONTROLLED_ANSWER: '🟡 建议确认',
   ASK_CLARIFY: '需要补充信息',
   REQUIRE_LOOKUP: '需要查询系统',
-  TRANSFER_HUMAN: '需要人工处理',
+  TRANSFER_HUMAN: '🔴 建议人工处理',
   REFUSE: '不能作出该承诺'
 }
 
@@ -546,6 +652,11 @@ const experienceCaseFeedbackLabels: Record<ExperienceCaseFeedbackType, string> =
 const experienceCaseFeedbackOptions = EXPERIENCE_CASE_FEEDBACK_TYPES.map((value) => ({
   value,
   label: experienceCaseFeedbackLabels[value]
+}))
+
+const notAdoptedReasonOptions = NOT_ADOPTED_REASONS.map((value) => ({
+  value,
+  label: NOT_ADOPTED_REASON_LABELS[value]
 }))
 
 const platformLabels: Record<string, string> = {
@@ -646,6 +757,13 @@ const experienceCaseError = ref('')
 const experienceCaseStatus = ref('')
 const experienceCaseFinalAnswer = ref('')
 const experienceCaseFeedbackType = ref<ExperienceCaseFeedbackType | ''>('')
+const aiFeedbackDialogOpen = ref(false)
+const aiFeedbackSubmitting = ref(false)
+const aiFeedbackError = ref('')
+const aiFeedbackStatus = ref('')
+const aiFeedbackType = ref<NotAdoptedReason | ''>('')
+const aiFeedbackNote = ref('')
+const aiFeedbackFinalAnswer = ref('')
 const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
@@ -748,9 +866,11 @@ const actionTagType = computed(() =>
     ? 'danger'
     : result.value?.action === 'ASK_CLARIFY' || result.value?.action === 'REQUIRE_LOOKUP'
       ? 'warning'
-      : result.value?.action
-        ? 'primary'
-        : 'info'
+      : result.value?.action === 'DIRECT_ANSWER'
+        ? 'success'
+        : result.value?.action
+          ? 'primary'
+          : 'info'
 )
 
 const riskTagType = computed(() => {
@@ -761,15 +881,25 @@ const riskTagType = computed(() => {
 })
 
 const adoptionMessage = computed(() =>
-  adoption.value
-    ? `已在本页记录：${adoptionLabels[adoption.value.type]}。未发送到远端反馈服务。`
-    : ''
+  !adoption.value
+    ? ''
+    : adoption.value.type === 'REJECTED'
+      ? aiFeedbackStatus.value
+        ? '已在本页记录：未采用。AI 问题反馈已独立提交。'
+        : '已在本页记录：未采用。可通过“AI 问题反馈”单独提交原因。'
+      : `已在本页记录：${adoptionLabels[adoption.value.type]}。未发送到远端反馈服务。`
 )
 
 const clearAnswer = () => {
   result.value = null
   replyDraft.value = ''
   adoption.value = null
+  aiFeedbackDialogOpen.value = false
+  aiFeedbackType.value = ''
+  aiFeedbackNote.value = ''
+  aiFeedbackFinalAnswer.value = ''
+  aiFeedbackError.value = ''
+  aiFeedbackStatus.value = ''
   copyStatus.value = 'idle'
   requestError.value = ''
 }
@@ -1036,6 +1166,12 @@ const recordAdoption = (type: AdoptionType) => {
     originalAnswer,
     finalAnswer
   }
+  aiFeedbackDialogOpen.value = false
+  aiFeedbackType.value = ''
+  aiFeedbackNote.value = ''
+  aiFeedbackFinalAnswer.value = ''
+  aiFeedbackError.value = ''
+  aiFeedbackStatus.value = ''
   ElMessage.success('已记录本页反馈')
 }
 
@@ -1049,6 +1185,60 @@ const openExperienceCaseCapture = () => {
   experienceCaseFinalAnswer.value = adoption.value.finalAnswer
   experienceCaseFeedbackType.value = ''
   experienceCaseDialogOpen.value = true
+}
+
+const openAiFeedbackCapture = () => {
+  if (!result.value || adoption.value?.type !== 'REJECTED') {
+    ElMessage.warning('请先选择“未采用”后再记录 AI 问题反馈')
+    return
+  }
+  aiFeedbackError.value = ''
+  aiFeedbackStatus.value = ''
+  aiFeedbackType.value = ''
+  aiFeedbackNote.value = ''
+  aiFeedbackFinalAnswer.value = ''
+  aiFeedbackDialogOpen.value = true
+}
+
+const submitAiFeedback = async () => {
+  if (!result.value || adoption.value?.type !== 'REJECTED' || aiFeedbackSubmitting.value) return
+
+  const question = customerQuestion.value.trim()
+  const aiAnswer = result.value.answer.trim()
+  if (!question || !aiAnswer) {
+    aiFeedbackError.value = '缺少当前问题或 AI 回复，无法提交反馈。'
+    return
+  }
+  if (!aiFeedbackType.value) {
+    aiFeedbackError.value = '请选择未采用原因后再提交。'
+    return
+  }
+  if (aiFeedbackType.value === 'OTHER' && !aiFeedbackNote.value.trim()) {
+    aiFeedbackError.value = '选择“其他”时请填写去标识化说明。'
+    return
+  }
+
+  aiFeedbackSubmitting.value = true
+  aiFeedbackError.value = ''
+  aiFeedbackStatus.value = ''
+  try {
+    await aiResponseFeedbackClient.submit({
+      storeCode: result.value.context.store_code,
+      productId: result.value.context.product_id,
+      skuId: result.value.context.sku_id,
+      question,
+      aiAnswer,
+      feedbackType: aiFeedbackType.value,
+      feedbackNote: aiFeedbackType.value === 'OTHER' ? aiFeedbackNote.value.trim() : null,
+      finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
+      createdBy: identity.value.reporterId
+    })
+    aiFeedbackStatus.value = '反馈已记录。'
+  } catch (error) {
+    aiFeedbackError.value = error instanceof Error ? error.message : 'AI 问题反馈服务当前不可用。'
+  } finally {
+    aiFeedbackSubmitting.value = false
+  }
 }
 
 const submitExperienceCase = async () => {
@@ -1314,6 +1504,21 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .feedback-actions { display: flex; flex-wrap: wrap; margin: 16px 12px 14px 0; }
 .feedback-section > .el-button { vertical-align: top; margin-top: 16px; }
 .feedback-result { margin-top: 12px; color: #246b3f !important; font-weight: 700; }
+.experience-case-entry-hint { margin-top: -2px !important; color: #47705d !important; }
+.ai-feedback-entry-hint { margin-top: 8px !important; color: #315fbd !important; }
+.customer-friendly-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 14px;
+  padding: 10px 14px;
+  border: 1px solid #c8d9f3;
+  border-radius: 12px;
+  background: #f4f8ff;
+  color: #294d84;
+  font-size: 12px;
+}
+.customer-friendly-notice ul { display: flex; flex-wrap: wrap; gap: 5px 14px; margin: 0; padding-left: 18px; }
 
 @keyframes pulse {
   0%, 100% { opacity: 0.45; transform: scale(0.88); }
@@ -1751,4 +1956,13 @@ h2 {
 .experience-case-field { display: grid; gap: 7px; font-size: 13px; font-weight: 700; }
 .experience-case-error { margin-top: 14px; color: #b83b32 !important; }
 .experience-case-success { margin-top: 14px; color: #1c6a49 !important; font-weight: 700; }
+.ai-feedback-dialog { margin-top: 16px; padding: 20px; border: 1px solid #f0c57c; border-radius: 12px; background: #fffdf8; box-shadow: 0 8px 24px rgb(90 62 23 / 12%); }
+.ai-feedback-dialog-header, .ai-feedback-dialog-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-feedback-dialog-header h3 { margin: 0; font-size: 18px; }
+.ai-feedback-dialog-footer { justify-content: flex-end; margin-top: 18px; }
+.ai-feedback-field { display: grid; gap: 7px; margin-top: 16px; font-size: 13px; font-weight: 700; }
+.ai-feedback-field em { color: #c33d35; font-style: normal; }
+.ai-feedback-field small { color: #748198; font-weight: 400; }
+.ai-feedback-error { margin-top: 14px; color: #b83b32 !important; }
+.ai-feedback-success { margin-top: 14px; color: #1c6a49 !important; font-weight: 700; }
 </style>

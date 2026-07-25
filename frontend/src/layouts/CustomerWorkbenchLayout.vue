@@ -134,6 +134,35 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="pilotGuideOpen"
+      title="AI客服助手（测试版）"
+      width="min(560px, calc(100vw - 32px))"
+      data-testid="pilot-guide-dialog"
+      @close="dismissPilotGuide"
+    >
+      <p class="pilot-guide-intro">这是辅助客服工具，请按以下流程完成一条建议回复。</p>
+      <ol class="pilot-guide-steps">
+        <li>选择商品 / SKU</li>
+        <li>输入客户问题</li>
+        <li>查看 AI 建议</li>
+        <li>人工确认后复制发送</li>
+        <li>好回复可以收藏为优秀案例</li>
+      </ol>
+      <el-alert
+        title="AI 建议需要人工确认"
+        description="系统不会自动发送消息、自动退款或修改订单。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <template #footer>
+        <el-button type="primary" data-testid="pilot-guide-start" @click="dismissPilotGuide">
+          我知道了，开始使用
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -150,6 +179,7 @@ const route = useRoute()
 const mobileMenuOpen = ref(false)
 const identityDialogOpen = ref(false)
 const identityError = ref('')
+const pilotGuideOpen = ref(false)
 const identityStore = createTesterIdentityStore()
 const identity = identityStore.identity
 const systemStatus = createSystemStatusStore()
@@ -161,6 +191,25 @@ const identityDraft = reactive({
   reporterName: identity.value.reporterName,
   defaultStoreCode: identity.value.defaultStoreCode
 })
+
+const PILOT_GUIDE_STORAGE_KEY = 'mumu-customer-workspace:pilot-guide-seen'
+
+const shouldShowPilotGuide = () => {
+  try {
+    return globalThis.localStorage?.getItem(PILOT_GUIDE_STORAGE_KEY) !== 'true'
+  } catch {
+    return true
+  }
+}
+
+const dismissPilotGuide = () => {
+  pilotGuideOpen.value = false
+  try {
+    globalThis.localStorage?.setItem(PILOT_GUIDE_STORAGE_KEY, 'true')
+  } catch {
+    // A restricted browser can show the safety guide again next time.
+  }
+}
 
 const currentTitle = computed(() => String(route.meta.title ?? '客服智能工作台'))
 
@@ -183,6 +232,7 @@ const saveIdentity = () => {
   identityStore.save(identityDraft.reporterName, identityDraft.defaultStoreCode)
   identityError.value = ''
   identityDialogOpen.value = false
+  pilotGuideOpen.value = shouldShowPilotGuide()
 }
 
 watch(() => route.fullPath, closeMobileMenu)
@@ -192,6 +242,7 @@ onMounted(() => {
   identityDraft.reporterName = identity.value.reporterName
   identityDraft.defaultStoreCode = identity.value.defaultStoreCode
   identityDialogOpen.value = !identity.value.reporterName
+  pilotGuideOpen.value = Boolean(identity.value.reporterName) && shouldShowPilotGuide()
   void systemStatus.refresh()
 })
 </script>
@@ -422,6 +473,8 @@ onMounted(() => {
 .identity-field em { color: #c33d35; font-style: normal; font-size: 12px; }
 .identity-field small { color: #748198; font-weight: 400; }
 .identity-error { margin: 12px 0 0; color: #c33d35; font-size: 13px; }
+.pilot-guide-intro { margin: 0 0 12px; color: #52627a; }
+.pilot-guide-steps { display: grid; gap: 9px; margin: 0 0 18px; padding-left: 24px; color: #203555; line-height: 1.5; }
 .mobile-mask { display: none; }
 
 @media (max-width: 980px) {

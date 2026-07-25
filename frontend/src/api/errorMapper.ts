@@ -35,6 +35,25 @@ export class PlatformClientError extends Error {
   }
 }
 
+export type AiResponseFeedbackErrorKind =
+  | 'canceled'
+  | 'timeout'
+  | 'validation'
+  | 'unavailable'
+  | 'contract'
+  | 'unknown'
+
+export class AiResponseFeedbackClientError extends Error {
+  constructor(
+    public readonly kind: AiResponseFeedbackErrorKind,
+    message: string,
+    public readonly status: number | null = null
+  ) {
+    super(message)
+    this.name = 'AiResponseFeedbackClientError'
+  }
+}
+
 const recordValue = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null
 
@@ -122,5 +141,48 @@ export const toPlatformClientError = (error: unknown): PlatformClientError => {
   return new PlatformClientError(
     'unknown',
     error instanceof Error ? error.message : 'C 目录服务发生未知错误'
+  )
+}
+
+export const toAiResponseFeedbackClientError = (error: unknown): AiResponseFeedbackClientError => {
+  if (error instanceof AiResponseFeedbackClientError) return error
+  if (error instanceof PlatformAdapterError) {
+    return new AiResponseFeedbackClientError('contract', error.message)
+  }
+  if (axios.isCancel(error)) {
+    return new AiResponseFeedbackClientError('canceled', 'AI 问题反馈已取消')
+  }
+
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status ?? null
+    const code = responseCode(error.response?.data)
+    const detail = responseMessage(error.response?.data)
+    if (error.code === 'ECONNABORTED') {
+      return new AiResponseFeedbackClientError('timeout', 'AI 问题反馈请求超时，请稍后重试', status)
+    }
+    if (code === 'AI_RESPONSE_FEEDBACK_VALIDATION_FAILED' || status === 422) {
+      return new AiResponseFeedbackClientError(
+        'validation',
+        detail ?? 'AI 问题反馈不符合冻结接口要求',
+        status
+      )
+    }
+    if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
+      return new AiResponseFeedbackClientError(
+        'unavailable',
+        detail ?? 'AI 问题反馈服务当前不可用，请稍后重试',
+        status
+      )
+    }
+    return new AiResponseFeedbackClientError(
+      'unknown',
+      detail ?? error.message ?? 'AI 问题反馈请求失败',
+      status
+    )
+  }
+
+  return new AiResponseFeedbackClientError(
+    'unknown',
+    error instanceof Error ? error.message : 'AI 问题反馈服务发生未知错误'
   )
 }
