@@ -175,3 +175,33 @@ class AdminOverviewResponse(BaseModel):
     recent_imported_at: datetime | None
     test_data_mode: bool
     production_usable: bool
+
+
+class PilotTodayCounts(BaseModel):
+    ai_call_count: int
+    case_submission_count: int
+    pending_review_count: int
+    approved_case_count: int
+    evaluated_case_count: int
+
+
+class PilotExperienceCaseCounts(BaseModel):
+    new: int
+    reviewing: int
+    approved: int
+    evaluated: int
+
+
+class FrequentQuestionItem(BaseModel):
+    question: str
+    case_count: int
+
+
+class PilotOperationDashboardResponse(BaseModel):
+    generated_at: datetime
+    data_mode: str
+    official_operation_report: bool
+    ai_call_measurement: str
+    today: PilotTodayCounts
+    experience_cases: PilotExperienceCaseCounts
+    frequent_questions: list[FrequentQuestionItem]

@@ -178,6 +178,30 @@ export interface AdminOverview {
   production_usable: boolean
 }
 
+export interface PilotOperationDashboard {
+  generated_at: string
+  data_mode: 'TEST_OR_PILOT'
+  official_operation_report: false
+  ai_call_measurement: 'CASE_AI_ANSWER_PROXY'
+  today: {
+    ai_call_count: number
+    case_submission_count: number
+    pending_review_count: number
+    approved_case_count: number
+    evaluated_case_count: number
+  }
+  experience_cases: {
+    new: number
+    reviewing: number
+    approved: number
+    evaluated: number
+  }
+  frequent_questions: Array<{
+    question: string
+    case_count: number
+  }>
+}
+
 export interface AdminStore {
   store_code: string
   store_name: string
@@ -315,6 +339,11 @@ export type AdminResource =
 
 export async function getAdminOverview(): Promise<AdminOverview> {
   const response = await apiClient.get<AdminOverview>('/api/v1/admin/overview')
+  return response.data
+}
+
+export async function getPilotOperationDashboard(): Promise<PilotOperationDashboard> {
+  const response = await apiClient.get<PilotOperationDashboard>('/api/v1/admin/pilot-operation-dashboard')
   return response.data
 }
 

@@ -4,14 +4,14 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "MVP-PLUS-01",
-  "current_stage": "Customer experience case center and human review workflow",
-  "current_gate": "C local implementation and verification PASS; Draft PR #30 open against develop",
+  "current_task": "MVP-PLUS-02",
+  "current_stage": "Customer-service pilot operations observation dashboard",
+  "current_gate": "C local implementation and verification PASS; stacked Draft PR pending",
   "status": "ready_for_review",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "Frozen task interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
-    "Additive B submission/status projection and A approved-snapshot/evaluation-evidence paths; affected-line review required before any later shared-contract promotion."
+    "MVP-PLUS-01 frozen interface remains unchanged in docs/control/interfaces/experience-case.v1-draft.md",
+    "MVP-PLUS-02 adds only a C-owned read-only administration projection; no new cross-line or shared-contract interface."
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -25,32 +25,27 @@
     "contracts/**"
   ],
   "entrypoints": [
-    "platform_backend/app/main.py:app",
-    "platform_backend/app/api/customer_experience_case_routes.py",
-    "platform_backend/app/api/admin_experience_case_routes.py",
-    "platform_backend/app/experience_cases/models.py",
-    "platform_backend/migrations/versions/0004_mvp_plus_01_experience_cases.py",
-    "admin_web/src/views/CustomerExperienceCasesView.vue",
-    "admin_web/src/views/AiOptimizationPoolView.vue"
+    "platform_backend/app/api/admin_routes.py:get_pilot_operation_dashboard",
+    "platform_backend/app/admin/schemas.py:PilotOperationDashboardResponse",
+    "platform_backend/tests/test_pilot_operation_dashboard.py",
+    "admin_web/src/views/PilotOperationDashboardView.vue",
+    "admin_web route: /pilot-operation-dashboard"
   ],
   "provided_interfaces": [
-    "POST/GET /api/v1/customer-experience-cases",
-    "GET /api/v1/admin/ai-optimization/cases/export",
-    "POST /api/v1/admin/ai-optimization/evaluation-results",
-    "C-owned internal Admin review/list/detail and AI optimization pool endpoints",
+    "GET /api/v1/admin/pilot-operation-dashboard",
+    "Existing MVP-PLUS-01 experience-case, review, export, and evaluation interfaces (unchanged)",
     "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
   "required_interfaces": [
-    "B consumes only the frozen C submission/status projection",
-    "A consumes only C-approved snapshots and posts structured matching evaluation evidence",
-    "No direct A/C database access or cross-line automatic action"
+    "Existing C-owned CustomerExperienceCase persistence from stacked MVP-PLUS-01 branch",
+    "No B/A service, direct database, or shared-contract dependency added by MVP-PLUS-02"
   ],
   "cross_line_compatibility": {
-    "affected_lines": ["B", "A"],
-    "change": "MVP-PLUS-01 additive frozen paths only; existing paths and shared contract version remain unchanged.",
+    "affected_lines": [],
+    "change": "MVP-PLUS-02 is C-only and read-only; it preserves the inherited MVP-PLUS-01 B/A paths without changing them.",
     "shared_contract_version": "0.1.0 unchanged",
-    "database_change": true,
-    "verified": "C API lifecycle/export/evidence tests; B/A integration remains consumer-owned follow-up."
+    "database_change": false,
+    "verified": "Pilot dashboard API test and admin-web view test use existing C experience-case data only."
   },
   "data_boundaries": {
     "source": "Synthetic local test values only",
@@ -58,9 +53,8 @@
     "attachment_binary_stored": false,
     "case_content_logged": false,
     "automatic_redaction_enabled": false,
-    "raw_rtf_returned": false,
-    "published_to_a_line": false,
-    "a_b_live_integration_claimed": false,
+    "pilot_dashboard_raw_question_visible": true,
+    "pilot_dashboard_official_report": false,
     "formal_permissions_enabled": false,
     "automatic_training_enabled": false,
     "prompt_change_enabled": false,
@@ -68,7 +62,7 @@
     "customer_message_enabled": false,
     "order_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-25 MVP-PLUS-01: backend pytest 67 passed (one existing upstream TestClient deprecation warning); isolated SQLite Alembic upgrade -> downgrade 0003_ct05_customer_suggestions -> upgrade reached 0004_mvp_plus_01_experience_cases; admin_web Vitest 27 passed and Vite production build/typecheck passed. Temporary SQLite database and pnpm cache artifacts were removed.",
+  "last_test_result": "2026-07-25 MVP-PLUS-02: backend pytest 68 passed (one existing upstream TestClient deprecation warning); isolated SQLite Alembic upgrade -> downgrade 0003_ct05_customer_suggestions -> upgrade reached 0004_mvp_plus_01_experience_cases; admin_web Vitest 28 passed and Vite production build/typecheck passed. The temporary SQLite database was removed.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0003_ct05_customer_suggestions; upgrade head",
@@ -76,22 +70,23 @@
   ],
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
-    "Experience-case text is not logged by the new modules, but v1-reminder-only is a pre-submission reminder and not automatic redaction.",
-    "A evaluation evidence is stored only after snapshot matching; C does not verify an A identity in this baseline.",
+    "Pilot AI-call count is CASE_AI_ANSWER_PROXY, not production AI request telemetry; its service day is UTC and question frequency is exact-string grouping only.",
+    "The pilot page exposes raw case questions to an unauthenticated internal-test administrator; v1-reminder-only is not automatic redaction.",
     "CORS is not authentication or authorization."
   ],
   "out_of_scope": [
-    "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes",
+    "New business records, complex analytics, production telemetry, automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes",
     "Formal login, roles, retention, access audit, and production data",
     "A/B business code and shared contract changes"
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-mvp-plus-01",
-    "base": "origin/develop 271c15520dd7bf91ad8bfa26cad784d3b780e376",
-    "commit": "5394dbe6c66a3c39324d39f9326f310317f4ff0c",
-    "draft_pr": "#30 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/30"
+    "branch": "agent/platform-mvp-plus-02",
+    "base": "agent/platform-mvp-plus-01 4cc48e0d6b269b7897386c2e53805f336af62f95",
+    "parent_draft_pr": "#30 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/30",
+    "commit": null,
+    "draft_pr": null
   },
-  "next_recommended_task": "Review Draft PR #30. Do not enable consumer integration, formal security claims, or automatic actions without separate approval.",
+  "next_recommended_task": "Create a stacked Draft PR targeting agent/platform-mvp-plus-01. Retarget after PR #30 merges.",
   "last_updated": "2026-07-25"
 }
