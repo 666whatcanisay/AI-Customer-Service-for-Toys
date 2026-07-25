@@ -4,9 +4,9 @@
 
 ## 当前任务
 
-- 任务：B-T05-LONG 客服工作台平台壳与意见建议闭环。
+- 任务：B-T05-C-INTEROP-VERIFY。
 - 分支：`agent/customer-platform-shell-t05`，基线 `origin/develop@36ec2d326d1613f62cb647ad9ef5835315e4db21`。
-- 状态：前端实现、测试和 production build 已完成；C 建议接口尚未发布，真实建议联调为 `ENV_BLOCKED`。
+- 状态：前端实现、测试和 production build 已完成；C-T05 真实建议端点可调用，但响应标识字段与 B 冻结 adapter 不兼容，联调为 `BLOCKED`。
 
 ## 允许范围
 
@@ -56,12 +56,13 @@ Node：`v24.14.0`。
 
 - A `GET http://127.0.0.1:8000/api/health`：HTTP 200。
 - C `GET http://127.0.0.1:8011/health`：HTTP 200。
-- C `GET /api/v1/customer-suggestions?reporter_id=TESTER-CONTRACT-PROBE`：HTTP 404。
+- C-T05 在隔离临时 SQLite 服务（`127.0.0.1:8013`）上：POST HTTP 201、`status=SUBMITTED`；GET HTTP 200、`items`、`total`。
+- POST 响应和列表项均为 `id`，不含 B adapter 要求的 `suggestion_id`。
 
-因此不能声明意见建议真实联调通过；待 C 发布冻结端点后再做 POST/GET smoke，不得用 Mock 冒充。
+因此不能声明意见建议真实联调通过；需由 C 提供兼容字段或走经批准的版本化跨线变更，不得用宽松前端映射或 Mock 冒充。
 
 ## 已知风险与交接
 
-- C 建议端点 404 是当前唯一交付阻塞，前端代码审查和回归验证不受影响。
+- C 建议端点响应中的 `id`/`suggestion_id` 字段不兼容是当前唯一交付阻塞，前端代码审查和回归验证不受影响。
 - production chunk 大于 500 kB；本任务不进行依赖升级或拆包重构。
 - 下一任务不得自动实现退款、补发、浏览器扩展、快麦或自动发送。
