@@ -25,7 +25,8 @@ try {
 
     Assert-RagVirtualEnvironment $config
     Assert-Dependencies $config
-    $services = @(@{Name='platform';Port=$config.PlatformPort},@{Name='rag';Port=$config.RagPort},@{Name='customer-web';Port=$config.CustomerWebPort})
+    Assert-AdminWebDependencies $config | Out-Null
+    $services = @(@{Name='platform';Port=$config.PlatformPort},@{Name='rag';Port=$config.RagPort},@{Name='customer-web';Port=$config.CustomerWebPort},@{Name='admin-web';Port=$config.AdminWebPort})
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })
     if ($alreadyRunning.Count -eq $services.Count) {
         Write-Host "局域网 AI 客服已运行：$($config.CustomerWebUrl)" -ForegroundColor Green
@@ -57,13 +58,17 @@ try {
     Start-ManagedServiceWithEnvironment $config 'customer-web' (Get-Command node.exe).Source @($vite,'--host',$config.CustomerWebBindAddress,'--port',$config.CustomerWebPort,'--strictPort') (Join-Path $config.RepositoryRoot 'frontend') 'vite.js' $config.CustomerWebPort $frontendEnvironment | Out-Null
     $startedServices += 'customer-web'
     Wait-HttpOk $config.CustomerWebUrl 45 '客服页面'
+    Start-AdminWebService $config | Out-Null
+    $startedServices += 'admin-web'
 
     Write-Host '局域网 AI 客服已启动。' -ForegroundColor Green
     Write-Host "局域网页面：$($config.CustomerWebUrl)"
+    Write-Host "运营后台（默认仅服务器本机）：$($config.AdminWebUrl)"
     Write-Host "前端 API：RAG=$($frontendEnvironment.VITE_RAG_API_BASE_URL)；平台=$($frontendEnvironment.VITE_PLATFORM_API_BASE_URL)"
     Write-Host 'API 模式：SAME_ORIGIN_PROXY（浏览器仅连接 5173；A/C 只监听 127.0.0.1）'
     Write-Host "日志目录：$(Get-ServiceLogDirectory $config)"
     if ([bool]$config.OpenBrowser) { Start-Process $config.CustomerWebUrl }
+    if ([bool]$config.AdminOpenBrowser) { Start-Process $config.AdminWebUrl }
 } catch {
     Write-Error $_
     if ($null -ne $config) { Write-StartupFailureSummary $config $startedServices }

@@ -39,3 +39,8 @@
 
 - 起始基线 `844dbe6955a659ed525c6a13effe5d0859656ca3` 与 `origin/develop` 一致；本任务未修改业务代码、依赖、数据库、迁移或 `.runtime` 以外的运行数据。
 - 按一次性授权重新核验 PID `21816` 后，没有满足任务规定的 C Worktree 可执行路径条件，且 5173 已存在本地已建立连接。恢复 Gate 阻断，未发生进程停止或 Git 业务提交。
+
+## 2026-07-24 OPS-T05 管理后台运行接入
+
+- 独立 Worktree `C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS-admin-runtime-t05` 从最新 `origin/develop` 的 `36ec2d326d1613f62cb647ad9ef5835315e4db21` 创建，分支为 `control/admin-runtime-t05`。
+- 变更只限 `scripts/windows/**`、`docs/control/**`；未修改 `.env`、运行记录、依赖、A/B/C 业务代码或共享 contracts。Draft PR 与合并均尚未执行。

@@ -23,6 +23,13 @@ function Get-LocalConfig([string]$ConfigPath) {
         LanBindAddress = '0.0.0.0'
         LanAdvertisedHost = ''
         AllowPublicNetwork = $false
+        # The management UI remains loopback-only unless an operator explicitly
+        # opts into LAN exposure. This launcher never changes firewall rules.
+        AdminWebPort = 5174
+        AdminWebBindAddress = '127.0.0.1'
+        AdminWebUrl = 'http://127.0.0.1:5174/'
+        AdminEnableLanMode = $false
+        AdminOpenBrowser = $false
     }
     foreach ($entry in $optionalDefaults.GetEnumerator()) {
         if (-not $config.ContainsKey($entry.Key) -or $null -eq $config[$entry.Key] -or [string]::IsNullOrWhiteSpace([string]$config[$entry.Key])) {
@@ -36,12 +43,12 @@ function Get-LocalConfig([string]$ConfigPath) {
     foreach ($directory in @('backend','frontend','platform_backend')) { if (-not (Test-Path -LiteralPath (Join-Path $root $directory))) { throw "RepositoryRoot 不含 $directory：$root" } }
     $config.RepositoryRoot = $root
     if ([string]::IsNullOrWhiteSpace([string]$config.RuntimeDirectory)) { $config.RuntimeDirectory = Join-Path $root '.runtime' }
-    foreach ($name in @('RagPort','CustomerWebPort','PlatformPort')) {
+    foreach ($name in @('RagPort','CustomerWebPort','PlatformPort','AdminWebPort')) {
         $port = 0
         if (-not [int]::TryParse([string]$config[$name], [ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw "$name 必须为 1-65535 的端口。" }
         $config[$name] = $port
     }
-    if ((@($config.RagPort,$config.CustomerWebPort,$config.PlatformPort) | Select-Object -Unique).Count -ne 3) { throw '三个服务端口必须不同。' }
+    if ((@($config.RagPort,$config.CustomerWebPort,$config.PlatformPort,$config.AdminWebPort) | Select-Object -Unique).Count -ne 4) { throw '四个服务端口必须不同。' }
     foreach ($pathKey in @('RagPythonPath','PlatformPythonPath')) { if (-not (Test-Path -LiteralPath $config[$pathKey])) { throw "$pathKey 不存在：$($config[$pathKey])" } }
     if (-not (Get-Command $config.PnpmCommand -ErrorAction SilentlyContinue) -and -not (Test-Path -LiteralPath $config.PnpmCommand)) { throw "PnpmCommand 不可用：$($config.PnpmCommand)" }
     if (@($config.CorsAllowedOrigins).Count -eq 0) { throw 'CorsAllowedOrigins 至少要有一个来源。' }
@@ -57,11 +64,29 @@ function Get-LocalConfig([string]$ConfigPath) {
     foreach ($key in @('PlatformDatabaseUrl', 'TestKnowledgePackageId')) {
         if ([string]::IsNullOrWhiteSpace([string]$config[$key])) { throw "配置项 $key 缺失或为空。" }
     }
-    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork')) {
+    try {
+        $adminWebUri = [uri]$config.AdminWebUrl
+        if (-not $adminWebUri.IsAbsoluteUri -or $adminWebUri.Scheme -notin @('http', 'https') -or [string]::IsNullOrWhiteSpace($adminWebUri.Host) -or $adminWebUri.Port -ne [int]$config.AdminWebPort) {
+            throw 'invalid'
+        }
+        $config.AdminWebUrl = $adminWebUri.AbsoluteUri
+    } catch {
+        throw "AdminWebUrl 必须是与 AdminWebPort 一致的有效 http(s) 地址：$($config.AdminWebUrl)"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$config.AdminWebBindAddress)) { throw 'AdminWebBindAddress 不能为空。' }
+    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser')) {
         if ($config[$key] -isnot [bool]) {
             $parsed = $false
             if (-not [bool]::TryParse([string]$config[$key], [ref]$parsed)) { throw "配置项 $key 必须为 true 或 false。" }
             $config[$key] = $parsed
+        }
+    }
+    if (-not [bool]$config.AdminEnableLanMode) {
+        if ([string]$config.AdminWebBindAddress -notin @('127.0.0.1', '::1', 'localhost')) {
+            throw 'AdminEnableLanMode=false 时 AdminWebBindAddress 必须是本机回环地址。'
+        }
+        if ($adminWebUri.Host -notin @('127.0.0.1', '::1', 'localhost')) {
+            throw 'AdminEnableLanMode=false 时 AdminWebUrl 必须是本机回环地址。'
         }
     }
     return $config
@@ -369,6 +394,13 @@ function Get-ManagedServiceHealthUrl($Config, [string]$Name, [int]$FallbackPort 
         $path = if ($Config.ContainsKey('RagHealthPath')) { [string]$Config.RagHealthPath } else { '/api/health' }
         return "http://${bindAddress}:$port$path"
     }
+    if ($Name -eq 'admin-web') {
+        if ($Config.ContainsKey('AdminWebUrl') -and -not [string]::IsNullOrWhiteSpace([string]$Config.AdminWebUrl)) { return [string]$Config.AdminWebUrl }
+        $port = if ($Config.ContainsKey('AdminWebPort')) { [int]$Config.AdminWebPort } else { $FallbackPort }
+        $adminBindAddress = if ($Config.ContainsKey('AdminWebBindAddress')) { [string]$Config.AdminWebBindAddress } else { '127.0.0.1' }
+        if ($adminBindAddress -in @('0.0.0.0', '::', '')) { $adminBindAddress = '127.0.0.1' }
+        return "http://${adminBindAddress}:$port/"
+    }
     # Test helpers may register a deliberately unknown service name to verify
     # that a tampered record cannot stop it. Its record still needs a harmless
     # loopback URL; normal launchers only use the three standard names above.
@@ -376,6 +408,10 @@ function Get-ManagedServiceHealthUrl($Config, [string]$Name, [int]$FallbackPort 
 }
 
 function Get-ManagedServiceExpectedListenerAddress($Config, [string]$Name, [int]$Port) {
+    if ($Name -eq 'admin-web') {
+        $address = if ($Config.ContainsKey('AdminWebBindAddress')) { [string]$Config.AdminWebBindAddress } else { '127.0.0.1' }
+        return "${address}:$Port"
+    }
     if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) {
         return Get-LanServiceListenerAddress $Config $Port
     }
@@ -387,6 +423,17 @@ function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
     $record = Test-RecordedProcess $Config $Name
     if (-not $record -or -not $record.Valid) { return $false }
     $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    if ($Name -eq 'admin-web') {
+        $owners = @(if ($listeners.Count -gt 0) { @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) } else { @(Get-PortOwner $Port) })
+        $listenerPid = if ($record.Record.PSObject.Properties.Name -contains 'listener_pid') { [int]$record.Record.listener_pid } else { 0 }
+        if ($owners.Count -ne 1 -or $owners[0] -ne $listenerPid) { return $false }
+        if ($listeners.Count -gt 0) {
+            $expected = Get-ManagedServiceExpectedListenerAddress $Config $Name $Port
+            $expectedHost = $expected.Substring(0, $expected.LastIndexOf(':'))
+            if (@($listeners | Where-Object { [string]$_.LocalAddress -eq $expectedHost }).Count -ne $listeners.Count) { return $false }
+        }
+        return Test-HttpOk (Get-ManagedServiceHealthUrl $Config $Name $Port)
+    }
     if ($listeners.Count -eq 0) { return $false }
     $owners = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)
     if (@($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -ne $owners.Count) { return $false }
@@ -419,6 +466,16 @@ function Get-ProcessIdentitySummary([int]$Id) {
     return "PID $Id；路径：$path；命令：$command"
 }
 
+function Get-CommandFeatureSha256([string]$Value) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $sha.Dispose()
+    }
+}
+
 function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
     $path = Get-ServiceRecordPath $Config $Name
     if (-not (Test-Path -LiteralPath $path)) { return $null }
@@ -434,22 +491,115 @@ function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
     $recordedStart = ([datetime]$record.startedUtc).ToUniversalTime().ToString('o')
     $sameStart = $process.StartTime.ToUniversalTime().ToString('o') -eq $recordedStart
     $sameParent = $true
-    if ($record.PSObject.Properties.Name -contains 'parentProcessId') {
+    if ($record.PSObject.Properties.Name -contains 'parentProcessId' -and [int]$record.parentProcessId -gt 0) {
         $sameParent = $metadata -and [int]$metadata.ParentProcessId -eq [int]$record.parentProcessId
     }
-    if ($sameExecutable -and $sameStart -and $sameParent -and ($hasFeature -or -not $canVerifyCommandLine)) {
+    $featureIntegrity = -not ($record.PSObject.Properties.Name -contains 'commandFeatureSha256') -or [string]$record.commandFeatureSha256 -eq (Get-CommandFeatureSha256 ([string]$record.commandFeature))
+    $adminRecordValid = $true
+    if ($Name -eq 'admin-web') {
+        $requiredAdminFields = @('service_name','managed_pid','listener_pid','parent_pid','creation_time','executable_path','command_summary','working_directory','bind_address','port','url','started_at')
+        $adminRecordValid = @($requiredAdminFields | Where-Object { $record.PSObject.Properties.Name -notcontains $_ }).Count -eq 0
+        if ($adminRecordValid) {
+            $listenerPid = 0
+            $adminRecordValid =
+                [int]::TryParse([string]$record.listener_pid, [ref]$listenerPid) -and $listenerPid -gt 0 -and
+                [string]$record.service_name -eq 'admin-web' -and
+                [int]$record.managed_pid -eq [int]$record.pid -and
+                [int]$record.parent_pid -eq [int]$record.parentProcessId -and
+                [string]$record.executable_path -eq [string]$record.executablePath -and
+                [string]$record.command_summary -eq [string]$record.commandSummary -and
+                [string]$record.working_directory -eq [string]$record.workingDirectory -and
+                [string]$record.started_at -eq [string]$record.startedUtc -and
+                [int]$record.port -eq [int]$Config.AdminWebPort -and
+                [string]$record.bind_address -eq [string]$Config.AdminWebBindAddress -and
+                [string]$record.url -eq [string]$Config.AdminWebUrl -and
+                [IO.Path]::GetFullPath([string]$record.working_directory) -eq [IO.Path]::GetFullPath((Join-Path $Config.RepositoryRoot 'admin_web'))
+            if ($adminRecordValid) {
+                $listenerOwners = @(Get-PortOwner ([int]$record.port))
+                $listenerProcess = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
+                $listenerMetadata = if ($listenerProcess) { Get-ProcessMetadata $listenerPid } else { $null }
+                $listenerPath = if ($listenerMetadata -and -not [string]::IsNullOrWhiteSpace([string]$listenerMetadata.ExecutablePath)) { [string]$listenerMetadata.ExecutablePath } elseif ($listenerProcess) { [string]$listenerProcess.Path } else { '' }
+                $listenerStartMatches = $listenerProcess -and $record.PSObject.Properties.Name -contains 'listener_started_at' -and $listenerProcess.StartTime.ToUniversalTime().ToString('o') -eq [string]$record.listener_started_at
+                $listenerPathMatches = $record.PSObject.Properties.Name -contains 'listener_executable_path' -and -not [string]::IsNullOrWhiteSpace($listenerPath) -and [string]::Equals([IO.Path]::GetFullPath($listenerPath), [IO.Path]::GetFullPath([string]$record.listener_executable_path), [StringComparison]::OrdinalIgnoreCase)
+                $adminRecordValid = $listenerOwners -contains $listenerPid -and $listenerStartMatches -and $listenerPathMatches
+            }
+        }
+    }
+    if ($sameExecutable -and $sameStart -and $sameParent -and ($hasFeature -or -not $canVerifyCommandLine) -and $featureIntegrity -and $adminRecordValid) {
         $reason = if ($hasFeature) { '已验证' } else { '已验证（系统未公开命令行，使用可执行路径和启动时间）' }
         return [pscustomobject]@{ Valid = $true; Reason = $reason; Record = $record; Process = $process }
     }
-    return [pscustomobject]@{ Valid = $false; Reason = 'PID、父子关系、可执行路径、启动时间或命令特征不匹配'; Record = $record; Process = $process }
+    $details = "executable=$sameExecutable; started=$sameStart; parent=$sameParent; command=$($hasFeature -or -not $canVerifyCommandLine); featureIntegrity=$featureIntegrity; admin=$adminRecordValid"
+    return [pscustomobject]@{ Valid = $false; Reason = "PID、父子关系、可执行路径、启动时间或命令特征不匹配（$details）"; Record = $record; Process = $process }
 }
 
 function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$ExecutablePath, [string]$WorkingDirectory, [string]$CommandSummary, [string]$CommandFeature, [int]$Port) {
     New-Item -ItemType Directory -Force -Path $Config.RuntimeDirectory, (Get-ServiceLogDirectory $Config) | Out-Null
     $metadata = Get-ProcessMetadata $Process.Id
     $parentProcessId = if ($metadata) { [int]$metadata.ParentProcessId } else { 0 }
-    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config) }
+    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config) }
     $record | ConvertTo-Json | Set-Content -LiteralPath (Get-ServiceRecordPath $Config $Name) -Encoding UTF8
+}
+
+function Update-AdminWebServiceRecord($Config, $Process) {
+    $recordPath = Get-ServiceRecordPath $Config 'admin-web'
+    $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $managedMetadata = Get-ProcessMetadata $Process.Id
+    $managedPath = if ($managedMetadata -and -not [string]::IsNullOrWhiteSpace([string]$managedMetadata.ExecutablePath)) { [string]$managedMetadata.ExecutablePath } else { [string]$Process.Path }
+    if ([string]::IsNullOrWhiteSpace($managedPath)) { throw "无法读取 Admin 后台受管 PID $($Process.Id) 的可执行路径，拒绝建立运行记录。" }
+    $owners = @(Get-PortOwner ([int]$Config.AdminWebPort))
+    if ($owners.Count -ne 1) {
+        throw "Admin 后台端口 $($Config.AdminWebPort) 的监听 PID 数量异常：$($owners -join ', ')。"
+    }
+    $listenerPid = [int]$owners[0]
+    $listenerProcess = Get-Process -Id $listenerPid -ErrorAction Stop
+    $listenerMetadata = Get-ProcessMetadata $listenerPid
+    $listenerPath = if ($listenerMetadata -and -not [string]::IsNullOrWhiteSpace([string]$listenerMetadata.ExecutablePath)) { [string]$listenerMetadata.ExecutablePath } else { [string]$listenerProcess.Path }
+    if ([string]::IsNullOrWhiteSpace($listenerPath)) { throw "无法读取 Admin 后台监听 PID $listenerPid 的可执行路径，拒绝建立运行记录。" }
+    $record | Add-Member -NotePropertyName service_name -NotePropertyValue 'admin-web' -Force
+    $record | Add-Member -NotePropertyName managed_pid -NotePropertyValue ([int]$Process.Id) -Force
+    $record | Add-Member -NotePropertyName listener_pid -NotePropertyValue $listenerPid -Force
+    $record | Add-Member -NotePropertyName listener_executable_path -NotePropertyValue ([IO.Path]::GetFullPath($listenerPath)) -Force
+    $record | Add-Member -NotePropertyName listener_started_at -NotePropertyValue ($listenerProcess.StartTime.ToUniversalTime().ToString('o')) -Force
+    $record | Add-Member -NotePropertyName executablePath -NotePropertyValue ([IO.Path]::GetFullPath($managedPath)) -Force
+    $record | Add-Member -NotePropertyName parent_pid -NotePropertyValue ([int]$record.parentProcessId) -Force
+    $record | Add-Member -NotePropertyName creation_time -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    $record | Add-Member -NotePropertyName executable_path -NotePropertyValue ([IO.Path]::GetFullPath($managedPath)) -Force
+    $record | Add-Member -NotePropertyName command_summary -NotePropertyValue ([string]$record.commandSummary) -Force
+    $record | Add-Member -NotePropertyName working_directory -NotePropertyValue ([string]$record.workingDirectory) -Force
+    $record | Add-Member -NotePropertyName bind_address -NotePropertyValue ([string]$Config.AdminWebBindAddress) -Force
+    $record | Add-Member -NotePropertyName url -NotePropertyValue ([string]$Config.AdminWebUrl) -Force
+    $record | Add-Member -NotePropertyName started_at -NotePropertyValue ([string]$record.startedUtc) -Force
+    $record | ConvertTo-Json | Set-Content -LiteralPath $recordPath -Encoding UTF8
+    return $record
+}
+
+function Get-ProcessDescendantIds([int]$ProcessId) {
+    try { $allProcesses = @(Get-CimInstance Win32_Process -ErrorAction Stop) } catch { return @() }
+    $queue = [Collections.Generic.Queue[int]]::new()
+    $queue.Enqueue($ProcessId)
+    $descendants = [Collections.Generic.List[int]]::new()
+    while ($queue.Count -gt 0) {
+        $parentId = $queue.Dequeue()
+        foreach ($child in @($allProcesses | Where-Object { [int]$_.ParentProcessId -eq $parentId })) {
+            $childId = [int]$child.ProcessId
+            if (-not $descendants.Contains($childId)) {
+                $descendants.Add($childId)
+                $queue.Enqueue($childId)
+            }
+        }
+    }
+    return @($descendants)
+}
+
+function Stop-VerifiedProcessTree([int]$ProcessId, [int]$ListenerProcessId = 0) {
+    $descendants = @(Get-ProcessDescendantIds $ProcessId)
+    $processIds = @($descendants | Sort-Object -Descending) + @($ListenerProcessId, $ProcessId) | Where-Object { $_ -gt 0 } | Select-Object -Unique
+    foreach ($id in $processIds) {
+        if (Get-Process -Id $id -ErrorAction SilentlyContinue) { Stop-Process -Id $id -ErrorAction Stop }
+    }
+    Start-Sleep -Milliseconds 500
+    return @($processIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
 }
 
 function Get-PortOwner([int]$Port) {
@@ -463,6 +613,9 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
     $owners = @(Get-PortOwner $Port)
     if ($owners.Count -eq 0) { return }
     $record = Test-RecordedProcess $Config $Name
+    if ($Name -eq 'admin-web' -and $record -and $record.Valid -and $record.Record.PSObject.Properties.Name -contains 'listener_pid' -and $owners.Count -eq 1 -and [int]$owners[0] -eq [int]$record.Record.listener_pid) {
+        throw "$Name 已由本工具启动（登记 PID $($record.Process.Id)，监听 PID $($owners -join ', ')，端口 $Port）。请使用检查脚本，或先停止后再启动。"
+    }
     if ($record -and $record.Valid -and @($owners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $owners.Count) {
         throw "$Name 已由本工具启动（登记 PID $($record.Process.Id)，监听 PID $($owners -join ', ')，端口 $Port）。请使用检查脚本，或先停止后再启动。"
     }
@@ -472,6 +625,44 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
 
 function Test-HttpOk([string]$Url) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3; return $r.StatusCode -ge 200 -and $r.StatusCode -lt 400 } catch { return $false } }
 function Wait-HttpOk([string]$Url, [int]$Seconds, [string]$Label) { for ($i=0; $i -lt $Seconds; $i++) { if (Test-HttpOk $Url) { return }; Start-Sleep -Seconds 1 }; throw "$Label 未在 $Seconds 秒内就绪：$Url。请查看运行日志。" }
+
+function Assert-AdminWebDependencies($Config) {
+    $adminDirectory = Join-Path $Config.RepositoryRoot 'admin_web'
+    $packagePath = Join-Path $adminDirectory 'package.json'
+    $lockPath = Join-Path $adminDirectory 'pnpm-lock.yaml'
+    $nodeModulesPath = Join-Path $adminDirectory 'node_modules'
+    $node = Get-Command node.exe -ErrorAction SilentlyContinue
+    if (-not $node) { throw 'Admin 后台缺少 Node.js（node.exe）。脚本不会自动安装。' }
+    if (-not (Get-Command $Config.PnpmCommand -ErrorAction SilentlyContinue) -and -not (Test-Path -LiteralPath $Config.PnpmCommand -PathType Leaf)) {
+        throw "Admin 后台 PnpmCommand 不可用：$($Config.PnpmCommand)。脚本不会自动安装。"
+    }
+    & $Config.PnpmCommand --version | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Admin 后台 pnpm 无法执行。脚本不会自动安装依赖。' }
+    if (-not (Test-Path -LiteralPath $adminDirectory -PathType Container)) { throw "缺少 admin_web 目录：$adminDirectory" }
+    if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) { throw "缺少 admin_web/package.json：$packagePath" }
+    if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf)) { throw "缺少 admin_web 的 pnpm 锁文件：$lockPath" }
+    if (-not (Test-Path -LiteralPath $nodeModulesPath -PathType Container)) { throw "缺少 admin_web/node_modules：$nodeModulesPath。请人工安装依赖。" }
+    try { $package = Get-Content -LiteralPath $packagePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { throw "admin_web/package.json 无法解析：$($_.Exception.Message)" }
+    if ($null -eq $package.scripts -or [string]::IsNullOrWhiteSpace([string]$package.scripts.dev)) { throw 'admin_web/package.json 缺少真实 dev package script。' }
+    return [pscustomobject]@{ Directory=$adminDirectory; PackagePath=$packagePath; PnpmExecutable=(Get-Command $Config.PnpmCommand -ErrorAction Stop).Source }
+}
+
+function Start-AdminWebService($Config) {
+    $dependency = Assert-AdminWebDependencies $Config
+    Assert-PortAvailable $Config 'admin-web' ([int]$Config.AdminWebPort)
+    if ([bool]$Config.AdminEnableLanMode) {
+        Write-Warning "AdminEnableLanMode=true：管理后台将使用 $($Config.AdminWebUrl)。本轮不会创建或修改任何防火墙规则。"
+    }
+    $process = Start-ManagedService $Config 'admin-web' $dependency.PnpmExecutable @('dev','--host',$Config.AdminWebBindAddress,'--port',$Config.AdminWebPort,'--strictPort') $dependency.Directory 'pnpm' ([int]$Config.AdminWebPort)
+    Wait-HttpOk ([string]$Config.AdminWebUrl) 45 '管理后台'
+    return Update-AdminWebServiceRecord $Config $process
+}
+
+function Open-AdminWeb($Config, [switch]$NoLaunch) {
+    if (-not (Test-HttpOk ([string]$Config.AdminWebUrl))) { throw "管理后台不可用：$($Config.AdminWebUrl)。请先运行启动AI客服.bat。" }
+    if (-not $NoLaunch) { Start-Process ([string]$Config.AdminWebUrl) }
+    return [string]$Config.AdminWebUrl
+}
 
 function Get-Json([string]$Url, [string]$Label) {
     try { return Invoke-RestMethod -UseBasicParsing -Uri $Url -TimeoutSec 10 } catch { throw "$Label 请求失败：$Url。$($_.Exception.Message)" }
@@ -542,7 +733,7 @@ function Assert-RagVirtualEnvironment($Config) {
 
 function Write-StartupFailureSummary($Config, [string[]]$StartedServices) {
     Write-Host '启动失败；本次启动流程服务状态：' -ForegroundColor Yellow
-    foreach ($service in @(@{ Label='C'; Name='platform' }, @{ Label='A'; Name='rag' }, @{ Label='B'; Name='customer-web' })) {
+    foreach ($service in @(@{ Label='C'; Name='platform' }, @{ Label='A'; Name='rag' }, @{ Label='B'; Name='customer-web' }, @{ Label='Admin'; Name='admin-web' })) {
         $state = if ($StartedServices -contains $service.Name) { '已启动' } else { '未启动' }
         Write-Host "$($service.Label)：$state"
     }
@@ -574,9 +765,16 @@ function Stop-ManagedService($Config, [string]$Name) {
     $check = Test-RecordedProcess $Config $Name
     if (-not $check.Process) { Remove-Item -LiteralPath $path -Force; Write-Host "$Name：记录的进程已退出，已清理记录。"; return }
     if (-not $check.Valid) { Write-Warning "$Name：拒绝停止 PID $($check.Process.Id)，原因：$($check.Reason)。请人工核对后处理。"; return }
-    Stop-Process -Id $check.Process.Id -ErrorAction Stop
-    Start-Sleep -Milliseconds 500
-    if (Get-Process -Id $check.Process.Id -ErrorAction SilentlyContinue) { throw "$Name（PID $($check.Process.Id)）未能停止，请人工处理。" }
+    if ($Name -eq 'admin-web') {
+        $remaining = @(Stop-VerifiedProcessTree $check.Process.Id ([int]$check.Record.listener_pid))
+        if ($remaining.Count -gt 0) { throw "$Name 的已验证进程树未能停止（PID $($remaining -join ', ')），请人工处理。" }
+        $owners = @(Get-PortOwner ([int]$check.Record.port))
+        if ($owners.Count -gt 0) { throw "$Name 的端口 $($check.Record.port) 仍由 PID $($owners -join ', ') 监听；不会按端口强杀。" }
+    } else {
+        Stop-Process -Id $check.Process.Id -ErrorAction Stop
+        Start-Sleep -Milliseconds 500
+        if (Get-Process -Id $check.Process.Id -ErrorAction SilentlyContinue) { throw "$Name（PID $($check.Process.Id)）未能停止，请人工处理。" }
+    }
     Remove-Item -LiteralPath $path -Force
     Write-Host "$Name 已停止（PID $($check.Record.pid)）。"
 }
