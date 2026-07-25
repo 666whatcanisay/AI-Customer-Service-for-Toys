@@ -34,6 +34,7 @@ describe('CustomerWorkbenchLayout', () => {
     expect(wrapper.get('nav').text()).toContain('工作台首页')
     expect(wrapper.get('nav').text()).toContain('AI 客服')
     expect(wrapper.get('nav').text()).toContain('我的建议')
+    expect(wrapper.get('nav').text()).toContain('我的案例')
     expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('AI 可用')
     expect(wrapper.get('[data-testid="global-test-banner"]').text()).toContain('禁止填写真实客户隐私')
     wrapper.unmount()

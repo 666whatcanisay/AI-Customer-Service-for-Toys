@@ -1,8 +1,11 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlatformClientError, RagClientError } from '@/api/errorMapper'
 import type { RagAction, RagChatResult } from '@/api/ragTypes'
+import { clearExperienceCaseSubmissions } from '@/workspace/experienceCaseSession'
+import { TesterIdentityKey } from '@/workspace/testerIdentity'
 import AiChat from './AiChat.vue'
 
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
@@ -13,7 +16,8 @@ const apiMocks = vi.hoisted(() => ({
   getPlatformHealth: vi.fn(),
   listStores: vi.fn(),
   listProducts: vi.fn(),
-  listSkus: vi.fn()
+  listSkus: vi.fn(),
+  submitExperienceCase: vi.fn()
 }))
 
 vi.mock('@/api/ragClient', () => ({
@@ -30,6 +34,10 @@ vi.mock('@/api/platformClient', () => ({
     listProducts: apiMocks.listProducts,
     listSkus: apiMocks.listSkus
   }
+}))
+
+vi.mock('@/api/experienceCaseClient', () => ({
+  experienceCaseClient: { submit: apiMocks.submitExperienceCase }
 }))
 
 const store = {
@@ -111,11 +119,23 @@ const resultFor = (action: RagAction = 'DIRECT_ANSWER', withSku = true): RagChat
   }
 })
 
-const mountPage = () => mount(AiChat, {
-  global: {
-    plugins: [ElementPlus]
-  }
-})
+const mountedPages: VueWrapper[] = []
+
+const mountPage = () => {
+  const wrapper = mount(AiChat, {
+    global: {
+      plugins: [ElementPlus],
+      provide: {
+        [TesterIdentityKey as symbol]: {
+          identity: ref({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }),
+          save: vi.fn(), reload: vi.fn()
+        }
+      }
+    }
+  })
+  mountedPages.push(wrapper)
+  return wrapper
+}
 
 const selectAt = async (wrapper: VueWrapper, index: number, value: string) => {
   const component = wrapper.findAllComponents({ name: 'ElSelect' })[index]
@@ -139,8 +159,13 @@ const submit = async (wrapper: VueWrapper, withSku = true) => {
 }
 
 describe('AiChat B-T04 three-step workbench', () => {
+  afterEach(() => {
+    mountedPages.splice(0).forEach((wrapper) => wrapper.unmount())
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    clearExperienceCaseSubmissions()
     window.localStorage.clear()
     apiMocks.getRagHealth.mockResolvedValue({ status: 'ok', ready: true })
     apiMocks.getPlatformHealth.mockResolvedValue({ status: 'ok', service: 'platform' })
@@ -152,6 +177,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     )
     apiMocks.listSkus.mockResolvedValue([sku])
     apiMocks.chat.mockResolvedValue(resultFor())
+    apiMocks.submitExperienceCase.mockResolvedValue({ status: 'NEW' })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) }
@@ -315,6 +341,42 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('修改后采用')
     await wrapper.get('[data-testid="reject"]').trigger('click')
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
+  })
+
+  it('captures an excellent case only after a feedback choice and shows the actual returned status', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(wrapper.get('[data-testid="save-experience-case"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="edited-accept"]').trigger('click')
+    await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="experience-case-final-answer"]').setValue('客服审核后的测试回复')
+    await wrapper.get('[data-testid="experience-case-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.submitExperienceCase).toHaveBeenCalledWith({
+      storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
+      aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', finalAnswer: '客服审核后的测试回复',
+      feedbackType: 'EDITED_ACCEPT', createdBy: 'TESTER-ONE'
+    })
+    expect(wrapper.get('[data-testid="experience-case-success"]').text()).toContain('新建')
+  })
+
+  it('shows the C endpoint failure and never records a local success', async () => {
+    apiMocks.submitExperienceCase.mockRejectedValue(new Error('C 优秀案例接口尚未发布'))
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+    await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="experience-case-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="experience-case-error"]').text()).toContain('接口尚未发布')
+    expect(wrapper.find('[data-testid="experience-case-success"]').exists()).toBe(false)
   })
 
   it('shows an actionable data-service error separately from AI health', async () => {

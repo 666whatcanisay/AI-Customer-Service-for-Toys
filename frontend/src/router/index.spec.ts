@@ -7,7 +7,7 @@ describe('customer workbench router', () => {
     const paths = createCustomerRouter(createMemoryHistory()).getRoutes().map((route) => route.path)
 
     expect(paths).toEqual(expect.arrayContaining([
-      '/', '/ai-chat', '/suggestions', '/suggestions/mine', '/modules/:moduleKey'
+      '/', '/ai-chat', '/suggestions', '/suggestions/mine', '/experience-cases', '/modules/:moduleKey'
     ]))
   })
 
