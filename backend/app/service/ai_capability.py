@@ -155,8 +155,23 @@ class RuntimeMetrics:
         self._total_latency_ms = 0.0
         self._last_called_at: str | None = None
         self._last_error_summary: str | None = None
+        self._pilot_ai_answer_count = 0
+        self._pilot_action_counts = {
+            "DIRECT_ANSWER": 0,
+            "CONTROLLED_ANSWER": 0,
+            "TRANSFER_HUMAN": 0,
+            "OTHER": 0,
+        }
+        self._pilot_last_answer_at: str | None = None
 
-    def record(self, latency_ms: float, error_summary: str | None = None) -> None:
+    def record(
+        self,
+        latency_ms: float,
+        error_summary: str | None = None,
+        *,
+        action: str | None = None,
+        include_pilot_quality: bool = True,
+    ) -> None:
         with self._lock:
             self._call_count += 1
             self._total_latency_ms += max(0.0, latency_ms)
@@ -167,6 +182,13 @@ class RuntimeMetrics:
                 self._last_error_summary = error_summary[:80]
             else:
                 self._success_count += 1
+            if include_pilot_quality:
+                self._pilot_ai_answer_count += 1
+                metric_action = (
+                    action if action in self._pilot_action_counts else "OTHER"
+                )
+                self._pilot_action_counts[metric_action] += 1
+                self._pilot_last_answer_at = self._last_called_at
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -184,6 +206,23 @@ class RuntimeMetrics:
                 "average_latency_ms": average,
                 "last_called_at": self._last_called_at,
                 "last_error_summary": self._last_error_summary,
+            }
+
+    def pilot_answer_snapshot(self) -> dict[str, Any]:
+        """Return customer-response-only counters, excluding admin online tests."""
+        with self._lock:
+            return {
+                "metrics_scope": "since_start",
+                "ai_answer_count": self._pilot_ai_answer_count,
+                "direct_answer_count": self._pilot_action_counts["DIRECT_ANSWER"],
+                "controlled_answer_count": self._pilot_action_counts[
+                    "CONTROLLED_ANSWER"
+                ],
+                "transfer_human_count": self._pilot_action_counts[
+                    "TRANSFER_HUMAN"
+                ],
+                "other_action_count": self._pilot_action_counts["OTHER"],
+                "last_answer_at": self._pilot_last_answer_at,
             }
 
 
@@ -219,6 +258,7 @@ def not_available_module_detail(module: AIModuleDefinition) -> dict[str, Any]:
         "last_called_at": None,
         "last_error_summary": "NOT_AVAILABLE",
         "supported_actions": [],
+        "pilot_quality_observation": unavailable_pilot_quality_observation(),
     }
     return {**module_summary(module, "PLANNED"), **unavailable}
 
@@ -245,6 +285,29 @@ def unavailable_metrics() -> dict[str, Any]:
     }
 
 
+def unavailable_pilot_quality_observation() -> dict[str, Any]:
+    from app.service.quality_observation import unavailable_quality_observation_metrics
+
+    return {
+        "answer_metrics": {
+            "metrics_scope": "NOT_AVAILABLE",
+            "ai_answer_count": None,
+            "direct_answer_count": None,
+            "controlled_answer_count": None,
+            "transfer_human_count": None,
+            "other_action_count": None,
+            "last_answer_at": None,
+        },
+        "badcase_metrics": unavailable_quality_observation_metrics(),
+        "constraints": [
+            "manual_explicit_run_only",
+            "no_automatic_prompt_change",
+            "no_automatic_knowledge_publish",
+            "no_automatic_model_training",
+        ],
+    }
+
+
 def customer_service_detail(application: Any) -> dict[str, Any]:
     module = MODULES_BY_ID["ai_customer_service"]
     rag = getattr(application.state, "rag_service", None)
@@ -252,6 +315,21 @@ def customer_service_detail(application: Any) -> dict[str, Any]:
     initialization_error = getattr(application.state, "initialization_error", None)
     module_status = "RUNNING" if ready else ("ERROR" if initialization_error else "PAUSED")
     metrics = rag.runtime_metrics.snapshot() if rag is not None else unavailable_metrics()
+    quality_metrics = getattr(application.state, "quality_observation_metrics", None)
+    pilot_quality_observation = (
+        {
+            "answer_metrics": rag.runtime_metrics.pilot_answer_snapshot(),
+            "badcase_metrics": quality_metrics.snapshot(),
+            "constraints": [
+                "manual_explicit_run_only",
+                "no_automatic_prompt_change",
+                "no_automatic_knowledge_publish",
+                "no_automatic_model_training",
+            ],
+        }
+        if rag is not None and quality_metrics is not None
+        else unavailable_pilot_quality_observation()
+    )
     return {
         **module_summary(module, module_status),
         "model_provider": rag.settings.llm_provider if rag is not None else None,
@@ -262,6 +340,7 @@ def customer_service_detail(application: Any) -> dict[str, Any]:
         "knowledge_count": safe_knowledge_count(rag) if rag is not None else None,
         **prompt_metadata(),
         **metrics,
+        "pilot_quality_observation": pilot_quality_observation,
         "supported_actions": [
             "answer_customer_question",
             "search_knowledge",

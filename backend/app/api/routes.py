@@ -18,6 +18,10 @@ from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
 )
+from app.service.quality_observation import (
+    QualityObservationError,
+    QualityObservationService,
+)
 from app.service.ai_capability import (
     MODULE_DEFINITIONS,
     MODULES_BY_ID,
@@ -62,6 +66,15 @@ def get_experience_evaluation_service(request: Request) -> ExperienceEvaluationS
     if service is None:
         service = ExperienceEvaluationService(request.app.state.settings)
         request.app.state.experience_evaluation_service = service
+    return service
+
+
+def get_quality_observation_service(request: Request) -> QualityObservationService:
+    metrics = request.app.state.quality_observation_metrics
+    service = getattr(request.app.state, "quality_observation_service", None)
+    if service is None:
+        service = QualityObservationService(request.app.state.settings, metrics)
+        request.app.state.quality_observation_service = service
     return service
 
 
@@ -338,6 +351,7 @@ def run_ai_module_test(
     result = get_rag(request).query(
         test_request.question,
         context=test_request.context,
+        include_pilot_quality=False,
     )
     data = {
         key: result.get(key)
@@ -381,6 +395,38 @@ def run_experience_evaluation(
             content=envelope({"code": exc.code}, message=exc.message, success=False),
         )
     return envelope(recorded, message="Experience evaluation recorded")
+
+
+@router.get("/admin/ai/quality-observation", tags=["ai-admin"])
+def get_quality_observation(request: Request) -> dict[str, Any]:
+    """Return aggregate pilot counters without customer case contents."""
+    detail = customer_service_detail(request.app)
+    return envelope(detail["pilot_quality_observation"])
+
+
+@router.post(
+    "/admin/ai/quality-observation/run",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_quality_observation(
+    request: Request,
+    evaluation_request: ExperienceEvaluationRunRequest,
+):
+    """Explicitly evaluate and classify one immutable C-approved snapshot."""
+    require_loopback_client(request)
+    try:
+        recorded = get_experience_evaluation_service(request).run_with_quality_observation(
+            evaluation_request.case_id,
+            evaluation_request.revision,
+            get_quality_observation_service(request),
+        )
+    except (ExperienceEvaluationError, QualityObservationError) as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=envelope({"code": exc.code}, message=exc.message, success=False),
+        )
+    return envelope(recorded, message="Experience evaluation and quality observation recorded")
 
 
 @router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])

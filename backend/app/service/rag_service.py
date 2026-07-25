@@ -812,20 +812,26 @@ class RAGService:
         return answer or "大模型未返回有效内容，请稍后重试。"
 
     def query(
-        self, question: str, context: FrozenChatContext | None = None
+        self,
+        question: str,
+        context: FrozenChatContext | None = None,
+        *,
+        include_pilot_quality: bool = True,
     ) -> dict[str, Any]:
         """Execute a RAG request and record only aggregate process metrics."""
         started = time.perf_counter()
         error_summary: str | None = None
+        action: str | None = None
         try:
             result = self._query(question, context=context)
+            action = result.get("action")
             if result.get("answer") == LLM_REQUEST_FAILED_MESSAGE:
                 error_summary = "LLM_REQUEST_FAILED"
             return result
         except Exception as exc:
             error_summary = type(exc).__name__
             logger.error("RAG request failed category=%s", error_summary)
-            return {
+            result = {
                 "answer": RAG_RUNTIME_ERROR_MESSAGE,
                 "action": "REFUSE",
                 "sources": [],
@@ -837,10 +843,14 @@ class RAGService:
                 "required_fields": [],
                 "context": context.model_dump() if context else None,
             }
+            action = result["action"]
+            return result
         finally:
             self.runtime_metrics.record(
                 (time.perf_counter() - started) * 1000,
                 error_summary=error_summary,
+                action=action,
+                include_pilot_quality=include_pilot_quality,
             )
 
     def _query(

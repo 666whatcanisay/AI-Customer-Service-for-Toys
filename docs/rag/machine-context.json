@@ -4,13 +4,13 @@
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "ready_for_integration",
-  "current_task": "MVP-PLUS-01 CONTRACT-FIX1 A experience-evaluation consumer",
-  "next_recommended_task": "Run the real B-to-C approval-to-A-to-C evaluation integration with the C experience-case branch; do not auto-merge this A branch.",
-  "current_stage": "Explicit C approved-snapshot consumer and controlled Ollama evaluation implementation are ready for real cross-service verification.",
-  "current_gate": "Focused A unit tests and local real qwen3.5:9b controlled-JSON smoke pass; real C export/writeback integration remains pending. A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
-  "last_test_result": "2026-07-25: focused experience-evaluation pytest 8 passed; full pytest backend 71 passed, 2 skipped, 30 warnings; git diff --check and machine-context JSON checks passed. A direct local qwen3.5:9b smoke returned a parsed KEEP result with zero suggestions and did not call C. C APPROVED export/writeback was intentionally left for isolated cross-line integration.",
-  "blockers": ["Real C APPROVED snapshot export/writeback remains required before the MVP-PLUS-01 end-to-end integration claim."],
+  "status": "ready_for_delivery",
+  "current_task": "AI-Agent MVP-PLUS-02 pilot AI quality observation",
+  "next_recommended_task": "Review the Draft PR; run isolated real C APPROVED export/writeback integration before making a cross-service claim. Do not auto-merge.",
+  "current_stage": "A-side pilot answer metrics and explicit evaluation-bound Badcase aggregation are implemented and verified locally.",
+  "current_gate": "A functional gate is PASS: focused regression 32 passed, full pytest backend 76 passed and 3 explicit real-model skips, and local qwen3.5:9b synthetic quality smoke passed. Real C export/writeback remains pending for any cross-service claim. A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
+  "last_test_result": "2026-07-25: focused observation/API/evaluation pytest 32 passed; full pytest backend 76 passed, 3 skipped, 33 warnings; local qwen3.5:9b synthetic quality-observation smoke 1 passed; git diff --check and machine-context JSON checks passed. No real C customer content was read or written by the smoke.",
+  "blockers": ["Real C APPROVED snapshot export/writeback remains required before an MVP-PLUS-01 or MVP-PLUS-02 cross-service integration claim."],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
     "Frozen rag-export omits or conflicts with required facts for CASE 007, 011, 019, 020, 023 and 027",
@@ -27,20 +27,21 @@
     "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
   ],
   "git": {
-    "branch": "agent/rag-experience-evaluation-fix1",
+    "branch": "agent/rag-quality-observation-mvp-plus-02",
     "clean": false,
-    "baseline_commit": "271c155",
+    "baseline_commit": "ea69c5f",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
-    "remote_branch": "origin/agent/rag-experience-evaluation-fix1",
+    "remote_branch": "origin/agent/rag-quality-observation-mvp-plus-02",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-25T10:06:08+08:00",
+  "checked_at": "2026-07-25T15:39:29+08:00",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/service/rag_service.py",
     "backend/app/service/ai_capability.py",
     "backend/app/service/experience_evaluation.py",
+    "backend/app/service/quality_observation.py",
     "backend/app/api/routes.py",
     "backend/app/models/chat.py"
   ],
@@ -55,7 +56,9 @@
   ],
   "test_commands": [
     "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
+    "source isolated test environment python -m pytest backend/tests/test_quality_observation.py backend/tests/test_api.py backend/tests/test_experience_evaluation.py -q",
     "source read-only venv python -m pytest backend -q",
+    "RUN_REAL_RAG_E2E=1 source isolated test environment python -m pytest backend/tests/test_real_quality_observation_e2e.py -q -s",
     "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
     "PLATFORM_API_BASE_URL=http://127.0.0.1:8012 source read-only venv python backend/scripts/evaluate_test_knowledge.py PDD-SM-2026-001-TEST --output-dir docs/rag/evaluations/a-t03-v031-live"
   ],
@@ -70,7 +73,8 @@
     "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
     "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
-    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)"
+    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
+    "AI-Agent MVP-PLUS-02 pilot answer metrics and evaluation-bound Badcase aggregation (ready for Draft PR)"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -90,7 +94,9 @@
     "GET /api/admin/ai/modules/{module_id}/prompt",
     "POST /api/admin/ai/modules/{module_id}/test",
     "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
-    "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation"
+    "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
+    "GET /api/admin/ai/quality-observation aggregate-only pilot metrics",
+    "POST /api/admin/ai/quality-observation/run loopback-only explicit evaluation-bound Badcase observation"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }

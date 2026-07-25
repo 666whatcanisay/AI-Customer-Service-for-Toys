@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router
 from app.config.settings import Settings, get_settings
 from app.service.rag_service import RAGService
+from app.service.quality_observation import QualityObservationMetrics
 
 
 def configure_logging(settings: Settings) -> None:
@@ -45,6 +46,7 @@ def create_app(
         application.state.settings = active_settings
         application.state.ready = False
         application.state.rag_service = None
+        application.state.quality_observation_metrics = QualityObservationMetrics()
         application.state.initialization_error = None
         application.state.loading_message = "正在加载本地知识库..."
 
