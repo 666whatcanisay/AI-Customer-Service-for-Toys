@@ -6,7 +6,7 @@
   "version": "0.1.0",
   "current_task": "MVP-PLUS-02-FEEDBACK-CONTRACT-FIX",
   "current_stage": "Versioned AI feedback-case export and idempotent analysis-evidence writeback",
-  "current_gate": "C local implementation and focused API verification PASS; local delivery commit pending",
+  "current_gate": "C local implementation and verification PASS; feature commit 078482c created locally, not pushed by task scope",
   "status": "ready_for_review",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
@@ -97,7 +97,7 @@
   "git": {
     "branch": "agent/platform-ai-feedback-center",
     "base": "origin/develop ea69c5f24c897b68b4cbd0eb0f96da3de8a6dfc1",
-    "commit": "pending local delivery",
+    "commit": "078482ce83a038d008b38068036b47ecd5e06ec6",
     "draft_pr": null
   },
   "next_recommended_task": "A may consume the versioned feedback-case interface and run its controlled integration verification. Do not enable automatic actions or change B entry behavior without separate approval.",
