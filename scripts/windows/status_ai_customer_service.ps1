@@ -16,11 +16,18 @@ try {
     foreach ($item in @(
         @{Label='C';Name='platform';Port=$config.PlatformPort;Url=(Get-ServiceUrl $config $config.PlatformPort $config.PlatformHealthPath)},
         @{Label='A';Name='rag';Port=$config.RagPort;Url=(Get-ServiceUrl $config $config.RagPort $config.RagHealthPath)},
-        @{Label='B';Name='customer-web';Port=$config.CustomerWebPort;Url=$config.CustomerWebUrl}
+        @{Label='B';Name='customer-web';Port=$config.CustomerWebPort;Url=$config.CustomerWebUrl},
+        @{Label='Admin';Name='admin-web';Port=$config.AdminWebPort;Url=(Get-ManagedServiceHealthUrl $config 'admin-web')}
     )) {
         $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url
-        Write-Host "$($item.Label)：$($serviceStatus.State)；PID $($serviceStatus.ProcessId)；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
+        Write-Host "$($item.Label)：$($serviceStatus.State)；受管 PID $($serviceStatus.ManagedProcessId)；监听 PID $($serviceStatus.ListenerProcessId)；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
     }
+    $adminCheck = Test-RecordedProcess $config 'admin-web'
+    $adminRecord = if ($adminCheck) { $adminCheck.Record } else { $null }
+    $adminListenerPid = if ($adminRecord -and ($adminRecord.PSObject.Properties.Name -contains 'listener_pid')) { [string]$adminRecord.listener_pid } else { '未记录' }
+    $adminLan = if ([bool]$config.AdminEnableLanMode) { '是（本轮未修改防火墙）' } else { '否（仅服务器本机）' }
+    Write-Host "运营后台地址：$($config.AdminWebUrl)；监听地址：$($config.AdminWebBindAddress):$($config.AdminWebPort)；监听 PID：$adminListenerPid"
+    Write-Host "运营后台 LAN 模式：$adminLan；日志：$(Join-Path (Get-ServiceLogDirectory $config) 'admin-web.out.log')；$(Join-Path (Get-ServiceLogDirectory $config) 'admin-web.err.log')"
 
     Write-Host "C 数据库迁移：$(Get-PlatformMigrationStatus $config)"
     try {

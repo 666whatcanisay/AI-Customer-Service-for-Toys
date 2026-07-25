@@ -47,8 +47,15 @@ try {
     $selectedAdapter = if ($hasLanSelection) { $config.LanSelection } else { $null }
     $customerUrl = if ($hasLanSelection) { [string]$config.CustomerWebUrl } else { '' }
     $clientTestCommand = if ($customerUrl) { "Test-NetConnection $($config.LanAdvertisedHost) -Port 5173" } else { '' }
+    $adminDirectory = Join-Path $config.RepositoryRoot 'admin_web'
+    $adminDependencies = [ordered]@{
+        directoryExists = (Test-Path -LiteralPath $adminDirectory -PathType Container)
+        packageJsonExists = (Test-Path -LiteralPath (Join-Path $adminDirectory 'package.json') -PathType Leaf)
+        lockFileExists = (Test-Path -LiteralPath (Join-Path $adminDirectory 'pnpm-lock.yaml') -PathType Leaf)
+        nodeModulesExists = (Test-Path -LiteralPath (Join-Path $adminDirectory 'node_modules') -PathType Container)
+    }
     $report = [ordered]@{
-        generatedUtc=[DateTime]::UtcNow.ToString('o'); diagnosticMode='read-only'; lanResolutionError=$resolutionError; selectedAdapter=$selectedAdapter; eligiblePhysicalAdapters=$candidates; vpnOrVirtualAdapters=$vpnOrVirtualAdapters; defaultRoutes=$defaultRoutes; customerUrl=$customerUrl; clientTestCommand=$clientTestCommand; services=@((Get-ServiceDiagnostic $config 'platform' $config.PlatformPort), (Get-ServiceDiagnostic $config 'rag' $config.RagPort), (Get-ServiceDiagnostic $config 'customer-web' $config.CustomerWebPort)); firewallRules=$rules
+        generatedUtc=[DateTime]::UtcNow.ToString('o'); diagnosticMode='read-only'; lanResolutionError=$resolutionError; selectedAdapter=$selectedAdapter; eligiblePhysicalAdapters=$candidates; vpnOrVirtualAdapters=$vpnOrVirtualAdapters; defaultRoutes=$defaultRoutes; customerUrl=$customerUrl; clientTestCommand=$clientTestCommand; adminWeb=[ordered]@{ url=[string]$config.AdminWebUrl; bindAddress=[string]$config.AdminWebBindAddress; port=[int]$config.AdminWebPort; lanEnabled=[bool]$config.AdminEnableLanMode; dependencies=$adminDependencies }; services=@((Get-ServiceDiagnostic $config 'platform' $config.PlatformPort), (Get-ServiceDiagnostic $config 'rag' $config.RagPort), (Get-ServiceDiagnostic $config 'customer-web' $config.CustomerWebPort), (Get-ServiceDiagnostic $config 'admin-web' $config.AdminWebPort)); firewallRules=$rules
     }
     $directory = Join-Path $config.RuntimeDirectory 'diagnostics'; New-Item -ItemType Directory -Force -Path $directory | Out-Null
     $path = Join-Path $directory ("lan-diagnostic-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
@@ -60,6 +67,7 @@ try {
         Write-Host "Run on client: Test-NetConnection $($config.LanAdvertisedHost) -Port 5173"
     }
     Write-Host "VPN/virtual adapters: $(if ($vpnOrVirtualAdapters.Count -gt 0) { ($vpnOrVirtualAdapters.Name -join ', ') } else { 'none detected' })"
+    Write-Host "Admin URL: $($config.AdminWebUrl); bind=$($config.AdminWebBindAddress):$($config.AdminWebPort); LAN=$($config.AdminEnableLanMode); dependencies package=$($adminDependencies.packageJsonExists), lock=$($adminDependencies.lockFileExists), node_modules=$($adminDependencies.nodeModulesExists)"
     foreach ($service in $report.services) {
         $addresses = @($service.listeners | ForEach-Object { "$($_.LocalAddress):$($_.LocalPort) (PID $($_.OwningProcess))" }) -join '; '
         Write-Host "$($service.name): listener=$addresses; health=$($service.healthOk)"
