@@ -7,6 +7,8 @@ import NewImportView from '../views/NewImportView.vue'
 import TestDataPackagesView from '../views/TestDataPackagesView.vue'
 import AiCapabilityCenterView from '../views/AiCapabilityCenterView.vue'
 import CustomerSuggestionsView from '../views/CustomerSuggestionsView.vue'
+import CustomerExperienceCasesView from '../views/CustomerExperienceCasesView.vue'
+import AiOptimizationPoolView from '../views/AiOptimizationPoolView.vue'
 import OperationsOverviewView from '../views/OperationsOverviewView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ReadonlyListView from '../views/ReadonlyListView.vue'
@@ -61,6 +63,8 @@ export const router = createRouter({
       ] },
     },
     { path: '/suggestions', name: 'suggestions', component: CustomerSuggestionsView },
+    { path: '/experience-cases', name: 'experience-cases', component: CustomerExperienceCasesView },
+    { path: '/ai-optimization-pool', name: 'ai-optimization-pool', component: AiOptimizationPoolView },
     {
       path: '/system-status',
       name: 'system-status',

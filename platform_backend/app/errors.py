@@ -57,11 +57,18 @@ async def http_exception_handler(
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
+    experience_case_path = request.url.path.startswith(
+        (
+            "/api/v1/customer-experience-cases",
+            "/api/v1/admin/customer-experience-cases",
+            "/api/v1/admin/ai-optimization",
+        )
+    )
     return JSONResponse(
         status_code=422,
         content=_error_payload(
             request,
-            code="VALIDATION_ERROR",
+            code="EXPERIENCE_CASE_VALIDATION_FAILED" if experience_case_path else "VALIDATION_ERROR",
             message="Request validation failed",
             details=exc.errors(),
         ),
