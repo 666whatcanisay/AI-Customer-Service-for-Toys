@@ -4,17 +4,17 @@
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
   "current_task": "MVP-PLUS-02-FEEDBACK AI response feedback capture",
-  "current_stage": "MVP-PLUS-02-FEEDBACK: frozen AIResponseFeedback client, dialog and local verification complete",
-  "current_gate": "CONDITIONAL PASS: local acceptance complete; GitHub authentication restored and Draft PR delivery pending",
-  "status": "ready_for_draft_pr",
+  "current_stage": "MVP-PLUS-02-FEEDBACK: B client, dialog, local verification and Draft PR delivery complete",
+  "current_gate": "PASS: B frontend delivery complete in Draft PR #34; real cross-line integration remains a separate gate",
+  "status": "draft_pr_open",
   "last_updated": "2026-07-25",
   "git": {
     "branch": "codex/customer-pilot-experience",
     "base_commit": "68796a9",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "pull_request": {
-      "number": null,
-      "url": null,
+      "number": 34,
+      "url": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/34",
       "draft": true,
       "base": "develop"
     },

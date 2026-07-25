@@ -2,7 +2,7 @@
 
 日期：2026-07-25
 
-Draft PR：待创建，标题为 `feat(customer): add AI feedback capture`，目标分支为 `develop`。
+Draft PR：[#34](https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/34)，标题为 `feat(customer): add AI feedback capture`，目标分支为 `develop`。
 
 ## 页面
 
@@ -21,4 +21,4 @@ Draft PR：待创建，标题为 `feat(customer): add AI feedback capture`，目
 - Vitest：22 文件 / 87 测试 PASS
 - `vite build`：PASS
 
-结论：本地交付 `PASS`，等待 GitHub Draft PR 交付。构建保留单个 JavaScript chunk 超过 500 kB 的既有警告；真实 C POST 联调不在本任务内执行。
+结论：B 前端交付 `PASS`，Draft PR #34 已创建。构建保留单个 JavaScript chunk 超过 500 kB 的既有警告；真实 C POST 联调不在本任务内执行。

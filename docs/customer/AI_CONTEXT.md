@@ -5,8 +5,8 @@
 ## 当前任务
 
 - 任务：`MVP-PLUS-02-FEEDBACK 客服反馈闭环入口`。
-- 分支：`codex/customer-pilot-experience`；Draft PR 待创建，标题 `feat(customer): add AI feedback capture`，目标分支 `develop`。MVP-PLUS-01 Draft PR #29 已合并。
-- 状态：本地验收 `PASS`；B 端消费已冻结 `ai-feedback.v1-draft` 的独立创建协议，尚未执行真实跨线 POST 联调。GitHub 会话已恢复，等待 Draft PR 交付。
+- 分支：`codex/customer-pilot-experience`；Draft PR [#34](https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/34)，标题 `feat(customer): add AI feedback capture`，目标分支 `develop`。MVP-PLUS-01 Draft PR #29 已合并。
+- 状态：B 前端本地验收 `PASS`；消费已冻结 `ai-feedback.v1-draft` 的独立创建协议，尚未执行真实跨线 POST 联调。
 
 ## 范围与入口
 
