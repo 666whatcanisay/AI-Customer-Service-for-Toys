@@ -14,6 +14,11 @@ from openai import OpenAI
 
 from app.config.settings import Settings
 from app.models.chat import FrozenChatContext
+from app.service.ai_capability import (
+    PROMPT_SYSTEM_MESSAGE,
+    RuntimeMetrics,
+    render_customer_answer_prompt,
+)
 from app.service.test_knowledge import (
     PlatformTestKnowledgeClient,
     TestKnowledgeIndex,
@@ -26,6 +31,8 @@ REFUSAL_MESSAGE = "知识库中未找到足够可靠的相关内容，无法回�
 MODEL_NOT_CONFIGURED_MESSAGE = (
     "大模型尚未配置，当前已完成知识库检索，但暂时无法生成完整回答。"
 )
+LLM_REQUEST_FAILED_MESSAGE = "大模型请求失败，请检查网络和模型配置后重试。"
+RAG_RUNTIME_ERROR_MESSAGE = "服务暂时不可用，请稍后重试。"
 SAFETY_ACTION_MESSAGES = {
     "ASK_CLARIFY": "请补充具体商品规格或 SKU，信息完整后才能继续确认。",
     "REQUIRE_LOOKUP": "该问题需要查询订单或实时系统后才能确认，当前不会直接承诺。",
@@ -67,6 +74,7 @@ class RAGService:
             settings.platform_api_timeout_seconds,
         )
         self._configuration_lock = RLock()
+        self.runtime_metrics = RuntimeMetrics()
 
         if settings.llm_provider == "ollama":
             self.client = None
@@ -743,39 +751,18 @@ class RAGService:
         if not self.model_configured:
             return MODEL_NOT_CONFIGURED_MESSAGE
 
-        prompt = f"""
-你负责把已核实的玩具商品事实整理成可直接复制给客户的客服话术。
-只能使用下方事实，不允许编造；事实不足时简短说明暂时无法确认。
-
-已核实事实：
-{context[:3000]}
-
-授权动作：{answer_action}
-风险等级：{risk_level}
-
-问题：
-{question}
-
-本次回答范围：{answer_focus or self._answer_focus(question)}。
-
-硬性要求：
-1. 只输出给客户看的最终话术，1～3句话，优先直接回答问题。
-2. 只回答本次范围，不附加客户没问的颗粒数、尺寸、包装、玩法等参数。
-3. 不得提及资料、证据、依据摘要、检索、来源编号、source_id、评分或距离。
-4. 不得列出或复述内部上下文，不得把来源信息拼到话术中。
-5. 可自然使用“亲”，但不得夸张承诺。
-6. 安全提示只能来自上方明确事实；年龄问题仅保留建议年龄和必要安全提示，
-   且事实中已有的小颗粒、低龄限制、成人陪同提示必须保留。
-7. 年龄事实包含上下限时必须完整保留，不得泛化为“X岁以上”；成人陪同类提示只表达一次。
-"""
+        prompt = render_customer_answer_prompt(
+            context=context,
+            answer_action=answer_action,
+            risk_level=risk_level,
+            question=question,
+            answer_focus=answer_focus or self._answer_focus(question),
+        )
         try:
             messages = [
                 {
                     "role": "system",
-                    "content": (
-                        "你是简洁的电商玩具客服话术助手。只能使用已核实事实，"
-                        "只输出客户可见话术，禁止暴露任何内部检索或来源信息。"
-                    ),
+                    "content": PROMPT_SYSTEM_MESSAGE,
                 },
                 {"role": "user", "content": prompt},
             ]
@@ -794,7 +781,7 @@ class RAGService:
             return answer.strip()
         except Exception:
             logger.exception("大模型请求失败（密钥不会写入日志）")
-            return "大模型请求失败，请检查网络和模型配置后重试。"
+            return LLM_REQUEST_FAILED_MESSAGE
 
     def _call_ollama(self, messages: list[dict[str, str]]) -> str:
         payload = json.dumps(
@@ -825,6 +812,38 @@ class RAGService:
         return answer or "大模型未返回有效内容，请稍后重试。"
 
     def query(
+        self, question: str, context: FrozenChatContext | None = None
+    ) -> dict[str, Any]:
+        """Execute a RAG request and record only aggregate process metrics."""
+        started = time.perf_counter()
+        error_summary: str | None = None
+        try:
+            result = self._query(question, context=context)
+            if result.get("answer") == LLM_REQUEST_FAILED_MESSAGE:
+                error_summary = "LLM_REQUEST_FAILED"
+            return result
+        except Exception as exc:
+            error_summary = type(exc).__name__
+            logger.error("RAG request failed category=%s", error_summary)
+            return {
+                "answer": RAG_RUNTIME_ERROR_MESSAGE,
+                "action": "REFUSE",
+                "sources": [],
+                "model": self.settings.llm_model,
+                "latency_ms": round((time.perf_counter() - started) * 1000, 1),
+                "request_id": str(uuid.uuid4()),
+                "risk_level": "HIGH" if context else None,
+                "warnings": ["RAG_RUNTIME_ERROR"],
+                "required_fields": [],
+                "context": context.model_dump() if context else None,
+            }
+        finally:
+            self.runtime_metrics.record(
+                (time.perf_counter() - started) * 1000,
+                error_summary=error_summary,
+            )
+
+    def _query(
         self, question: str, context: FrozenChatContext | None = None
     ) -> dict[str, Any]:
         start = time.perf_counter()

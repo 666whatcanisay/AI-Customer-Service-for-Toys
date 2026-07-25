@@ -26,4 +26,16 @@ When omitted, only `http://127.0.0.1:5173` and `http://localhost:5173` are allow
 
 仅允许本机调用。从配置的 C 地址获取 `version=V0.3.1`、`schema_version=0.3.1-test` 的 rag-export，严格验证后写入独立测试 Collection。未配置或服务不可用返回 `503 ENV_BLOCKED`，不合格包返回 422。
 
+## AI capability center admin APIs
+
+All responses use the existing `{success, message, data}` envelope. These endpoints are read-only except for a bounded, no-side-effect online test; they do not publish prompts, send messages, or perform business writes.
+
+- `GET /api/admin/ai/modules` lists the five registered modules. Only `ai_customer_service` can report `RUNNING`, `PAUSED`, or `ERROR` from the real service state. `aftersales_intent`, `shipping_note_extractor`, `appeal_writer`, and `risk_checker` remain `PLANNED`.
+- `GET /api/admin/ai/modules/{module_id}` returns the customer-service model/provider, ready/configuration state, initialization error, knowledge count, prompt version/hash, supported actions, and process-local `since_start` metrics. Planned modules return `null` or `NOT_AVAILABLE` for unavailable model, health, knowledge, and metric fields.
+- `GET /api/admin/ai/modules/{module_id}/prompt` returns code-managed prompt version/hash, safe preview, answer-style rules, and forbidden internal markers. It never returns the full prompt, an API key, environment values, hidden system text, or customer data.
+- `POST /api/admin/ai/modules/{module_id}/test` accepts `question`, frozen `context` (`tenant_id`, `platform`, `store_code`, `product_id`, `sku_id`), and optional `include_diagnostics=false`. It calls the actual RAG service and returns `answer`, `action`, `risk_level`, `sources`, `latency_ms`, `model`, and `request_id`. Diagnostics appear only when explicitly requested and contain safe counts/codes. A planned module returns `409` with `AI_MODULE_NOT_TESTABLE`.
+- `GET /api/admin/ai/modules/{module_id}/evaluations/latest` reads the newest saved `live_c_api` report. It returns its internal ID, recorded timestamp and dataset version when the report provides them (otherwise `NOT_AVAILABLE`), case/pass totals, check counts, failed IDs, and report availability. `report_path` is an internal identifier only, never an absolute filesystem path. If no saved real report exists, the route returns `NOT_AVAILABLE` instead of 500.
+
+Runtime metrics are thread-safe and reset on process restart. They contain no question, prompt, raw request body, source excerpt, or exception text; `last_error_summary` is only a controlled error category.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。

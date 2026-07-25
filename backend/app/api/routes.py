@@ -4,9 +4,24 @@ from ipaddress import ip_address
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 
 from app.config.settings import update_env_values
-from app.models.chat import ChatRequest, ModelConfigUpdate, SearchRequest
+from app.models.chat import (
+    AIOnlineTestRequest,
+    ChatRequest,
+    ModelConfigUpdate,
+    SearchRequest,
+)
+from app.service.ai_capability import (
+    MODULE_DEFINITIONS,
+    MODULES_BY_ID,
+    customer_service_detail,
+    latest_evaluation,
+    module_summary,
+    not_available_module_detail,
+    prompt_metadata,
+)
 from app.service.test_knowledge import (
     PlatformIntegrationUnavailable,
     TestKnowledgeValidationError,
@@ -90,6 +105,38 @@ def statistics_data(request: Request) -> dict[str, Any]:
         "collection_name": stats["collection_name"],
         "model_configured": rag.model_configured,
     }
+
+
+def admin_module_or_404(module_id: str):
+    module = MODULES_BY_ID.get(module_id)
+    if module is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AI_MODULE_NOT_FOUND",
+        )
+    return module
+
+
+def module_not_testable_response(module_id: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=envelope(
+            {"code": "AI_MODULE_NOT_TESTABLE", "module_id": module_id},
+            message="AI module is planned and cannot be tested.",
+            success=False,
+        ),
+    )
+
+
+def module_not_ready_response(module_id: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=envelope(
+            {"code": "AI_MODULE_NOT_READY", "module_id": module_id},
+            message="AI module is not ready for an online test.",
+            success=False,
+        ),
+    )
 
 
 @router.get("/health", tags=["system"])
@@ -217,6 +264,113 @@ def sync_test_knowledge(request: Request, package_id: str) -> dict[str, Any]:
             detail=f"invalid V0.3.1 test package: {exc}",
         ) from exc
     return envelope(result, message="V0.3.1 test knowledge synchronized")
+
+
+@router.get("/admin/ai/modules", tags=["ai-admin"])
+def list_ai_modules(request: Request) -> dict[str, Any]:
+    details = customer_service_detail(request.app)
+    modules = [
+        module_summary(module, details["status"])
+        if module.implemented
+        else module_summary(module, "PLANNED")
+        for module in MODULE_DEFINITIONS
+    ]
+    return envelope({"modules": modules})
+
+
+@router.get("/admin/ai/modules/{module_id}", tags=["ai-admin"])
+def get_ai_module(request: Request, module_id: str) -> dict[str, Any]:
+    module = admin_module_or_404(module_id)
+    detail = (
+        customer_service_detail(request.app)
+        if module.implemented
+        else not_available_module_detail(module)
+    )
+    return envelope(detail)
+
+
+@router.get("/admin/ai/modules/{module_id}/prompt", tags=["ai-admin"])
+def get_ai_module_prompt(request: Request, module_id: str) -> dict[str, Any]:
+    module = admin_module_or_404(module_id)
+    if not module.implemented:
+        return envelope(
+            {
+                "module_id": module_id,
+                "status": "NOT_AVAILABLE",
+                "prompt_version": "NOT_AVAILABLE",
+                "prompt_hash": "NOT_AVAILABLE",
+            }
+        )
+    del request
+    return envelope({"module_id": module_id, **prompt_metadata()})
+
+
+@router.post(
+    "/admin/ai/modules/{module_id}/test",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_ai_module_test(
+    request: Request,
+    module_id: str,
+    test_request: AIOnlineTestRequest,
+):
+    module = admin_module_or_404(module_id)
+    if not module.implemented:
+        return module_not_testable_response(module_id)
+    detail = customer_service_detail(request.app)
+    if not detail["ready"]:
+        return module_not_ready_response(module_id)
+
+    result = get_rag(request).query(
+        test_request.question,
+        context=test_request.context,
+    )
+    data = {
+        key: result.get(key)
+        for key in (
+            "answer",
+            "action",
+            "risk_level",
+            "sources",
+            "latency_ms",
+            "model",
+            "request_id",
+        )
+    }
+    if test_request.include_diagnostics:
+        data["diagnostics"] = {
+            "source_count": len(result.get("sources") or []),
+            "warning_codes": result.get("warnings") or [],
+            "required_fields": result.get("required_fields") or [],
+        }
+    return envelope(data)
+
+
+@router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])
+def get_latest_ai_module_evaluation(
+    request: Request, module_id: str
+) -> dict[str, Any]:
+    module = admin_module_or_404(module_id)
+    if not module.implemented:
+        return envelope(
+            {
+                "module_id": module_id,
+                "status": "NOT_AVAILABLE",
+                "evaluation": None,
+            }
+        )
+    return envelope(
+        {
+            "module_id": module_id,
+            **latest_evaluation(
+                request.app.state.settings.project_root
+                / "docs"
+                / "rag"
+                / "evaluations"
+            ),
+        }
+    )
 
 
 @router.get("/ai/status", tags=["compatibility"])
