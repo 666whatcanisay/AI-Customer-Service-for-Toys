@@ -5,7 +5,7 @@
 ## 当前任务
 
 - 任务：`MVP-PLUS-01 客服经验沉淀入口`。
-- 分支：`codex/customer-experience-case-capture`，基线 `origin/develop@271c155`。
+- 分支：`codex/customer-experience-case-capture`，基线 `origin/develop@271c155`，Draft PR #29 指向 `develop`。
 - 状态：前端实现、类型检查、回归测试和生产构建完成；C 优秀案例接口尚未发布完整版本化契约，真实跨线联调为 `BLOCKED`。
 
 ## 范围与入口

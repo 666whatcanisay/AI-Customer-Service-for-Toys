@@ -2,6 +2,8 @@
 
 日期：2026-07-25
 
+Draft PR：[#29](https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/29)（目标分支：`develop`）。
+
 ## 交付
 
 - AI 回答反馈区保留“直接采用 / 修改后采用 / 未采用”，并在选择反馈后提供“⭐ 保存优秀案例”。

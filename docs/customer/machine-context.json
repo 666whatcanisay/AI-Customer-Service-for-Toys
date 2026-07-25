@@ -12,6 +12,12 @@
     "branch": "codex/customer-experience-case-capture",
     "base_commit": "271c155",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
+    "pull_request": {
+      "number": 29,
+      "url": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/29",
+      "draft": true,
+      "base": "develop"
+    },
     "clean": false,
     "task_commit": "HEAD (this commit)"
   },
