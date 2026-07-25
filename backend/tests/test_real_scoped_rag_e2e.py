@@ -164,5 +164,24 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
             assert data["action"] == "DIRECT_ANSWER"
             assert data["context"] == chat_context.model_dump()
             assert data["sources"][0]["knowledge_version"] == "V0.3.1"
+
+            admin_response = client.post(
+                "/api/admin/ai/modules/ai_customer_service/test",
+                json={
+                    "question": question,
+                    "context": chat_context.model_dump(),
+                    "include_diagnostics": True,
+                },
+            )
+            assert admin_response.status_code == 200
+            admin_data = admin_response.json()["data"]
+            assert admin_data["action"] == "DIRECT_ANSWER"
+            assert admin_data["model"] == "qwen3.5:9b"
+            assert admin_data["sources"]
+            assert admin_data["diagnostics"]["source_count"] >= 1
+
+            metrics_response = client.get("/api/admin/ai/modules/ai_customer_service")
+            assert metrics_response.status_code == 200
+            assert metrics_response.json()["data"]["call_count"] >= 4
     finally:
         service.close()

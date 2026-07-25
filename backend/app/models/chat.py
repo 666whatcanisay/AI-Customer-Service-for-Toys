@@ -95,6 +95,24 @@ class SearchRequest(BaseModel):
         return value
 
 
+class AIOnlineTestRequest(BaseModel):
+    """A bounded, no-side-effect test invocation for an implemented AI module."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(..., min_length=1, max_length=4000)
+    context: FrozenChatContext
+    include_diagnostics: bool = False
+
+    @field_validator("question")
+    @classmethod
+    def question_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("question must not be blank")
+        return value
+
+
 class ModelConfigUpdate(BaseModel):
     provider: str = Field(default="ollama", min_length=1, max_length=40)
     model: str = Field(default="qwen3.5:9b", min_length=1, max_length=100)
