@@ -38,4 +38,25 @@ All responses use the existing `{success, message, data}` envelope. These endpoi
 
 Runtime metrics are thread-safe and reset on process restart. They contain no question, prompt, raw request body, source excerpt, or exception text; `last_error_summary` is only a controlled error category.
 
+## Pilot quality observation APIs
+
+- `GET /api/admin/ai/quality-observation` returns only process-local,
+  aggregate-only data: `ai_answer_count`, `direct_answer_count`,
+  `controlled_answer_count`, `transfer_human_count`, and the four Badcase
+  issue counts (`FACT_ERROR`, `MISSING_INFO`, `STYLE_ISSUE`, `RISK_ISSUE`).
+  Customer reply counts exclude `POST /api/admin/ai/modules/.../test`; those
+  online tests remain in the legacy runtime metrics only.
+- `POST /api/admin/ai/quality-observation/run` is loopback-only and accepts
+  `{case_id, revision}`. It uses the existing explicit APPROVED snapshot
+  evaluation and C writeback transaction, then performs a second local,
+  bounded classification before updating the in-memory aggregate. It never
+  independently scans C exports, stores source text, or adds fields to the C
+  evaluation writeback contract.
+
+Both routes return the existing `{success, message, data}` envelope. They do
+not modify Prompt, publish knowledge, retrain/update a model, or return a
+question, AI draft, final answer, full prompt, or secret. The Badcase counters
+cover only successful explicit A-side evaluation runs since the current process
+started; they are not a historical audit of all `CustomerExperienceCase` data.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。

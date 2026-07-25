@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.config.settings import Settings
+from app.service.quality_observation import QualityObservationService
 
 
 EXPORT_PATH = "/api/v1/admin/ai-optimization/cases/export"
@@ -365,9 +366,41 @@ class ExperienceEvaluationService:
         return raw
 
     def run(self, case_id: str, revision: int) -> dict[str, Any]:
+        return self._run(case_id, revision)
+
+    def run_with_quality_observation(
+        self,
+        case_id: str,
+        revision: int,
+        observer: QualityObservationService,
+    ) -> dict[str, Any]:
+        """Evaluate and aggregate one case within the existing C writeback flow.
+
+        Classification happens before the C writeback, while the immutable
+        snapshot is still in memory.  Its aggregate is updated only after the
+        platform accepts the evaluation evidence, so a failed run cannot add a
+        misleading Badcase count.
+        """
+        return self._run(case_id, revision, observer=observer)
+
+    def _run(
+        self,
+        case_id: str,
+        revision: int,
+        observer: QualityObservationService | None = None,
+    ) -> dict[str, Any]:
         snapshot = self.platform_client.fetch_approved_snapshot(case_id, revision)
         raw_output = self._call_ollama(_evaluation_prompt(snapshot))
         result, suggestions = _parse_model_output(raw_output)
+        issues = (
+            observer.classify(
+                question=snapshot.question,
+                ai_answer=snapshot.ai_answer,
+                final_answer=snapshot.final_answer,
+            )
+            if observer is not None
+            else None
+        )
         evaluation_run_id = f"AEC-{uuid.uuid4()}"
         payload = {
             "case_id": snapshot.case_id,
@@ -383,4 +416,13 @@ class ExperienceEvaluationService:
         recorded = self.platform_client.record_evaluation(payload)
         # Do not surface the source snapshot or prompt.  C returns only the
         # traceable evaluation evidence it recorded.
+        if observer is not None and issues is not None:
+            metrics = observer.metrics.record(issues, self.settings.llm_model)
+            return {
+                **recorded,
+                "quality_observation": {
+                    "issues": issues,
+                    "metrics": metrics,
+                },
+            }
         return recorded
