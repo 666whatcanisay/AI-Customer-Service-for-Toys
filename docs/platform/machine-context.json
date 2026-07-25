@@ -6,11 +6,11 @@
   "version": "0.1.0",
   "current_task": "C-T05-LONG",
   "current_stage": "C1-C7 operations and AI management portal v1",
-  "current_gate": "L2 local implementation and verification PASS; Draft PR creation pending",
+  "current_gate": "L2 local implementation and verification PASS; Draft PR #27 open; additive B-T05 suggestion_id compatibility patch verified",
   "status": "ready_for_review",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "No cross-line field, error-code, schema, or version change was made."
+    "C-owned additive customer-suggestion response alias: suggestion_id equals retained id; B-T05 is the affected adapter consumer; no shared-contract version, error-code, or database change."
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -35,7 +35,7 @@
   "provided_interfaces": [
     "GET /health",
     "Existing C-line import and frozen test-catalog endpoints (unchanged)",
-    "POST/GET /api/v1/customer-suggestions",
+    "POST/GET /api/v1/customer-suggestions (retains id and returns same-value suggestion_id for B-T05 compatibility)",
     "GET/PATCH /api/v1/admin/customer-suggestions",
     "GET /api/v1/admin/overview, stores, products, product detail/SKUs, faqs, safety-rules, sources, conflicts, import-batches"
   ],
@@ -43,6 +43,13 @@
     "Existing five frozen test-catalog and knowledge-package GET interfaces",
     "Task-declared A-line probe: /ai-api/api/admin/ai/modules (not implemented in this baseline)"
   ],
+  "cross_line_compatibility": {
+    "affected_line": "B-T05",
+    "change": "Customer-suggestion POST and reporter-history GET retain id and add same-value suggestion_id.",
+    "shared_contract_version": "0.1.0 unchanged",
+    "database_change": false,
+    "verified": "C API tests plus isolated real B suggestionClient POST/GET smoke"
+  },
   "data_boundaries": {
     "source": "Validated V0.3.1 test baseline only; source packages remain out of Git",
     "production_data_imported": false,
@@ -77,7 +84,7 @@
     "branch": "agent/platform-admin-v1-t05",
     "base": "origin/develop 326658d",
     "commit": null,
-    "draft_pr": null
+    "draft_pr": "#27 https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/27"
   },
   "next_recommended_task": "Review C-T05 and publish a Draft PR against develop. Do not enable AI detail/test calls without an approved versioned A-line contract.",
   "last_updated": "2026-07-25"

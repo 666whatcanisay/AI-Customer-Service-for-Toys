@@ -182,12 +182,15 @@ def test_customer_suggestion_is_persisted_with_a_forced_initial_status(client: T
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "SUBMITTED"
+    assert body["suggestion_id"] == body["id"]
     assert "internal_note" not in body
 
     history = client.get("/api/v1/customer-suggestions", params={"reporter_id": "agent-7"})
     assert history.status_code == 200
     assert history.json()["total"] == 1
-    assert history.json()["items"][0]["description"] == _suggestion_payload()["description"]
+    history_item = history.json()["items"][0]
+    assert history_item["description"] == _suggestion_payload()["description"]
+    assert history_item["suggestion_id"] == history_item["id"]
 
 
 def test_admin_suggestion_lifecycle_only_allows_declared_transitions(client: TestClient) -> None:

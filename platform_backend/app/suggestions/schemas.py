@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class SuggestionStatus(StrEnum):
@@ -59,6 +59,12 @@ class SuggestionResponse(BaseModel):
     status: SuggestionStatus
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def suggestion_id(self) -> str:
+        """Compatibility alias for the C-owned customer-workbench API."""
+        return self.id
 
 
 class AdminSuggestionResponse(SuggestionResponse):
