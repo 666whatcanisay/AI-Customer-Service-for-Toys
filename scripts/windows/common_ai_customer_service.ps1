@@ -743,9 +743,9 @@ function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUr
     $listenerProcessId = if ($record -and $record.ListenerProcess) { [string]$record.ListenerProcess.Id } else { '-' }
     $portOwners = @(Get-PortOwner $Port)
     $ownsPort = $record -and $record.Valid -and (($record.ListenerProcess -and $portOwners.Count -eq 1 -and [int]$portOwners[0] -eq [int]$record.ListenerProcess.Id) -or ($record.Process -and $portOwners.Count -gt 0 -and @($portOwners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $portOwners.Count))
-    $serviceState = if ($ownsPort) { 'RUNNING' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
+    $serviceState = if ($ownsPort) { '运行中（RUNNING）' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
     $healthOk = Test-HttpOk $HealthUrl
-    $portState = if ($portOwners.Count -gt 0) { "LISTENING（PID $($portOwners -join ', ')）" } elseif ($healthOk) { 'LISTENING（health 已确认；未能读取端口 PID）' } else { '未监听' }
+    $portState = if ($portOwners.Count -gt 0) { "监听（LISTENING；PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（LISTENING；health 已确认；未能读取端口 PID）' } else { '未监听' }
     $healthState = if ($healthOk) { '可用' } else { '不可用' }
     return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; Record=$record }
 }
