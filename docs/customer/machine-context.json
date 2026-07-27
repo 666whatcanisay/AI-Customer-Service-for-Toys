@@ -3,18 +3,18 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "TARGET-PILOT-B independent daily customer consultation",
-  "current_stage": "Implementation, error and empty-state review complete: default-store catalog load, safe next-consultation reset, stale-answer protection, daily-mode guidance, case status guidance, feedback-path distinction and service recovery actions. The complete live success path is blocked because A/RAG is unavailable.",
-  "current_gate": "CONDITIONAL_LOCAL_PASS_PENDING_DELIVERY: typecheck, 24 Vitest files / 96 tests and production build passed. Browser verified homepage, live C catalog product selection, AI unavailable state, service recovery, experience-case empty state and feedback guide. No answer/copy/case/feedback success result was fabricated.",
-  "status": "target_pilot_b_ready_for_draft_pr_with_rag_blocker",
+  "current_task": "PILOT-HARDENING-B daily customer-service workbench hardening",
+  "current_stage": "Draft PR #49 created: catalog readiness and recovery guidance, cross-store reset boundary, missing-knowledge warning, clipboard recovery and adoption next-step guidance are complete. The complete live success path remains blocked because A/RAG is unavailable.",
+  "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
+  "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
   "last_updated": "2026-07-27",
   "git": {
-    "branch": "codex/customer-pilot-b-v3",
+    "branch": "codex/customer-pilot-hardening-b-v4",
     "base_commit": "348c875",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "DRAFT_PR_46",
+    "delivery": "DRAFT_PR_49",
     "clean": false,
-    "task_commit": "fdec128"
+    "task_commit": "89f9ead"
   },
   "owned_paths": [
     "frontend/**",
@@ -60,7 +60,7 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 TARGET-PILOT-B: vue-tsc --noEmit PASS; Vitest 24 files / 96 tests PASS; vite build PASS. Browser verified homepage guidance, live C catalog product selection, AI unavailable state, recovery actions, experience-case empty state and feedback guide. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "last_test_result": "2026-07-27 PILOT-HARDENING-B: vue-tsc --noEmit PASS; Vitest 24 files / 99 tests PASS; vite build PASS. Browser verified the real test store/catalog, catalog readiness guidance, cross-store reset warning and no-product submission guard. A/RAG was unavailable, so no answer/copy/case/feedback success was fabricated. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
   "blockers": [
     "A/RAG service was unavailable during browser validation and the actual de-identified consultation request failed, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
   ],
@@ -85,7 +85,8 @@
     "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS",
     "UI-1 unified customer product shell (local UI verification PASS; delivery pending)",
     "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)",
-    "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)"
+    "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
+    "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
