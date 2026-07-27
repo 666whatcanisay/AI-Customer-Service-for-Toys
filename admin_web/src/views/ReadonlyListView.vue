@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { apiErrorMessage, listAdminResource, type AdminResource } from '../api/client'
+import { displayStatus } from '../presentation'
 
 interface Column {
   key: string
@@ -28,6 +29,9 @@ function value(row: Record<string, unknown>, key: string): string {
   if (Array.isArray(raw)) return raw.join(', ')
   if (raw === null || raw === undefined || raw === '') return '—'
   if (typeof raw === 'boolean') return raw ? '是' : '否'
+  if (typeof raw === 'string' && [
+    'sales_status', 'review_status', 'risk_level', 'answer_action', 'status', 'relation_type',
+  ].includes(key)) return displayStatus(raw)
   return String(raw)
 }
 
@@ -74,8 +78,8 @@ onMounted(load)
       <button class="button" type="submit">筛选</button>
     </form>
     <p v-if="loading" class="notice" role="status">正在加载…</p>
-    <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
-    <p v-else-if="rows.length === 0" class="notice">没有符合条件的数据。</p>
+    <p v-else-if="error" class="notice error" role="alert">暂时无法读取{{ title }}。{{ error }}</p>
+    <p v-else-if="rows.length === 0" class="notice">暂无符合当前筛选条件的{{ title }}。请调整筛选条件，或先完成数据导入与审核。</p>
     <div v-else class="card table-wrap">
       <table class="data-table">
         <thead><tr><th v-for="column in columns" :key="column.key">{{ column.label }}</th></tr></thead>
