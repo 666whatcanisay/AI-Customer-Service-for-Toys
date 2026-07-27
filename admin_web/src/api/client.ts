@@ -651,11 +651,14 @@ export function errorReportUrl(batchId: string): string {
 }
 
 export function apiErrorMessage(error: unknown): string {
-  if (isOfflineError(error)) return '无法连接平台服务，请检查网络或服务状态。'
+  if (isOfflineError(error)) return '无法连接运营平台。请确认本机服务已启动后再重试。'
   if (error instanceof AxiosError) {
-    const data = error.response?.data as { error?: { message?: unknown } } | undefined
-    const message = data?.error?.message
-    if (typeof message === 'string') return message
+    const status = error.response?.status
+    if (status === 400 || status === 422) return '筛选条件或提交内容不符合要求。请检查页面中的必填项和格式。'
+    if (status === 401 || status === 403) return '当前试运行账号没有访问此项数据的权限。请联系管理员确认。'
+    if (status === 404) return '没有找到所需记录。请刷新页面并确认筛选条件。'
+    if (status === 409) return '这条记录的状态已发生变化。请刷新后再核对和操作。'
+    if (status !== undefined && status >= 500) return '运营平台暂时无法处理请求。请稍后重试；若持续出现，请查看服务状态。'
   }
-  return '请求失败，请稍后重试。'
+  return '暂时无法完成此操作。请稍后重试；若持续出现，请查看服务状态。'
 }

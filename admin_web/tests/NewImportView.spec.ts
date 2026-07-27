@@ -190,5 +190,7 @@ describe('NewImportView', () => {
 
     expect(link.attributes('href')).toBe('/template.xlsx')
     expect(link.text()).toContain('下载标准 Excel 模板')
+    expect(wrapper.text()).toContain('资料准备清单')
+    expect(wrapper.text()).toContain('不会自动发布给 AI')
   })
 })
