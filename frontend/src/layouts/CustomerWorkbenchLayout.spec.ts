@@ -47,4 +47,23 @@ describe('CustomerWorkbenchLayout', () => {
     expect(document.body.textContent).toContain('不是登录或权限认证')
     wrapper.unmount()
   })
+
+  it('shows the test guide once for a known tester and records dismissal', async () => {
+    localStorage.setItem(
+      TESTER_IDENTITY_STORAGE_KEY,
+      JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' })
+    )
+    const wrapper = await mountLayout()
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('AI客服助手（测试版）')
+    expect(document.body.textContent).toContain('选择商品 / SKU')
+    expect(document.body.textContent).toContain('人工确认后复制发送')
+    expect(document.body.textContent).toContain('AI 建议需要人工确认')
+
+    await wrapper.get('[data-testid="pilot-guide-start"]').trigger('click')
+    await flushPromises()
+    expect(localStorage.getItem('mumu-customer-workspace:pilot-guide-seen')).toBe('true')
+    wrapper.unmount()
+  })
 })

@@ -4,9 +4,9 @@
 
 ## 当前任务
 
-- 任务：`MVP-PLUS-01 客服经验沉淀入口`。
-- 分支：`codex/customer-experience-case-capture`，基线 `origin/develop@271c155`，Draft PR #29 指向 `develop`。
-- 状态：`CONTRACT-FIX1` 已将 B adapter 对齐任务内冻结；等待 C 审核、A 真实评测和回写的集成闭环。
+- 任务：`MVP-PLUS-02-FEEDBACK 客服反馈闭环入口`。
+- 分支：`codex/customer-pilot-experience`；Draft PR [#34](https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/34)，标题 `feat(customer): add AI feedback capture`，目标分支 `develop`。MVP-PLUS-01 Draft PR #29 已合并。
+- 状态：B 前端本地验收 `PASS`；消费已冻结 `ai-feedback.v1-draft` 的独立创建协议，尚未执行真实跨线 POST 联调。
 
 ## 范围与入口
 
@@ -22,10 +22,18 @@
 - 成功只消费顶层 `case_id/review_status`，其中 `review_status` 仅限 `NEW/REVIEWING/APPROVED/REJECTED`；不兼容 `status` 或 `data` 包装。未知或失败响应必须显示错误，且不得生成本地成功。
 - C 未发布 GET 契约；`/experience-cases` 仅展示当前会话已真实成功的最小摘要，不存 raw 问题、AI 回复或最终回复，刷新后明确提示等待 C 查询接口。
 
+## 试运行体验边界
+
+- 首次引导只展示测试版使用流程与“AI 建议需要人工确认”，关闭状态仅保存本机布尔标记。
+- `DIRECT_ANSWER/CONTROLLED_ANSWER/TRANSFER_HUMAN` 的展示依次为“🟢 可以参考 / 🟡 建议确认 / 🔴 建议人工处理”；不改变 action wire value。
+- 未采用原因 `FACT_ERROR/MISSING_INFO/STYLE_ISSUE/RISK_ISSUE/OTHER` 是独立 `AIResponseFeedback.feedback_type`，不映射为 CustomerExperienceCase 的 `feedback_type`。选择“未采用”后由独立弹窗提交真实 POST；`OTHER` 需要去标识化说明。
+- B 严格请求 `POST /platform-api/api/v1/ai-response-feedback`，携带受控三字段 context 与非空 `Idempotency-Key`；新反馈会话首次提交生成唯一键，失败重试复用。只在收到顶层 `feedback_id/status=NEW` 后展示成功；错误、未知响应和契约偏差不产生本地成功或优秀案例回退。
+- 2026-07-27 真实 B-C 联调：隔离当前 C 的五类带 `Idempotency-Key` POST 均为 HTTP 201、非空 `feedback_id`、`status=NEW`；同键重放返回相同 `feedback_id`，GET 历史为 HTTP 200、`items=5`、`total=5`。创建回执只消费冻结的两字段，当前 gate 为 `PASS`。
+
 ## 安全与验证
 
 - 只用于内部测试，不收集客户姓名、电话、地址、完整订单号或隐私截图；不自动发送消息或执行订单动作。
 - Node：`v24.14.0`。
 - `vue-tsc --noEmit`：PASS。
-- Vitest：19 文件 / 77 测试 PASS，覆盖保存、失败提示、状态展示和原 AI 客服回归。
+- Vitest：22 文件 / 87 测试 PASS，覆盖首次引导、状态展示、AI 问题反馈提交/失败、优秀案例独立边界和原 AI 客服回归。
 - `vite build`：PASS；保留单 JS chunk 大于 500 kB 的已知警告。
