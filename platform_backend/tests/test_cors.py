@@ -53,7 +53,7 @@ def test_allowed_origin_receives_preflight_and_actual_cors_headers(
                 headers={
                     "Origin": "http://127.0.0.1:5173",
                     "Access-Control-Request-Method": "GET",
-                    "Access-Control-Request-Headers": "X-Request-ID",
+                    "Access-Control-Request-Headers": "Idempotency-Key, X-Request-ID",
                 },
             )
             actual = client.get(
@@ -70,6 +70,7 @@ def test_allowed_origin_receives_preflight_and_actual_cors_headers(
     assert preflight.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
     assert "GET" in preflight.headers["access-control-allow-methods"]
     assert "PATCH" in preflight.headers["access-control-allow-methods"]
+    assert "idempotency-key" in preflight.headers["access-control-allow-headers"].lower()
     assert actual.status_code == 200
     assert actual.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
     assert actual.headers["access-control-expose-headers"] == "X-Request-ID"
