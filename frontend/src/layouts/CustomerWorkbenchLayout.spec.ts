@@ -12,7 +12,14 @@ vi.mock('@/api/platformClient', () => ({ platformClient: { getHealth: healthMock
 const mountLayout = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/', component: { template: '<div>首页内容</div>' } }]
+    routes: [
+      { path: '/', component: { template: '<div>首页内容</div>' } },
+      { path: '/ai-chat', component: { template: '<div />' } },
+      { path: '/ai-control-center', component: { template: '<div />' } },
+      { path: '/suggestions', component: { template: '<div />' } },
+      { path: '/suggestions/mine', component: { template: '<div />' } },
+      { path: '/experience-cases', component: { template: '<div />' } }
+    ]
   })
   await router.push('/')
   await router.isReady()
@@ -33,6 +40,7 @@ describe('CustomerWorkbenchLayout', () => {
     await flushPromises()
     expect(wrapper.get('nav').text()).toContain('工作台首页')
     expect(wrapper.get('nav').text()).toContain('AI 客服')
+    expect(wrapper.get('nav').text()).toContain('AI 控制中心')
     expect(wrapper.get('nav').text()).toContain('我的建议')
     expect(wrapper.get('nav').text()).toContain('我的案例')
     expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('AI 可用')
