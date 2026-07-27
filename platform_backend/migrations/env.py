@@ -8,6 +8,7 @@ from app.database import Base
 from app.ingestion import models  # noqa: F401
 from app.suggestions import models as suggestion_models  # noqa: F401
 from app.experience_cases import models as experience_case_models  # noqa: F401
+from app.ai_feedback import models as ai_feedback_models  # noqa: F401
 from app.test_catalog import models as test_catalog_models  # noqa: F401
 
 config = context.config
