@@ -64,12 +64,35 @@ async def validation_exception_handler(
             "/api/v1/admin/ai-optimization",
         )
     )
+    ai_feedback_path = request.url.path.startswith(
+        (
+            "/api/v1/ai-response-feedback",
+            "/api/v1/admin/ai-response-feedback",
+            "/api/v1/admin/ai-quality",
+        )
+    )
+    analysis_output_invalid = (
+        request.url.path == "/api/v1/admin/ai-quality/analysis-results"
+        and any(
+            len(error.get("loc", ())) > 1
+            and error["loc"][1] in {"analysis", "suggestions"}
+            for error in exc.errors()
+        )
+    )
     return JSONResponse(
         status_code=422,
         content=_error_payload(
             request,
-            code="EXPERIENCE_CASE_VALIDATION_FAILED" if experience_case_path else "VALIDATION_ERROR",
-            message="Request validation failed",
+            code=(
+                "AI_RESPONSE_FEEDBACK_ANALYSIS_OUTPUT_INVALID"
+                if analysis_output_invalid
+                else "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
+                if ai_feedback_path
+                else "EXPERIENCE_CASE_VALIDATION_FAILED"
+                if experience_case_path
+                else "VALIDATION_ERROR"
+            ),
+            message="The request is invalid." if ai_feedback_path else "Request validation failed",
             details=exc.errors(),
         ),
     )
