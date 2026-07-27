@@ -13,7 +13,7 @@ Draft PR：[#34](https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/
 
 ## API 调用
 
-生产客户端仅调用 `POST /platform-api/api/v1/ai-response-feedback`，并按 `ai-feedback.v1-draft` 发送受控上下文与五值 `feedback_type`。成功只接受顶层 `feedback_id`、`status=NEW`、`analysis_status=NEW`、`created_at`，然后显示“反馈已记录。”；接口失败和异常回执均显示失败，不生成本地成功，也不会回退为 CustomerExperienceCase。
+生产客户端仅调用 `POST /platform-api/api/v1/ai-response-feedback`，并按 `ai-feedback.v1-draft` 发送受控上下文、五值 `feedback_type` 与非空 `Idempotency-Key`。新反馈会话首次提交生成唯一键，失败重试复用该键。成功只接受顶层 `feedback_id`、`status=NEW`，然后显示“反馈已记录。”；接口失败和异常回执均显示失败，不生成本地成功，也不会回退为 CustomerExperienceCase。
 
 ## 验证
 

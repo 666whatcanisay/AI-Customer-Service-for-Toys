@@ -27,7 +27,8 @@
 - 首次引导只展示测试版使用流程与“AI 建议需要人工确认”，关闭状态仅保存本机布尔标记。
 - `DIRECT_ANSWER/CONTROLLED_ANSWER/TRANSFER_HUMAN` 的展示依次为“🟢 可以参考 / 🟡 建议确认 / 🔴 建议人工处理”；不改变 action wire value。
 - 未采用原因 `FACT_ERROR/MISSING_INFO/STYLE_ISSUE/RISK_ISSUE/OTHER` 是独立 `AIResponseFeedback.feedback_type`，不映射为 CustomerExperienceCase 的 `feedback_type`。选择“未采用”后由独立弹窗提交真实 POST；`OTHER` 需要去标识化说明。
-- B 严格请求 `POST /platform-api/api/v1/ai-response-feedback`，携带受控三字段 context；只在收到顶层 `feedback_id/status=NEW/analysis_status=NEW/created_at` 后展示成功。错误、未知响应和契约偏差不产生本地成功或优秀案例回退。
+- B 严格请求 `POST /platform-api/api/v1/ai-response-feedback`，携带受控三字段 context 与非空 `Idempotency-Key`；新反馈会话首次提交生成唯一键，失败重试复用。只在收到顶层 `feedback_id/status=NEW` 后展示成功；错误、未知响应和契约偏差不产生本地成功或优秀案例回退。
+- 2026-07-27 真实 B-C 联调：隔离当前 C 的五类带 `Idempotency-Key` POST 均为 HTTP 201、非空 `feedback_id`、`status=NEW`；同键重放返回相同 `feedback_id`，GET 历史为 HTTP 200、`items=5`、`total=5`。创建回执只消费冻结的两字段，当前 gate 为 `PASS`。
 
 ## 安全与验证
 

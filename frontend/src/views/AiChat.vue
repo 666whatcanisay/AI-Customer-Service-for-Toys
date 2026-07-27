@@ -585,7 +585,10 @@ import { ElMessage } from 'element-plus'
 import { ragClient } from '@/api/ragClient'
 import { platformClient } from '@/api/platformClient'
 import { experienceCaseClient } from '@/api/experienceCaseClient'
-import { aiResponseFeedbackClient } from '@/api/aiResponseFeedbackClient'
+import {
+  aiResponseFeedbackClient,
+  createAiResponseFeedbackIdempotencyKey
+} from '@/api/aiResponseFeedbackClient'
 import {
   PlatformClientError,
   toPlatformClientError,
@@ -764,6 +767,7 @@ const aiFeedbackStatus = ref('')
 const aiFeedbackType = ref<NotAdoptedReason | ''>('')
 const aiFeedbackNote = ref('')
 const aiFeedbackFinalAnswer = ref('')
+const aiFeedbackIdempotencyKey = ref('')
 const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
@@ -1197,6 +1201,7 @@ const openAiFeedbackCapture = () => {
   aiFeedbackType.value = ''
   aiFeedbackNote.value = ''
   aiFeedbackFinalAnswer.value = ''
+  aiFeedbackIdempotencyKey.value = ''
   aiFeedbackDialogOpen.value = true
 }
 
@@ -1221,6 +1226,9 @@ const submitAiFeedback = async () => {
   aiFeedbackSubmitting.value = true
   aiFeedbackError.value = ''
   aiFeedbackStatus.value = ''
+  const idempotencyKey =
+    aiFeedbackIdempotencyKey.value || createAiResponseFeedbackIdempotencyKey()
+  aiFeedbackIdempotencyKey.value = idempotencyKey
   try {
     await aiResponseFeedbackClient.submit({
       storeCode: result.value.context.store_code,
@@ -1232,7 +1240,7 @@ const submitAiFeedback = async () => {
       feedbackNote: aiFeedbackType.value === 'OTHER' ? aiFeedbackNote.value.trim() : null,
       finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
       createdBy: identity.value.reporterId
-    })
+    }, idempotencyKey)
     aiFeedbackStatus.value = '反馈已记录。'
   } catch (error) {
     aiFeedbackError.value = error instanceof Error ? error.message : 'AI 问题反馈服务当前不可用。'

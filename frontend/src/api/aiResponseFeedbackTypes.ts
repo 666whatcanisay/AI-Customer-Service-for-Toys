@@ -26,10 +26,12 @@ export interface AiResponseFeedbackDraft {
 export interface AiResponseFeedbackReceipt {
   feedbackId: string
   status: AiResponseFeedbackStatus
-  analysisStatus: AiResponseFeedbackStatus
-  createdAt: string
 }
 
 export interface AiResponseFeedbackApiClient {
-  submit(draft: AiResponseFeedbackDraft, signal?: AbortSignal): Promise<AiResponseFeedbackReceipt>
+  submit(
+    draft: AiResponseFeedbackDraft,
+    idempotencyKey: string,
+    signal?: AbortSignal
+  ): Promise<AiResponseFeedbackReceipt>
 }

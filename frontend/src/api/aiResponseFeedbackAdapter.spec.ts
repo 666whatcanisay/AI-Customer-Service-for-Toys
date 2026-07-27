@@ -42,15 +42,15 @@ describe('aiResponseFeedbackAdapter', () => {
 
   it('accepts only the frozen creation receipt', () => {
     expect(adaptAiResponseFeedbackReceipt({
-      feedback_id: 'ARF-001', status: 'NEW', analysis_status: 'NEW', created_at: '2026-07-25T16:00:00+08:00'
+      feedback_id: 'ARF-001', status: 'NEW'
     })).toEqual({
-      feedbackId: 'ARF-001', status: 'NEW', analysisStatus: 'NEW', createdAt: '2026-07-25T16:00:00+08:00'
+      feedbackId: 'ARF-001', status: 'NEW'
     })
     expect(() => adaptAiResponseFeedbackReceipt({
-      feedback_id: 'ARF-001', status: 'ANALYZING', analysis_status: 'ANALYZING', created_at: '2026-07-25T16:00:00+08:00'
+      feedback_id: 'ARF-001', status: 'ANALYZING'
     })).toThrow(PlatformAdapterError)
     expect(() => adaptAiResponseFeedbackReceipt({
-      data: { feedback_id: 'ARF-001', status: 'NEW', analysis_status: 'NEW', created_at: '2026-07-25T16:00:00+08:00' }
+      data: { feedback_id: 'ARF-001', status: 'NEW' }
     })).toThrow(PlatformAdapterError)
   })
 })

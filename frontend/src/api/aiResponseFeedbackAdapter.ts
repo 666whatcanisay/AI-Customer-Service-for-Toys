@@ -51,11 +51,6 @@ const requiredFeedbackType = (value: unknown): AiResponseFeedbackType => {
   return value
 }
 
-const validCreatedAt = (value: unknown): value is string =>
-  typeof value === 'string' &&
-  /^\d{4}-\d{2}-\d{2}T/.test(value) &&
-  !Number.isNaN(Date.parse(value))
-
 export const toAiResponseFeedbackPayload = (
   draft: AiResponseFeedbackDraft
 ): AiResponseFeedbackRequestPayload => {
@@ -93,19 +88,14 @@ export const adaptAiResponseFeedbackReceipt = (payload: unknown): AiResponseFeed
     typeof payload.feedback_id !== 'string' ||
     !payload.feedback_id.trim() ||
     payload.status !== 'NEW' ||
-    payload.analysis_status !== 'NEW' ||
-    !isStatus(payload.status) ||
-    !isStatus(payload.analysis_status) ||
-    !validCreatedAt(payload.created_at)
+    !isStatus(payload.status)
   ) {
     throw new PlatformAdapterError(
-      'AI 问题反馈提交结果必须包含冻结字段 feedback_id、NEW 状态和 created_at'
+      'AI 问题反馈提交结果必须包含冻结字段 feedback_id 和 NEW 状态'
     )
   }
   return {
     feedbackId: payload.feedback_id.trim(),
-    status: payload.status,
-    analysisStatus: payload.analysis_status,
-    createdAt: payload.created_at
+    status: payload.status
   }
 }

@@ -18,7 +18,8 @@ const apiMocks = vi.hoisted(() => ({
   listProducts: vi.fn(),
   listSkus: vi.fn(),
   submitExperienceCase: vi.fn(),
-  submitAiFeedback: vi.fn()
+  submitAiFeedback: vi.fn(),
+  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key')
 }))
 
 vi.mock('@/api/ragClient', () => ({
@@ -42,7 +43,8 @@ vi.mock('@/api/experienceCaseClient', () => ({
 }))
 
 vi.mock('@/api/aiResponseFeedbackClient', () => ({
-  aiResponseFeedbackClient: { submit: apiMocks.submitAiFeedback }
+  aiResponseFeedbackClient: { submit: apiMocks.submitAiFeedback },
+  createAiResponseFeedbackIdempotencyKey: apiMocks.createAiFeedbackIdempotencyKey
 }))
 
 const store = {
@@ -200,7 +202,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     apiMocks.chat.mockResolvedValue(resultFor())
     apiMocks.submitExperienceCase.mockResolvedValue({ caseId: 'CEC-001', reviewStatus: 'NEW' })
     apiMocks.submitAiFeedback.mockResolvedValue({
-      feedbackId: 'ARF-001', status: 'NEW', analysisStatus: 'NEW', createdAt: '2026-07-25T16:00:00+08:00'
+      feedbackId: 'ARF-001', status: 'NEW'
     })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -390,9 +392,32 @@ describe('AiChat B-T04 three-step workbench', () => {
       storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
       aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', feedbackType: 'RISK_ISSUE',
       feedbackNote: null, finalAnswer: null, createdBy: 'TESTER-ONE'
-    })
+    }, expect.stringMatching(/^ai-feedback-/))
     expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
     expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
+  })
+
+  it('reuses an in-flight feedback Idempotency-Key and displays C replay as the recorded result', async () => {
+    apiMocks.submitAiFeedback
+      .mockRejectedValueOnce(new Error('网络暂时不可用'))
+      .mockResolvedValueOnce({ feedbackId: 'ARF-001', status: 'NEW' })
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
+    await selectAiFeedbackType(wrapper, 'FACT_ERROR')
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+    const idempotencyKey = apiMocks.submitAiFeedback.mock.calls[0]?.[1]
+    expect(wrapper.get('[data-testid="ai-feedback-error"]').text()).toContain('网络暂时不可用')
+
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+    expect(apiMocks.submitAiFeedback).toHaveBeenCalledTimes(2)
+    expect(apiMocks.submitAiFeedback.mock.calls[1]?.[1]).toBe(idempotencyKey)
+    expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
   })
 
   it('requires an OTHER note and shows the feedback endpoint failure without a local success', async () => {

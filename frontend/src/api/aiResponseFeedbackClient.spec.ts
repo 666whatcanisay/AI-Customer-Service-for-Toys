@@ -7,7 +7,10 @@ vi.mock('axios', () => ({
   default: { create: httpCreate, isCancel: () => false, isAxiosError: () => false }
 }))
 
-import { aiResponseFeedbackClient } from './aiResponseFeedbackClient'
+import {
+  aiResponseFeedbackClient,
+  createAiResponseFeedbackIdempotencyKey
+} from './aiResponseFeedbackClient'
 
 const draft = {
   storeCode: 'PDD-SM',
@@ -24,12 +27,15 @@ const draft = {
 describe('aiResponseFeedbackClient', () => {
   beforeEach(() => httpPost.mockReset())
 
-  it('posts only to the frozen feedback endpoint with no experience-case fallback', async () => {
+  it('posts to the frozen feedback endpoint with a generated Idempotency-Key and no experience-case fallback', async () => {
     httpPost.mockResolvedValue({
-      data: { feedback_id: 'ARF-001', status: 'NEW', analysis_status: 'NEW', created_at: '2026-07-25T16:00:00+08:00' }
+      data: { feedback_id: 'ARF-001', status: 'NEW' }
     })
 
-    await expect(aiResponseFeedbackClient.submit(draft)).resolves.toMatchObject({ feedbackId: 'ARF-001' })
+    const idempotencyKey = createAiResponseFeedbackIdempotencyKey()
+    await expect(aiResponseFeedbackClient.submit(draft, idempotencyKey)).resolves.toEqual({
+      feedbackId: 'ARF-001', status: 'NEW'
+    })
     expect(httpPost).toHaveBeenCalledWith('/api/v1/ai-response-feedback', {
       store_code: 'PDD-SM',
       product_id: 'PROD-1',
@@ -41,11 +47,33 @@ describe('aiResponseFeedbackClient', () => {
       final_answer: null,
       created_by: 'TESTER-ONE',
       context: { store_code: 'PDD-SM', product_id: 'PROD-1', sku_id: 'SKU-1' }
-    }, { signal: undefined })
+    }, { signal: undefined, headers: { 'Idempotency-Key': idempotencyKey } })
   })
 
-  it('rejects an unrecognized response instead of reporting feedback as recorded', async () => {
+  it('reuses an explicit Idempotency-Key so C can return the existing result without creating a duplicate', async () => {
     httpPost.mockResolvedValue({ data: { feedback_id: 'ARF-001', status: 'NEW' } })
-    await expect(aiResponseFeedbackClient.submit(draft)).rejects.toBeInstanceOf(Error)
+
+    const idempotencyKey = 'ai-feedback-replay-001'
+    await expect(aiResponseFeedbackClient.submit(draft, idempotencyKey)).resolves.toEqual({
+      feedbackId: 'ARF-001', status: 'NEW'
+    })
+    await expect(aiResponseFeedbackClient.submit(draft, idempotencyKey)).resolves.toEqual({
+      feedbackId: 'ARF-001', status: 'NEW'
+    })
+
+    expect(httpPost).toHaveBeenCalledTimes(2)
+    expect(httpPost.mock.calls[0]?.[2]).toEqual({
+      signal: undefined, headers: { 'Idempotency-Key': idempotencyKey }
+    })
+    expect(httpPost.mock.calls[1]?.[2]).toEqual({
+      signal: undefined, headers: { 'Idempotency-Key': idempotencyKey }
+    })
+  })
+
+  it('rejects an unrecognized response or a missing Idempotency-Key instead of reporting feedback as recorded', async () => {
+    httpPost.mockResolvedValue({ data: { feedback_id: 'ARF-001', status: 'ANALYZING' } })
+    await expect(aiResponseFeedbackClient.submit(draft, 'ai-feedback-invalid-receipt')).rejects.toBeInstanceOf(Error)
+    await expect(aiResponseFeedbackClient.submit(draft, '   ')).rejects.toBeInstanceOf(Error)
+    expect(httpPost).toHaveBeenCalledTimes(1)
   })
 })

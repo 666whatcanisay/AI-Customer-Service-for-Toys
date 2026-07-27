@@ -3,11 +3,11 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "MVP-PLUS-02-FEEDBACK AI response feedback capture",
-  "current_stage": "MVP-PLUS-02-FEEDBACK: B client, dialog, local verification and Draft PR delivery complete",
-  "current_gate": "PASS: B frontend delivery complete in Draft PR #34; real cross-line integration remains a separate gate",
+  "current_task": "MVP-PLUS-02-B-CONTRACT-ADAPT AI response feedback consumer adaptation",
+  "current_stage": "MVP-PLUS-02-B-CONTRACT-ADAPT implemented, locally verified and validated against an isolated current-C instance",
+  "current_gate": "PASS: B sends Idempotency-Key and consumes the frozen feedback_id/status=NEW creation receipt; five real submissions and same-key replay passed",
   "status": "draft_pr_open",
-  "last_updated": "2026-07-25",
+  "last_updated": "2026-07-27",
   "git": {
     "branch": "codex/customer-pilot-experience",
     "base_commit": "68796a9",
@@ -39,7 +39,9 @@
     "frontend/src/views/AiChat.vue",
     "frontend/src/views/ExperienceCases.vue",
     "frontend/src/api/experienceCaseClient.ts",
-    "frontend/src/api/experienceCaseAdapter.ts"
+    "frontend/src/api/experienceCaseAdapter.ts",
+    "frontend/src/api/aiResponseFeedbackClient.ts",
+    "frontend/src/api/aiResponseFeedbackAdapter.ts"
   ],
   "required_interfaces": [
     "GET A /api/health",
@@ -47,7 +49,8 @@
     "GET C /health",
     "POST C /api/v1/customer-experience-cases with frozen feedback_type and top-level case_id/review_status receipt",
     "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI",
-    "POST C /api/v1/ai-response-feedback with ai-feedback.v1-draft fields and top-level feedback_id/status=NEW/analysis_status=NEW/created_at receipt"
+    "POST C /api/v1/ai-response-feedback with ai-feedback.v1-draft fields, an Idempotency-Key header, and top-level feedback_id/status=NEW receipt",
+    "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total"
   ],
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
@@ -59,7 +62,7 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-25 MVP-PLUS-02-FEEDBACK: vue-tsc --noEmit PASS; Vitest 22 files / 87 tests PASS; vite build PASS.",
+  "last_test_result": "2026-07-27 MVP-PLUS-02-B-CONTRACT-ADAPT: vue-tsc --noEmit PASS; Vitest 22 files / 89 tests PASS; vite build PASS. Isolated current-C health 200; all five feedback types POSTed with Idempotency-Key returned 201 feedback_id/status=NEW; same-key replay returned the same feedback_id; GET history returned total=5/items=5.",
   "blockers": [],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
@@ -67,7 +70,7 @@
     "Experience-case session summaries disappear on refresh until C publishes the GET contract",
     "Pilot-guide dismissal is a local browser boolean, not authentication or training evidence",
     "AI feedback is limited to synthetic or manually de-identified test data; automatic redaction and formal authorization are not implemented",
-    "Real C feedback endpoint availability and cross-line lifecycle remain unverified until controlled integration"
+    "Feedback history UI is intentionally absent; any future status-query page must consume the frozen GET fields and pagination without inventing fields."
   ],
   "completed_tasks": [
     "B-T01 frontend baseline audit",
@@ -77,7 +80,9 @@
     "B-T05 modular shell, local tester identity and suggestion client/pages",
     "MVP-PLUS-01 customer experience case capture frontend",
     "MVP-PLUS-02 customer pilot experience improvement",
-    "MVP-PLUS-02-FEEDBACK AI response feedback capture frontend"
+    "MVP-PLUS-02-FEEDBACK AI response feedback capture frontend",
+    "MVP-PLUS-02-B-C-SMOKE real integration evidence (BLOCKED; no code changes)",
+    "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
