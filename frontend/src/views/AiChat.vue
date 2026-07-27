@@ -589,6 +589,7 @@ import {
   aiResponseFeedbackClient,
   createAiResponseFeedbackIdempotencyKey
 } from '@/api/aiResponseFeedbackClient'
+import { createCustomerEfficiencyOpaqueId } from '@/api/customerEfficiencyEventClient'
 import {
   PlatformClientError,
   toPlatformClientError,
@@ -618,6 +619,8 @@ import {
   NOT_ADOPTED_REASON_LABELS,
   type NotAdoptedReason
 } from '@/workspace/adoptionFeedback'
+import type { CustomerEfficiencyEventType } from '@/api/customerEfficiencyEventTypes'
+import { customerEfficiencyEventTracker } from '@/workspace/customerEfficiencyEventTracker'
 import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
 import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
 import { useTesterIdentity } from '@/workspace/testerIdentity'
@@ -768,6 +771,10 @@ const aiFeedbackType = ref<NotAdoptedReason | ''>('')
 const aiFeedbackNote = ref('')
 const aiFeedbackFinalAnswer = ref('')
 const aiFeedbackIdempotencyKey = ref('')
+const efficiencyInteractionId = ref<string | null>(null)
+const efficiencyOutcomeRecorded = ref(false)
+const efficiencyOperatorId = createCustomerEfficiencyOpaqueId('op')
+const efficiencyConversationId = createCustomerEfficiencyOpaqueId('conv')
 const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
@@ -898,6 +905,8 @@ const clearAnswer = () => {
   result.value = null
   replyDraft.value = ''
   adoption.value = null
+  efficiencyInteractionId.value = null
+  efficiencyOutcomeRecorded.value = false
   aiFeedbackDialogOpen.value = false
   aiFeedbackType.value = ''
   aiFeedbackNote.value = ''
@@ -906,6 +915,31 @@ const clearAnswer = () => {
   aiFeedbackStatus.value = ''
   copyStatus.value = 'idle'
   requestError.value = ''
+}
+
+const queueCustomerEfficiencyEvent = (
+  eventType: CustomerEfficiencyEventType,
+  feedbackId: string | null = null
+) => {
+  if (!result.value) return
+
+  const interactionId = efficiencyInteractionId.value
+  if (!interactionId) return
+
+  try {
+    customerEfficiencyEventTracker.record({
+      eventType,
+      operatorId: efficiencyOperatorId,
+      storeCode: result.value.context.store_code,
+      productId: result.value.context.product_id,
+      skuId: result.value.context.sku_id,
+      conversationId: efficiencyConversationId,
+      interactionId,
+      feedbackId
+    })
+  } catch {
+    // Event collection is strictly best-effort and must not affect customer-service work.
+  }
 }
 
 const readRememberedStore = () => {
@@ -1115,6 +1149,8 @@ const submitQuestion = async () => {
     }
     result.value = response
     replyDraft.value = response.answer
+    efficiencyInteractionId.value = createCustomerEfficiencyOpaqueId('int')
+    queueCustomerEfficiencyEvent('AI_REQUEST')
   } catch (error) {
     const clientError = toRagClientError(error)
     if (controller.signal.aborted || clientError.kind === 'canceled') {
@@ -1176,6 +1212,15 @@ const recordAdoption = (type: AdoptionType) => {
   aiFeedbackFinalAnswer.value = ''
   aiFeedbackError.value = ''
   aiFeedbackStatus.value = ''
+  if (!efficiencyOutcomeRecorded.value) {
+    const eventTypeByAdoption: Record<AdoptionType, CustomerEfficiencyEventType> = {
+      DIRECT_ACCEPT: 'AI_DIRECT_ADOPT',
+      EDITED_ACCEPT: 'AI_EDIT_ADOPT',
+      REJECTED: 'AI_REJECT'
+    }
+    queueCustomerEfficiencyEvent(eventTypeByAdoption[type])
+    efficiencyOutcomeRecorded.value = true
+  }
   ElMessage.success('已记录本页反馈')
 }
 
@@ -1230,7 +1275,7 @@ const submitAiFeedback = async () => {
     aiFeedbackIdempotencyKey.value || createAiResponseFeedbackIdempotencyKey()
   aiFeedbackIdempotencyKey.value = idempotencyKey
   try {
-    await aiResponseFeedbackClient.submit({
+    const receipt = await aiResponseFeedbackClient.submit({
       storeCode: result.value.context.store_code,
       productId: result.value.context.product_id,
       skuId: result.value.context.sku_id,
@@ -1241,6 +1286,7 @@ const submitAiFeedback = async () => {
       finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
       createdBy: identity.value.reporterId
     }, idempotencyKey)
+    queueCustomerEfficiencyEvent('AI_FEEDBACK_SUBMIT', receipt.feedbackId)
     aiFeedbackStatus.value = '反馈已记录。'
   } catch (error) {
     aiFeedbackError.value = error instanceof Error ? error.message : 'AI 问题反馈服务当前不可用。'
@@ -1287,6 +1333,7 @@ const submitExperienceCase = async () => {
       reviewStatus: receipt.reviewStatus,
       submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
     })
+    queueCustomerEfficiencyEvent('EXPERIENCE_CASE_SAVE')
     experienceCaseStatus.value = `案例已提交，当前状态：${EXPERIENCE_CASE_STATUS_LABELS[receipt.reviewStatus]}。`
   } catch (error) {
     experienceCaseError.value = error instanceof Error ? error.message : '案例服务当前不可用。'
