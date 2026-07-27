@@ -3,18 +3,18 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "PILOT-HARDENING-B daily customer-service workbench hardening",
-  "current_stage": "Draft PR #49 created: catalog readiness and recovery guidance, cross-store reset boundary, missing-knowledge warning, clipboard recovery and adoption next-step guidance are complete. The complete live success path remains blocked because A/RAG is unavailable.",
-  "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
-  "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
+  "current_task": "B-CUSTOMER-WORKBENCH-V2-PRODUCT daily customer workbench",
+  "current_stage": "Draft PR #54 created: stateful home readiness, business-language case and feedback guidance, chat readiness/recovery guidance, and direct /feedback routing are complete. A de-identified live consultation returned source-backed advice and the reply was copied in the browser.",
+  "current_gate": "PASS: typecheck, 24 Vitest files / 102 tests and production build passed. Browser verified 1366x768 routes, direct and refreshed /feedback, plus a real de-identified product → question → source-backed answer → copy flow. No interface contract changed.",
+  "status": "customer_workbench_v2_draft_pr_54",
   "last_updated": "2026-07-27",
   "git": {
-    "branch": "codex/customer-pilot-hardening-b-v4",
-    "base_commit": "348c875",
+    "branch": "codex/customer-workbench-v2-product",
+    "base_commit": "89f9ead",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "DRAFT_PR_49",
+    "delivery": "DRAFT_PR_54",
     "clean": false,
-    "task_commit": "89f9ead"
+    "task_commit": "25e1952"
   },
   "owned_paths": [
     "frontend/**",
@@ -60,10 +60,8 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 PILOT-HARDENING-B: vue-tsc --noEmit PASS; Vitest 24 files / 99 tests PASS; vite build PASS. Browser verified the real test store/catalog, catalog readiness guidance, cross-store reset warning and no-product submission guard. A/RAG was unavailable, so no answer/copy/case/feedback success was fabricated. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
-  "blockers": [
-    "A/RAG service was unavailable during browser validation and the actual de-identified consultation request failed, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
-  ],
+  "last_test_result": "2026-07-27 B-CUSTOMER-WORKBENCH-V2-PRODUCT: vue-tsc --noEmit PASS; Vitest 24 files / 102 tests PASS; vite build PASS. At 1366x768, browser verified primary routes, direct and refreshed /feedback, and a de-identified real consultation that returned four sources and copied successfully. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "blockers": [],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
     "Tester identity is local browser state and is not authentication or authorization",
@@ -86,7 +84,8 @@
     "UI-1 unified customer product shell (local UI verification PASS; delivery pending)",
     "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)",
     "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
-    "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)"
+    "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)",
+    "B-CUSTOMER-WORKBENCH-V2-PRODUCT daily customer workbench (Draft PR #54; real de-identified AI answer and copy browser flow PASS)"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
