@@ -154,6 +154,28 @@ const aiClient = axios.create({
   timeout: 30000,
 })
 
+type OptionalQueryParam = string | number | undefined
+
+/**
+ * Omit an unselected filter instead of serializing it as an empty enum value.
+ *
+ * FastAPI correctly rejects values such as `review_status=` because an empty
+ * string is not a member of the review-status enum.  The Admin filter forms
+ * represent their "all" choice with an empty string, so normalize that UI
+ * state at the client boundary before sending the request.
+ */
+export function omitBlankQueryParams(
+  params?: Record<string, OptionalQueryParam>,
+): Record<string, string | number> | undefined {
+  if (!params) return undefined
+
+  const normalized = Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== '' && value !== undefined),
+  ) as Record<string, string | number>
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
 export interface AdminPage<T> {
   items: T[]
   page: number
@@ -450,7 +472,7 @@ export async function listAdminExperienceCases(
 ): Promise<AdminPage<AdminExperienceCase>> {
   const response = await apiClient.get<AdminPage<AdminExperienceCase>>(
     '/api/v1/admin/customer-experience-cases',
-    { params },
+    { params: omitBlankQueryParams(params) },
   )
   return response.data
 }
@@ -482,7 +504,7 @@ export async function listAiOptimizationCases(
 ): Promise<AdminPage<AiOptimizationCase>> {
   const response = await apiClient.get<AdminPage<AiOptimizationCase>>(
     '/api/v1/admin/ai-optimization/cases',
-    { params },
+    { params: omitBlankQueryParams(params) },
   )
   return response.data
 }
@@ -518,19 +540,22 @@ function normalizeAiModule(value: unknown, index: number): AiModule {
   }
 }
 
+function modulesFromAiSuccessEnvelope(payload: unknown): unknown[] {
+  if (typeof payload !== 'object' || payload === null) return []
+  const envelope = payload as { success?: unknown; data?: unknown }
+  if (envelope.success !== true || typeof envelope.data !== 'object' || envelope.data === null) return []
+
+  const data = envelope.data as { modules?: unknown }
+  return Array.isArray(data.modules) ? data.modules : []
+}
+
 /**
- * The sole A-line path declared by the task card.  This adapter never
- * fabricates module data when the A branch has not yet been integrated.
+ * The sole A-line path declared by ai-control.v1. This adapter consumes only
+ * the A success envelope's `data.modules` field and never fabricates modules.
  */
 export async function listAiModules(): Promise<AiModule[]> {
   const response = await aiClient.get<unknown>('/api/admin/ai/modules')
-  const payload = response.data
-  const rows = Array.isArray(payload)
-    ? payload
-    : typeof payload === 'object' && payload !== null && Array.isArray((payload as { items?: unknown }).items)
-      ? (payload as { items: unknown[] }).items
-      : []
-  return rows.map(normalizeAiModule)
+  return modulesFromAiSuccessEnvelope(response.data).map(normalizeAiModule)
 }
 
 export async function getHealth(): Promise<HealthResponse> {
