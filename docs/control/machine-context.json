@@ -4,9 +4,9 @@
   "line": "CONTROL",
   "version": "0.1.0",
   "status": "pilot_candidate_ready",
-  "current_task": "CONTROL-BASELINE-MERGE-V2 Pilot candidate baseline",
-  "current_stage": "Interface #58, C #55, B #57, A 2ac537f and OPS #56 were reviewed and merged in the declared order. An isolated real runtime closure passed for C/A/B/Admin, sourced qwen chat, experience-case review and feedback analysis writeback.",
-  "current_gate": "PILOT_CANDIDATE_READY: functional merge d1d2ba2 is a verified internal-pilot candidate; later control documentation commits do not change runtime behavior. Resolve the current final SHA with git rev-parse origin/develop. INTERNAL_PILOT_READY still requires an explicitly configured current-subnet Private TCP 5173 firewall rule plus second controlled customer-computer TCP/browser acceptance. Do not expose 8000, 8011 or 5174.",
+  "current_task": "CONTROL-INTERNAL-PILOT-READY-NIGHT V12.1",
+  "current_stage": "Current deployed isolation baseline is origin/develop f5fccfd. A #61, C/Data #59 and OPS #60 are independently tested Draft candidates; B verified without a source change. Browser and UTF-8 proxy smoke prove the existing customer workflow, but candidate fixes are not deployed until reviewed and merged.",
+  "current_gate": "PILOT_CANDIDATE_READY: merge and formally restart #61/#59/#60, then verify live (not historical) A knowledge statistics. INTERNAL_PILOT_READY additionally requires an administrator-authorized current-subnet Private TCP 5173 rule and a second controlled customer-computer TCP/browser acceptance. Do not expose 8000, 8011 or 5174.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
