@@ -44,7 +44,10 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         allow_origins=list(settings.cors_allowed_origins),
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["Accept", "Content-Type", "X-Request-ID"],
+        # B submits the frozen feedback v1 Idempotency-Key header from the
+        # browser. Keep the CORS policy explicit; do not widen it to a
+        # wildcard just to accommodate this preflight.
+        allow_headers=["Accept", "Content-Type", "Idempotency-Key", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
