@@ -7,6 +7,7 @@ $statusScript = Join-Path $PSScriptRoot '..\status_ai_customer_service.ps1'
 $startScript = Join-Path $PSScriptRoot '..\start_ai_customer_service.ps1'
 $commonScript = Join-Path $PSScriptRoot '..\common_ai_customer_service.ps1'
 $shellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
+$platformProbePath = (Get-Command where.exe -ErrorAction Stop).Source
 $fakeProcess = $null
 
 try {
@@ -15,7 +16,9 @@ try {
 @{
     RepositoryRoot = '$($testRoot.Replace("'", "''"))'
     RagPythonPath = '$($shellPath.Replace("'", "''"))'
-    PlatformPythonPath = '$($shellPath.Replace("'", "''"))'
+    # The status script invokes the platform Python for a migration probe.
+    # Use a fast failing executable instead of an interactive PowerShell host.
+    PlatformPythonPath = '$($platformProbePath.Replace("'", "''"))'
     PnpmCommand = '$($shellPath.Replace("'", "''"))'
     RagPort = 65401; CustomerWebPort = 65402; PlatformPort = 65403; BindAddress = '127.0.0.1'
     CustomerWebUrl = 'http://127.0.0.1:65402/'

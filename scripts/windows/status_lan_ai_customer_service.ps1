@@ -32,6 +32,7 @@ try {
         $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url
         $listener = if ($lanResolutionError) { '无法确定' } else { Get-LanServiceListenerAddress $config $item.Port }
         Write-Host "$($item.Label)：$($serviceStatus.State)；受管 PID $($serviceStatus.ManagedProcessId)；监听 PID $($serviceStatus.ListenerProcessId)；监听地址：$listener；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
+        Write-Host "  运行版本：$($serviceStatus.RuntimeIdentityState)；SHA $($serviceStatus.RuntimeGitShortSha)；源码 $($serviceStatus.RuntimeSourceState)；$($serviceStatus.RuntimeIdentityDetail)"
     }
     $adminStatus = Get-ServiceStatus $config 'admin-web' $config.AdminWebPort (Get-ManagedServiceHealthUrl $config 'admin-web')
     $adminCheck = Test-RecordedProcess $config 'admin-web'
@@ -39,6 +40,7 @@ try {
     $adminListenerPid = if ($adminRecord -and ($adminRecord.PSObject.Properties.Name -contains 'listener_pid')) { [string]$adminRecord.listener_pid } else { '未记录' }
     $adminLan = if ([bool]$config.AdminEnableLanMode) { '是（本轮未修改防火墙）' } else { '否（仅服务器本机）' }
     Write-Host "Admin：$($adminStatus.State)；受管 PID $($adminStatus.ManagedProcessId)；监听 PID $($adminStatus.ListenerProcessId)；监听地址：$($config.AdminWebBindAddress):$($config.AdminWebPort)；端口 $($adminStatus.Port)：$($adminStatus.PortState)；health：$($adminStatus.HealthState)"
+    Write-Host "  运行版本：$($adminStatus.RuntimeIdentityState)；SHA $($adminStatus.RuntimeGitShortSha)；源码 $($adminStatus.RuntimeSourceState)；$($adminStatus.RuntimeIdentityDetail)"
     Write-Host "运营后台地址：$($config.AdminWebUrl)；监听 PID：$adminListenerPid；LAN 模式：$adminLan；日志：$(Join-Path (Get-ServiceLogDirectory $config) 'admin-web.out.log')；$(Join-Path (Get-ServiceLogDirectory $config) 'admin-web.err.log')"
 
     Write-Host "C 数据库迁移：$(Get-PlatformMigrationStatus $config)"
