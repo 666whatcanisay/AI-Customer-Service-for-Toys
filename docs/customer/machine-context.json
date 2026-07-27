@@ -12,9 +12,9 @@
     "branch": "codex/customer-product-v1-1",
     "base_commit": "3f0d967",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "PENDING_COMMIT_AND_DRAFT_PR",
+    "delivery": "DRAFT_PR_45",
     "clean": false,
-    "task_commit": "PENDING_DELIVERY"
+    "task_commit": "55e96ae"
   },
   "owned_paths": [
     "frontend/**",
