@@ -241,6 +241,13 @@
           <p>尽量保留客户原话，不要自行补充价格、库存或承诺。</p>
         </div>
       </div>
+      <section class="consultation-readiness" data-testid="consultation-readiness">
+        <div>
+          <strong>{{ consultationReadiness.title }}</strong>
+          <p>{{ consultationReadiness.description }}</p>
+        </div>
+        <span>{{ consultationReadiness.stage }}</span>
+      </section>
       <label class="question-label" for="customer-question">客户问题</label>
       <el-input
         id="customer-question"
@@ -294,6 +301,13 @@
       :closable="false"
       show-icon
     />
+    <section v-if="shouldShowRequestRecovery" class="request-recovery-card" data-testid="request-recovery-card">
+      <div>
+        <strong>这条咨询还没有生成可用回复</strong>
+        <p>当前客户问题和商品上下文会保留。检查 AI 状态后，可直接重新生成；不要复制或采用旧回答。</p>
+      </div>
+      <el-button :loading="ragHealthLoading" plain @click="refreshRagHealth">检查 AI 状态</el-button>
+    </section>
     <el-alert
       v-if="nextQuestionNotice"
       data-testid="next-question-notice"
@@ -911,6 +925,46 @@ const workflowStep = computed(() => {
   return 1
 })
 
+const consultationReadiness = computed(() => {
+  if (loading.value) {
+    return {
+      stage: '生成中',
+      title: '正在查询商品资料并生成建议',
+      description: '请不要重复提交；系统不会自动向客户发送回复。'
+    }
+  }
+  if (result.value) {
+    return {
+      stage: '待核对',
+      title: '先核对建议和来源，再决定是否复制',
+      description: '采用结果、优秀案例和问题反馈都应基于当前这条回复。'
+    }
+  }
+  if (selectedProduct.value) {
+    return {
+      stage: '可提问',
+      title: '商品已确认，可以输入客户原话',
+      description: 'SKU 不确定可留空；不要自行补充价格、库存或承诺。'
+    }
+  }
+  if (selectedStore.value) {
+    return {
+      stage: '待选商品',
+      title: '下一步：选择客户正在咨询的商品',
+      description: '确认商品后再提问，避免把别的商品资料用于当前客户。'
+    }
+  }
+  return {
+    stage: '待确认店铺',
+    title: '先确认客户来自哪个店铺',
+    description: '店铺和商品确认后，才能生成可核对的 AI 建议。'
+  }
+})
+
+const shouldShowRequestRecovery = computed(() =>
+  Boolean(requestError.value && selectedStore.value && selectedProduct.value)
+)
+
 const catalogGuidance = computed(() => {
   if (storesLoading.value) {
     return {
@@ -1335,8 +1389,10 @@ const submitQuestion = async () => {
       requestError.value = '问答请求已取消，可以重新提交'
     } else if (clientError.kind === 'timeout') {
       requestError.value = 'AI 服务请求超时，请稍后重试或按原客服流程处理。'
-    } else {
+    } else if (clientError.kind === 'unavailable') {
       requestError.value = 'AI 服务不可用，请稍后重试或按原客服流程处理。'
+    } else {
+      requestError.value = '网络或服务连接异常，请检查网络和 AI 状态后重试。'
     }
   } finally {
     if (activeRagController === controller) activeRagController = null
@@ -1624,6 +1680,8 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .status-alert { margin-top: 16px; }
 .service-recovery-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 13px 15px; border: 1px solid #efc5a6; border-radius: 12px; background: #fff9f3; color: #7a4318; }
 .service-recovery-card strong { font-size: 14px; }.service-recovery-card p { margin: 4px 0 0; color: #8a5a35; font-size: 12px; line-height: 1.5; }.service-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.request-recovery-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 13px 15px; border: 1px solid #e5c98d; border-radius: 12px; background: #fffaf0; color: #75520a; }
+.request-recovery-card strong { font-size: 14px; }.request-recovery-card p { margin: 4px 0 0; color: #806332; font-size: 12px; line-height: 1.5; }
 .context-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1717,6 +1775,20 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   background: #f6f8ff; color: #3157c8; cursor: pointer;
 }
 .question-actions, .reply-action-bar { margin-top: 16px; }
+.consultation-readiness {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 15px 0;
+  padding: 11px 13px;
+  border: 1px solid #d7e3f4;
+  border-radius: 12px;
+  background: #f7faff;
+}
+.consultation-readiness strong { display: block; color: #294c85; font-size: 13px; }
+.consultation-readiness p { margin: 4px 0 0; color: #69788e; font-size: 12px; line-height: 1.5; }
+.consultation-readiness > span { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: #e7f0ff; color: #315fbd; font-size: 11px; font-weight: 800; }
 
 .loading-card, .empty-card { display: flex; align-items: center; gap: 16px; padding: 28px; }
 .loading-dot {
@@ -1802,6 +1874,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   }
   .system-summary, .question-actions .el-button, .reply-actions .el-button { width: 100%; }
   .catalog-guidance { align-items: flex-start; flex-direction: column; }
+  .consultation-readiness, .request-recovery-card { align-items: flex-start; flex-direction: column; }
   .reply-actions { width: 100%; }
   .context-summary-grid { grid-template-columns: 1fr; gap: 6px; }
   .connection-card { grid-template-columns: 1fr; }

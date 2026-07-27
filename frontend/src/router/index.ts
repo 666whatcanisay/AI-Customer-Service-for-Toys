@@ -17,9 +17,24 @@ export const createCustomerRouter = (history: RouterHistory = createWebHistory()
         component: CustomerWorkbenchLayout,
         children: [
           { path: '', name: 'WorkspaceHome', component: WorkspaceHome, meta: { title: '工作台首页' } },
-          { path: 'ai-chat', name: 'AiChat', component: AiChat, meta: { title: 'AI 客服' } },
-          { path: 'suggestions', name: 'SuggestionForm', component: SuggestionForm, meta: { title: '提交意见建议' } },
-          { path: 'suggestions/mine', name: 'MySuggestions', component: MySuggestions, meta: { title: '我的建议' } },
+          {
+            path: 'ai-chat',
+            name: 'AiChat',
+            component: AiChat,
+            meta: { title: 'AI 客服', requiresTesterIdentity: true }
+          },
+          {
+            path: 'suggestions',
+            name: 'SuggestionForm',
+            component: SuggestionForm,
+            meta: { title: '提交意见建议', requiresTesterIdentity: true }
+          },
+          {
+            path: 'suggestions/mine',
+            name: 'MySuggestions',
+            component: MySuggestions,
+            meta: { title: '我的建议', requiresTesterIdentity: true }
+          },
           { path: 'experience-cases', name: 'ExperienceCases', component: ExperienceCases, meta: { title: '我的案例' } },
           { path: 'feedback', name: 'FeedbackGuide', component: FeedbackGuide, meta: { title: '问题反馈' } },
           { path: 'modules/:moduleKey', name: 'ModuleInfo', component: ModuleInfo, meta: { title: '模块说明' } }

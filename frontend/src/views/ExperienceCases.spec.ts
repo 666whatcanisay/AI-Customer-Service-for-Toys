@@ -27,6 +27,7 @@ describe('ExperienceCases', () => {
     expect(wrapper.get('[data-testid="experience-case-status-guide"]').text()).toContain('审核中')
     expect(wrapper.get('[data-testid="experience-case-status-guide"]').text()).toContain('未通过')
     expect(wrapper.get('[data-testid="experience-case-list"] .status-reviewing').text()).toContain('审核中')
+    expect(wrapper.get('[data-testid="experience-case-summary"]').text()).toContain('已确认 1 条提交')
   })
 
   it('does not invent a remote list when no real submission exists', () => {

@@ -9,14 +9,20 @@ const healthMocks = vi.hoisted(() => ({ rag: vi.fn(), platform: vi.fn() }))
 vi.mock('@/api/ragClient', () => ({ ragClient: { getHealth: healthMocks.rag } }))
 vi.mock('@/api/platformClient', () => ({ platformClient: { getHealth: healthMocks.platform } }))
 
-const mountLayout = async () => {
+const mountLayout = async (initialPath = '/') => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       '/', '/ai-chat', '/experience-cases', '/feedback', '/suggestions', '/suggestions/mine'
-    ].map((path) => ({ path, component: { template: '<div>页面内容</div>' } }))
+    ].map((path) => ({
+      path,
+      component: { template: '<div>页面内容</div>' },
+      meta: ['/ai-chat', '/suggestions', '/suggestions/mine'].includes(path)
+        ? { requiresTesterIdentity: true }
+        : {}
+    }))
   })
-  await router.push('/')
+  await router.push(initialPath)
   await router.isReady()
   return mount(CustomerWorkbenchLayout, { attachTo: document.body, global: { plugins: [router, ElementPlus] } })
 }
@@ -49,10 +55,18 @@ describe('CustomerWorkbenchLayout', () => {
   })
 
   it('asks a first-time tester for a display name without claiming authentication', async () => {
-    const wrapper = await mountLayout()
+    const wrapper = await mountLayout('/ai-chat')
     await flushPromises()
     expect(document.body.textContent).toContain('设置测试客服身份')
     expect(document.body.textContent).toContain('不是登录或权限认证')
+    wrapper.unmount()
+  })
+
+  it('allows direct feedback guidance without blocking it behind a tester-identity dialog', async () => {
+    const wrapper = await mountLayout('/feedback')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="identity-dialog"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -61,7 +75,7 @@ describe('CustomerWorkbenchLayout', () => {
       TESTER_IDENTITY_STORAGE_KEY,
       JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' })
     )
-    const wrapper = await mountLayout()
+    const wrapper = await mountLayout('/ai-chat')
     await flushPromises()
 
     expect(document.body.textContent).toContain('AI客服助手（测试版）')
