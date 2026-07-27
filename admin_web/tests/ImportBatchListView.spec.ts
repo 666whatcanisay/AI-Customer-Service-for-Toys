@@ -22,7 +22,7 @@ describe('ImportBatchListView', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('暂无导入批次')
+    expect(wrapper.text()).toContain('尚无数据同步记录')
   })
 
   it('renders only the batches returned by the API', async () => {
@@ -56,7 +56,7 @@ describe('ImportBatchListView', () => {
 
     expect(wrapper.text()).toContain('batch-1')
     expect(wrapper.text()).toContain('synthetic.xlsx')
-    expect(wrapper.text()).toContain('READY_FOR_REVIEW')
+    expect(wrapper.text()).toContain('待审核')
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
   })
 })

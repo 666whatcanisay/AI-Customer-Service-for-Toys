@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import { apiErrorMessage, listImportBatches, type ImportBatch } from '../api/client'
+import { displayStatus } from '../presentation'
 
 const loading = ref(true)
 const error = ref('')
@@ -30,16 +31,16 @@ onMounted(load)
   <main class="page">
     <div class="page-header">
       <div>
-        <h1>导入批次</h1>
-        <p>所有有效数据只进入待审核区，不会发布到 AI。</p>
+        <h1>数据同步</h1>
+        <p>所有有效数据只进入待审核区，不会自动发布给 AI。</p>
       </div>
-      <RouterLink class="button" to="/imports/new">新建导入</RouterLink>
+      <RouterLink class="button" to="/imports/new">同步商品数据</RouterLink>
     </div>
 
     <section class="card">
       <p v-if="loading" class="notice" role="status">正在加载批次…</p>
-      <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
-      <p v-else-if="batches.length === 0" class="notice">暂无导入批次。</p>
+      <p v-else-if="error" class="notice error" role="alert">暂时无法读取同步记录。{{ error }}</p>
+      <p v-else-if="batches.length === 0" class="notice">待启用：尚无数据同步记录。请先同步商品数据。</p>
       <div v-else class="table-wrap">
         <table class="data-table">
           <thead>
@@ -58,7 +59,7 @@ onMounted(load)
             <tr v-for="batch in batches" :key="batch.id">
               <td><RouterLink :to="`/imports/${batch.id}`">{{ batch.id }}</RouterLink></td>
               <td>{{ batch.original_filename }}</td>
-              <td><span class="badge">{{ batch.status }}</span></td>
+              <td><span class="badge">{{ displayStatus(batch.status) }}</span></td>
               <td>{{ batch.total_rows }}</td>
               <td>{{ batch.valid_rows }}</td>
               <td>{{ batch.invalid_rows }}</td>

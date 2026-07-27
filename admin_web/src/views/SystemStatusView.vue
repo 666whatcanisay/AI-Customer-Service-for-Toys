@@ -37,7 +37,7 @@ onMounted(loadStatus)
       <div v-else-if="state === 'ok'" class="state state-ok" role="status">
         <strong>正常</strong>
         <span>{{ health?.service }} · v{{ health?.version }}</span>
-        <small>Request ID: {{ health?.request_id }}</small>
+        <small>请求编号：{{ health?.request_id }}</small>
       </div>
 
       <div v-else-if="state === 'offline'" class="state state-offline" role="alert">
@@ -47,7 +47,7 @@ onMounted(loadStatus)
 
       <div v-else class="state state-error" role="alert">
         <strong>错误</strong>
-        <span>平台服务返回错误，请稍后重试。</span>
+        <span>平台服务返回错误。请重新检查；若持续失败，请联系技术负责人。</span>
       </div>
 
       <button v-if="state !== 'loading'" type="button" @click="loadStatus">重新检查</button>

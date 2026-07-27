@@ -216,6 +216,39 @@ def list_products(
     return ProductListResponse(items=[_product_item(item) for item in items], page=page, size=size, total=total)
 
 
+@router.get("/skus", response_model=SkuListResponse)
+def list_skus(
+    store_code: str | None = Query(default=None, max_length=96),
+    product_id: str | None = Query(default=None, max_length=96),
+    relation_type: str | None = Query(default=None, max_length=32),
+    keyword: str | None = Query(default=None, max_length=160),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    session: Session = Depends(get_db),
+) -> SkuListResponse:
+    """Return the C-internal, test-only SKU inventory for business navigation."""
+    statement = select(TestSku).join(TestProduct, TestProduct.product_id == TestSku.product_id)
+    if store_code:
+        statement = statement.where(TestProduct.store_code == store_code)
+    if product_id:
+        statement = statement.where(TestSku.product_id == product_id)
+    if relation_type:
+        statement = statement.where(TestSku.relation_type == relation_type)
+    if keyword:
+        statement = statement.where(
+            or_(
+                TestSku.sku_id.ilike(f"%{keyword}%"),
+                TestSku.sku_code.ilike(f"%{keyword}%"),
+                TestSku.sku_name_display.ilike(f"%{keyword}%"),
+            )
+        )
+    total = _total(session, statement)
+    rows = session.scalars(
+        statement.order_by(TestSku.sku_id).offset((page - 1) * size).limit(size)
+    ).all()
+    return SkuListResponse(items=[_sku_item(item) for item in rows], page=page, size=size, total=total)
+
+
 @router.get("/products/{product_id}", response_model=ProductDetailResponse)
 def get_product(product_id: str, session: Session = Depends(get_db)) -> ProductDetailResponse:
     item = session.get(TestProduct, product_id)

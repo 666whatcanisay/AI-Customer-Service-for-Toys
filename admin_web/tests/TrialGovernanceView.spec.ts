@@ -56,7 +56,7 @@ describe('TrialGovernanceView', () => {
 
     expect(wrapper.text()).toContain('客服')
     expect(wrapper.text()).toContain('未启用')
-    expect(wrapper.text()).toContain('v1-reminder-only')
+    expect(wrapper.text()).toContain('当前仅有提交前提醒')
     expect(wrapper.text()).toContain('正式上线前')
     expect(wrapper.text()).toContain('只读边界')
     expect(mockedAudit).not.toHaveBeenCalled()
@@ -74,8 +74,8 @@ describe('TrialGovernanceView', () => {
     const wrapper = mount(TrialGovernanceView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('EXPERIENCE_CASE_VIEW')
-    expect(wrapper.text()).toContain('CASE_REVIEW')
+    expect(wrapper.text()).toContain('查看客服案例')
+    expect(wrapper.text()).toContain('案例审核')
     expect(wrapper.text()).not.toContain('Synthetic customer question')
   })
 

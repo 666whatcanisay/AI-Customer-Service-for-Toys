@@ -271,6 +271,9 @@ def test_admin_read_only_api_projects_real_catalog_data_without_local_paths(
     assert products["items"][0]["test_data_mode"] is True
     assert products["items"][0]["production_usable"] is False
     assert client.get("/api/v1/admin/products/P-1").json()["sku_count"] == 1
+    global_skus = client.get("/api/v1/admin/skus", params={"store_code": "TEST-STORE"}).json()
+    assert global_skus["total"] == 1
+    assert global_skus["items"][0]["sku_id"] == "SKU-1"
     assert client.get("/api/v1/admin/products/P-1/skus", params={"relation_type": "REFERENCE"}).json()["total"] == 1
     assert client.get("/api/v1/admin/faqs", params={"risk_level": "HIGH"}).json()["total"] == 1
     assert client.get("/api/v1/admin/safety-rules").json()["items"][0]["forbidden_claim"]

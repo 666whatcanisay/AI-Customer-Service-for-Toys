@@ -53,7 +53,7 @@ const dashboardCards = computed(() => {
     { label: '今日案例', value: zeroAware(today?.experience_case_submission_count ?? null, ' 件'), detail: '按客服经验案例创建时间统计', to: '/experience-cases' },
     { label: '今日问题', value: zeroAware(today?.ai_feedback_submission_count ?? null, ' 个'), detail: `已完成分析 ${zeroAware(today?.completed_ai_analysis_count ?? null, ' 个')}`, to: '/ai-feedback-optimization-pool' },
     { label: '知识状态', value: knowledgeReady.value ? '已连接' : '待启用', detail: knowledge ? `${knowledge.store_count} 店铺 · ${knowledge.product_count} 商品 · ${knowledge.faq_count} FAQ` : '知识资产统计尚未连接', to: '/imports/new' },
-    { label: '服务状态', value: serviceText.value, detail: 'C 平台健康检查与 A 能力目录实时读取', to: '/system-status' },
+    { label: '服务状态', value: serviceText.value, detail: '平台健康检查与 AI 能力目录实时读取', to: '/system-status' },
   ]
 })
 
@@ -147,7 +147,7 @@ onMounted(load)
 
     <section class="card operating-note">
       <h2>运营口径</h2>
-      <p>“今日 AI 使用”仅统计无客服内容的效率事件；“今日案例”和“今日问题”按创建时间统计；“已完成分析”按分析证据写入时间统计。页面不展示员工排名、绩效评价、Prompt 修改、知识发布或业务自动执行。</p>
+      <p>“今日 AI 使用”仅统计无客服内容的效率事件；“今日案例”和“今日问题”按创建时间统计；“已完成分析”按分析证据写入时间统计。页面不展示员工排名、绩效评价、提示词修改、知识发布或业务自动执行。</p>
     </section>
   </main>
 </template>

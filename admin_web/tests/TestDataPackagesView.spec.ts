@@ -99,7 +99,7 @@ describe('TestDataPackagesView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('PDD-SM-2026-001-TEST')
-    expect(wrapper.text()).toContain('IMPORTED_TEST_ONLY')
+    expect(wrapper.text()).toContain('已导入（测试）')
     expect(wrapper.text()).toContain('测试专用 / 不可生产 / 禁止自动发送')
     expect(wrapper.text()).toContain('28')
   })
@@ -138,7 +138,7 @@ describe('TestDataPackagesView', () => {
     await wrapper.get('[data-testid="package-preflight"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('ZIP 预检未通过')
+    expect(wrapper.text()).toContain('压缩包预检未通过')
     expect(wrapper.get('[data-testid="package-import"]').attributes()).toHaveProperty('disabled')
     expect(mockedImport).not.toHaveBeenCalled()
   })
@@ -152,14 +152,14 @@ describe('TestDataPackagesView', () => {
     await wrapper.get('[data-testid="package-preflight"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('ZIP 预检通过')
+    expect(wrapper.text()).toContain('压缩包预检通过')
     expect(wrapper.text()).toContain('TEST_ONLY_PACKAGE')
     expect(wrapper.get('[data-testid="package-import"]').attributes()).not.toHaveProperty('disabled')
 
     await wrapper.get('[data-testid="package-import"]').trigger('click')
     await flushPromises()
     expect(mockedImport).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('IMPORTED_TEST_ONLY')
+    expect(wrapper.text()).toContain('已导入（测试）')
   })
 
   it('keeps a store-targeted knowledge import bound to its declared store code', async () => {

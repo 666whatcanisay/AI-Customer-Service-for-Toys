@@ -192,6 +192,15 @@ const aiClient = axios.create({
   timeout: 30000,
 })
 
+function queryParams(
+  params?: Record<string, string | number | undefined>,
+): Record<string, string | number> | undefined {
+  if (!params) return undefined
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== '' && value !== undefined),
+  ) as Record<string, string | number>
+}
+
 export interface AdminPage<T> {
   items: T[]
   page: number
@@ -345,6 +354,7 @@ export interface AdminSuggestion {
 export type AdminResource =
   | 'stores'
   | 'products'
+  | 'skus'
   | 'faqs'
   | 'safety-rules'
   | 'sources'
@@ -360,7 +370,7 @@ export async function listAdminResource<T>(
   resource: AdminResource,
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<T>> {
-  const response = await apiClient.get<AdminPage<T>>(`/api/v1/admin/${resource}`, { params })
+  const response = await apiClient.get<AdminPage<T>>(`/api/v1/admin/${resource}`, { params: queryParams(params) })
   return response.data
 }
 
@@ -383,7 +393,7 @@ export async function listAdminSuggestions(
 ): Promise<AdminPage<AdminSuggestion>> {
   const response = await apiClient.get<AdminPage<AdminSuggestion>>(
     '/api/v1/admin/customer-suggestions',
-    { params },
+    { params: queryParams(params) },
   )
   return response.data
 }
@@ -587,7 +597,7 @@ export async function listAdminExperienceCases(
 ): Promise<AdminPage<AdminExperienceCase>> {
   const response = await apiClient.get<AdminPage<AdminExperienceCase>>(
     '/api/v1/admin/customer-experience-cases',
-    { params },
+    { params: queryParams(params) },
   )
   return response.data
 }
@@ -619,7 +629,7 @@ export async function listAiOptimizationCases(
 ): Promise<AdminPage<AiOptimizationCase>> {
   const response = await apiClient.get<AdminPage<AiOptimizationCase>>(
     '/api/v1/admin/ai-optimization/cases',
-    { params },
+    { params: queryParams(params) },
   )
   return response.data
 }
@@ -808,9 +818,26 @@ export function errorReportUrl(batchId: string): string {
 export function apiErrorMessage(error: unknown): string {
   if (isOfflineError(error)) return '无法连接平台服务，请检查网络或服务状态。'
   if (error instanceof AxiosError) {
-    const data = error.response?.data as { error?: { message?: unknown } } | undefined
+    const status = error.response?.status
+    const data = error.response?.data as { error?: { code?: unknown; message?: unknown } } | undefined
+    const code = data?.error?.code
+    if (code === 'TRIAL_ROLE_FORBIDDEN' || code === 'TRIAL_ACTOR_UNKNOWN') {
+      return '当前试运行角色没有此操作权限。请切换到有权限的角色，或联系管理员。'
+    }
+    if (status === 400 || status === 422) {
+      return '提交内容不完整或格式不正确。请检查必填项、筛选条件和输入格式后重试。'
+    }
+    if (status === 403 || status === 401) {
+      return '当前试运行角色没有访问权限。请联系管理员确认权限边界。'
+    }
+    if (status === 404) {
+      return '未找到所需数据。请检查链接或筛选条件，必要时先完成数据同步。'
+    }
+    if (status === 409) {
+      return '数据存在冲突或状态已变化。请刷新后核对当前记录再重试。'
+    }
     const message = data?.error?.message
-    if (typeof message === 'string') return message
+    if (typeof message === 'string' && /[\u3400-\u9fff]/.test(message)) return message
   }
   return '请求失败，请稍后重试。'
 }

@@ -153,7 +153,7 @@ describe('NewImportView', () => {
     await flushPromises()
 
     expect(mockedUpload).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('READY_FOR_REVIEW')
+    expect(wrapper.text()).toContain('待审核')
     expect(wrapper.text()).toContain('待审核有效行')
   })
 

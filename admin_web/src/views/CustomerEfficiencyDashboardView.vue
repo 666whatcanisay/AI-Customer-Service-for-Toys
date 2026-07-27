@@ -38,7 +38,7 @@ onMounted(load)
       <button class="button secondary" type="button" @click="load">刷新数据</button>
     </div>
 
-    <p v-if="error" class="notice error" role="alert">待启用：{{ error }}</p>
+    <p v-if="error" class="notice error" role="alert">暂时无法读取效率摘要。{{ error }}</p>
     <p v-else-if="!summary" class="notice" role="status">正在读取效率摘要…</p>
     <template v-else>
       <p v-if="!hasSamples" class="notice warning">样本不足：当前统计窗口没有 AI 请求，不展示推断性采用率。</p>

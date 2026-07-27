@@ -34,9 +34,16 @@ export const router = createRouter({
     },
     {
       path: '/products', name: 'products', component: ReadonlyListView,
-      props: { resource: 'products', title: '商品与 SKU', description: '查询商品，并打开只读 SKU 明细。', columns: [
+      props: { resource: 'products', title: '商品', description: '查询已同步商品，并打开只读 SKU 明细。', columns: [
         { key: 'product_id', label: '商品 ID' }, { key: 'product_name_display', label: '商品' },
         { key: 'store_code', label: '店铺' }, { key: 'sales_status', label: '销售状态' }, { key: 'review_status', label: '审核状态' },
+      ] },
+    },
+    {
+      path: '/skus', name: 'skus', component: ReadonlyListView,
+      props: { resource: 'skus', title: 'SKU', description: '查看已同步 SKU 及其与商品的关联关系。', columns: [
+        { key: 'sku_id', label: 'SKU ID' }, { key: 'sku_name_display', label: 'SKU 名称' },
+        { key: 'product_id', label: '所属商品' }, { key: 'relation_type', label: '关联关系' }, { key: 'publishable', label: '可发布' },
       ] },
     },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailView, props: true },

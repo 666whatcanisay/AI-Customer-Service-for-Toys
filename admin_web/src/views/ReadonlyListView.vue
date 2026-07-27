@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { apiErrorMessage, listAdminResource, type AdminResource } from '../api/client'
+import { displayStatus } from '../presentation'
 
 interface Column { key: string; label: string }
 const props = defineProps<{ resource: AdminResource; title: string; description: string; columns: Column[] }>()
@@ -17,6 +18,7 @@ function value(row: Record<string, unknown>, key: string): string {
   if (Array.isArray(raw)) return raw.join(', ')
   if (raw === null || raw === undefined || raw === '') return '—'
   if (typeof raw === 'boolean') return raw ? '是' : '否'
+  if (/(status|risk|action|relation|type)$/i.test(key)) return displayStatus(String(raw))
   return String(raw)
 }
 async function load(): Promise<void> {
@@ -33,9 +35,9 @@ onMounted(load)
 
 <template>
   <main class="page">
-    <div class="page-header"><div><h1>{{ title }}</h1><p>{{ description }} 当前为只读数据观察；知识维护请使用受控的数据导入流程。</p></div></div>
-    <form class="filters card" @submit.prevent="search"><label>关键词<input v-model.trim="filters.keyword" type="search" placeholder="搜索" /></label><label>店铺编码<input v-model.trim="filters.store_code" type="search" placeholder="可选" /></label><label>商品 ID<input v-model.trim="filters.product_id" type="search" placeholder="可选" /></label><label>状态 / 风险<input v-model.trim="filters.status" type="search" placeholder="可选" /></label><button class="button" type="submit">筛选</button></form>
-    <p v-if="loading" class="notice" role="status">正在读取数据…</p><p v-else-if="error" class="notice error" role="alert">待启用：{{ error }}</p><p v-else-if="rows.length === 0" class="notice">样本不足：没有符合条件的数据。</p>
+    <div class="page-header"><div><h1>{{ title }}</h1><p>{{ description }} 当前为只读数据观察；知识维护请使用受控的数据同步流程。</p></div></div>
+    <form class="filters card" @submit.prevent="search"><label>关键词<input v-model.trim="filters.keyword" type="search" placeholder="输入关键词" /></label><label>店铺编码<input v-model.trim="filters.store_code" type="search" placeholder="可不填" /></label><label>商品标识<input v-model.trim="filters.product_id" type="search" placeholder="可不填" /></label><label>状态 / 风险<input v-model.trim="filters.status" type="search" placeholder="可不填" /></label><button class="button" type="submit">筛选</button></form>
+    <p v-if="loading" class="notice" role="status">正在读取数据…</p><p v-else-if="error" class="notice error" role="alert">暂时无法读取数据。{{ error }}</p><p v-else-if="rows.length === 0" class="notice">样本不足：没有符合条件的数据。请调整筛选条件或先完成数据同步。</p>
     <div v-else class="card table-wrap"><table class="data-table"><thead><tr><th v-for="column in columns" :key="column.key">{{ column.label }}</th></tr></thead><tbody><tr v-for="row in rows" :key="value(row, columns[0]?.key || 'id')"><td v-for="column in columns" :key="column.key"><RouterLink v-if="resource === 'products' && column.key === 'product_id'" :to="`/products/${encodeURIComponent(value(row, column.key))}`">{{ value(row, column.key) }}</RouterLink><span v-else>{{ value(row, column.key) }}</span></td></tr></tbody></table></div>
     <div class="pager" aria-label="分页"><button class="button secondary" :disabled="filters.page <= 1 || loading" @click="changePage(filters.page - 1)">上一页</button><span>第 {{ filters.page }} / {{ pageCount }} 页，共 {{ total }} 条</span><button class="button secondary" :disabled="filters.page >= pageCount || loading" @click="changePage(filters.page + 1)">下一页</button></div>
   </main>

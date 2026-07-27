@@ -10,6 +10,7 @@ import {
   type ImportRow,
   type RowStatus,
 } from '../api/client'
+import { displayStatus } from '../presentation'
 
 const props = defineProps<{ batchId: string }>()
 const loading = ref(true)
@@ -45,23 +46,23 @@ onMounted(load)
         <h1>导入批次详情</h1>
         <p>{{ batchId }}</p>
       </div>
-      <RouterLink class="button secondary" to="/imports">返回批次</RouterLink>
+      <RouterLink class="button secondary" to="/imports">返回数据同步</RouterLink>
     </div>
 
     <p v-if="loading" class="notice" role="status">正在加载批次详情…</p>
-    <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
+    <p v-else-if="error" class="notice error" role="alert">暂时无法读取同步详情。{{ error }}</p>
     <template v-else-if="batch">
       <section class="card">
         <div class="summary-row">
           <div>
             <strong>{{ batch.original_filename }}</strong>
-            <p><span class="badge">{{ batch.status }}</span></p>
+            <p><span class="badge">{{ displayStatus(batch.status) }}</span></p>
           </div>
           <a class="button secondary" :href="errorReportUrl(batchId)" download>下载错误报告</a>
         </div>
         <div class="metrics">
           <span class="metric">总行数<strong>{{ batch.total_rows }}</strong></span>
-          <span class="metric">PENDING_REVIEW<strong>{{ batch.staged_rows ?? batch.valid_rows }}</strong></span>
+          <span class="metric">待审核行<strong>{{ batch.staged_rows ?? batch.valid_rows }}</strong></span>
           <span class="metric">错误行<strong>{{ batch.invalid_rows }}</strong></span>
           <span class="metric">重复行<strong>{{ batch.duplicate_rows }}</strong></span>
         </div>
@@ -73,10 +74,10 @@ onMounted(load)
             行状态
             <select v-model="status" @change="load">
               <option value="">全部</option>
-              <option value="VALID">VALID</option>
-              <option value="INVALID">INVALID</option>
-              <option value="DUPLICATE">DUPLICATE</option>
-              <option value="CONFLICT">CONFLICT</option>
+              <option value="VALID">校验通过</option>
+              <option value="INVALID">格式错误</option>
+              <option value="DUPLICATE">重复记录</option>
+              <option value="CONFLICT">存在冲突</option>
             </select>
           </label>
         </div>
@@ -97,7 +98,7 @@ onMounted(load)
             <tbody>
               <tr v-for="row in rows" :key="row.id">
                 <td>{{ row.source_row_number }}</td>
-                <td><span class="badge">{{ row.validation_status }}</span></td>
+                <td><span class="badge">{{ displayStatus(row.validation_status) }}</span></td>
                 <td>{{ row.normalized_data.product_name }} / {{ row.normalized_data.sku_name }}</td>
                 <td>{{ row.errors.map((issue) => issue.error_code).join(', ') || '—' }}</td>
                 <td>{{ row.errors.map((issue) => issue.field).filter(Boolean).join(', ') || '—' }}</td>

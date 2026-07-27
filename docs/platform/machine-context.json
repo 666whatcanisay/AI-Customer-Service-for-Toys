@@ -4,16 +4,16 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "PILOT-HARDENING-C",
-  "current_stage": "C-internal test-only trial governance with fixed roles, content-free audit foundation, and role-gated sensitive Admin reads/writes",
-  "current_gate": "PILOT-HARDENING-C verification PASS; Draft PR #50 is open against agent/platform-pilot-c",
-  "status": "ready_for_delivery",
+  "current_task": "C-OPERATION-CENTER-V2-PRODUCTIZATION",
+  "current_stage": "Chinese C-internal AI customer-service operations center with source-backed home metrics, business navigation, Chinese state/error presentation, and a test-only SKU inventory",
+  "current_gate": "C-OPERATION-CENTER-V2-PRODUCTIZATION verification PASS; code branch pushed, Draft PR blocked by GitHub API TLS handshake timeout",
+  "status": "external_delivery_blocked",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
     "Frozen feedback supplement: docs/control/interfaces/ai-feedback.v1-draft.md (not modified in this worktree)",
-    "C implementation note: docs/platform/13_AI反馈接口说明.md; frozen B/C/A Provider paths with affected-line review required before any shared-contract promotion."
-    ,"C Provider note: docs/platform/14_客服效率接口说明.md; original frozen customer-efficiency.v1 copy is not present in this worktree, and contracts/version.json remains 0.1.0."
+    "C implementation note: docs/platform/13_AI反馈接口说明.md; frozen B/C/A Provider paths with affected-line review required before any shared-contract promotion.",
+    "C Provider note: docs/platform/14_客服效率接口说明.md; original frozen customer-efficiency.v1 copy is not present in this worktree, and contracts/version.json remains 0.1.0."
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -40,14 +40,17 @@
     "platform_backend/app/api/admin_ai_feedback_routes.py",
     "platform_backend/migrations/versions/0005_mvp_plus_02_ai_response_feedback.py",
     "platform_backend/migrations/versions/0006_mvp_plus_02_ai_feedback_idempotency.py",
-    "docs/platform/13_AI反馈接口说明.md"
-    ,"platform_backend/app/customer_efficiency/models.py",
+    "docs/platform/13_AI反馈接口说明.md",
+    "platform_backend/app/customer_efficiency/models.py",
     "platform_backend/app/api/customer_efficiency_routes.py",
     "platform_backend/migrations/versions/0007_p0_customer_efficiency_events.py",
     "platform_backend/app/api/admin_operations_routes.py",
+    "platform_backend/app/api/admin_routes.py (C-internal GET /api/v1/admin/skus)",
     "admin_web/src/App.vue",
     "admin_web/src/views/OperationsOverviewView.vue",
     "admin_web/src/views/CustomerEfficiencyDashboardView.vue",
+    "admin_web/src/presentation.ts",
+    "docs/platform/17_AI客服运营中心V2说明.md",
     "docs/platform/14_客服效率接口说明.md"
   ],
   "provided_interfaces": [
@@ -64,6 +67,7 @@
     "GET /api/v1/admin/ai-quality/customer-efficiency/summary",
     "C-owned internal GET /api/v1/admin/customer-efficiency/summary",
     "C-owned internal GET /api/v1/admin/operations/today (content-free daily Admin aggregation)",
+    "C-owned internal GET /api/v1/admin/skus (test-only SKU inventory projection)",
     "C-owned internal GET /api/v1/admin/trial-governance and administrator-only /audit-events (test-only role/audit status)",
     "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
@@ -73,6 +77,7 @@
     "No direct A/C database access, A model call, or cross-line automatic action",
     "C-OPERATION-V1.1 adds no cross-line interface, shared schema, error-code, or contract-version change",
     "PILOT-HARDENING-C changes only C-internal Admin/test-only paths and does not revise B/A frozen interfaces or contracts/**",
+    "C-OPERATION-CENTER-V2-PRODUCTIZATION adds only C-internal Admin presentation and the test-only SKU read projection; B/A frozen paths and contracts/** remain unchanged",
     "B writes content-free efficiency event types; A consumes aggregate-only customer-efficiency summaries"
   ],
   "cross_line_compatibility": {
@@ -96,23 +101,26 @@
     "trial_audit_foundation_enabled": true,
     "trial_audit_contains_customer_content": false,
     "retention_policy_configured": false,
+    "operations_center_uses_real_source_states": true,
+    "operations_center_fabricated_trends_enabled": false,
     "automatic_training_enabled": false,
     "prompt_change_enabled": false,
     "knowledge_publication_enabled": false,
     "customer_message_enabled": false,
-    "order_or_erp_write_enabled": false
-    ,"customer_efficiency_raw_content_stored": false,
+    "order_or_erp_write_enabled": false,
+    "customer_efficiency_raw_content_stored": false,
     "customer_efficiency_employee_identity_stored": false,
     "customer_efficiency_ranking_enabled": false
   },
-  "last_test_result": "2026-07-27 PILOT-HARDENING-C: isolated SQLite Alembic upgrade/downgrade/upgrade through 0009 passed. TestClient verified support safe-store read, sensitive case-read/write denial, operator case-view audit, administrator audit read, and unknown-actor denial with no raw case text in the audit projection. Full platform backend pytest passed (77); Admin typecheck, Vitest (38), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
+  "last_test_result": "2026-07-27 C-OPERATION-CENTER-V2-PRODUCTIZATION: current-worktree browser verification at localhost:5174 passed for Chinese business navigation, primary direct routes, refresh, support-role access denial, and 1366x768 layout with no console errors. The C-internal /api/v1/admin/skus route returned a real empty test-only inventory. Full platform backend pytest passed (77); Admin typecheck, Vitest (40), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0006_mvp_plus_02_ai_feedback_idempotency; upgrade head",
     "cd admin_web; npm.cmd run typecheck; npm.cmd test; npm.cmd run build",
-    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_admin_operations_api.py tests/test_admin_api.py"
+    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_admin_operations_api.py tests/test_admin_api.py",
+    "current-worktree local runtime: platform_backend on 8011 and admin_web Vite on 5174; verify primary direct routes, refresh, support boundary, and 1366x768 layout"
   ],
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, production authorization, retention, deletion, recovery, or production security certification. The fixed trial-actor header and content-free audit table are a test-only governance foundation, not identity proof or formal access control.",
@@ -123,23 +131,25 @@
     "The customer-efficiency provider has no formal authentication, authorization, audit, retention, or production-security certification; aggregate-only output does not establish a personnel-performance capability.",
     "CORS is not authentication or authorization.",
     "UI-3 preserves the existing internal-test Admin boundary; it does not add formal authentication, authorization, audit, retention, or sensitive-data controls.",
-    "C-OPERATION-V1.1 returns aggregate-only daily metrics but does not add formal Admin access control, audit logging, retention, or production-report certification."
+    "C-OPERATION-V1.1 returns aggregate-only daily metrics but does not add formal Admin access control, audit logging, retention, or production-report certification.",
+    "C-OPERATION-CENTER-V2-PRODUCTIZATION maps endpoint reachability to a Chinese UI state but does not establish AI answer quality, business impact, or production readiness."
   ],
   "out_of_scope": [
     "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, and A model invocation",
     "Formal login, roles, retention, access audit, and production data",
-    "A/B business code and shared contract changes"
-    ,"Employee rankings, performance evaluations, raw customer-service content, and efficiency-event detail APIs",
+    "A/B business code and shared contract changes",
+    "Employee rankings, performance evaluations, raw customer-service content, and efficiency-event detail APIs",
     "Prompt modification, knowledge publication, automatic model training, ERP writes, order changes, and implementation of planning-only business extensions",
-    "Relabelling cumulative totals as daily metrics or inferring unavailable service state from another source"
+    "Relabelling cumulative totals as daily metrics or inferring unavailable service state from another source",
+    "Inventing trends or replacing unavailable/zero sources with synthetic operating values"
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-pilot-hardening-c",
-    "base": "agent/platform-pilot-c bcc9e61 (multi-store pilot operations center)",
-    "commit": "feat(platform): harden trial operations governance",
-    "draft_pr": "#50 against agent/platform-pilot-c"
+    "branch": "agent/platform-operation-center-v2",
+    "base": "agent/platform-pilot-hardening-c d5dcc38 (trial governance foundation)",
+    "commit": "feat(platform): productize Chinese operations center",
+    "draft_pr": "ENV_BLOCKED_CREATE_PR: GitHub API TLS handshake timeout after two create attempts"
   },
-  "next_recommended_task": "Review the dependent multi-store pilot PR before this child PR. Do not promote trial headers or content-free audit metadata into formal authentication, production authorization, retention, or automatic redaction without separately approved work.",
+  "next_recommended_task": "Review the dependent trial-governance and multi-store pilot PRs before this child PR. Do not promote source reachability, trial headers, or content-free audit metadata into AI-quality, formal authentication, production authorization, retention, or automatic-redaction claims without separately approved work.",
   "last_updated": "2026-07-27"
 }

@@ -31,7 +31,7 @@ describe('AiFeedbackOptimizationPoolView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('What age is this toy for?')
-    expect(wrapper.text()).toContain('MISSING_INFO')
+    expect(wrapper.text()).toContain('信息缺失')
     await wrapper.get('.link-button').trigger('click')
     expect(wrapper.text()).toContain('Missing lower-age safety limit.')
     await wrapper.get('.technical-details summary').trigger('click')

@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import { apiErrorMessage, listAiFeedbackAnalysisResults, type AiFeedbackAnalysisResult } from '../api/client'
+import { displayStatus } from '../presentation'
 
 const results = ref<AiFeedbackAnalysisResult[]>([])
 const total = ref<number | null>(null)
@@ -38,15 +39,15 @@ onMounted(load)
     <div class="page-header">
       <div>
         <h1>AI 问题中心</h1>
-        <p>查看已完成 AI 分析的客服问题与改进建议。此页面只读，不提供 Prompt 修改、知识发布或业务自动执行。</p>
+        <p>查看已完成 AI 分析的客服问题与改进建议。此页面只读，不提供提示词修改、知识发布或业务自动执行。</p>
       </div>
       <button class="button secondary" type="button" @click="load">刷新数据</button>
     </div>
 
     <p class="notice trial-note">当前展示测试/试运行中的已分析问题；未分析的问题不会被错误展示为分析结果。</p>
     <p v-if="loading" class="notice" role="status">正在读取已分析问题…</p>
-    <p v-else-if="error" class="notice error" role="alert">待启用：{{ error }}</p>
-    <p v-else-if="results.length === 0" class="notice">样本不足：{{ total === 0 ? '尚无已完成分析的 AI 问题。' : '未读取到可展示的问题。' }}</p>
+    <p v-else-if="error" class="notice error" role="alert">暂时无法读取优化建议。{{ error }}</p>
+    <p v-else-if="results.length === 0" class="notice">样本不足：{{ total === 0 ? '尚无已完成分析的 AI 问题。请先等待分析结果回写。' : '未读取到可展示的问题。请刷新后重试。' }}</p>
 
     <section v-else class="pool-grid">
       <div class="card table-wrap">
@@ -55,9 +56,9 @@ onMounted(load)
           <tbody>
             <tr v-for="item in results" :key="`${item.feedback_id}-${item.revision}`">
               <td><button class="link-button" type="button" @click="choose(item)">{{ item.question }}</button></td>
-              <td><span class="badge">{{ item.feedback_type }}</span></td>
+              <td><span class="badge">{{ displayStatus(item.feedback_type) }}</span></td>
               <td class="analysis-cell">{{ formatted(item.analysis) }}</td>
-              <td><span class="badge">{{ item.analysis_status }}</span></td>
+              <td><span class="badge">{{ displayStatus(item.analysis_status) }}</span></td>
             </tr>
           </tbody>
         </table>
@@ -72,7 +73,7 @@ onMounted(load)
         <p><strong>改进建议</strong></p><pre>{{ formatted(selected.suggestions) }}</pre>
         <details class="technical-details">
           <summary>技术信息</summary>
-          <dl><div><dt>证据版本</dt><dd>Revision {{ selected.revision }}</dd></div><div><dt>内容校验</dt><dd>{{ selected.content_hash }}</dd></div><div><dt>分析任务</dt><dd>{{ selected.analysis_run_id }}</dd></div><div><dt>模型 / Prompt</dt><dd>{{ selected.model_version }} / {{ selected.prompt_version }}</dd></div><div><dt>写入时间</dt><dd>{{ selected.created_at }}</dd></div></dl>
+          <dl><div><dt>证据版本</dt><dd>修订版本 {{ selected.revision }}</dd></div><div><dt>内容校验</dt><dd>{{ selected.content_hash }}</dd></div><div><dt>分析任务</dt><dd>{{ selected.analysis_run_id }}</dd></div><div><dt>模型 / 提示词版本</dt><dd>{{ selected.model_version }} / {{ selected.prompt_version }}</dd></div><div><dt>写入时间</dt><dd>{{ selected.created_at }}</dd></div></dl>
         </details>
       </aside>
       <aside v-else class="card detail"><h2>问题详情</h2><p>选择一条已分析问题，查看客服反馈与 AI 分析证据。</p></aside>

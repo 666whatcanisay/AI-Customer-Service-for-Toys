@@ -38,50 +38,39 @@ onMounted(loadSystemState)
     <aside class="sidebar">
       <RouterLink class="brand" to="/overview">
         <span class="brand-mark">AI</span>
-        <span><strong>运营中心</strong><small>试运行管理台</small></span>
+        <span><strong>AI 客服运营中心</strong><small>内部试运行</small></span>
       </RouterLink>
 
       <nav class="side-nav" aria-label="运营中心导航">
         <section class="nav-group">
           <p>首页</p>
-          <RouterLink to="/overview">运营概览</RouterLink>
+          <RouterLink to="/overview">运营总览</RouterLink>
         </section>
         <section class="nav-group">
           <p>客服运营</p>
-          <RouterLink to="/experience-cases">客服经验库</RouterLink>
+          <RouterLink to="/experience-cases">客服案例</RouterLink>
           <RouterLink to="/ai-feedback-optimization-pool">AI 问题中心</RouterLink>
           <RouterLink to="/customer-efficiency">效率分析</RouterLink>
-          <RouterLink to="/suggestions">客户建议</RouterLink>
         </section>
         <section class="nav-group">
-          <p>商品知识中心</p>
-          <RouterLink to="/store-center">店铺中心</RouterLink>
-          <RouterLink to="/stores">已导入店铺</RouterLink>
-          <RouterLink to="/products">商品与 SKU</RouterLink>
+          <p>商品知识</p>
+          <RouterLink to="/store-center">店铺</RouterLink>
+          <RouterLink to="/products">商品</RouterLink>
+          <RouterLink to="/skus">SKU</RouterLink>
           <RouterLink to="/faqs">FAQ</RouterLink>
           <RouterLink to="/safety-rules">安全规则</RouterLink>
-          <RouterLink to="/imports/new">知识维护（导入）</RouterLink>
-          <RouterLink to="/sources">知识来源</RouterLink>
-          <RouterLink to="/conflicts">数据冲突</RouterLink>
         </section>
         <section class="nav-group">
           <p>AI 管理</p>
-          <RouterLink to="/ai-capabilities">AI 服务状态</RouterLink>
-          <RouterLink to="/ai-optimization-pool">评测记录</RouterLink>
-          <RouterLink to="/ai-feedback-optimization-pool">Badcase 与优化</RouterLink>
-        </section>
-        <section class="nav-group">
-          <p>业务扩展</p>
-          <span class="nav-planned">ERP 镜像（规划）</span>
-          <span class="nav-planned">售后助手（规划）</span>
-          <span class="nav-planned">退款风险（规划）</span>
+          <RouterLink to="/ai-capabilities">AI 效果</RouterLink>
+          <RouterLink to="/ai-optimization-pool">AI 评测</RouterLink>
+          <RouterLink to="/ai-feedback-optimization-pool">优化建议</RouterLink>
         </section>
         <section class="nav-group">
           <p>系统</p>
-          <RouterLink to="/trial-governance">试运行治理</RouterLink>
           <RouterLink to="/system-status">服务状态</RouterLink>
-          <RouterLink to="/imports">数据导入</RouterLink>
-          <RouterLink to="/test-data-packages">测试数据包</RouterLink>
+          <RouterLink to="/imports">数据同步</RouterLink>
+          <RouterLink to="/trial-governance">试运行治理</RouterLink>
         </section>
       </nav>
     </aside>
@@ -90,15 +79,15 @@ onMounted(loadSystemState)
       <header class="topbar">
         <div>
           <p class="eyebrow">AI 运营中心</p>
-          <p class="topbar-title">试运行观察与人工运营</p>
+          <p class="topbar-title">今日运营状态与人工处理</p>
         </div>
         <div class="service-chips" aria-label="系统实时状态">
-          <span class="service-chip"><i :class="platformState"></i>C 平台：{{ platformLabel }}</span>
+          <span class="service-chip"><i :class="platformState"></i>平台服务：{{ platformLabel }}</span>
           <span class="service-chip"><i :class="aiState"></i>AI 服务：{{ aiLabel }}</span>
           <span class="service-chip"><i :class="operationState"></i>运营数据：{{ operationLabel }}</span>
         </div>
       </header>
-      <p class="trial-banner">当前为测试/试运行数据观察，不构成正式运营报表；仅启用无原文的试运行审计基础，正式身份、权限、留存与自动脱敏尚未启用。</p>
+      <p class="trial-banner">当前展示测试 / 试运行数据，不构成正式运营报表；已启用无原文审计基础，正式身份认证、权限体系、留存策略和自动脱敏尚未启用。</p>
       <main class="content"><RouterView /></main>
       <footer class="app-footer">
         <button class="technical-toggle" type="button" @click="technicalOpen = !technicalOpen">

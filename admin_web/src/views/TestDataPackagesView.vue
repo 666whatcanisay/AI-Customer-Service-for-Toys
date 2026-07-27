@@ -9,6 +9,7 @@ import {
   type TestPackagePreflight,
   type TestPackageSummary,
 } from '../api/client'
+import { displayStatus } from '../presentation'
 
 const MAX_PACKAGE_BYTES = 32 * 1024 * 1024
 const packages = ref<TestPackageSummary[]>([])
@@ -118,7 +119,7 @@ onMounted(loadPackages)
     <section class="card package-import">
       <h2>导入汕明 V0.3.1 测试基线包</h2>
       <p class="notice warning">
-        测试专用：test_data_mode=true、production_usable=false、SUGGESTION_ONLY、allow_auto_send=false。
+        测试专用：不可用于生产，仅提供建议，不会自动发送。
       </p>
       <input
         type="file"
@@ -135,7 +136,7 @@ onMounted(loadPackages)
           :disabled="!selectedFile || preflighting || importing"
           @click="runPreflight"
         >
-          {{ preflighting ? '预检中…' : '先预检 ZIP' }}
+          {{ preflighting ? '预检中…' : '先预检压缩包' }}
         </button>
         <button
           class="button"
@@ -150,7 +151,7 @@ onMounted(loadPackages)
       <p v-if="importError" class="notice error" role="alert">{{ importError }}</p>
 
       <div v-if="preflight" class="preflight" role="status">
-        <h3>{{ preflight.can_import ? 'ZIP 预检通过' : 'ZIP 预检未通过' }}</h3>
+        <h3>{{ preflight.can_import ? '压缩包预检通过' : '压缩包预检未通过' }}</h3>
         <p>{{ preflight.package_id }} · {{ preflight.version }} · {{ preflight.schema_version }}</p>
         <div class="metrics">
           <span class="metric">商品<strong>{{ preflight.counts.products }}</strong></span>
@@ -168,7 +169,7 @@ onMounted(loadPackages)
       </div>
 
       <p v-if="imported" class="notice success" role="status">
-        已导入 {{ imported.package_id }}；状态 {{ imported.import_status }}。
+        已导入 {{ imported.package_id }}；状态 {{ displayStatus(imported.import_status) }}。
       </p>
     </section>
 
@@ -183,7 +184,7 @@ onMounted(loadPackages)
           <tbody>
             <tr v-for="item in visiblePackages" :key="item.package_id">
               <td>{{ item.package_id }}<br /><small>{{ item.version }}</small></td>
-              <td><span class="badge">{{ item.import_status }}</span></td>
+              <td><span class="badge">{{ displayStatus(item.import_status) }}</span></td>
               <td>{{ item.counts.products }}</td>
               <td>{{ item.counts.skus_and_bundles }}</td>
               <td>{{ item.counts.faqs }}</td>
