@@ -26,6 +26,7 @@ describe('ImportBatchDetailView', () => {
       id: 'batch-1',
       batch_id: 'batch-1',
       tenant_id: 'tenant-demo',
+      target_store_code: null,
       import_type: 'PRODUCT_SKU',
       original_filename: 'demo.xlsx',
       file_sha256: 'hash',

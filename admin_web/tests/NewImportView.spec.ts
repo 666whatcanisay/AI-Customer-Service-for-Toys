@@ -46,6 +46,7 @@ function batch() {
     id: 'batch-1',
     batch_id: 'batch-1',
     tenant_id: 'tenant-demo',
+    target_store_code: null,
     import_type: 'PRODUCT_SKU',
     original_filename: 'demo.xlsx',
     file_sha256: 'hash',
@@ -88,6 +89,7 @@ async function runSuccessfulPreflight(wrapper: ReturnType<typeof mount>): Promis
 
 describe('NewImportView', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/')
     mockedPreflight.mockReset()
     mockedUpload.mockReset()
   })
@@ -153,6 +155,22 @@ describe('NewImportView', () => {
     expect(mockedUpload).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('READY_FOR_REVIEW')
     expect(wrapper.text()).toContain('待审核有效行')
+  })
+
+  it('binds a store-center import to the selected trial store', async () => {
+    window.history.replaceState({}, '', '/imports/new?store_code=STORE-ONE')
+    const wrapper = mountView()
+    await chooseXlsx(wrapper)
+    await runSuccessfulPreflight(wrapper)
+    mockedUpload.mockResolvedValue({ ...batch(), target_store_code: 'STORE-ONE' })
+
+    expect(wrapper.text()).toContain('目标试运行店铺：')
+    expect(mockedPreflight).toHaveBeenCalledWith(expect.any(File), 'STORE-ONE')
+    await wrapper.get('[data-testid="upload-button"]').trigger('click')
+    await flushPromises()
+
+    expect(mockedUpload).toHaveBeenCalledWith(expect.any(File), expect.any(Function), 'STORE-ONE')
+    expect(wrapper.text()).toContain('STORE-ONE')
   })
 
   it('shows upload progress after a passing preflight', async () => {

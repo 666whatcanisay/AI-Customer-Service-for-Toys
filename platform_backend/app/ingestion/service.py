@@ -47,6 +47,7 @@ class IngestionService:
         filename: str,
         content_type: str | None,
         content: bytes,
+        target_store_code: str | None = None,
     ) -> ProductSkuPreflightResponse:
         """Analyze an XLSX without opening a database session or writing a batch."""
         safe_filename = PurePosixPath(filename.replace("\\", "/")).name
@@ -126,6 +127,7 @@ class IngestionService:
             and not inspection.row_limit_exceeded
         ):
             processed = self._process_rows(inspection.parsed_rows)
+            self._enforce_target_store(processed, target_store_code)
             for row in processed:
                 for issue in row.errors:
                     if issue.error_code != ErrorCode.FORMULA_NOT_ALLOWED:
@@ -195,6 +197,7 @@ class IngestionService:
         content_type: str | None,
         content: bytes,
         created_by: str,
+        target_store_code: str | None = None,
     ) -> ImportBatch:
         safe_filename = PurePosixPath(filename.replace("\\", "/")).name
         self._validate_file(safe_filename, content_type, content)
@@ -204,11 +207,13 @@ class IngestionService:
             original_filename=safe_filename,
             file_sha256=sha256_bytes(content),
             created_by=created_by.strip()[:128] or "manual-import",
+            target_store_code=target_store_code,
         )
         self.repository.set_status(batch, BatchStatus.PARSING)
         try:
             parsed_rows = parse_product_sku_xlsx(content, max_rows=self.max_import_rows)
             processed = self._process_rows(parsed_rows)
+            self._enforce_target_store(processed, target_store_code)
             self.repository.save_processed_rows(batch, processed)
             self.repository.set_status(batch, BatchStatus.VALIDATED)
             final_status = (
@@ -334,6 +339,27 @@ class IngestionService:
                     )
                 )
         return rows
+
+    @staticmethod
+    def _enforce_target_store(rows: list[ProcessedRow], target_store_code: str | None) -> None:
+        """Reject valid rows that would silently enter a different trial store."""
+        if not target_store_code:
+            return
+        for row in rows:
+            actual_store_code = str(row.normalized_data.get("store_code") or "")
+            if actual_store_code == target_store_code or row.validation_status != RowStatus.VALID:
+                continue
+            row.validation_status = RowStatus.INVALID
+            row.errors.append(
+                _issue(
+                    ErrorCode.STORE_CODE_MISMATCH,
+                    row.source_row_number,
+                    "store_code",
+                    actual_store_code,
+                    "The row store_code does not match the selected trial store",
+                    f"Use store_code '{target_store_code}' or select the matching trial store",
+                )
+            )
 
 
 def _issue(

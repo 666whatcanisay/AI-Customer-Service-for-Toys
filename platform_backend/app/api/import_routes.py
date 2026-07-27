@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.api.admin_pilot_store_routes import require_pilot_store
 from app.database import get_db
 from app.errors import AppError
 from app.ingestion.models import ImportBatch, ImportRow
@@ -46,6 +47,7 @@ def _summary(batch: ImportBatch) -> BatchSummary:
         id=batch.id,
         batch_id=batch.id,
         tenant_id=batch.tenant_id,
+        target_store_code=batch.target_store_code,
         import_type=batch.import_type,
         original_filename=batch.original_filename,
         file_sha256=batch.file_sha256,
@@ -98,7 +100,12 @@ def download_product_sku_template() -> FileResponse:
 )
 async def preflight_product_sku(
     file: UploadFile = File(...),
+    target_store_code: str | None = Form(default=None),
+    session: Session = Depends(get_db),
 ) -> ProductSkuPreflightResponse:
+    target = target_store_code.strip() if target_store_code else None
+    if target:
+        require_pilot_store(session, target)
     settings = get_settings()
     content = await file.read(settings.max_upload_bytes + 1)
     service = IngestionService(
@@ -110,6 +117,7 @@ async def preflight_product_sku(
         filename=file.filename or "upload.xlsx",
         content_type=file.content_type,
         content=content,
+        target_store_code=target,
     )
 
 
@@ -117,8 +125,12 @@ async def preflight_product_sku(
 async def upload_product_sku(
     file: UploadFile = File(...),
     created_by: str = Form("manual-import"),
+    target_store_code: str | None = Form(default=None),
     session: Session = Depends(get_db),
 ) -> BatchSummary:
+    target = target_store_code.strip() if target_store_code else None
+    if target:
+        require_pilot_store(session, target)
     settings = get_settings()
     content = await file.read(settings.max_upload_bytes + 1)
     service = IngestionService(
@@ -131,6 +143,7 @@ async def upload_product_sku(
         content_type=file.content_type,
         content=content,
         created_by=created_by,
+        target_store_code=target,
     )
     return _summary(batch)
 

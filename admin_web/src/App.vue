@@ -55,7 +55,8 @@ onMounted(loadSystemState)
         </section>
         <section class="nav-group">
           <p>商品知识中心</p>
-          <RouterLink to="/stores">店铺</RouterLink>
+          <RouterLink to="/store-center">店铺中心</RouterLink>
+          <RouterLink to="/stores">已导入店铺</RouterLink>
           <RouterLink to="/products">商品与 SKU</RouterLink>
           <RouterLink to="/faqs">FAQ</RouterLink>
           <RouterLink to="/safety-rules">安全规则</RouterLink>

@@ -20,6 +20,7 @@ class ImportBatch(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     tenant_id: Mapped[str] = mapped_column(String(64), index=True)
+    target_store_code: Mapped[Optional[str]] = mapped_column(String(96), nullable=True, index=True)
     import_type: Mapped[str] = mapped_column(String(32), default="PRODUCT_SKU")
     original_filename: Mapped[str] = mapped_column(String(255))
     file_sha256: Mapped[str] = mapped_column(String(64), index=True)

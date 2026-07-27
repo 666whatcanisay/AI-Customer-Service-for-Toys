@@ -20,9 +20,11 @@ class IngestionRepository:
         original_filename: str,
         file_sha256: str,
         created_by: str,
+        target_store_code: str | None = None,
     ) -> ImportBatch:
         batch = ImportBatch(
             tenant_id="UNRESOLVED",
+            target_store_code=target_store_code,
             import_type="PRODUCT_SKU",
             original_filename=original_filename,
             file_sha256=file_sha256,

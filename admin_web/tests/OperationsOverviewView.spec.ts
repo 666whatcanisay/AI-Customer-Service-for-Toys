@@ -2,24 +2,27 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OperationsOverviewView from '../src/views/OperationsOverviewView.vue'
-import { getAdminOperationsToday, getHealth, listAiModules } from '../src/api/client'
+import { getAdminOperationsToday, getHealth, listAiModules, listPilotStores } from '../src/api/client'
 
 vi.mock('../src/api/client', () => ({
   getAdminOperationsToday: vi.fn(),
   getHealth: vi.fn(),
   listAiModules: vi.fn(),
+  listPilotStores: vi.fn(),
   apiErrorMessage: vi.fn(() => 'Could not load operations snapshot'),
 }))
 
 const mockedOperations = vi.mocked(getAdminOperationsToday)
 const mockedHealth = vi.mocked(getHealth)
 const mockedModules = vi.mocked(listAiModules)
+const mockedPilotStores = vi.mocked(listPilotStores)
 
 describe('OperationsOverviewView', () => {
   beforeEach(() => {
     mockedOperations.mockReset()
     mockedHealth.mockReset()
     mockedModules.mockReset()
+    mockedPilotStores.mockReset()
   })
 
   it('renders one API-backed UTC-day snapshot and does not turn unavailable AI into a metric', async () => {
@@ -35,6 +38,7 @@ describe('OperationsOverviewView', () => {
     })
     mockedHealth.mockResolvedValue({ status: 'ok', service: 'platform-backend', version: '0.1.0', request_id: 'health-1' })
     mockedModules.mockRejectedValue(new Error('A unavailable'))
+    mockedPilotStores.mockResolvedValue({ items: [{ store_code: 'STORE-1', store_name: 'Store one', platform: 'pdd', created_at: '2026-07-27T08:00:00Z', setup_status: 'OBSERVABLE', catalog_product_count: 1, catalog_sku_count: 1, staged_product_count: 0, staged_sku_count: 0, faq_count: 1, safety_rule_count: 1, experience_case_count: 0, ai_feedback_count: 0, latest_product_imported_at: null, test_data_mode: true, production_usable: false }], total: 1 })
 
     const wrapper = mount(OperationsOverviewView, {
       global: { stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } } },
@@ -48,6 +52,8 @@ describe('OperationsOverviewView', () => {
     expect(wrapper.text()).toContain('4 件')
     expect(wrapper.text()).toContain('待审核经验案例')
     expect(wrapper.text()).toContain('平台可用 · AI 待连接')
+    expect(wrapper.text()).toContain('多店铺准备状态')
+    expect(wrapper.text()).toContain('可观察')
     expect(mockedOperations).toHaveBeenCalledTimes(1)
   })
 
@@ -64,6 +70,7 @@ describe('OperationsOverviewView', () => {
     })
     mockedHealth.mockRejectedValue(new Error('offline'))
     mockedModules.mockRejectedValue(new Error('offline'))
+    mockedPilotStores.mockRejectedValue(new Error('offline'))
 
     const wrapper = mount(OperationsOverviewView, {
       global: { stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } } },

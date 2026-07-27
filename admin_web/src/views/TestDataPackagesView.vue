@@ -22,8 +22,16 @@ const preflight = ref<TestPackagePreflight | null>(null)
 const importing = ref(false)
 const importError = ref('')
 const imported = ref<TestPackageSummary | null>(null)
+const targetStoreCode = new URLSearchParams(window.location.search).get('store_code')?.trim() || ''
+const visiblePackages = computed(() => (
+  targetStoreCode
+    ? packages.value.filter((item) => item.store_code === targetStoreCode)
+    : packages.value
+))
 const canImport = computed(
-  () => selectedFile.value !== null && preflight.value?.can_import === true,
+  () => selectedFile.value !== null
+    && preflight.value?.can_import === true
+    && (!targetStoreCode || preflight.value.store_code === targetStoreCode),
 )
 
 async function loadPackages(): Promise<void> {
@@ -69,6 +77,9 @@ async function runPreflight(): Promise<void> {
   imported.value = null
   try {
     preflight.value = await preflightTestDataPackage(selectedFile.value)
+    if (targetStoreCode && preflight.value.store_code !== targetStoreCode) {
+      preflightError.value = `知识包店铺编码 ${preflight.value.store_code} 与目标店铺 ${targetStoreCode} 不一致，不能导入。`
+    }
   } catch (reason: unknown) {
     preflightError.value = apiErrorMessage(reason)
   } finally {
@@ -102,6 +113,7 @@ onMounted(loadPackages)
         <p>仅导入 TENANT-PDD-SM-TEST；不可用于生产，禁止自动发送。</p>
       </div>
     </div>
+    <p v-if="targetStoreCode" class="notice warning">目标试运行店铺：<strong>{{ targetStoreCode }}</strong>。只展示并允许导入店铺编码一致的受控测试知识包。</p>
 
     <section class="card package-import">
       <h2>导入汕明 V0.3.1 测试基线包</h2>
@@ -164,12 +176,12 @@ onMounted(loadPackages)
       <h2>已导入测试包</h2>
       <p v-if="loading" class="notice" role="status">正在加载…</p>
       <p v-else-if="listError" class="notice error" role="alert">{{ listError }}</p>
-      <p v-else-if="packages.length === 0" class="notice">暂无测试数据包。</p>
+      <p v-else-if="visiblePackages.length === 0" class="notice">{{ targetStoreCode ? '待维护知识：尚无该目标店铺的受控测试知识包。' : '暂无测试数据包。' }}</p>
       <div v-else class="table-wrap">
         <table class="data-table">
           <thead><tr><th>数据包</th><th>状态</th><th>商品</th><th>SKU</th><th>FAQ</th><th>规则</th><th>评测</th><th>限制</th></tr></thead>
           <tbody>
-            <tr v-for="item in packages" :key="item.package_id">
+            <tr v-for="item in visiblePackages" :key="item.package_id">
               <td>{{ item.package_id }}<br /><small>{{ item.version }}</small></td>
               <td><span class="badge">{{ item.import_status }}</span></td>
               <td>{{ item.counts.products }}</td>
