@@ -4,6 +4,10 @@ import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlatformClientError, RagClientError } from '@/api/errorMapper'
 import type { RagAction, RagChatResult } from '@/api/ragTypes'
+import {
+  clearCustomerSessionActivity,
+  useCustomerSessionActivity
+} from '@/workspace/customerSessionActivity'
 import { clearExperienceCaseSubmissions } from '@/workspace/experienceCaseSession'
 import { TesterIdentityKey } from '@/workspace/testerIdentity'
 import AiChat from './AiChat.vue'
@@ -188,6 +192,7 @@ describe('AiChat B-T04 three-step workbench', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    clearCustomerSessionActivity()
     clearExperienceCaseSubmissions()
     window.localStorage.clear()
     apiMocks.getRagHealth.mockResolvedValue({ status: 'ok', ready: true })
@@ -302,9 +307,13 @@ describe('AiChat B-T04 three-step workbench', () => {
         sku_id: 'SKU-RED'
       }
     }, expect.any(AbortSignal))
-    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe('🟢 可以参考')
+    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe('🟢 可直接参考')
     expect(wrapper.get('[data-testid="sources-details"]').attributes('open')).toBeUndefined()
     expect(wrapper.get('[data-testid="citation-item"]').text()).toContain('toy-guide.pdf')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('当前店铺')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('商品上下文')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('SKU 上下文')
+    expect(useCustomerSessionActivity().aiAssists.value).toBe(1)
   })
 
   it('keeps SKU optional and translates the clarification field into Chinese', async () => {
@@ -320,7 +329,7 @@ describe('AiChat B-T04 three-step workbench', () => {
   })
 
   it.each([
-    ['DIRECT_ANSWER', '🟢 可以参考'],
+    ['DIRECT_ANSWER', '🟢 可直接参考'],
     ['CONTROLLED_ANSWER', '🟡 建议确认'],
     ['ASK_CLARIFY', '需要补充信息'],
     ['REQUIRE_LOOKUP', '需要查询系统'],
@@ -354,6 +363,23 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(technical.text()).toContain('req-ui-1')
     expect(technical.text()).toContain('qwen-turbo')
     expect(wrapper.get('[data-testid="citation-technical-details"]').text()).toContain('SRC-001')
+  })
+
+  it('keeps the core reply actions visible without changing the existing adoption flow', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(wrapper.get('[data-testid="copy-button"]').text()).toContain('复制回复')
+    expect(wrapper.get('[data-testid="edit-reply-button"]').text()).toContain('编辑回复')
+    expect(wrapper.get('[data-testid="collect-experience-case-button"]').text()).toContain('收藏优秀案例')
+    expect(wrapper.get('[data-testid="feedback-problem-button"]').text()).toContain('反馈问题')
+    const focus = vi.spyOn(
+      wrapper.get('[data-testid="reply-draft"]').element as HTMLTextAreaElement,
+      'focus'
+    )
+    await wrapper.get('[data-testid="edit-reply-button"]').trigger('click')
+    expect(focus).toHaveBeenCalled()
   })
 
   it('copies the customer-service edit and records all three page-local outcomes', async () => {
@@ -395,6 +421,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     }, expect.stringMatching(/^ai-feedback-/))
     expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
     expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
+    expect(useCustomerSessionActivity().feedbackSubmissions.value).toBe(1)
   })
 
   it('reuses an in-flight feedback Idempotency-Key and displays C replay as the recorded result', async () => {

@@ -26,20 +26,20 @@
       </div>
       <div class="overview-grid">
         <article>
-          <small>AI 帮助次数</small>
-          <strong class="waiting">待启用</strong>
-          <span>P0 效率聚合尚未发布，暂不显示次数。</span>
+          <small>今日 AI 辅助</small>
+          <strong class="metric-value" data-testid="today-ai-assist-count">{{ activity.aiAssists.value }}</strong>
+          <span>本次会话成功生成的建议；日统计待服务端聚合。</span>
         </article>
         <article>
           <small>优秀案例</small>
-          <strong>查看我的案例</strong>
-          <span>收藏后仍需运营审核，不等于已进入知识库。</span>
+          <strong class="metric-value" data-testid="experience-case-count">{{ submissions.length }}</strong>
+          <span>本次会话已确认沉淀的案例；仍需运营审核。</span>
           <RouterLink to="/experience-cases">打开案例</RouterLink>
         </article>
         <article>
-          <small>待反馈问题</small>
-          <strong>在咨询后提交</strong>
-          <span>只在未采用 AI 建议时选择原因并提交真实反馈。</span>
+          <small>反馈数量</small>
+          <strong class="metric-value" data-testid="feedback-count">{{ activity.feedbackSubmissions.value }}</strong>
+          <span>本次会话提交成功的 AI 问题反馈。</span>
           <RouterLink to="/feedback">了解反馈流程</RouterLink>
         </article>
       </div>
@@ -76,11 +76,15 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import ProductEmptyState from '@/components/ProductEmptyState.vue'
+import { useCustomerSessionActivity } from '@/workspace/customerSessionActivity'
+import { useExperienceCaseSubmissions } from '@/workspace/experienceCaseSession'
 import { useTesterIdentity } from '@/workspace/testerIdentity'
 import { useSystemStatus } from '@/workspace/systemStatus'
 
 const { identity } = useTesterIdentity()
 const systemStatus = useSystemStatus()
+const activity = useCustomerSessionActivity()
+const { submissions } = useExperienceCaseSubmissions(identity.value.reporterId)
 </script>
 
 <style scoped>
@@ -104,7 +108,7 @@ h2, h3, p { margin-top: 0; }
 .overview-grid article { display: grid; gap: 6px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }
 .overview-grid small, .overview-grid span { color: #718096; font-size: 12px; line-height: 1.55; }
 .overview-grid strong { color: #203b65; font-size: 17px; }
-.overview-grid strong.waiting { color: #896000; }
+.overview-grid .metric-value { color: #214f9a; font-size: 28px; line-height: 1.1; }
 .overview-grid a { margin-top: 4px; color: #285fc8; font-size: 13px; font-weight: 800; text-decoration: none; }
 .quick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .quick-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; min-height: 142px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 16px; background: #fff; color: inherit; text-decoration: none; box-shadow: 0 8px 20px rgb(31 61 109 / 5%); }
