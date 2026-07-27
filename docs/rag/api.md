@@ -44,4 +44,15 @@ Returns the versioned `ai-control-center.v1.1` management snapshot. It is a read
 
 The route does not probe C, call Ollama, run analysis/evaluation, expose C URLs, or return feedback IDs, content hashes, raw question/answer text, analyses, suggestions, full prompts, environment values, or secrets. Existing module endpoints remain available for V1.0 clients.
 
+### GET /api/admin/ai/operations/overview
+
+Returns the versioned `ai-operations.v1` read-only operations metric snapshot. Its OpenAPI `response_model` is `AiOperationsOverviewResponse`.
+
+- `answer_volume` is an A-process-since-start aggregate of request outcomes: `DIRECT_ANSWER`, `CONTROLLED_ANSWER`, `TRANSFER_HUMAN`, and other/controlled outcomes. It resets on restart and is not durable history or an employee metric.
+- `answer_quality` and `knowledge_coverage` use only the newest saved `live_c_api` evaluation. Quality is the evaluation pass rate; evidence coverage is the evaluation `source_ids` check pass rate. Neither represents all production conversations or all business knowledge.
+- `badcase` always exposes the fixed four categories with `null` counts until a browser-safe, de-identified aggregate contract exists. `external_data` reports feedback and efficiency dependency state without contacting C; `read_attempted` is false.
+- `model_status` reports configuration and A process readiness, not a model liveness probe. `notices` supply controlled explanations and manual next steps only; every notice has `automatic_action_taken=false`.
+
+The route never calls Ollama or C, and never returns customer content, feedback IDs, case IDs, content hashes, prompt text, platform URLs, secrets, raw errors, or individual evaluation records. It does not modify Prompt, knowledge, model, or C data.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。

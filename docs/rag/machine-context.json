@@ -5,14 +5,15 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "draft_delivery_pending_external_validation",
-  "current_task": "AI-Agent AI-CONTROL-V1.1 technical-lead AI control center",
-  "next_recommended_task": "Provide a reachable isolated A service for HTTP UI smoke and an isolated C PLATFORM_API_BASE_URL with one human-confirmed, de-identified ANALYZING feedback snapshot; then execute the existing explicit feedback read/qwen/writeback/idempotency E2E. Do not add automatic actions or merge automatically.",
-  "current_stage": "A versioned read-only control-center snapshot and necessary UI present RAG, qwen, evaluation, Badcase safety state, and feedback-analysis aggregate evidence without reading raw customer content or triggering model/C work on GET.",
-  "current_gate": "CONDITIONAL PASS: backend regression is 74 passed and 3 opt-in E2Es skipped; frontend typecheck, 22-file/89-test Vitest and build pass; real scoped qwen3.5:9b smoke passes. Existing live evaluation is 19/28 and both direct A HTTP smoke plus real C feedback read/writeback remain BLOCKED.",
-  "last_test_result": "2026-07-27 AI-CONTROL-V1.1: full pytest backend 74 passed, 3 skipped, 32 warnings; frontend typecheck PASS, Vitest 22 files/89 tests PASS, Vite build PASS; explicit real scoped qwen3.5:9b smoke 1 passed (1430.8 ms). latest_evaluation read a-t03-v031-live 19/28/0.6786. Default A :8000 management GETs timed out; no C feedback service/snapshot was available.",
+  "current_task": "AI-Agent TARGET-PILOT-A AI operations foundation",
+  "next_recommended_task": "Provide a reachable isolated C PLATFORM_API_BASE_URL with one human-confirmed, de-identified ANALYZING feedback snapshot to run the existing explicit feedback read/qwen/writeback/idempotency E2E; separately register a versioned aggregate-only C efficiency summary contract with schema/version/changelog/compatibility/affected-line review before A consumes efficiency data. Do not add automatic actions or merge automatically.",
+  "current_stage": "A versioned read-only ai-operations.v1 overview reports process action aggregates, saved evaluation quality and evidence coverage, safe Badcase empty state, model configuration state, and explicit C feedback/efficiency dependency notices without reading raw customer content or triggering model/C work on GET.",
+  "current_gate": "CONDITIONAL PASS: TARGET-PILOT-A backend regression is 77 passed and 3 opt-in E2Es skipped; real scoped qwen3.5:9b smoke passes. Saved live evaluation is 19/28; real C feedback read/writeback is BLOCKED by absent configuration/snapshot and C efficiency consumption is BLOCKED by no registered aggregate contract.",
+  "last_test_result": "2026-07-27 TARGET-PILOT-A: targeted operations/control/API tests 25 passed; full pytest backend 77 passed, 3 skipped, 35 warnings; explicit real scoped qwen3.5:9b smoke 1 passed (1373.9 ms). latest_evaluation read a-t03-v031-live 19/28. PLATFORM_API_BASE_URL was not configured and no A-scope registered C efficiency summary contract was found.",
   "blockers": [
     "A service at the default UI base URL http://127.0.0.1:8000 is unreachable, so direct browser-to-A control-center smoke remains unverified.",
-    "An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before the feedback-analysis real read/qwen/writeback/idempotency claim can be made."
+    "An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before the feedback-analysis real read/qwen/writeback/idempotency claim can be made.",
+    "No approved versioned aggregate-only C customer-efficiency summary contract is registered in A scope, so efficiency data cannot be read or inferred."
   ],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -29,21 +30,24 @@
     "AI capability metrics are intentionally process-local and reset on restart; they are not historical monitoring or an audit store",
     "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made",
     "The control-center snapshot is process-local operational state, not a durable audit or monitoring system; call and feedback-summary values reset on A restart.",
-    "Badcase counts intentionally remain null until a browser-safe, de-identified aggregate interface is versioned and approved."
+    "Badcase counts intentionally remain null until a browser-safe, de-identified aggregate interface is versioned and approved.",
+    "AI operations action/latency/error metrics are current-process aggregates only; they reset on restart and must not be used as durable monitoring, audit, SLA, or employee-evaluation evidence.",
+    "Saved evaluation pass and source-attribution rates are test-evaluation evidence, not production-wide customer-answer quality or business-knowledge coverage."
   ],
   "git": {
     "branch": "agent/ai-control-center-ui-v1",
     "clean": false,
-    "baseline_commit": "1346abd",
+    "baseline_commit": "ac213e5",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
     "remote_branch": "origin/agent/ai-control-center-ui-v1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-27T12:00:00+08:00",
+  "checked_at": "2026-07-27T12:36:00+08:00",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "ai-control-center.v1.1 A-to-necessary-UI read-only OpenAPI projection (no shared contract change)"
+    "ai-control-center.v1.1 A-to-necessary-UI read-only OpenAPI projection (no shared contract change)",
+    "ai-operations.v1 A read-only OpenAPI projection (no shared contract change; C efficiency consumption intentionally not implemented)"
   ],
   "entrypoints": [
     "backend/app/service/rag_service.py",
@@ -53,6 +57,7 @@
     "backend/app/api/routes.py",
     "backend/app/models/chat.py",
     "backend/app/models/ai_control.py",
+    "backend/app/models/ai_operations.py",
     "frontend/src/api/aiControlCenterClient.ts",
     "frontend/src/api/aiControlCenterAdapter.ts",
     "frontend/src/views/AiControlCenter.vue"
@@ -68,6 +73,7 @@
   ],
   "test_commands": [
     "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
+    "source read-only venv python -m pytest backend/tests/test_ai_operations.py backend/tests/test_ai_control_center.py backend/tests/test_api.py -q",
     "source read-only venv python -m pytest backend -q",
     "RUN_REAL_FEEDBACK_ANALYSIS_E2E=1 with an isolated C service and human-confirmed de-identified feedback python -m pytest backend/tests/test_real_feedback_analysis_e2e.py -q -s",
     "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
@@ -85,7 +91,8 @@
     "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
     "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
-    "AI-CONTROL-V1.1 read-only technical-lead control center (local and real-qwen verification complete; external A/C validation blocked)"
+    "AI-CONTROL-V1.1 read-only technical-lead control center (local and real-qwen verification complete; external A/C validation blocked)",
+    "TARGET-PILOT-A AI operations foundation (local and real-qwen verification complete; C feedback/efficiency external validation blocked)"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -109,7 +116,8 @@
     "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
     "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
     "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
-    "GET /api/admin/ai/control-center ai-control-center.v1.1 read-only management snapshot"
+    "GET /api/admin/ai/control-center ai-control-center.v1.1 read-only management snapshot",
+    "GET /api/admin/ai/operations/overview ai-operations.v1 read-only operational metrics snapshot"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }

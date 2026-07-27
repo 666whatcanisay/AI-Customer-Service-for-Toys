@@ -817,13 +817,16 @@ class RAGService:
         """Execute a RAG request and record only aggregate process metrics."""
         started = time.perf_counter()
         error_summary: str | None = None
+        answer_action: str | None = None
         try:
             result = self._query(question, context=context)
+            answer_action = result.get("action") if isinstance(result, dict) else None
             if result.get("answer") == LLM_REQUEST_FAILED_MESSAGE:
                 error_summary = "LLM_REQUEST_FAILED"
             return result
         except Exception as exc:
             error_summary = type(exc).__name__
+            answer_action = "REFUSE"
             logger.error("RAG request failed category=%s", error_summary)
             return {
                 "answer": RAG_RUNTIME_ERROR_MESSAGE,
@@ -841,6 +844,7 @@ class RAGService:
             self.runtime_metrics.record(
                 (time.perf_counter() - started) * 1000,
                 error_summary=error_summary,
+                answer_action=answer_action,
             )
 
     def _query(

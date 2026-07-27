@@ -21,6 +21,17 @@ from app.models.ai_control import (
     FeedbackAnalysisRunSummary,
     PromptReadOnlyState,
 )
+from app.models.ai_operations import (
+    AiOperationsOverviewSnapshot,
+    AnswerQualityMetric,
+    AnswerVolumeMetric,
+    BadcaseCategoryMetric,
+    BadcaseMetric,
+    ExternalDataIntegrationMetric,
+    KnowledgeCoverageMetric,
+    ModelStatusMetric,
+    OperationsNotice,
+)
 
 
 AI_MODULE_STATUSES = {
@@ -169,12 +180,30 @@ class RuntimeMetrics:
         self._total_latency_ms = 0.0
         self._last_called_at: str | None = None
         self._last_error_summary: str | None = None
+        self._action_counts = {
+            "DIRECT_ANSWER": 0,
+            "CONTROLLED_ANSWER": 0,
+            "TRANSFER_HUMAN": 0,
+            "OTHER": 0,
+        }
 
-    def record(self, latency_ms: float, error_summary: str | None = None) -> None:
+    def record(
+        self,
+        latency_ms: float,
+        error_summary: str | None = None,
+        answer_action: str | None = None,
+    ) -> None:
         with self._lock:
             self._call_count += 1
             self._total_latency_ms += max(0.0, latency_ms)
             self._last_called_at = datetime.now(timezone.utc).isoformat()
+            action_key = (
+                answer_action
+                if answer_action
+                in {"DIRECT_ANSWER", "CONTROLLED_ANSWER", "TRANSFER_HUMAN"}
+                else "OTHER"
+            )
+            self._action_counts[action_key] += 1
             if error_summary:
                 self._error_count += 1
                 # The caller supplies a controlled category, never exception text.
@@ -198,6 +227,7 @@ class RuntimeMetrics:
                 "average_latency_ms": average,
                 "last_called_at": self._last_called_at,
                 "last_error_summary": self._last_error_summary,
+                "action_counts": dict(self._action_counts),
             }
 
 
@@ -256,6 +286,7 @@ def unavailable_metrics() -> dict[str, Any]:
         "average_latency_ms": None,
         "last_called_at": None,
         "last_error_summary": "NOT_AVAILABLE",
+        "action_counts": None,
     }
 
 
@@ -387,6 +418,242 @@ def _feedback_summary(application: Any) -> FeedbackAnalysisRunSummary | None:
         return FeedbackAnalysisRunSummary.model_validate(value)
     except (TypeError, ValueError):
         return None
+
+
+def _percent(numerator: int | None, denominator: int | None) -> float | None:
+    if (
+        isinstance(numerator, bool)
+        or isinstance(denominator, bool)
+        or not isinstance(numerator, int)
+        or not isinstance(denominator, int)
+        or denominator <= 0
+        or numerator < 0
+    ):
+        return None
+    return round((numerator / denominator) * 100, 2)
+
+
+def operations_overview_snapshot(application: Any) -> AiOperationsOverviewSnapshot:
+    """Build a non-executing AI operations summary from safe local evidence.
+
+    A GET never contacts C or the model. Feedback and efficiency integration
+    state is intentionally explicit when a safe, registered aggregate is not
+    locally available; the endpoint must not infer counts from raw snapshots.
+    """
+
+    settings = application.state.settings
+    detail = customer_service_detail(application)
+    latest = latest_evaluation(
+        settings.project_root / "docs" / "rag" / "evaluations"
+    )
+    evaluation = latest.get("evaluation")
+    evaluation = evaluation if isinstance(evaluation, dict) else None
+    total_cases = evaluation.get("total_cases") if evaluation else None
+    passed_cases = evaluation.get("passed_cases") if evaluation else None
+    checks = evaluation.get("checks") if evaluation else None
+    source_attribution_passed = (
+        checks.get("source_ids") if isinstance(checks, dict) else None
+    )
+    action_counts = detail.get("action_counts")
+    action_counts = action_counts if isinstance(action_counts, dict) else None
+    metrics_available = detail.get("metrics_scope") == "since_start" and action_counts
+    platform_configured = bool(settings.platform_api_base_url)
+    feedback_summary = _feedback_summary(application)
+
+    quality_rate = _percent(passed_cases, total_cases)
+    source_attribution_rate = _percent(source_attribution_passed, total_cases)
+    coverage_available = source_attribution_rate is not None
+    quality_available = quality_rate is not None
+
+    answer_volume = AnswerVolumeMetric(
+        status="AVAILABLE" if metrics_available else "NOT_AVAILABLE",
+        metrics_scope=detail.get("metrics_scope") or "NOT_AVAILABLE",
+        processed_request_count=detail.get("call_count") if metrics_available else None,
+        direct_answer_count=(
+            action_counts.get("DIRECT_ANSWER") if metrics_available else None
+        ),
+        controlled_answer_count=(
+            action_counts.get("CONTROLLED_ANSWER") if metrics_available else None
+        ),
+        transfer_human_count=(
+            action_counts.get("TRANSFER_HUMAN") if metrics_available else None
+        ),
+        other_outcome_count=(action_counts.get("OTHER") if metrics_available else None),
+        explanation=(
+            "Counts are process-local since A start and include only aggregate "
+            "answer actions; they reset when A restarts and are not staff metrics."
+        ),
+    )
+    answer_quality = AnswerQualityMetric(
+        status="AVAILABLE" if quality_available else "NOT_AVAILABLE",
+        evaluation_id=evaluation.get("evaluation_id") if evaluation else None,
+        evaluated_case_count=total_cases if isinstance(total_cases, int) else None,
+        passed_case_count=passed_cases if isinstance(passed_cases, int) else None,
+        pass_rate_percent=quality_rate,
+        measured_at=evaluation.get("executed_at") if evaluation else None,
+        explanation=(
+            "Quality is the latest saved live_c_api evaluation pass rate. It is "
+            "evaluation evidence, not a claim about all production conversations."
+        ),
+    )
+    knowledge_coverage = KnowledgeCoverageMetric(
+        status="AVAILABLE" if coverage_available else "NOT_AVAILABLE",
+        indexed_chunk_count=(
+            detail.get("knowledge_count")
+            if isinstance(detail.get("knowledge_count"), int)
+            else None
+        ),
+        source_attribution_checked_case_count=(
+            source_attribution_passed
+            if isinstance(source_attribution_passed, int)
+            else None
+        ),
+        source_attribution_pass_rate_percent=source_attribution_rate,
+        explanation=(
+            "Indexed chunks describe the current A process store. Source "
+            "attribution coverage is the source_ids check pass rate in the saved "
+            "evaluation, not a percentage of all business knowledge."
+        ),
+    )
+    badcase = BadcaseMetric(
+        categories=[
+            BadcaseCategoryMetric(category="FACT_ERROR"),
+            BadcaseCategoryMetric(category="MISSING_INFO"),
+            BadcaseCategoryMetric(category="STYLE_ISSUE"),
+            BadcaseCategoryMetric(category="RISK_ISSUE"),
+        ],
+        explanation=(
+            "No registered, de-identified Badcase aggregate is available to A. "
+            "Counts remain empty; this endpoint never reads or classifies raw feedback."
+        ),
+    )
+    model_configured = bool(detail.get("model_configured"))
+    model_status = ModelStatusMetric(
+        status="CONFIGURED" if model_configured else "NOT_CONFIGURED",
+        provider=detail.get("model_provider"),
+        model_version=detail.get("model_name"),
+        service_ready=bool(detail.get("ready")),
+        average_latency_ms=(
+            detail.get("average_latency_ms") if metrics_available else None
+        ),
+        error_count=detail.get("error_count") if metrics_available else None,
+        last_error_category=(
+            detail.get("last_error_summary")
+            if metrics_available and detail.get("last_error_summary") != "NOT_AVAILABLE"
+            else None
+        ),
+        explanation=(
+            "Configuration and process readiness are reported without probing the "
+            "model. Use the explicit smoke test to establish live model availability."
+        ),
+    )
+    feedback_status = (
+        "AVAILABLE"
+        if feedback_summary is not None
+        else ("CONFIGURED" if platform_configured else "NOT_CONFIGURED")
+    )
+    external_data = [
+        ExternalDataIntegrationMetric(
+            source_id="feedback",
+            status=feedback_status,
+            explanation=(
+                "Feedback integration is manual-only. This read-only overview does "
+                "not contact C or expose feedback content; AVAILABLE means only a "
+                "safe aggregate of a completed current-process run exists."
+            ),
+            operator_action=(
+                "Provide a reachable isolated C service and a human-confirmed, "
+                "de-identified ANALYZING snapshot before running the explicit feedback loop."
+                if not platform_configured
+                else "Use the explicit loopback feedback-analysis operation; no polling is performed."
+            ),
+        ),
+        ExternalDataIntegrationMetric(
+            source_id="efficiency",
+            status="NOT_REGISTERED",
+            explanation=(
+                "No approved de-identified C efficiency-summary contract is "
+                "registered in A scope, so no efficiency data is read or inferred."
+            ),
+            operator_action=(
+                "Register a versioned aggregate-only efficiency contract and review "
+                "affected lines before A consumes it."
+            ),
+        ),
+    ]
+    notices: list[OperationsNotice] = []
+    if not quality_available:
+        notices.append(
+            OperationsNotice(
+                code="EVALUATION_NOT_AVAILABLE",
+                severity="INFO",
+                message="No saved live evaluation is available for the quality metric.",
+                operator_action="Run an explicit approved evaluation; do not treat fixture results as live quality.",
+            )
+        )
+    elif quality_rate is not None and quality_rate < 100:
+        notices.append(
+            OperationsNotice(
+                code="EVALUATION_QUALITY_ATTENTION",
+                severity="WARNING",
+                message="The latest saved evaluation has non-passing cases.",
+                operator_action="Review the saved evaluation attribution before proposing a knowledge, rule, or prompt change; no change is automatic.",
+            )
+        )
+    if coverage_available and source_attribution_rate is not None and source_attribution_rate < 100:
+        notices.append(
+            OperationsNotice(
+                code="KNOWLEDGE_EVIDENCE_COVERAGE_ATTENTION",
+                severity="WARNING",
+                message="The saved evaluation has source-attribution check gaps.",
+                operator_action="Inspect evaluation evidence and C knowledge provenance; do not publish knowledge automatically.",
+            )
+        )
+    notices.append(
+        OperationsNotice(
+            code="BADCASE_AGGREGATE_NOT_AVAILABLE",
+            severity="INFO",
+            message="Badcase category counts are intentionally unavailable without a safe aggregate contract.",
+            operator_action="Obtain a de-identified aggregate-only Badcase interface before displaying category totals.",
+        )
+    )
+    if not platform_configured:
+        notices.append(
+            OperationsNotice(
+                code="C_FEEDBACK_NOT_CONFIGURED",
+                severity="WARNING",
+                message="C feedback integration is not configured for this A process.",
+                operator_action="Configure an isolated C endpoint and confirm de-identification before explicit feedback analysis.",
+            )
+        )
+    notices.append(
+        OperationsNotice(
+            code="C_EFFICIENCY_CONTRACT_NOT_REGISTERED",
+            severity="WARNING",
+            message="C efficiency data cannot be consumed because no approved contract is registered in A scope.",
+            operator_action="Complete cross-line contract review before adding an efficiency consumer.",
+        )
+    )
+    if not model_configured:
+        notices.append(
+            OperationsNotice(
+                code="MODEL_NOT_CONFIGURED",
+                severity="ERROR",
+                message="The configured model provider has no usable model client in this A process.",
+                operator_action="Check local model configuration, then run the explicit smoke test; do not auto-switch models.",
+            )
+        )
+
+    return AiOperationsOverviewSnapshot(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        answer_volume=answer_volume,
+        answer_quality=answer_quality,
+        knowledge_coverage=knowledge_coverage,
+        badcase=badcase,
+        model_status=model_status,
+        external_data=external_data,
+        notices=notices,
+    )
 
 
 def control_center_snapshot(application: Any) -> AiControlCenterSnapshot:

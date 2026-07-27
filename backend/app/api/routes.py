@@ -16,6 +16,7 @@ from app.models.chat import (
     SearchRequest,
 )
 from app.models.ai_control import AiControlCenterResponse
+from app.models.ai_operations import AiOperationsOverviewResponse
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
@@ -32,6 +33,7 @@ from app.service.ai_capability import (
     latest_evaluation,
     module_summary,
     not_available_module_detail,
+    operations_overview_snapshot,
     prompt_metadata,
     summarize_feedback_analysis_run,
 )
@@ -317,6 +319,19 @@ def get_ai_control_center(request: Request) -> dict[str, Any]:
     return envelope(
         control_center_snapshot(request.app).model_dump(),
         message="AI control-center snapshot",
+    )
+
+
+@router.get(
+    "/admin/ai/operations/overview",
+    tags=["ai-admin"],
+    response_model=AiOperationsOverviewResponse,
+)
+def get_ai_operations_overview(request: Request) -> dict[str, Any]:
+    """Read safe operations metrics without contacting C or the local model."""
+    return envelope(
+        operations_overview_snapshot(request.app).model_dump(),
+        message="AI operations overview",
     )
 
 
