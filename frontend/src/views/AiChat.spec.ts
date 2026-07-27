@@ -19,7 +19,9 @@ const apiMocks = vi.hoisted(() => ({
   listSkus: vi.fn(),
   submitExperienceCase: vi.fn(),
   submitAiFeedback: vi.fn(),
-  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key')
+  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key'),
+  recordEfficiencyEvent: vi.fn(),
+  createEfficiencyOpaqueId: vi.fn((prefix: string) => `${prefix}-test-id`)
 }))
 
 vi.mock('@/api/ragClient', () => ({
@@ -45,6 +47,14 @@ vi.mock('@/api/experienceCaseClient', () => ({
 vi.mock('@/api/aiResponseFeedbackClient', () => ({
   aiResponseFeedbackClient: { submit: apiMocks.submitAiFeedback },
   createAiResponseFeedbackIdempotencyKey: apiMocks.createAiFeedbackIdempotencyKey
+}))
+
+vi.mock('@/api/customerEfficiencyEventClient', () => ({
+  createCustomerEfficiencyOpaqueId: apiMocks.createEfficiencyOpaqueId
+}))
+
+vi.mock('@/workspace/customerEfficiencyEventTracker', () => ({
+  customerEfficiencyEventTracker: { record: apiMocks.recordEfficiencyEvent }
 }))
 
 const store = {
@@ -188,6 +198,8 @@ describe('AiChat B-T04 three-step workbench', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    apiMocks.recordEfficiencyEvent.mockImplementation(() => undefined)
+    apiMocks.createEfficiencyOpaqueId.mockImplementation((prefix: string) => `${prefix}-test-id`)
     clearExperienceCaseSubmissions()
     window.localStorage.clear()
     apiMocks.getRagHealth.mockResolvedValue({ status: 'ok', ready: true })
@@ -307,6 +319,43 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="citation-item"]').text()).toContain('toy-guide.pdf')
   })
 
+  it('records a privacy-safe AI_REQUEST only after a valid answer is shown', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(apiMocks.recordEfficiencyEvent).toHaveBeenCalledWith({
+      eventType: 'AI_REQUEST',
+      operatorId: 'op-test-id',
+      storeCode: 'PDD-SM',
+      productId: 'PROD-001',
+      skuId: 'SKU-RED',
+      conversationId: 'conv-test-id',
+      interactionId: 'int-test-id',
+      feedbackId: null
+    })
+    expect(JSON.stringify(apiMocks.recordEfficiencyEvent.mock.calls[0]?.[0])).not.toContain(
+      '适合几岁'
+    )
+  })
+
+  it.each([
+    ['direct-accept', 'AI_DIRECT_ADOPT'],
+    ['edited-accept', 'AI_EDIT_ADOPT'],
+    ['reject', 'AI_REJECT']
+  ] as const)('records %s as %s after the AI request', async (button, eventType) => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get(`[data-testid="${button}"]`).trigger('click')
+
+    expect(apiMocks.recordEfficiencyEvent.mock.calls.map(([event]) => event.eventType)).toEqual([
+      'AI_REQUEST',
+      eventType
+    ])
+  })
+
   it('keeps SKU optional and translates the clarification field into Chinese', async () => {
     apiMocks.chat.mockResolvedValue(resultFor('ASK_CLARIFY', false))
     const wrapper = mountPage()
@@ -395,6 +444,14 @@ describe('AiChat B-T04 three-step workbench', () => {
     }, expect.stringMatching(/^ai-feedback-/))
     expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
     expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
+    expect(apiMocks.recordEfficiencyEvent.mock.calls.map(([event]) => event.eventType)).toEqual([
+      'AI_REQUEST',
+      'AI_REJECT',
+      'AI_FEEDBACK_SUBMIT'
+    ])
+    expect(apiMocks.recordEfficiencyEvent.mock.calls.at(-1)?.[0]).toMatchObject({
+      feedbackId: 'ARF-001'
+    })
   })
 
   it('reuses an in-flight feedback Idempotency-Key and displays C replay as the recorded result', async () => {
@@ -485,6 +542,37 @@ describe('AiChat B-T04 three-step workbench', () => {
 
     expect(wrapper.get('[data-testid="experience-case-error"]').text()).toContain('接口尚未发布')
     expect(wrapper.find('[data-testid="experience-case-success"]').exists()).toBe(false)
+  })
+
+  it('records an experience event only after the case service accepts the submission', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+    await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
+    await flushPromises()
+    await selectExperienceCaseFeedbackType(wrapper, 'ADOPTED')
+    await wrapper.get('[data-testid="experience-case-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.recordEfficiencyEvent.mock.calls.map(([event]) => event.eventType)).toEqual([
+      'AI_REQUEST',
+      'AI_DIRECT_ADOPT',
+      'EXPERIENCE_CASE_SAVE'
+    ])
+  })
+
+  it('continues the AI workflow when best-effort event enqueueing fails', async () => {
+    apiMocks.recordEfficiencyEvent.mockImplementation(() => {
+      throw new Error('efficiency unavailable')
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-testid="answer-card"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    expect(wrapper.find('[data-testid="adoption-result"]').exists()).toBe(true)
   })
 
   it('shows an actionable data-service error separately from AI health', async () => {
