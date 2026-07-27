@@ -24,7 +24,7 @@ function Get-ServiceDiagnostic($Config, [string]$Name, [int]$Port) {
     $recordPath = Get-ServiceRecordPath $Config $Name
     $record = $null; $recordError = ''
     if (Test-Path -LiteralPath $recordPath) { try { $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $recordError = $_.Exception.Message } }
-    $listener = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, OwningProcess)
+    $listener = @(Get-TcpListeningConnection $Port | Select-Object LocalAddress, LocalPort, OwningProcess)
     $pids = @($listener.OwningProcess); if ($record) { $pids += [int]$record.pid }
     $healthUrl = Get-ManagedServiceHealthUrl $Config $Name
     return [pscustomobject]@{ name=$Name; port=$Port; recordPath=$recordPath; record=$record; recordError=$recordError; listeners=$listener; processes=@($pids | Select-Object -Unique | ForEach-Object { Get-ProcessDiagnostic ([int]$_) }); healthUrl=$healthUrl; healthOk=(Test-HttpOk $healthUrl) }

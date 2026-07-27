@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$ConfigPath
+    [string]$ConfigPath,
+    [switch]$NoBrowser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,8 +71,8 @@ try {
     Write-Host "前端 API：RAG=$($frontendEnvironment.VITE_RAG_API_BASE_URL)；平台=$($frontendEnvironment.VITE_PLATFORM_API_BASE_URL)"
     Write-Host 'API 模式：SAME_ORIGIN_PROXY（浏览器仅连接 5173；A/C 只监听 127.0.0.1）'
     Write-Host "日志目录：$(Get-ServiceLogDirectory $config)"
-    if ([bool]$config.OpenBrowser) { Start-Process $config.CustomerWebUrl }
-    if ([bool]$config.AdminOpenBrowser) { Start-Process $config.AdminWebUrl }
+    if (-not $NoBrowser -and [bool]$config.OpenBrowser) { Start-Process $config.CustomerWebUrl }
+    if (-not $NoBrowser -and [bool]$config.AdminOpenBrowser) { Start-Process $config.AdminWebUrl }
 } catch {
     Write-Error $_
     if ($null -ne $config) { Write-StartupFailureSummary $config $startedServices }
