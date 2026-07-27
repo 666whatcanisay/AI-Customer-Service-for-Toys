@@ -3,6 +3,14 @@
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from app.admin.trial_governance import (
+    TrialActor,
+    TrialAuditReason,
+    TrialRole,
+    get_trial_reason,
+    record_trial_audit_event,
+    require_trial_roles,
+)
 from app.config import get_settings
 from app.database import get_db
 from app.test_catalog.repository import TestCatalogRepository
@@ -60,16 +68,33 @@ async def preflight_test_package(
 async def import_test_package(
     file: UploadFile = File(...),
     imported_by: str = Form("admin-test-import"),
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> TestPackageSummary:
     settings = get_settings()
     content = await file.read(settings.max_test_package_upload_bytes + 1)
-    return _service(_repository(session)).import_package(
+    result = _service(_repository(session)).import_package(
         filename=file.filename or "test-package.zip",
         content_type=file.content_type,
         content=content,
         imported_by=imported_by,
     )
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="KNOWLEDGE_PACKAGE_IMPORT",
+        resource_type="TEST_KNOWLEDGE_PACKAGE",
+        resource_id=result.package_id,
+        outcome="SUCCESS",
+        reason=reason,
+        metadata={
+            "faq_count": result.counts.get("faqs", 0),
+            "safety_rule_count": result.counts.get("safety_rules", 0),
+        },
+    )
+    session.commit()
+    return result
 
 
 @router.get("/test-data-packages", response_model=TestPackageListResponse)

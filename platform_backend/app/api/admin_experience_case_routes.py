@@ -7,6 +7,14 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.admin.trial_governance import (
+    TrialActor,
+    TrialAuditReason,
+    TrialRole,
+    get_trial_reason,
+    record_trial_audit_event,
+    require_trial_roles,
+)
 from app.database import get_db
 from app.errors import AppError
 from app.experience_cases.models import (
@@ -123,6 +131,8 @@ def list_admin_experience_cases(
     created_by: str | None = Query(default=None, max_length=128),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> AdminExperienceCaseListResponse:
     statement = select(CustomerExperienceCase)
@@ -143,6 +153,17 @@ def list_admin_experience_cases(
         .offset((page - 1) * size)
         .limit(size)
     ).all()
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="EXPERIENCE_CASE_VIEW",
+        resource_type="CUSTOMER_EXPERIENCE_CASE",
+        resource_id="collection",
+        outcome="SUCCESS",
+        reason=reason,
+        metadata={"returned_count": len(items)},
+    )
+    session.commit()
     return AdminExperienceCaseListResponse(
         items=[_admin_response(item) for item in items], total=total, page=page, size=size
     )
@@ -151,15 +172,30 @@ def list_admin_experience_cases(
 @admin_router.get("/{case_id}", response_model=AdminExperienceCaseResponse)
 def get_admin_experience_case(
     case_id: str,
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> AdminExperienceCaseResponse:
-    return _admin_response(_case_or_404(session, case_id))
+    item = _case_or_404(session, case_id)
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="EXPERIENCE_CASE_VIEW",
+        resource_type="CUSTOMER_EXPERIENCE_CASE",
+        resource_id=item.case_id,
+        outcome="SUCCESS",
+        reason=reason,
+    )
+    session.commit()
+    return _admin_response(item)
 
 
 @admin_router.patch("/{case_id}/review", response_model=AdminExperienceCaseResponse)
 def review_customer_experience_case(
     case_id: str,
     payload: ExperienceCaseReviewUpdate,
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> AdminExperienceCaseResponse:
     item = _case_or_404(session, case_id)
@@ -201,6 +237,16 @@ def review_customer_experience_case(
         snapshot = create_export_snapshot(item)
         session.add(snapshot)
 
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="EXPERIENCE_CASE_REVIEW",
+        resource_type="CUSTOMER_EXPERIENCE_CASE",
+        resource_id=item.case_id,
+        outcome="SUCCESS",
+        reason=reason,
+        metadata={"review_status": item.review_status},
+    )
     session.commit()
     session.refresh(item)
     return _admin_response(item)
@@ -343,6 +389,8 @@ def list_ai_optimization_cases(
     evaluation_status: EvaluationStatus | None = None,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> AiOptimizationCaseListResponse:
     statement = select(CustomerExperienceCase).where(
@@ -393,6 +441,17 @@ def list_ai_optimization_cases(
                 latest_evaluation=evaluation,
             )
         )
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="EXPERIENCE_CASE_EVALUATION_VIEW",
+        resource_type="CUSTOMER_EXPERIENCE_CASE",
+        resource_id="approved-collection",
+        outcome="SUCCESS",
+        reason=reason,
+        metadata={"returned_count": len(items)},
+    )
+    session.commit()
     return AiOptimizationCaseListResponse(items=items, total=total, page=page, size=size)
 
 
@@ -402,6 +461,8 @@ def list_ai_optimization_cases(
 def list_case_evaluations(
     case_id: str,
     revision: int = Query(default=1, ge=1),
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> ExperienceCaseEvaluationListResponse:
     case = session.scalar(
@@ -420,6 +481,17 @@ def list_case_evaluations(
         )
         .order_by(CustomerExperienceEvaluation.recorded_at.desc())
     ).all()
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="EXPERIENCE_CASE_EVALUATION_VIEW",
+        resource_type="CUSTOMER_EXPERIENCE_CASE",
+        resource_id=case.case_id,
+        outcome="SUCCESS",
+        reason=reason,
+        metadata={"returned_count": len(items)},
+    )
+    session.commit()
     return ExperienceCaseEvaluationListResponse(
         items=[_evaluation_response(item) for item in items], total=len(items)
     )

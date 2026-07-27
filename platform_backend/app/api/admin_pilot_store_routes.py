@@ -14,6 +14,14 @@ from sqlalchemy.orm import Session
 
 from app.admin.pilot_store_models import PilotStore
 from app.admin.pilot_store_schemas import PilotStoreCreate, PilotStoreItem, PilotStoreListResponse
+from app.admin.trial_governance import (
+    TrialActor,
+    TrialAuditReason,
+    TrialRole,
+    get_trial_reason,
+    record_trial_audit_event,
+    require_trial_roles,
+)
 from app.ai_feedback.models import AIResponseFeedback
 from app.database import get_db
 from app.errors import AppError
@@ -95,6 +103,8 @@ def _item(session: Session, store: PilotStore) -> PilotStoreItem:
 @router.post("", response_model=PilotStoreItem, status_code=201)
 def create_pilot_store(
     payload: PilotStoreCreate,
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> PilotStoreItem:
     """Create one trial-store setup record; this does not publish knowledge or enable AI."""
@@ -107,12 +117,25 @@ def create_pilot_store(
         raise AppError(
             "PILOT_STORE_ALREADY_EXISTS", "A trial store already uses this store_code.", status_code=409
         ) from None
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="PILOT_STORE_CREATE",
+        resource_type="PILOT_STORE",
+        resource_id=store.store_code,
+        outcome="SUCCESS",
+        reason=reason,
+    )
+    session.commit()
     session.refresh(store)
     return _item(session, store)
 
 
 @router.get("", response_model=PilotStoreListResponse)
-def list_pilot_stores(session: Session = Depends(get_db)) -> PilotStoreListResponse:
+def list_pilot_stores(
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR, TrialRole.SUPPORT)),
+    session: Session = Depends(get_db),
+) -> PilotStoreListResponse:
     stores = session.scalars(select(PilotStore).order_by(PilotStore.created_at.desc(), PilotStore.store_code)).all()
     return PilotStoreListResponse(items=[_item(session, store) for store in stores], total=len(stores))
 

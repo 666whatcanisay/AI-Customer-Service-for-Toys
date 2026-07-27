@@ -150,6 +150,43 @@ const apiClient = axios.create({
   timeout: 30000,
 })
 
+export type TrialActorId = 'trial-admin' | 'trial-operator' | 'trial-support'
+export type TrialAuditReason = 'DAILY_OPERATIONS' | 'CASE_REVIEW' | 'KNOWLEDGE_MAINTENANCE' | 'GOVERNANCE_REVIEW'
+
+const TRIAL_ACTOR_STORAGE_KEY = 'mumu.trial-actor'
+const TRIAL_REASON_STORAGE_KEY = 'mumu.trial-reason'
+
+function storedValue(key: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  return window.localStorage.getItem(key) || fallback
+}
+
+export function getTrialActor(): TrialActorId {
+  const actor = storedValue(TRIAL_ACTOR_STORAGE_KEY, 'trial-operator')
+  return actor === 'trial-admin' || actor === 'trial-support' ? actor : 'trial-operator'
+}
+
+export function setTrialActor(actor: TrialActorId): void {
+  window.localStorage.setItem(TRIAL_ACTOR_STORAGE_KEY, actor)
+}
+
+export function getTrialAuditReason(): TrialAuditReason {
+  const reason = storedValue(TRIAL_REASON_STORAGE_KEY, 'DAILY_OPERATIONS')
+  return reason === 'CASE_REVIEW' || reason === 'KNOWLEDGE_MAINTENANCE' || reason === 'GOVERNANCE_REVIEW'
+    ? reason
+    : 'DAILY_OPERATIONS'
+}
+
+export function setTrialAuditReason(reason: TrialAuditReason): void {
+  window.localStorage.setItem(TRIAL_REASON_STORAGE_KEY, reason)
+}
+
+apiClient.interceptors.request.use((config) => {
+  config.headers.set('X-Platform-Trial-Actor', getTrialActor())
+  config.headers.set('X-Platform-Reason', getTrialAuditReason())
+  return config
+})
+
 const aiClient = axios.create({
   baseURL: AI_API_BASE_URL,
   timeout: 30000,
@@ -489,6 +526,41 @@ export interface AdminOperationsToday {
   production_usable: boolean
 }
 
+export interface TrialGovernanceStatus {
+  actor_id: string
+  role: 'ADMIN' | 'OPERATOR' | 'SUPPORT'
+  capabilities: string[]
+  access_boundary_mode: string
+  formal_authentication_enabled: boolean
+  formal_authorization_enabled: boolean
+  audit_foundation_enabled: boolean
+  automatic_redaction_enabled: boolean
+  retention_policy_configured: boolean
+  current_redaction_marker: string
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
+export interface TrialAuditEvent {
+  id: string
+  occurred_at: string
+  actor_id: string
+  actor_role: string
+  action: string
+  resource_type: string
+  resource_id: string
+  outcome: string
+  reason_code: string
+  metadata: Record<string, string | number | boolean>
+}
+
+export interface TrialAuditEventList {
+  items: TrialAuditEvent[]
+  total: number
+  page: number
+  size: number
+}
+
 export type PilotStoreSetupStatus = 'NEEDS_PRODUCT_IMPORT' | 'NEEDS_KNOWLEDGE' | 'OBSERVABLE'
 
 export interface PilotStore {
@@ -569,6 +641,16 @@ export async function getAdminCustomerEfficiencySummary(): Promise<CustomerEffic
 /** C-internal landing-page projection. It returns metrics and timestamps only. */
 export async function getAdminOperationsToday(): Promise<AdminOperationsToday> {
   const response = await apiClient.get<AdminOperationsToday>('/api/v1/admin/operations/today')
+  return response.data
+}
+
+export async function getTrialGovernance(): Promise<TrialGovernanceStatus> {
+  const response = await apiClient.get<TrialGovernanceStatus>('/api/v1/admin/trial-governance')
+  return response.data
+}
+
+export async function listTrialAuditEvents(): Promise<TrialAuditEventList> {
+  const response = await apiClient.get<TrialAuditEventList>('/api/v1/admin/trial-governance/audit-events')
   return response.data
 }
 

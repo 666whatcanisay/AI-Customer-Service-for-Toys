@@ -9,6 +9,7 @@ from app.config import Settings, get_settings
 from app.api.admin_routes import router as admin_router
 from app.api.admin_pilot_store_routes import router as admin_pilot_store_router
 from app.api.admin_operations_routes import router as admin_operations_router
+from app.api.admin_trial_governance_routes import router as admin_trial_governance_router
 from app.api.admin_suggestion_routes import router as admin_suggestion_router
 from app.api.customer_suggestion_routes import router as customer_suggestion_router
 from app.api.customer_experience_case_routes import router as customer_experience_case_router
@@ -51,7 +52,14 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         allow_origins=list(settings.cors_allowed_origins),
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["Accept", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+        allow_headers=[
+            "Accept",
+            "Content-Type",
+            "Idempotency-Key",
+            "X-Request-ID",
+            "X-Platform-Trial-Actor",
+            "X-Platform-Reason",
+        ],
         expose_headers=["X-Request-ID"],
     )
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
@@ -73,6 +81,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(customer_efficiency_admin_router)
     application.include_router(admin_operations_router)
     application.include_router(admin_pilot_store_router)
+    application.include_router(admin_trial_governance_router)
     application.include_router(admin_router)
 
     @application.get("/health")
