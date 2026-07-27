@@ -181,6 +181,29 @@
         </label>
       </div>
 
+      <section
+        class="catalog-guidance"
+        :class="`is-${catalogGuidance.tone}`"
+        data-testid="catalog-guidance"
+      >
+        <div>
+          <strong>{{ catalogGuidance.title }}</strong>
+          <p>{{ catalogGuidance.description }}</p>
+        </div>
+        <el-button
+          v-if="catalogGuidance.canRefresh"
+          data-testid="catalog-refresh-button"
+          plain
+          :loading="platformHealthLoading || storesLoading || productsLoading"
+          @click="refreshPlatform"
+        >
+          刷新商品目录
+        </el-button>
+      </section>
+      <p class="store-scope-note" data-testid="store-scope-note">
+        切换店铺会清空商品、SKU 和当前建议，避免把一个店铺的回答用于另一个店铺。
+      </p>
+
       <div v-if="selectedStore && selectedProduct" class="selection-confirmed" data-testid="context-summary">
         <span class="check-mark">✓</span>
         <div class="context-summary-grid">
@@ -334,7 +357,7 @@
         :rows="7"
         maxlength="8000"
         show-word-limit
-        @input="copyStatus = 'idle'"
+        @input="handleReplyInput"
       />
       <div class="reply-action-bar" aria-label="回复操作">
         <span>复制的是上方当前内容，包括你的修改。先记录采用结果，再收藏案例或反馈问题。</span>
@@ -364,6 +387,9 @@
           </el-button>
         </div>
       </div>
+      <p v-if="copyError" class="copy-recovery-note" data-testid="copy-recovery-note">
+        {{ copyError }} 回复仍保留在编辑框中，手动选择文本即可继续人工发送。
+      </p>
 
       <el-alert
         v-if="result.warnings.length"
@@ -379,6 +405,15 @@
         class="result-alert"
         :title="`还需要向客户确认：${requiredFieldText}`"
         type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-alert
+        v-if="!result.citations.length"
+        data-testid="no-knowledge-warning"
+        class="result-alert"
+        title="本次未返回可核对的知识依据，请不要直接采用；请补充信息或转人工处理。"
+        type="warning"
         :closable="false"
         show-icon
       />
@@ -462,6 +497,9 @@
             </el-button>
           </div>
           <p class="experience-case-entry-hint">优秀回复用于经验沉淀，帮助系统持续优化。</p>
+          <p class="adoption-next-step" data-testid="adoption-next-step">
+            {{ adoptionNextStep }}
+          </p>
           <p v-if="adoption?.type === 'REJECTED'" class="ai-feedback-entry-hint">
             未采用请通过“AI 问题反馈”单独记录原因，不会进入优秀案例。
           </p>
@@ -814,6 +852,7 @@ const lastAnsweredQuestion = ref('')
 const nextQuestionNotice = ref('')
 const replyEditor = ref<{ focus: () => void } | null>(null)
 const copyStatus = ref<'idle' | 'copied'>('idle')
+const copyError = ref('')
 const adoption = ref<AdoptionRecord | null>(null)
 const experienceCaseDialogOpen = ref(false)
 const experienceCaseSubmitting = ref(false)
@@ -870,6 +909,71 @@ const workflowStep = computed(() => {
   if (result.value) return 3
   if (selectedStore.value && selectedProduct.value) return 2
   return 1
+})
+
+const catalogGuidance = computed(() => {
+  if (storesLoading.value) {
+    return {
+      tone: 'loading',
+      title: '正在加载可用店铺',
+      description: '目录加载完成后会自动带入常用测试店铺。',
+      canRefresh: false
+    }
+  }
+  if (platformError.value) {
+    return {
+      tone: 'error',
+      title: '商品目录暂不可用',
+      description: '刷新后再继续；不要绕过商品上下文直接生成建议。',
+      canRefresh: true
+    }
+  }
+  if (!stores.value.length) {
+    return {
+      tone: 'warning',
+      title: '暂无可用测试店铺',
+      description: '请刷新商品目录；恢复前请按原客服流程处理。',
+      canRefresh: true
+    }
+  }
+  if (!selectedStore.value) {
+    return {
+      tone: 'info',
+      title: '先确认客户来源店铺',
+      description: '选定店铺后再选择商品，避免跨店使用商品资料。',
+      canRefresh: false
+    }
+  }
+  if (productsLoading.value) {
+    return {
+      tone: 'loading',
+      title: '正在加载该店铺的商品',
+      description: '商品加载完成后即可继续；SKU 可在知道具体款式时再选。',
+      canRefresh: false
+    }
+  }
+  if (!products.value.length) {
+    return {
+      tone: 'warning',
+      title: '该店铺暂无可用于 AI 建议的商品',
+      description: '请刷新目录或切换店铺；恢复前不要绕过商品上下文提问。',
+      canRefresh: true
+    }
+  }
+  if (!selectedProduct.value) {
+    return {
+      tone: 'info',
+      title: '请选择客户正在咨询的商品',
+      description: 'SKU 不确定可留空，系统会在建议中提示补充信息。',
+      canRefresh: false
+    }
+  }
+  return {
+    tone: 'ready',
+    title: '商品上下文已就绪',
+    description: '可以输入客户原话。SKU 不确定时保留为空，不要猜测款式。',
+    canRefresh: false
+  }
 })
 
 const platformName = (platform: string) => platformLabels[platform] ?? platform
@@ -962,6 +1066,12 @@ const adoptionMessage = computed(() =>
       : `已在本页记录：${adoptionLabels[adoption.value.type]}。未发送到远端反馈服务。`
 )
 
+const adoptionNextStep = computed(() => {
+  if (!adoption.value) return '先选择采用结果，系统才会开放对应的收藏案例或问题反馈入口。'
+  if (adoption.value.type === 'REJECTED') return '未采用时请提交 AI 问题反馈；这条记录不会进入优秀案例。'
+  return '采用后的好回复可以收藏为优秀案例，经验沉淀与 AI 问题反馈保持独立。'
+})
+
 const clearAnswer = () => {
   result.value = null
   replyDraft.value = ''
@@ -975,6 +1085,7 @@ const clearAnswer = () => {
   aiFeedbackError.value = ''
   aiFeedbackStatus.value = ''
   copyStatus.value = 'idle'
+  copyError.value = ''
   requestError.value = ''
 }
 
@@ -997,10 +1108,16 @@ const rememberStore = (value: string) => {
 
 const handleQuestionInput = (value: string) => {
   copyStatus.value = 'idle'
+  copyError.value = ''
   if (!result.value || value.trim() === lastAnsweredQuestion.value) return
 
   clearAnswer()
   nextQuestionNotice.value = '已清空上一条建议。请为当前客户问题重新生成回复。'
+}
+
+const handleReplyInput = () => {
+  copyStatus.value = 'idle'
+  copyError.value = ''
 }
 
 const useExample = (question: string) => {
@@ -1240,9 +1357,11 @@ const copyReply = async () => {
   try {
     await navigator.clipboard.writeText(text)
     copyStatus.value = 'copied'
+    copyError.value = ''
     ElMessage.success('已复制当前回复，请核对后人工发送')
   } catch {
     copyStatus.value = 'idle'
+    copyError.value = '浏览器未能自动复制。'
     ElMessage.error('复制失败，请手动选择回复文本')
   }
 }
@@ -1523,6 +1642,31 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .context-grid label em.optional { color: #697386; }
 .context-grid label small { color: #7b8496; }
 .context-grid .el-select { width: 100%; }
+.catalog-guidance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid #cdd9ee;
+  border-radius: 12px;
+  background: #f7f9fe;
+}
+.catalog-guidance strong { display: block; color: #294c85; font-size: 13px; }
+.catalog-guidance p, .store-scope-note, .copy-recovery-note, .adoption-next-step {
+  margin: 4px 0 0;
+  color: #61708a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.catalog-guidance.is-ready { border-color: #b7dfc8; background: #f1fbf5; }
+.catalog-guidance.is-ready strong { color: #19633f; }
+.catalog-guidance.is-warning { border-color: #efd49a; background: #fffaf0; }
+.catalog-guidance.is-warning strong { color: #8a5a00; }
+.catalog-guidance.is-error { border-color: #efc5c2; background: #fff7f6; }
+.catalog-guidance.is-error strong { color: #ad3730; }
+.store-scope-note { padding-left: 2px; }
 
 .selection-confirmed {
   justify-content: flex-start;
@@ -1604,6 +1748,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .reply-action-bar { align-items: center; justify-content: space-between; }
 .reply-action-bar > span { max-width: 420px; font-size: 12px; line-height: 1.5; }
 .reply-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.copy-recovery-note { color: #a64b1e; font-weight: 700; }
 
 .evidence-section, .feedback-section {
   margin-top: 28px;
@@ -1624,6 +1769,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .feedback-section > .el-button { vertical-align: top; margin-top: 16px; }
 .feedback-result { margin-top: 12px; color: #246b3f !important; font-weight: 700; }
 .experience-case-entry-hint { margin-top: -2px !important; color: #47705d !important; }
+.adoption-next-step { color: #495a78 !important; }
 .ai-feedback-entry-hint { margin-top: 8px !important; color: #315fbd !important; }
 .customer-friendly-notice {
   display: flex;
@@ -1655,6 +1801,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
     align-items: flex-start; flex-direction: column;
   }
   .system-summary, .question-actions .el-button, .reply-actions .el-button { width: 100%; }
+  .catalog-guidance { align-items: flex-start; flex-direction: column; }
   .reply-actions { width: 100%; }
   .context-summary-grid { grid-template-columns: 1fr; gap: 6px; }
   .connection-card { grid-template-columns: 1fr; }

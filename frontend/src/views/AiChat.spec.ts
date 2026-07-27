@@ -269,6 +269,18 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
   })
 
+  it('keeps a no-product catalog state recoverable without allowing a context-free shortcut', async () => {
+    apiMocks.listProducts.mockResolvedValue([])
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="catalog-guidance"]').text()).toContain(
+      '该店铺暂无可用于 AI 建议的商品'
+    )
+    expect(wrapper.get('[data-testid="catalog-refresh-button"]').text()).toContain('刷新商品目录')
+    expect(wrapper.get('[data-testid="store-scope-note"]').text()).toContain('切换店铺会清空商品、SKU 和当前建议')
+  })
+
   it('clears product and SKU on store switch, and clears SKU on product switch', async () => {
     const wrapper = mountPage()
     await flushPromises()
@@ -325,6 +337,18 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="answer-trust-note"]').text()).toContain('资料匹配，可参考')
     expect(wrapper.get('[data-testid="feedback-section"]').attributes('open')).toBeDefined()
     expect(useCustomerSessionActivity().aiAssists.value).toBe(1)
+  })
+
+  it('warns the agent when the answer has no verifiable knowledge source', async () => {
+    apiMocks.chat.mockResolvedValue({ ...resultFor(), citations: [] })
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(wrapper.get('[data-testid="no-knowledge-warning"]').text()).toContain(
+      '未返回可核对的知识依据'
+    )
+    expect(wrapper.get('[data-testid="sources-details"]').text()).toContain('本次没有返回依据')
   })
 
   it('keeps SKU optional and translates the clarification field into Chinese', async () => {
@@ -426,16 +450,19 @@ describe('AiChat B-T04 three-step workbench', () => {
 
     const collect = wrapper.get('[data-testid="collect-experience-case-button"]')
     const feedback = wrapper.get('[data-testid="feedback-problem-button"]')
+    expect(wrapper.get('[data-testid="adoption-next-step"]').text()).toContain('先选择采用结果')
     expect(collect.attributes('disabled')).toBeDefined()
     expect(feedback.attributes('disabled')).toBeDefined()
 
     await wrapper.get('[data-testid="direct-accept"]').trigger('click')
     expect(collect.attributes('disabled')).toBeUndefined()
     expect(feedback.attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="adoption-next-step"]').text()).toContain('收藏为优秀案例')
 
     await wrapper.get('[data-testid="reject"]').trigger('click')
     expect(collect.attributes('disabled')).toBeDefined()
     expect(feedback.attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="adoption-next-step"]').text()).toContain('AI 问题反馈')
   })
 
   it('copies the customer-service edit and records all three page-local outcomes', async () => {
@@ -454,6 +481,26 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('修改后采用')
     await wrapper.get('[data-testid="reject"]').trigger('click')
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
+  })
+
+  it('keeps the edited reply available when browser clipboard access fails', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('clipboard denied')) }
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reply-draft"]').setValue('保留给人工复制的回复')
+    await wrapper.get('[data-testid="copy-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="copy-recovery-note"]').text()).toContain('浏览器未能自动复制')
+    expect((wrapper.get('[data-testid="reply-draft"]').element as HTMLTextAreaElement).value).toBe(
+      '保留给人工复制的回复'
+    )
+    expect(wrapper.get('[data-testid="copy-button"]').text()).toContain('复制回复')
   })
 
   it('submits a rejected answer to the independent AI feedback endpoint', async () => {
