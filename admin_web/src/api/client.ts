@@ -457,6 +457,37 @@ export interface CustomerEfficiencySummary {
   adoption_rate: number
 }
 
+export interface AdminOperationsToday {
+  today: {
+    generated_at: string
+    window_start: string
+    window_end: string
+    ai_request_count: number
+    direct_adoption_count: number
+    edited_adoption_count: number
+    not_adopted_count: number
+    adoption_rate: number
+    experience_case_submission_count: number
+    ai_feedback_submission_count: number
+    completed_ai_analysis_count: number
+  }
+  work_queue: {
+    pending_experience_review_count: number
+    pending_ai_analysis_count: number
+    open_knowledge_conflict_count: number
+  }
+  knowledge: {
+    store_count: number
+    product_count: number
+    sku_count: number
+    faq_count: number
+    safety_rule_count: number
+    recent_imported_at: string | null
+  }
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
 export async function listAdminExperienceCases(
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<AdminExperienceCase>> {
@@ -510,6 +541,12 @@ export async function getAdminCustomerEfficiencySummary(): Promise<CustomerEffic
   const response = await apiClient.get<CustomerEfficiencySummary>(
     '/api/v1/admin/customer-efficiency/summary',
   )
+  return response.data
+}
+
+/** C-internal landing-page projection. It returns metrics and timestamps only. */
+export async function getAdminOperationsToday(): Promise<AdminOperationsToday> {
+  const response = await apiClient.get<AdminOperationsToday>('/api/v1/admin/operations/today')
   return response.data
 }
 

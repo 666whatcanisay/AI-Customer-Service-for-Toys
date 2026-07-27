@@ -252,6 +252,19 @@ def test_admin_read_only_api_projects_real_catalog_data_without_local_paths(
         "suggestions": {"submitted": 1, "reviewing": 0, "planned": 0, "done": 0, "rejected": 0},
     }
 
+    operations = client.get("/api/v1/admin/operations/today")
+    assert operations.status_code == 200
+    assert operations.json()["knowledge"] == {
+        "store_count": 1,
+        "product_count": 1,
+        "sku_count": 1,
+        "faq_count": 1,
+        "safety_rule_count": 1,
+        "recent_imported_at": overview.json()["recent_imported_at"],
+    }
+    assert operations.json()["work_queue"]["open_knowledge_conflict_count"] == 1
+    assert "Synthetic product" not in str(operations.json())
+
     assert client.get("/api/v1/admin/stores").json()["items"][0]["product_count"] == 1
     products = client.get("/api/v1/admin/products", params={"store_code": "TEST-STORE"}).json()
     assert products["total"] == 1
