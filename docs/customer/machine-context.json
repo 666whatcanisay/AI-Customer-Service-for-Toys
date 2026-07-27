@@ -3,23 +3,22 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "MVP-PLUS-02-B-CONTRACT-ADAPT AI response feedback consumer adaptation",
-  "current_stage": "MVP-PLUS-02-B-CONTRACT-ADAPT implemented, locally verified and validated against an isolated current-C instance",
-  "current_gate": "PASS: B sends Idempotency-Key and consumes the frozen feedback_id/status=NEW creation receipt; five real submissions and same-key replay passed",
-  "status": "draft_pr_open",
+  "current_task": "AI-Agent UI-4 AI control center productization V1",
+  "current_stage": "Read-only A capability dashboard implemented with explicit no-data states; local validation passed and delivery is pending",
+  "current_gate": "CONDITIONAL: frontend typecheck/test/build and strict A response adapters pass; real A read-only smoke is BLOCKED because http://127.0.0.1:8000 is unreachable",
+  "status": "delivery_pending_real_smoke",
   "last_updated": "2026-07-27",
   "git": {
-    "branch": "codex/customer-pilot-experience",
-    "base_commit": "68796a9",
+    "branch": "agent/ai-control-center-ui-v1",
+    "base_commit": "3b9f3e6",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "pull_request": {
-      "number": 34,
-      "url": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/34",
+      "pending": true,
       "draft": true,
       "base": "develop"
     },
-    "clean": true,
-    "task_commit": "HEAD (this commit)"
+    "clean": false,
+    "task_commit": "PENDING_DELIVERY"
   },
   "owned_paths": [
     "frontend/**",
@@ -41,7 +40,11 @@
     "frontend/src/api/experienceCaseClient.ts",
     "frontend/src/api/experienceCaseAdapter.ts",
     "frontend/src/api/aiResponseFeedbackClient.ts",
-    "frontend/src/api/aiResponseFeedbackAdapter.ts"
+    "frontend/src/api/aiResponseFeedbackAdapter.ts",
+    "frontend/src/views/AiControlCenter.vue",
+    "frontend/src/api/aiControlCenterClient.ts",
+    "frontend/src/api/aiControlCenterAdapter.ts",
+    "frontend/src/api/aiControlCenterTypes.ts"
   ],
   "required_interfaces": [
     "GET A /api/health",
@@ -51,26 +54,36 @@
     "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI",
     "POST C /api/v1/ai-response-feedback with ai-feedback.v1-draft fields, an Idempotency-Key header, and top-level feedback_id/status=NEW receipt",
     "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total"
+    ,"GET A /api/admin/ai/modules"
+    ,"GET A /api/admin/ai/modules/ai_customer_service"
+    ,"GET A /api/admin/ai/modules/ai_customer_service/prompt"
+    ,"GET A /api/admin/ai/modules/ai_customer_service/evaluations/latest"
   ],
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "experience-case.v1-draft task-local frozen adapter agreement",
-    "ai-feedback.v1-draft task-local frozen adapter agreement"
+    "ai-feedback.v1-draft task-local frozen adapter agreement",
+    "A-T04 AI admin read-only endpoint projection (no shared contract change)"
   ],
   "test_commands": [
     "npm run typecheck",
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 MVP-PLUS-02-B-CONTRACT-ADAPT: vue-tsc --noEmit PASS; Vitest 22 files / 89 tests PASS; vite build PASS. Isolated current-C health 200; all five feedback types POSTed with Idempotency-Key returned 201 feedback_id/status=NEW; same-key replay returned the same feedback_id; GET history returned total=5/items=5.",
-  "blockers": [],
+  "last_test_result": "2026-07-27 AI-Agent UI-4: npm.cmd run typecheck PASS; Vitest 22 files / 89 tests PASS; npm.cmd run build PASS; git diff --check PASS. Real read-only A smoke against 127.0.0.1:8000 attempted modules, detail, prompt and latest evaluation GET paths; all timed out with no substitute data.",
+  "blockers": [
+    "A service at VITE_RAG_API_BASE_URL/default http://127.0.0.1:8000 is unavailable, so real capability-dashboard data smoke cannot complete."
+  ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
     "Tester identity is local browser state and is not authentication or authorization",
     "Experience-case session summaries disappear on refresh until C publishes the GET contract",
     "Pilot-guide dismissal is a local browser boolean, not authentication or training evidence",
     "AI feedback is limited to synthetic or manually de-identified test data; automatic redaction and formal authorization are not implemented",
-    "Feedback history UI is intentionally absent; any future status-query page must consume the frozen GET fields and pagination without inventing fields."
+    "Feedback history UI is intentionally absent; any future status-query page must consume the frozen GET fields and pagination without inventing fields.",
+    "AI capability call metrics are process-local since-start aggregates and reset on A restart; they are not historical monitoring.",
+    "Latest evaluation does not expose evaluation-snapshot model_version or prompt_version; the UI labels displayed versions as current module metadata.",
+    "Badcase category counts remain unavailable until a browser-safe de-identified aggregate read contract is published."
   ],
   "completed_tasks": [
     "B-T01 frontend baseline audit",
@@ -82,7 +95,8 @@
     "MVP-PLUS-02 customer pilot experience improvement",
     "MVP-PLUS-02-FEEDBACK AI response feedback capture frontend",
     "MVP-PLUS-02-B-C-SMOKE real integration evidence (BLOCKED; no code changes)",
-    "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS"
+    "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS",
+    "AI-Agent UI-4 AI control center V1 implementation and local validation (real A smoke BLOCKED)"
   ],
   "out_of_scope": [
     "Automatic customer message sending",

@@ -38,4 +38,31 @@ All responses use the existing `{success, message, data}` envelope. These endpoi
 
 Runtime metrics are thread-safe and reset on process restart. They contain no question, prompt, raw request body, source excerpt, or exception text; `last_error_summary` is only a controlled error category.
 
+### GET /api/admin/ai/control-center
+
+Returns the versioned `ai-control-center.v1.1` management snapshot. It is a read-only summary of A process runtime state, safe Prompt metadata, the newest saved `live_c_api` evaluation summary, fixed Badcase empty-state metadata, and a process-memory-only aggregate of successfully completed feedback-analysis runs. Its `response_model` is `AiControlCenterResponse`, so the complete field schema is available in `/openapi.json`.
+
+The route does not probe C, call Ollama, run analysis/evaluation, expose C URLs, or return feedback IDs, content hashes, raw question/answer text, analyses, suggestions, full prompts, environment values, or secrets. Existing module endpoints remain available for V1.0 clients.
+
+### GET /api/admin/ai/operations/overview
+
+Returns the versioned `ai-operations.v1` read-only operations metric snapshot. Its OpenAPI `response_model` is `AiOperationsOverviewResponse`.
+
+- `answer_volume` is an A-process-since-start aggregate of request outcomes: `DIRECT_ANSWER`, `CONTROLLED_ANSWER`, `TRANSFER_HUMAN`, and other/controlled outcomes. It resets on restart and is not durable history or an employee metric.
+- `answer_quality` and `knowledge_coverage` use only the newest saved `live_c_api` evaluation. Quality is the evaluation pass rate; evidence coverage is the evaluation `source_ids` check pass rate. Neither represents all production conversations or all business knowledge.
+- `badcase` always exposes the fixed four categories with `null` counts until a browser-safe, de-identified aggregate contract exists. `external_data` reports feedback and efficiency dependency state without contacting C; `read_attempted` is false.
+- `model_status` reports configuration and A process readiness, not a model liveness probe. `notices` supply controlled explanations and manual next steps only; every notice has `automatic_action_taken=false`.
+
+The route never calls Ollama or C, and never returns customer content, feedback IDs, case IDs, content hashes, prompt text, platform URLs, secrets, raw errors, or individual evaluation records. It does not modify Prompt, knowledge, model, or C data.
+
+### GET /api/admin/ai/quality-baseline/latest
+
+Returns the versioned `ai-quality-baseline.v1` diagnosis of the newest saved `live_c_api` evaluation report. Its OpenAPI `response_model` is `QualityBaselineResponse`.
+
+- `summary` contains only aggregate case/check counts and an internal evaluation identifier. `failed_cases` contains internal case IDs, safe evaluator failure classes, failed check names and numeric source/fact counts; it never contains the underlying question, answer, expected fact, source ID or source text.
+- `cause_findings` maps recorded evaluator signals to `DATA_PROBLEM`, `KNOWLEDGE_PROBLEM`, `RETRIEVAL_PROBLEM`, `PROMPT_OR_MODEL_PROBLEM`, and `RULE_DECISION_PROBLEM`. Findings may overlap and a zero count means no direct signal in this report, not proof that the cause is impossible.
+- `recommendations` are manual verification steps only. Each has `automatic_change_allowed=false`; the response itself has `model_or_prompt_changed=false` and `raw_content_exposed=false`.
+
+The route does not run qwen, retrieval or a new evaluation; it does not contact C and cannot modify Prompt, knowledge, rules, models, vectors or reports.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。

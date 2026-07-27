@@ -15,6 +15,9 @@ from app.models.chat import (
     ModelConfigUpdate,
     SearchRequest,
 )
+from app.models.ai_control import AiControlCenterResponse
+from app.models.ai_operations import AiOperationsOverviewResponse
+from app.models.quality_baseline import QualityBaselineResponse
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
@@ -27,11 +30,15 @@ from app.service.ai_capability import (
     MODULE_DEFINITIONS,
     MODULES_BY_ID,
     customer_service_detail,
+    control_center_snapshot,
     latest_evaluation,
     module_summary,
     not_available_module_detail,
+    operations_overview_snapshot,
     prompt_metadata,
+    summarize_feedback_analysis_run,
 )
+from app.service.quality_baseline import latest_quality_baseline
 from app.service.test_knowledge import (
     PlatformIntegrationUnavailable,
     TestKnowledgeValidationError,
@@ -304,6 +311,47 @@ def list_ai_modules(request: Request) -> dict[str, Any]:
     return envelope({"modules": modules})
 
 
+@router.get(
+    "/admin/ai/control-center",
+    tags=["ai-admin"],
+    response_model=AiControlCenterResponse,
+)
+def get_ai_control_center(request: Request) -> dict[str, Any]:
+    """Read one safe, non-executing control-center management snapshot."""
+    return envelope(
+        control_center_snapshot(request.app).model_dump(),
+        message="AI control-center snapshot",
+    )
+
+
+@router.get(
+    "/admin/ai/operations/overview",
+    tags=["ai-admin"],
+    response_model=AiOperationsOverviewResponse,
+)
+def get_ai_operations_overview(request: Request) -> dict[str, Any]:
+    """Read safe operations metrics without contacting C or the local model."""
+    return envelope(
+        operations_overview_snapshot(request.app).model_dump(),
+        message="AI operations overview",
+    )
+
+
+@router.get(
+    "/admin/ai/quality-baseline/latest",
+    tags=["ai-admin"],
+    response_model=QualityBaselineResponse,
+)
+def get_latest_quality_baseline(request: Request) -> dict[str, Any]:
+    """Diagnose saved evaluation signals without running a model or changing AI state."""
+    return envelope(
+        latest_quality_baseline(
+            request.app.state.settings.project_root / "docs" / "rag" / "evaluations"
+        ).model_dump(),
+        message="AI quality baseline diagnosis",
+    )
+
+
 @router.get("/admin/ai/modules/{module_id}", tags=["ai-admin"])
 def get_ai_module(request: Request, module_id: str) -> dict[str, Any]:
     module = admin_module_or_404(module_id)
@@ -414,6 +462,12 @@ def run_feedback_analysis(
             status_code=exc.status_code,
             content=envelope({"code": exc.code}, message=exc.message, success=False),
         )
+    # Keep only aggregate operational evidence. The service return itself is
+    # already safe, but the control-center never retains identifiers or other
+    # per-feedback values after this response completes.
+    request.app.state.latest_feedback_analysis_summary = summarize_feedback_analysis_run(
+        recorded
+    )
     return envelope(recorded, message="Feedback analysis recorded")
 
 

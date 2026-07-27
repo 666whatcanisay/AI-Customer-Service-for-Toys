@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
 import AiChat from '@/views/AiChat.vue'
+import AiControlCenter from '@/views/AiControlCenter.vue'
 import CustomerWorkbenchLayout from '@/layouts/CustomerWorkbenchLayout.vue'
 import ExperienceCases from '@/views/ExperienceCases.vue'
 import ModuleInfo from '@/views/ModuleInfo.vue'
@@ -17,6 +18,7 @@ export const createCustomerRouter = (history: RouterHistory = createWebHistory()
         children: [
           { path: '', name: 'WorkspaceHome', component: WorkspaceHome, meta: { title: '工作台首页' } },
           { path: 'ai-chat', name: 'AiChat', component: AiChat, meta: { title: 'AI 客服' } },
+          { path: 'ai-control-center', name: 'AiControlCenter', component: AiControlCenter, meta: { title: 'AI 控制中心' } },
           { path: 'suggestions', name: 'SuggestionForm', component: SuggestionForm, meta: { title: '提交意见建议' } },
           { path: 'suggestions/mine', name: 'MySuggestions', component: MySuggestions, meta: { title: '我的建议' } },
           { path: 'experience-cases', name: 'ExperienceCases', component: ExperienceCases, meta: { title: '我的案例' } },

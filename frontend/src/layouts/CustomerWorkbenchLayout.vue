@@ -16,6 +16,9 @@
         <RouterLink to="/ai-chat" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>AI</span><span>AI 客服</span>
         </RouterLink>
+        <RouterLink to="/ai-control-center" class="nav-link" active-class="active" @click="closeMobileMenu">
+          <span>管</span><span>AI 控制中心</span>
+        </RouterLink>
         <RouterLink to="/suggestions" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>✎</span><span>提交意见建议</span>
         </RouterLink>
