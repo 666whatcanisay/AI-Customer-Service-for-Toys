@@ -12,9 +12,9 @@
     "branch": "codex/customer-pilot-b-v3",
     "base_commit": "348c875",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "PENDING_COMMIT_AND_DRAFT_PR",
+    "delivery": "DRAFT_PR_46",
     "clean": false,
-    "task_commit": "PENDING_DELIVERY"
+    "task_commit": "fdec128"
   },
   "owned_paths": [
     "frontend/**",
