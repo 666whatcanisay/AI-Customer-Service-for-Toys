@@ -6,7 +6,7 @@
   "status": "pilot_candidate_ready",
   "current_task": "CONTROL-BASELINE-MERGE-V2 Pilot candidate baseline",
   "current_stage": "Interface #58, C #55, B #57, A 2ac537f and OPS #56 were reviewed and merged in the declared order. An isolated real runtime closure passed for C/A/B/Admin, sourced qwen chat, experience-case review and feedback analysis writeback.",
-  "current_gate": "PILOT_CANDIDATE_READY: develop@d1d2ba2 is a verified internal-pilot candidate. INTERNAL_PILOT_READY still requires an explicitly configured current-subnet Private TCP 5173 firewall rule plus second controlled customer-computer TCP/browser acceptance. Do not expose 8000, 8011 or 5174.",
+  "current_gate": "PILOT_CANDIDATE_READY: develop@11f23a1 is a verified internal-pilot candidate; its functional merge is d1d2ba2 and the final commit adds evidence only. INTERNAL_PILOT_READY still requires an explicitly configured current-subnet Private TCP 5173 firewall rule plus second controlled customer-computer TCP/browser acceptance. Do not expose 8000, 8011 or 5174.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -28,7 +28,8 @@
     "pilot_baseline_pr49_squash_commit": "b6e7b4708d787210b58d135d760edf91a38145bc",
     "pilot_baseline_pr51_squash_commit": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
     "pilot_baseline_develop": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
-    "pilot_candidate_baseline_v2": "d1d2ba281cc1a05a04cdd4349ec74e100e05f947",
+    "pilot_candidate_baseline_v2": "11f23a1afa8812aae2ae8a9e027031ee4fc33155",
+    "pilot_candidate_runtime_code_commit": "d1d2ba281cc1a05a04cdd4349ec74e100e05f947",
     "pilot_candidate_baseline_v2_merge_branch": "codex/pilot-baseline-v2-merge"
   },
   "pull_requests": {
