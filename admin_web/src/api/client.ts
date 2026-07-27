@@ -540,19 +540,22 @@ function normalizeAiModule(value: unknown, index: number): AiModule {
   }
 }
 
+function modulesFromAiSuccessEnvelope(payload: unknown): unknown[] {
+  if (typeof payload !== 'object' || payload === null) return []
+  const envelope = payload as { success?: unknown; data?: unknown }
+  if (envelope.success !== true || typeof envelope.data !== 'object' || envelope.data === null) return []
+
+  const data = envelope.data as { modules?: unknown }
+  return Array.isArray(data.modules) ? data.modules : []
+}
+
 /**
- * The sole A-line path declared by the task card.  This adapter never
- * fabricates module data when the A branch has not yet been integrated.
+ * The sole A-line path declared by ai-control.v1. This adapter consumes only
+ * the A success envelope's `data.modules` field and never fabricates modules.
  */
 export async function listAiModules(): Promise<AiModule[]> {
   const response = await aiClient.get<unknown>('/api/admin/ai/modules')
-  const payload = response.data
-  const rows = Array.isArray(payload)
-    ? payload
-    : typeof payload === 'object' && payload !== null && Array.isArray((payload as { items?: unknown }).items)
-      ? (payload as { items: unknown[] }).items
-      : []
-  return rows.map(normalizeAiModule)
+  return modulesFromAiSuccessEnvelope(response.data).map(normalizeAiModule)
 }
 
 export async function getHealth(): Promise<HealthResponse> {
