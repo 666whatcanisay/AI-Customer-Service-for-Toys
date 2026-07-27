@@ -179,6 +179,7 @@ class Settings:
     platform_api_base_url: str
     platform_api_timeout_seconds: float
     experience_evaluation_prompt_version: str
+    feedback_analysis_prompt_version: str
     rag_distance_threshold: float
     top_k: int
     cors_allowed_origins: tuple[str, ...]
@@ -230,6 +231,11 @@ class Settings:
                 "experience-evaluation-v1",
             ).strip()
             or "experience-evaluation-v1",
+            feedback_analysis_prompt_version=os.getenv(
+                "FEEDBACK_ANALYSIS_PROMPT_VERSION",
+                "ai-quality-feedback-v1",
+            ).strip()
+            or "ai-quality-feedback-v1",
             rag_distance_threshold=float(
                 os.getenv(
                     "RAG_DISTANCE_THRESHOLD",
