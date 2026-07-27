@@ -26,6 +26,8 @@ The local model is configured with `LLM_PROVIDER=ollama` and `LLM_MODEL=qwen3.5:
 
 The prompt instructs the model not to quote or repeat the raw question, answers, identifiers, or personal data.  A does not log the source snapshot, prompt, or model result, and its local API returns only a safe trace receipt rather than the source content.
 
+Before JSON decoding, A rejects a model response over 16,384 characters. It accepts plain JSON plus a complete json or application/json fenced JSON object (language marker is case-insensitive), then requires the exact frozen object keys, all five feedback-type assessments, bounded text fields, and no more than five bounded suggestions. Any other shape remains FEEDBACK_ANALYSIS_OUTPUT_INVALID (422) and is never written to C.
+
 The C `redaction_version` is a reminder rather than an automatic redaction guarantee.  Before any real run, the C operator must ensure the human-confirmed export is already de-identified and suitable for this test environment.  This implementation makes no authentication, authorization, retention, or production-security claim.
 
 ## Writeback and idempotency
