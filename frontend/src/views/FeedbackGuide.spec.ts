@@ -21,5 +21,7 @@ describe('FeedbackGuide', () => {
     expect(wrapper.get('[data-testid="feedback-reason-guide"]').text()).toContain('事实错误')
     expect(wrapper.get('[data-testid="feedback-reason-guide"]').text()).toContain('风险问题')
     expect(wrapper.findAll('[data-testid="feedback-reason-guide"] article')).toHaveLength(5)
+    expect(wrapper.get('[data-testid="capture-feedback-boundary"]').text()).toContain('优秀回复')
+    expect(wrapper.get('[data-testid="capture-feedback-boundary"]').text()).toContain('不会变成优秀案例')
   })
 })
