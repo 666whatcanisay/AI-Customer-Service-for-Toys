@@ -37,6 +37,10 @@ _SUGGESTION_CATEGORIES = {
     "POLICY_GAP",
     "COACHING",
 }
+# The accepted schema itself has bounded fields.  Apply a slightly larger
+# total bound before decoding so a misbehaving local model cannot make the
+# control-plane parser retain an arbitrarily large response.
+_MAX_MODEL_OUTPUT_CHARACTERS = 16_384
 
 
 class FeedbackAnalysisError(RuntimeError):
@@ -233,10 +237,12 @@ def _parse_snapshot(value: object) -> FeedbackSnapshot:
 
 def _strip_json_fence(value: str) -> str:
     value = value.strip()
-    if value.startswith("```json") and value.endswith("```"):
-        return value[7:-3].strip()
     if value.startswith("```") and value.endswith("```"):
-        return value[3:-3].strip()
+        content = value[3:-3].strip()
+        first_line, separator, remainder = content.partition("\n")
+        if separator and first_line.strip().lower() in {"json", "application/json"}:
+            return remainder.strip()
+        return content
     return value
 
 
@@ -250,6 +256,8 @@ def _bounded_text(value: object, limit: int) -> str:
 
 
 def _parse_model_output(raw: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    if not isinstance(raw, str) or len(raw) > _MAX_MODEL_OUTPUT_CHARACTERS:
+        raise _output_invalid()
     try:
         payload = json.loads(_strip_json_fence(raw))
     except (TypeError, json.JSONDecodeError):
