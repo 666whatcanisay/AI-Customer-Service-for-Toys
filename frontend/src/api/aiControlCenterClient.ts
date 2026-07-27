@@ -1,6 +1,8 @@
 import axios from 'axios'
 import {
   adaptAiControlCenterResponse,
+  adaptAiOperationsOverviewResponse,
+  adaptAiQualityBaselineResponse,
   adaptAiLatestEvaluationResponse,
   adaptAiModuleDetailResponse,
   adaptAiModulesResponse,
@@ -29,6 +31,24 @@ export const aiControlCenterClient: AiControlCenterApiClient = {
     try {
       const response = await http.get('/api/admin/ai/control-center', { signal })
       return adaptAiControlCenterResponse(response.data)
+    } catch (error) {
+      throw toRagClientError(error)
+    }
+  },
+
+  async getOperationsOverview(signal) {
+    try {
+      const response = await http.get('/api/admin/ai/operations/overview', { signal })
+      return adaptAiOperationsOverviewResponse(response.data)
+    } catch (error) {
+      throw toRagClientError(error)
+    }
+  },
+
+  async getQualityBaseline(signal) {
+    try {
+      const response = await http.get('/api/admin/ai/quality-baseline/latest', { signal })
+      return adaptAiQualityBaselineResponse(response.data)
     } catch (error) {
       throw toRagClientError(error)
     }

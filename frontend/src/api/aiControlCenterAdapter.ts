@@ -12,6 +12,9 @@ import {
   type AiEvaluation,
   type AiFeedbackAnalysisReadOnlyState,
   type AiFeedbackAnalysisRunSummary,
+  type AiOperationsOverviewSnapshot,
+  type AiQualityBaselineSnapshot,
+  type AiQualityDiagnosisCategory,
   type AiLatestEvaluation,
   type AiModuleStatus,
   type AiModuleSummary,
@@ -201,8 +204,8 @@ const adaptControlEvaluation = (value: unknown): AiEvaluation | null => {
   }
   return {
     evaluationId: requiredText(value.evaluation_id, 'evaluation.evaluation_id'),
-    executedAt: requiredText(value.executed_at, 'evaluation.executed_at'),
-    datasetVersion: requiredText(value.dataset_version, 'evaluation.dataset_version'),
+    executedAt: requiredLiteralText(value.executed_at, 'evaluation.executed_at'),
+    datasetVersion: requiredLiteralText(value.dataset_version, 'evaluation.dataset_version'),
     totalCases: nullableNumber(value.total_cases, 'evaluation.total_cases'),
     passedCases: nullableNumber(value.passed_cases, 'evaluation.passed_cases'),
     passRate: nullableNumber(value.pass_rate, 'evaluation.pass_rate'),
@@ -357,5 +360,197 @@ export const adaptAiControlCenterResponse = (payload: unknown): AiControlCenterS
     feedbackAnalysis,
     capabilities: adaptCapabilities(data.capabilities),
     dataSources: adaptDataSources(data.data_sources)
+  }
+}
+
+const metricStatus = (value: unknown, field: string) =>
+  stringLiteral(value, ['AVAILABLE', 'NOT_AVAILABLE'] as const, field)
+
+const qualityCategory = (value: unknown, field: string): AiQualityDiagnosisCategory =>
+  stringLiteral(value, [
+    'KNOWLEDGE_PROBLEM', 'RETRIEVAL_PROBLEM', 'PROMPT_OR_MODEL_PROBLEM',
+    'DATA_PROBLEM', 'RULE_DECISION_PROBLEM'
+  ] as const, field)
+
+const requiredRecord = (value: unknown, field: string): UnknownRecord => {
+  if (!isRecord(value)) throw new RagAdapterError(`AI 控制中心字段 ${field} 必须为对象`)
+  return value
+}
+
+// Quality reports use the explicit string NOT_AVAILABLE for persisted metadata
+// that was not recorded. Unlike nullable API fields, retain that provenance for
+// the read-only workbench instead of silently converting it to null.
+const requiredLiteralText = (value: unknown, field: string): string => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new RagAdapterError(`AI 控制中心字段 ${field} 必须为非空字符串`)
+  }
+  return value.trim()
+}
+
+const requiredList = (value: unknown, field: string): unknown[] => {
+  if (!Array.isArray(value)) throw new RagAdapterError(`AI 控制中心字段 ${field} 必须为数组`)
+  return value
+}
+
+const exactFalse = (value: unknown, field: string): false => {
+  if (value !== false) throw new RagAdapterError(`AI 控制中心字段 ${field} 必须为 false`)
+  return false
+}
+
+const adaptOperationsBadcase = (value: unknown) => {
+  const source = requiredRecord(value, 'badcase')
+  if (source.status !== 'NOT_AVAILABLE') throw new RagAdapterError('AI 控制中心 Badcase 只能展示安全空态')
+  return {
+    status: 'NOT_AVAILABLE' as const,
+    categories: requiredList(source.categories, 'badcase.categories').map((item, index) => {
+      const category = requiredRecord(item, `badcase.categories.${index}`)
+      if (category.count !== null) throw new RagAdapterError('AI 控制中心 Badcase 不可展示未发布的计数')
+      return {
+        category: stringLiteral(category.category, ['FACT_ERROR', 'MISSING_INFO', 'STYLE_ISSUE', 'RISK_ISSUE'] as const, `badcase.categories.${index}.category`),
+        count: null
+      }
+    }),
+    explanation: requiredText(source.explanation, 'badcase.explanation'),
+    rawContentExposed: exactFalse(source.raw_content_exposed, 'badcase.raw_content_exposed')
+  }
+}
+
+export const adaptAiOperationsOverviewResponse = (payload: unknown): AiOperationsOverviewSnapshot => {
+  const data = unwrapData(payload)
+  if (data.schema_version !== 'ai-operations.v1') throw new RagAdapterError('不支持的 AI 运营快照版本')
+  const answerVolume = requiredRecord(data.answer_volume, 'answer_volume')
+  const answerQuality = requiredRecord(data.answer_quality, 'answer_quality')
+  const knowledgeCoverage = requiredRecord(data.knowledge_coverage, 'knowledge_coverage')
+  const modelStatus = requiredRecord(data.model_status, 'model_status')
+  return {
+    schemaVersion: 'ai-operations.v1',
+    generatedAt: requiredText(data.generated_at, 'generated_at'),
+    answerVolume: {
+      status: metricStatus(answerVolume.status, 'answer_volume.status'),
+      metricsScope: requiredText(answerVolume.metrics_scope, 'answer_volume.metrics_scope'),
+      processedRequestCount: nullableNumber(answerVolume.processed_request_count, 'answer_volume.processed_request_count'),
+      directAnswerCount: nullableNumber(answerVolume.direct_answer_count, 'answer_volume.direct_answer_count'),
+      controlledAnswerCount: nullableNumber(answerVolume.controlled_answer_count, 'answer_volume.controlled_answer_count'),
+      transferHumanCount: nullableNumber(answerVolume.transfer_human_count, 'answer_volume.transfer_human_count'),
+      otherOutcomeCount: nullableNumber(answerVolume.other_outcome_count, 'answer_volume.other_outcome_count'),
+      durable: exactFalse(answerVolume.durable, 'answer_volume.durable'),
+      explanation: requiredText(answerVolume.explanation, 'answer_volume.explanation')
+    },
+    answerQuality: {
+      status: metricStatus(answerQuality.status, 'answer_quality.status'),
+      evaluationId: nullableText(answerQuality.evaluation_id, 'answer_quality.evaluation_id'),
+      evaluatedCaseCount: nullableNumber(answerQuality.evaluated_case_count, 'answer_quality.evaluated_case_count'),
+      passedCaseCount: nullableNumber(answerQuality.passed_case_count, 'answer_quality.passed_case_count'),
+      passRatePercent: nullableNumber(answerQuality.pass_rate_percent, 'answer_quality.pass_rate_percent'),
+      measuredAt: nullableText(answerQuality.measured_at, 'answer_quality.measured_at'),
+      explanation: requiredText(answerQuality.explanation, 'answer_quality.explanation')
+    },
+    knowledgeCoverage: {
+      status: metricStatus(knowledgeCoverage.status, 'knowledge_coverage.status'),
+      indexedChunkCount: nullableNumber(knowledgeCoverage.indexed_chunk_count, 'knowledge_coverage.indexed_chunk_count'),
+      sourceAttributionCheckedCaseCount: nullableNumber(knowledgeCoverage.source_attribution_checked_case_count, 'knowledge_coverage.source_attribution_checked_case_count'),
+      sourceAttributionPassRatePercent: nullableNumber(knowledgeCoverage.source_attribution_pass_rate_percent, 'knowledge_coverage.source_attribution_pass_rate_percent'),
+      explanation: requiredText(knowledgeCoverage.explanation, 'knowledge_coverage.explanation')
+    },
+    badcase: adaptOperationsBadcase(data.badcase),
+    modelStatus: {
+      status: stringLiteral(modelStatus.status, ['CONFIGURED', 'NOT_CONFIGURED'] as const, 'model_status.status'),
+      provider: nullableText(modelStatus.provider, 'model_status.provider'),
+      modelVersion: nullableText(modelStatus.model_version, 'model_status.model_version'),
+      serviceReady: requiredBoolean(modelStatus.service_ready, 'model_status.service_ready'),
+      availabilityProbed: exactFalse(modelStatus.availability_probed, 'model_status.availability_probed'),
+      averageLatencyMs: nullableNumber(modelStatus.average_latency_ms, 'model_status.average_latency_ms'),
+      errorCount: nullableNumber(modelStatus.error_count, 'model_status.error_count'),
+      lastErrorCategory: nullableText(modelStatus.last_error_category, 'model_status.last_error_category'),
+      explanation: requiredText(modelStatus.explanation, 'model_status.explanation')
+    },
+    externalData: requiredList(data.external_data, 'external_data').map((item, index) => {
+      const source = requiredRecord(item, `external_data.${index}`)
+      return {
+        sourceId: stringLiteral(source.source_id, ['feedback', 'efficiency'] as const, `external_data.${index}.source_id`),
+        status: stringLiteral(source.status, ['AVAILABLE', 'NOT_AVAILABLE', 'NOT_CONFIGURED', 'NOT_REGISTERED'] as const, `external_data.${index}.status`),
+        readAttempted: exactFalse(source.read_attempted, `external_data.${index}.read_attempted`),
+        explanation: requiredText(source.explanation, `external_data.${index}.explanation`),
+        operatorAction: requiredText(source.operator_action, `external_data.${index}.operator_action`)
+      }
+    }),
+    notices: requiredList(data.notices, 'notices').map((item, index) => {
+      const notice = requiredRecord(item, `notices.${index}`)
+      return {
+        code: requiredText(notice.code, `notices.${index}.code`),
+        severity: stringLiteral(notice.severity, ['INFO', 'WARNING', 'ERROR'] as const, `notices.${index}.severity`),
+        message: requiredText(notice.message, `notices.${index}.message`),
+        operatorAction: requiredText(notice.operator_action, `notices.${index}.operator_action`),
+        automaticActionTaken: exactFalse(notice.automatic_action_taken, `notices.${index}.automatic_action_taken`)
+      }
+    }),
+    rawContentExposed: exactFalse(data.raw_content_exposed, 'raw_content_exposed')
+  }
+}
+
+const adaptQualitySummary = (value: unknown) => {
+  if (value === null) return null
+  const summary = requiredRecord(value, 'summary')
+  return {
+    evaluationId: requiredText(summary.evaluation_id, 'summary.evaluation_id'),
+    executedAt: requiredLiteralText(summary.executed_at, 'summary.executed_at'),
+    datasetVersion: requiredLiteralText(summary.dataset_version, 'summary.dataset_version'),
+    totalCaseCount: requiredNumber(summary.total_case_count, 'summary.total_case_count'),
+    passedCaseCount: requiredNumber(summary.passed_case_count, 'summary.passed_case_count'),
+    failedCaseCount: requiredNumber(summary.failed_case_count, 'summary.failed_case_count'),
+    passRatePercent: requiredNumber(summary.pass_rate_percent, 'summary.pass_rate_percent'),
+    checks: requiredList(summary.checks, 'summary.checks').map((item, index) => {
+      const check = requiredRecord(item, `summary.checks.${index}`)
+      return {
+        check: stringLiteral(check.check, ['action', 'source_ids', 'key_facts', 'forbidden_claims', 'required_fields', 'risk_level', 'scope'] as const, `summary.checks.${index}.check`),
+        passedCaseCount: nullableNumber(check.passed_case_count, `summary.checks.${index}.passed_case_count`)
+      }
+    })
+  }
+}
+
+export const adaptAiQualityBaselineResponse = (payload: unknown): AiQualityBaselineSnapshot => {
+  const data = unwrapData(payload)
+  if (data.schema_version !== 'ai-quality-baseline.v1') throw new RagAdapterError('不支持的 AI 质量基线版本')
+  return {
+    schemaVersion: 'ai-quality-baseline.v1',
+    status: metricStatus(data.status, 'status'),
+    summary: adaptQualitySummary(data.summary),
+    failedCases: requiredList(data.failed_cases, 'failed_cases').map((item, index) => {
+      const failedCase = requiredRecord(item, `failed_cases.${index}`)
+      return {
+        caseId: requiredText(failedCase.case_id, `failed_cases.${index}.case_id`),
+        categories: requiredList(failedCase.categories, `failed_cases.${index}.categories`).map((category, categoryIndex) => qualityCategory(category, `failed_cases.${index}.categories.${categoryIndex}`)),
+        evaluatorFailureClasses: requiredList(failedCase.evaluator_failure_classes, `failed_cases.${index}.evaluator_failure_classes`).map((item, itemIndex) => stringLiteral(item, ['metadata_loss', 'retrieval_miss', 'model_expression_error', 'structured_decision_error'] as const, `failed_cases.${index}.evaluator_failure_classes.${itemIndex}`)),
+        failedChecks: requiredList(failedCase.failed_checks, `failed_cases.${index}.failed_checks`).map((item, itemIndex) => stringLiteral(item, ['action', 'source_ids', 'key_facts', 'forbidden_claims', 'required_fields', 'risk_level', 'scope'] as const, `failed_cases.${index}.failed_checks.${itemIndex}`)),
+        expectedSourceCount: requiredNumber(failedCase.expected_source_count, `failed_cases.${index}.expected_source_count`),
+        missingExpectedSourceCount: requiredNumber(failedCase.missing_expected_source_count, `failed_cases.${index}.missing_expected_source_count`),
+        expectedFactCount: requiredNumber(failedCase.expected_fact_count, `failed_cases.${index}.expected_fact_count`),
+        suggestedVerifications: requiredStringList(failedCase.suggested_verifications, `failed_cases.${index}.suggested_verifications`)
+      }
+    }),
+    causeFindings: requiredList(data.cause_findings, 'cause_findings').map((item, index) => {
+      const finding = requiredRecord(item, `cause_findings.${index}`)
+      return {
+        category: qualityCategory(finding.category, `cause_findings.${index}.category`),
+        affectedCaseCount: requiredNumber(finding.affected_case_count, `cause_findings.${index}.affected_case_count`),
+        evidence: stringLiteral(finding.evidence, ['DIRECT_EVALUATOR_SIGNAL', 'NO_SIGNAL_IN_CURRENT_REPORT'] as const, `cause_findings.${index}.evidence`),
+        conclusion: requiredText(finding.conclusion, `cause_findings.${index}.conclusion`),
+        recommendedVerification: requiredText(finding.recommended_verification, `cause_findings.${index}.recommended_verification`),
+        automaticChangeAllowed: exactFalse(finding.automatic_change_allowed, `cause_findings.${index}.automatic_change_allowed`)
+      }
+    }),
+    recommendations: requiredList(data.recommendations, 'recommendations').map((item, index) => {
+      const recommendation = requiredRecord(item, `recommendations.${index}`)
+      return {
+        priority: stringLiteral(recommendation.priority, ['P0', 'P1', 'P2'] as const, `recommendations.${index}.priority`),
+        category: qualityCategory(recommendation.category, `recommendations.${index}.category`),
+        recommendation: requiredText(recommendation.recommendation, `recommendations.${index}.recommendation`),
+        rationale: requiredText(recommendation.rationale, `recommendations.${index}.rationale`),
+        automaticChangeAllowed: exactFalse(recommendation.automatic_change_allowed, `recommendations.${index}.automatic_change_allowed`)
+      }
+    }),
+    rawContentExposed: exactFalse(data.raw_content_exposed, 'raw_content_exposed'),
+    modelOrPromptChanged: exactFalse(data.model_or_prompt_changed, 'model_or_prompt_changed')
   }
 }

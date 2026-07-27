@@ -670,9 +670,17 @@ def control_center_snapshot(application: Any) -> AiControlCenterSnapshot:
         settings.project_root / "docs" / "rag" / "evaluations"
     )
     raw_evaluation = latest.get("evaluation")
-    evaluation = (
-        EvaluationSummary.model_validate(raw_evaluation)
+    # The legacy module endpoint retains report_path as an internal report
+    # identifier.  The public control-center schema deliberately excludes it;
+    # project only the shared summary fields before strict validation.
+    public_evaluation = (
+        {key: value for key, value in raw_evaluation.items() if key != "report_path"}
         if isinstance(raw_evaluation, dict)
+        else None
+    )
+    evaluation = (
+        EvaluationSummary.model_validate(public_evaluation)
+        if public_evaluation is not None
         else None
     )
     platform_status = "CONFIGURED" if settings.platform_api_base_url else "NOT_CONFIGURED"

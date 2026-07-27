@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.service.ai_capability import summarize_feedback_analysis_run
 
 
@@ -84,6 +86,38 @@ def test_control_center_returns_aggregate_feedback_evidence_without_identifiers(
     serialized = response.text
     assert "FB-DO-NOT-EXPOSE" not in serialized
     assert "AQR-DO-NOT-EXPOSE" not in serialized
+
+
+def test_control_center_projects_saved_evaluation_without_internal_report_path(api_client):
+    client, vector_path = api_client
+    report_path = (
+        Path(vector_path).parent
+        / "docs"
+        / "rag"
+        / "evaluations"
+        / "live-control-center-evaluation"
+        / "a-t03-evaluation.json"
+    )
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(
+        """{
+  "evidence_mode": "live_c_api",
+  "total": 2,
+  "passed": 1,
+  "check_pass_counts": {"action": 2, "source_ids": 1, "key_facts": 1, "required_fields": 2, "risk_level": 2, "scope": 2},
+  "records": [{"case_id": "CASE-001", "passed": false}]
+}""",
+        encoding="utf-8",
+    )
+
+    response = client.get("/api/admin/ai/control-center")
+
+    assert response.status_code == 200
+    evaluation = response.json()["data"]["evaluation"]["evaluation"]
+    assert evaluation["evaluation_id"] == "live-control-center-evaluation"
+    assert evaluation["failed_case_ids"] == ["CASE-001"]
+    assert "report_path" not in evaluation
+    assert str(Path(vector_path).parent) not in response.text
 
 
 def test_feedback_run_summary_drops_raw_and_per_feedback_values():
