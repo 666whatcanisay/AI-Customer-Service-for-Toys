@@ -3,14 +3,14 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "UI-1 unified customer product shell",
-  "current_stage": "B customer workbench has an incremental UI-1 product shell: unified brand, primary navigation, real A/C health labels, default-collapsed technical information, honest waiting-data cards and a non-submitting feedback guide.",
-  "current_gate": "LOCAL_UI_VERIFIED_PENDING_DELIVERY: typecheck, 23 Vitest files / 90 tests and production build passed. No B API request/response, RAG flow, product/SKU selection, copy, experience-case or AI-feedback contract changed.",
-  "status": "ui_1_product_shell_ready_for_delivery",
+  "current_task": "B-PRODUCT-V1.1 daily customer workbench experience",
+  "current_stage": "Implementation and UI browser verification complete: guided consultation path, action-specific human-check note, adoption-gated follow-up actions, experience-case journey and feedback reason guide. The complete live consultation path is blocked because the current A/RAG service is unavailable.",
+  "current_gate": "CONDITIONAL_LOCAL_PASS_PENDING_DELIVERY: typecheck, 24 Vitest files / 93 tests and production build passed. Browser verified homepage, platform availability, AI unavailable-state, experience-case and feedback pages. No successful answer/copy/case/feedback result was fabricated.",
+  "status": "customer_product_v1_1_ready_for_draft_pr_with_rag_blocker",
   "last_updated": "2026-07-27",
   "git": {
-    "branch": "codex/ui-1-product-shell",
-    "base_commit": "3b9f3e63700ba1d5bcc27b54c5be7aabee28e252",
+    "branch": "codex/customer-product-v1-1",
+    "base_commit": "3f0d967",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "delivery": "PENDING_COMMIT_AND_DRAFT_PR",
     "clean": false,
@@ -60,8 +60,10 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 UI-1: vue-tsc --noEmit PASS; Vitest 23 files / 90 tests PASS; vite build PASS. UI tests verify grouped product navigation, default-collapsed technical details, honest AI/platform/current-page labels, waiting-data home copy and a feedback guide that does not submit data. Existing Vite CJS API deprecation and large chunk warnings remain.",
-  "blockers": [],
+  "last_test_result": "2026-07-27 B-PRODUCT-V1.1: vue-tsc --noEmit PASS; Vitest 24 files / 93 tests PASS; vite build PASS. Browser verified the homepage, live platform label, AI unavailable state, experience-case page and feedback page. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "blockers": [
+    "A/RAG service was unavailable during browser validation, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
+  ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
     "Tester identity is local browser state and is not authentication or authorization",
@@ -81,7 +83,8 @@
     "MVP-PLUS-02-FEEDBACK AI response feedback capture frontend",
     "MVP-PLUS-02-B-C-SMOKE real integration evidence (BLOCKED; no code changes)",
     "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS",
-    "UI-1 unified customer product shell (local UI verification PASS; delivery pending)"
+    "UI-1 unified customer product shell (local UI verification PASS; delivery pending)",
+    "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
