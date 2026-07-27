@@ -8,6 +8,13 @@
   "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
   "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
   "last_updated": "2026-07-27",
+  "runtime_version_audit": {
+    "audited_at": "2026-07-27",
+    "source_baseline": "origin/develop@32feb610",
+    "runtime_frontend_sha": "3b9f3e6",
+    "finding": "The source registers /feedback, while the running Vite route table does not. The feedback client already sends Idempotency-Key and consumes only feedback_id/status=NEW.",
+    "owner": "OPS for safe current-baseline restart; B added route regression coverage only."
+  },
   "git": {
     "branch": "codex/customer-pilot-hardening-b-v4",
     "base_commit": "348c875",
@@ -86,7 +93,8 @@
     "UI-1 unified customer product shell (local UI verification PASS; delivery pending)",
     "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)",
     "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
-    "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)"
+    "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)",
+    "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
