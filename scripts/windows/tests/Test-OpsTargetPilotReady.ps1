@@ -41,6 +41,9 @@ try {
         'scripts\windows\check_target_pilot_readiness.ps1',
         'scripts\windows\start_target_pilot.ps1',
         'scripts\windows\recover_target_pilot.ps1',
+        'scripts\windows\test_customer_pilot_access.ps1',
+        'scripts\windows\test_target_pilot_component_recovery.ps1',
+        'scripts\windows\backup_target_pilot_data.ps1',
         'scripts\windows\stop_ai_customer_service.ps1'
     )
     foreach ($path in $scriptPaths) {
@@ -94,13 +97,45 @@ try {
     if ($lanBlocked.State -ne 'LAN_CONFIGURATION_REQUIRED') { throw 'A loopback-only customer URL was accepted as a LAN pilot.' }
     if ($lanBlocked.SimulationScope -notmatch 'second customer computer') { throw 'The server-side LAN simulation limitation was not recorded.' }
 
+    $lanConfig = @{}
+    foreach ($entry in $config.GetEnumerator()) { $lanConfig[$entry.Key] = $entry.Value }
+    $lanConfig.CustomerWebUrl = 'http://192.168.1.20:5173/'
+    $lanConfig.CustomerWebPort = 5173
+    $lanConfig.CustomerWebBindAddress = '192.168.1.20'
+    $lanConfig.LanSelection = [pscustomobject]@{ InterfaceAlias='Private Ethernet'; IPAddress='192.168.1.20' }
+    $lanConfig.LanNetworkProfile = [pscustomobject]@{ NetworkCategory='Private' }
+    $lanConfig.LanSubnet = '192.168.1.0/24'
+    $lanStatuses = New-ServiceStatuses 5173 $adminPort
+    $firewallMissing = [pscustomobject]@{ State='FIREWALL_RULE_NOT_CONFIGURED'; Ready=$false; ExpectedPort=5173; ExpectedSubnet='192.168.1.0/24' }
+    $firewallBlocked = Get-TargetPilotReadiness $lanConfig -Mode Lan -ServiceStatuses $lanStatuses -HttpProbe $healthyHttpProbe -TcpProbe $healthyTcpProbe -FirewallReadiness $firewallMissing
+    if ($firewallBlocked.State -ne 'FIREWALL_CONFIGURATION_REQUIRED') { throw 'A LAN pilot without the scoped firewall rule was accepted.' }
+    $mockFirewallRule = [pscustomobject]@{ Enabled='True'; Direction='Inbound'; Action='Allow'; Profile='Private' }
+    function Get-NetFirewallPortFilter { param($AssociatedNetFirewallRule) [pscustomobject]@{ Protocol='TCP'; LocalPort='5173' } }
+    function Get-NetFirewallAddressFilter { param($AssociatedNetFirewallRule) [pscustomobject]@{ RemoteAddress='192.168.1.0/24' } }
+    $computedFirewallReady = Get-TargetPilotFirewallReadiness $lanConfig { @($mockFirewallRule) }
+    if (-not $computedFirewallReady.Ready -or $computedFirewallReady.State -ne 'SCOPED_5173_PRIVATE_RULE_PRESENT') { throw 'The scoped Private TCP 5173 firewall rule was not recognised.' }
+    $firewallReady = [pscustomobject]@{ State='SCOPED_5173_PRIVATE_RULE_PRESENT'; Ready=$true; ExpectedPort=5173; ExpectedSubnet='192.168.1.0/24' }
+    $lanReady = Get-TargetPilotReadiness $lanConfig -Mode Lan -ServiceStatuses $lanStatuses -HttpProbe $healthyHttpProbe -TcpProbe $healthyTcpProbe -FirewallReadiness $firewallReady
+    if (-not $lanReady.Ready -or $lanReady.Firewall.State -ne 'SCOPED_5173_PRIVATE_RULE_PRESENT') { throw 'A valid scoped firewall gate did not produce LAN readiness.' }
+
+    $clientReady = Get-TargetPilotCustomerAccess '192.168.1.20' 5173 $healthyHttpProbe $healthyTcpProbe
+    if (-not $clientReady.Ready -or $clientReady.State -ne 'READY_FOR_CUSTOMER_ACCESS') { throw 'The second-computer customer access check did not validate the fixed proxies.' }
+    $clientRejected = Get-TargetPilotCustomerAccess '127.0.0.1' 5173 $healthyHttpProbe $healthyTcpProbe
+    if ($clientRejected.State -ne 'UNSAFE_SERVER_ADDRESS') { throw 'The customer access check accepted a loopback server address.' }
+
+    Add-TargetPilotOpsEvent $config 'READINESS' 'READY' $lanReady @('A','B','C')
+    $eventText = Get-Content -LiteralPath (Get-TargetPilotOpsEventPath $config) -Raw -Encoding UTF8
+    if ($eventText -notmatch 'target-pilot-ops-event.v1' -or $eventText -match '(?i)"(password|token|secret|commandline|configuration)"\s*:') { throw 'The pilot event log is missing or contains an unsafe field name.' }
+
     $batchContents = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'scripts\windows') -Filter '*.bat' -File | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })
-    foreach ($entryPoint in @('start_target_pilot.ps1','check_target_pilot_readiness.ps1','recover_target_pilot.ps1')) {
+    foreach ($entryPoint in @('start_target_pilot.ps1','check_target_pilot_readiness.ps1','recover_target_pilot.ps1','test_customer_pilot_access.ps1','test_target_pilot_component_recovery.ps1','backup_target_pilot_data.ps1')) {
         if (@($batchContents | Where-Object { $_.Contains($entryPoint) }).Count -ne 1) { throw "Missing or ambiguous pilot batch entry: $entryPoint" }
     }
     $recoveryScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\recover_target_pilot.ps1') -Raw
     $stopScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\stop_ai_customer_service.ps1') -Raw
-    if ($recoveryScript -notmatch 'ConfirmRestart' -or $recoveryScript -match 'Stop-Process' -or $stopScript -notmatch 'Get-LocalConfig \$ConfigPath') { throw 'Recovery confirmation, config forwarding, or managed-stop boundary is missing.' }
+    $componentRecoveryScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\test_target_pilot_component_recovery.ps1') -Raw
+    $backupScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\backup_target_pilot_data.ps1') -Raw
+    if ($recoveryScript -notmatch 'ConfirmRestart' -or $recoveryScript -notmatch 'AllowFirewallGate' -or $recoveryScript -match 'Stop-Process' -or $stopScript -notmatch 'Get-LocalConfig \$ConfigPath' -or $componentRecoveryScript -notmatch 'ConfirmDisruption' -or $componentRecoveryScript -match 'Stop-Process' -or $backupScript -notmatch 'ConfirmBackup' -or $backupScript -notmatch 'source_db.backup') { throw 'Recovery confirmation, backup, config forwarding, or managed-stop boundary is missing.' }
     $newScriptText = @($scriptPaths | ForEach-Object { Get-Content -LiteralPath (Join-Path $repositoryRoot $_) -Raw }) -join "`n"
     $commonScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1') -Raw
     if ($newScriptText -notmatch 'NoBrowser' -or $newScriptText -match '(?i)(pnpm\s+install|Set-NetFirewall|New-NetFirewall|netsh\s+advfirewall)' -or $commonScriptText -match 'Get-NetTCPConnection') { throw 'Pilot scripts do not preserve the browser, listener-query, dependency, or firewall boundary.' }

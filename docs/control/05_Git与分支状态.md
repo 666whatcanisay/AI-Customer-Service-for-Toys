@@ -55,3 +55,8 @@
 - 独立 Worktree `AI-CS-ops-target-pilot-ready` 从 `origin/develop@3b9f3e63700ba1d5bcc27b54c5be7aabee28e252` 创建，分支为 `codex/ops-target-pilot-ready`。
 - 变更仅限 `scripts/windows/**`、`docs/control/**`，不读取或提交本地配置内容、运行日志、测试数据、数据库、依赖或构建产物。
 - 真实主机闭环使用已存在的被忽略本地配置和依赖；所有新增运行证据仅落在被忽略的 `.runtime/pilot-readiness/`，不会进入提交。
+
+## 2026-07-27 OPS-PILOT-HARDENING-V1
+
+- 独立 Worktree `AI-CS-ops-pilot-hardening-v1` 基于 `codex/ops-target-pilot-ready@a502360` 创建，分支为 `codex/ops-pilot-hardening-v1`。该分支是 PR #48 的叠加交付，避免复制尚未合并的试运行基线。
+- 变更仍只限 `scripts/windows/**`、`docs/control/**`；本轮产生的事件、报告、服务日志与 SQLite 备份均保留在被忽略的 `.runtime/`，不会暂存或提交。

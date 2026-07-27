@@ -806,7 +806,107 @@ function Get-TargetPilotServiceStatuses($Config) {
     )
 }
 
-function Get-TargetPilotReadiness($Config, [ValidateSet('Lan','Local')] [string]$Mode = 'Lan', [object[]]$ServiceStatuses = $null, [scriptblock]$HttpProbe = $null, [scriptblock]$TcpProbe = $null) {
+function Get-TargetPilotFirewallReadiness($Config, [scriptblock]$RuleProvider = $null) {
+    $expectedPort = [int]$Config.CustomerWebPort
+    $expectedSubnet = if ($Config.ContainsKey('LanSubnet')) { [string]$Config.LanSubnet } else { '' }
+    if ($expectedPort -ne 5173) {
+        return [pscustomobject]@{ State='UNSUPPORTED_CUSTOMER_PORT'; Ready=$false; ExpectedPort=$expectedPort; ExpectedSubnet=$expectedSubnet }
+    }
+    if ([string]::IsNullOrWhiteSpace($expectedSubnet)) {
+        return [pscustomobject]@{ State='LAN_SUBNET_REQUIRED'; Ready=$false; ExpectedPort=$expectedPort; ExpectedSubnet='' }
+    }
+    try {
+        $rules = @(
+            if ($RuleProvider) { & $RuleProvider } else { Get-AICustomerFirewallRules }
+        )
+    } catch {
+        return [pscustomobject]@{ State='FIREWALL_STATE_UNAVAILABLE'; Ready=$false; ExpectedPort=$expectedPort; ExpectedSubnet=$expectedSubnet }
+    }
+    if ($rules.Count -eq 0) {
+        return [pscustomobject]@{ State='FIREWALL_RULE_NOT_CONFIGURED'; Ready=$false; ExpectedPort=$expectedPort; ExpectedSubnet=$expectedSubnet }
+    }
+    $compliant = @()
+    foreach ($rule in $rules) {
+        try {
+            $portFilter = Get-NetFirewallPortFilter -AssociatedNetFirewallRule $rule -ErrorAction Stop
+            $addressFilter = Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $rule -ErrorAction Stop
+            $enabled = [string]$rule.Enabled -match '^(True|1)$'
+            $privateProfile = [string]$rule.Profile -match '(?i)Private|(^|[,\s])2($|[,\s])'
+            $portMatches = [string]$portFilter.Protocol -eq 'TCP' -and @($portFilter.LocalPort | ForEach-Object { [string]$_ }) -contains ([string]$expectedPort)
+            $subnetMatches = @($addressFilter.RemoteAddress | ForEach-Object { [string]$_ }) -contains $expectedSubnet
+            if ($enabled -and [string]$rule.Direction -eq 'Inbound' -and [string]$rule.Action -eq 'Allow' -and $privateProfile -and $portMatches -and $subnetMatches) {
+                $compliant += $rule
+            }
+        } catch {
+            continue
+        }
+    }
+    if ($compliant.Count -eq 1) {
+        return [pscustomobject]@{ State='SCOPED_5173_PRIVATE_RULE_PRESENT'; Ready=$true; ExpectedPort=$expectedPort; ExpectedSubnet=$expectedSubnet }
+    }
+    return [pscustomobject]@{ State='FIREWALL_RULE_NONCOMPLIANT'; Ready=$false; ExpectedPort=$expectedPort; ExpectedSubnet=$expectedSubnet }
+}
+
+function Get-TargetPilotOpsEventPath($Config) {
+    $directory = Join-Path $Config.RuntimeDirectory 'pilot-ops-events'
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    return (Join-Path $directory ('target-pilot-' + (Get-Date -Format 'yyyyMMdd') + '.jsonl'))
+}
+
+function Add-TargetPilotOpsEvent($Config, [ValidateSet('READINESS','START','RECOVERY','COMPONENT_RECOVERY')] [string]$Action, [ValidateSet('READY','NOT_READY','STARTED','RECOVERED','FAILED')] [string]$Outcome, $Readiness = $null, [string[]]$Components = @()) {
+    $event = [ordered]@{
+        schemaVersion = 'target-pilot-ops-event.v1'
+        recordedUtc = [DateTime]::UtcNow.ToString('o')
+        action = $Action
+        outcome = $Outcome
+        components = @($Components | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+    if ($null -ne $Readiness) {
+        $event.state = [string]$Readiness.State
+        $event.ready = [bool]$Readiness.Ready
+        $event.serviceFailures = @($Readiness.ServiceFailures)
+        $event.firewallState = if ($Readiness.Firewall) { [string]$Readiness.Firewall.State } else { '' }
+        $event.probes = [ordered]@{
+            tcpReachable = [bool]$Readiness.Probes.TcpReachable
+            customerPage = [bool]$Readiness.Probes.CustomerPage.Reachable
+            ragProxy = [bool]$Readiness.Probes.RagProxy.Reachable
+            platformProxy = [bool]$Readiness.Probes.PlatformProxy.Reachable
+        }
+    }
+    $event | ConvertTo-Json -Compress | Add-Content -LiteralPath (Get-TargetPilotOpsEventPath $Config) -Encoding UTF8
+}
+
+function Get-TargetPilotCustomerAccess($ServerHost, [int]$Port = 5173, [scriptblock]$HttpProbe = $null, [scriptblock]$TcpProbe = $null) {
+    if (-not (Test-PrivateLanIpv4 ([string]$ServerHost))) {
+        return [pscustomobject]@{ State='UNSAFE_SERVER_ADDRESS'; Ready=$false; ServerHost=[string]$ServerHost; Port=$Port; Probes=$null }
+    }
+    if ($Port -ne 5173) {
+        return [pscustomobject]@{ State='UNSUPPORTED_CUSTOMER_PORT'; Ready=$false; ServerHost=[string]$ServerHost; Port=$Port; Probes=$null }
+    }
+    $baseUrl = "http://${ServerHost}:$Port/"
+    $authority = "http://${ServerHost}:$Port"
+    $tcpReachable = if ($TcpProbe) { [bool](& $TcpProbe $ServerHost $Port) } else { Test-TargetPilotTcpProbe $ServerHost $Port }
+    $customerPage = if ($HttpProbe) { & $HttpProbe $baseUrl } else { Get-TargetPilotHttpProbe $baseUrl }
+    $ragProxy = if ($HttpProbe) { & $HttpProbe "$authority/rag-api/api/health" } else { Get-TargetPilotHttpProbe "$authority/rag-api/api/health" }
+    $platformProxy = if ($HttpProbe) { & $HttpProbe "$authority/platform-api/health" } else { Get-TargetPilotHttpProbe "$authority/platform-api/health" }
+    $state = if (-not $tcpReachable) {
+        'NETWORK_SEGMENTED'
+    } elseif (-not $customerPage.Reachable -or -not $ragProxy.Reachable -or -not $platformProxy.Reachable) {
+        'CUSTOMER_PATH_UNAVAILABLE'
+    } else {
+        'READY_FOR_CUSTOMER_ACCESS'
+    }
+    return [pscustomobject]@{
+        State=$state
+        Ready=($state -eq 'READY_FOR_CUSTOMER_ACCESS')
+        ServerHost=[string]$ServerHost
+        Port=$Port
+        SimulationScope='Run this script on the second controlled customer computer; it does not read or save customer content.'
+        Probes=[pscustomobject]@{ TcpReachable=$tcpReachable; CustomerPage=$customerPage; RagProxy=$ragProxy; PlatformProxy=$platformProxy }
+    }
+}
+
+function Get-TargetPilotReadiness($Config, [ValidateSet('Lan','Local')] [string]$Mode = 'Lan', [object[]]$ServiceStatuses = $null, [scriptblock]$HttpProbe = $null, [scriptblock]$TcpProbe = $null, $FirewallReadiness = $null) {
     $customerUri = [uri]$Config.CustomerWebUrl
     $customerAuthority = $customerUri.GetLeftPart([System.UriPartial]::Authority)
     $customerHost = [string]$customerUri.Host
@@ -828,6 +928,12 @@ function Get-TargetPilotReadiness($Config, [ValidateSet('Lan','Local')] [string]
         $networkReady = $customerHost -in $loopbackHosts
     }
 
+    $firewall = if ($Mode -eq 'Lan') {
+        if ($null -ne $FirewallReadiness) { $FirewallReadiness } else { Get-TargetPilotFirewallReadiness $Config }
+    } else {
+        [pscustomobject]@{ State='NOT_APPLICABLE_LOCAL_MODE'; Ready=$true; ExpectedPort=0; ExpectedSubnet='' }
+    }
+
     if ($null -eq $ServiceStatuses) { $ServiceStatuses = Get-TargetPilotServiceStatuses $Config }
     $serviceFailures = @($ServiceStatuses | Where-Object {
         $status = $_.Status
@@ -844,6 +950,8 @@ function Get-TargetPilotReadiness($Config, [ValidateSet('Lan','Local')] [string]
         'ADMIN_LOOPBACK_REQUIRED'
     } elseif (-not $networkReady) {
         if ($Mode -eq 'Lan') { 'LAN_CONFIGURATION_REQUIRED' } else { 'LOCAL_CONFIGURATION_REQUIRED' }
+    } elseif (-not $firewall.Ready) {
+        'FIREWALL_CONFIGURATION_REQUIRED'
     } elseif ($serviceFailures.Count -gt 0) {
         'SERVICE_NOT_READY'
     } elseif (-not $tcpReachable) {
@@ -865,6 +973,7 @@ function Get-TargetPilotReadiness($Config, [ValidateSet('Lan','Local')] [string]
         AdminUrl = [string]$Config.AdminWebUrl
         AdminLoopback = $adminLoopback
         NetworkReady = $networkReady
+        Firewall = $firewall
         Services = $ServiceStatuses
         ServiceFailures = @($serviceFailures | ForEach-Object { $_.Label })
         Probes = [pscustomobject]@{ TcpReachable=$tcpReachable; CustomerPage=$customerPage; RagProxy=$ragProxy; PlatformProxy=$platformProxy }
@@ -890,6 +999,7 @@ function Save-TargetPilotReadinessReport($Config, $Readiness) {
         adminUrl = $Readiness.AdminUrl
         adminLoopback = [bool]$Readiness.AdminLoopback
         networkReady = [bool]$Readiness.NetworkReady
+        firewall = [ordered]@{ state=[string]$Readiness.Firewall.State; ready=[bool]$Readiness.Firewall.Ready; expectedPort=[int]$Readiness.Firewall.ExpectedPort; expectedSubnet=[string]$Readiness.Firewall.ExpectedSubnet }
         serviceFailures = @($Readiness.ServiceFailures)
         services = $safeServices
         probes = [ordered]@{
@@ -911,6 +1021,7 @@ function Write-TargetPilotReadiness($Readiness, [string]$ReportPath = '') {
     }
     Write-Host "客服入口：$($Readiness.CustomerUrl)；TCP：$($Readiness.Probes.TcpReachable)；页面：$($Readiness.Probes.CustomerPage.Reachable)；/rag-api：$($Readiness.Probes.RagProxy.Reachable)；/platform-api：$($Readiness.Probes.PlatformProxy.Reachable)"
     Write-Host "运营后台：$($Readiness.AdminUrl)；仅本机：$($Readiness.AdminLoopback)"
+    Write-Host "5173 防火墙 Gate：$($Readiness.Firewall.State)；就绪：$($Readiness.Firewall.Ready)"
     Write-Host "模拟范围：$($Readiness.SimulationScope)"
     if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { Write-Host "已写入脱敏就绪报告：$ReportPath" }
     if (-not $Readiness.Ready) {
@@ -918,6 +1029,7 @@ function Write-TargetPilotReadiness($Readiness, [string]$ReportPath = '') {
             'SERVICE_NOT_READY' { Write-Host "下一步：先运行 检查局域网客服状态.bat；仅在核对运行记录后使用 停止AI客服.bat，再重新启动。未通过服务：$($Readiness.ServiceFailures -join '、')" -ForegroundColor Yellow }
             'NETWORK_SEGMENTED' { Write-Host '下一步：核对 Private 网络、5173 专用防火墙规则和同网段设备；仍不可达时记录 NETWORK_SEGMENTED，不开放 8000/8011/5174。' -ForegroundColor Yellow }
             'CUSTOMER_PATH_UNAVAILABLE' { Write-Host '下一步：保留服务进程，检查 B 的 Vite 代理与 A/C health；不要在客服电脑直连 8000、8011 或 5174。' -ForegroundColor Yellow }
+            'FIREWALL_CONFIGURATION_REQUIRED' { Write-Host '下一步：在受控 Private 网络上先运行检查AI客服防火墙.bat；如确认需要规则，使用现有配置AI客服防火墙.bat 显式创建仅限当前子网的 TCP 5173 入站规则。不要开放 8000、8011 或 5174。' -ForegroundColor Yellow }
             'ADMIN_LOOPBACK_REQUIRED' { Write-Host '下一步：将 AdminWebBindAddress 和 AdminWebUrl 恢复为 127.0.0.1，且保持 AdminEnableLanMode=false；本轮不开放 5174。' -ForegroundColor Yellow }
             default { Write-Host '下一步：检查 LAN 网卡选择和 Private 网络配置；脚本未修改防火墙、网络或未知进程。' -ForegroundColor Yellow }
         }
