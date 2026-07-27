@@ -11,12 +11,12 @@ const mockedModules = vi.mocked(listAiModules)
 describe('AiCapabilityCenterView', () => {
   beforeEach(() => mockedModules.mockReset())
 
-  it('renders returned A-line modules and keeps testing disabled without a versioned test contract', async () => {
+  it('renders returned A-line modules without creating online test controls', async () => {
     mockedModules.mockResolvedValue([{ id: 'answer', name: 'Answer module', status: 'READY', description: null, promptMetadata: null, recentEvaluations: [] }])
     const wrapper = mount(AiCapabilityCenterView)
     await flushPromises()
 
     expect(wrapper.text()).toContain('Answer module')
-    expect(wrapper.get('button[disabled]').attributes()).toHaveProperty('disabled')
+    expect(wrapper.find('button[disabled]').exists()).toBe(false)
   })
 })

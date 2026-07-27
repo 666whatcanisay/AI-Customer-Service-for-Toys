@@ -23,45 +23,45 @@ export const router = createRouter({
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
     {
       path: '/stores', name: 'stores', component: ReadonlyListView,
-      props: { resource: 'stores', title: 'Stores', description: 'Platform, store code, test status, and product count.', columns: [
-        { key: 'platform', label: 'Platform' }, { key: 'store_code', label: 'Store code' },
-        { key: 'store_name', label: 'Store' }, { key: 'test_data_mode', label: 'Test data' }, { key: 'product_count', label: 'Products' },
+      props: { resource: 'stores', title: '店铺', description: '查看平台、店铺编码、试运行标记与商品数量。', columns: [
+        { key: 'platform', label: '平台' }, { key: 'store_code', label: '店铺编码' },
+        { key: 'store_name', label: '店铺' }, { key: 'test_data_mode', label: '测试数据' }, { key: 'product_count', label: '商品数' },
       ] },
     },
     {
       path: '/products', name: 'products', component: ReadonlyListView,
-      props: { resource: 'products', title: 'Products and SKUs', description: 'Search products and open read-only SKU details.', columns: [
-        { key: 'product_id', label: 'Product ID' }, { key: 'product_name_display', label: 'Product' },
-        { key: 'store_code', label: 'Store' }, { key: 'sales_status', label: 'Status' }, { key: 'review_status', label: 'Review' },
+      props: { resource: 'products', title: '商品与 SKU', description: '查询商品，并打开只读 SKU 明细。', columns: [
+        { key: 'product_id', label: '商品 ID' }, { key: 'product_name_display', label: '商品' },
+        { key: 'store_code', label: '店铺' }, { key: 'sales_status', label: '销售状态' }, { key: 'review_status', label: '审核状态' },
       ] },
     },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailView, props: true },
     {
       path: '/faqs', name: 'faqs', component: ReadonlyListView,
-      props: { resource: 'faqs', title: 'FAQs', description: 'Question, answer action, risk, scope, and sources.', columns: [
-        { key: 'question', label: 'Question' }, { key: 'answer_action', label: 'Answer action' },
-        { key: 'risk_level', label: 'Risk' }, { key: 'product_id', label: 'Product' }, { key: 'source_ids', label: 'Sources' },
+      props: { resource: 'faqs', title: 'FAQ', description: '查看问题、回答动作、风险、适用范围与来源。', columns: [
+        { key: 'question', label: '问题' }, { key: 'answer_action', label: '回答动作' },
+        { key: 'risk_level', label: '风险' }, { key: 'product_id', label: '商品' }, { key: 'source_ids', label: '来源' },
       ] },
     },
     {
       path: '/safety-rules', name: 'safety-rules', component: ReadonlyListView,
-      props: { resource: 'safety-rules', title: 'Safety rules', description: 'Scenario, risk, allowed action, prohibited claim, and sources.', columns: [
-        { key: 'scenario', label: 'Scenario' }, { key: 'risk_level', label: 'Risk' },
-        { key: 'action', label: 'Action' }, { key: 'forbidden_claim', label: 'Prohibited claim' }, { key: 'source_ids', label: 'Sources' },
+      props: { resource: 'safety-rules', title: '安全规则', description: '查看场景、风险、允许动作、禁止表述与来源。', columns: [
+        { key: 'scenario', label: '场景' }, { key: 'risk_level', label: '风险' },
+        { key: 'action', label: '允许动作' }, { key: 'forbidden_claim', label: '禁止表述' }, { key: 'source_ids', label: '来源' },
       ] },
     },
     {
       path: '/sources', name: 'sources', component: ReadonlyListView,
-      props: { resource: 'sources', title: 'Source evidence', description: 'Metadata and safe relative locators only; no preview or download.', columns: [
-        { key: 'source_type', label: 'Type' }, { key: 'file_name', label: 'File' },
-        { key: 'file_sha256', label: 'SHA' }, { key: 'product_id', label: 'Product' }, { key: 'sku_id', label: 'SKU' },
+      props: { resource: 'sources', title: '知识来源', description: '仅展示元数据和安全相对定位，不提供预览或下载。', columns: [
+        { key: 'source_type', label: '类型' }, { key: 'file_name', label: '文件' },
+        { key: 'file_sha256', label: '校验值' }, { key: 'product_id', label: '商品' }, { key: 'sku_id', label: 'SKU' },
       ] },
     },
     {
       path: '/conflicts', name: 'conflicts', component: ReadonlyListView,
-      props: { resource: 'conflicts', title: 'Conflicts and confirmation', description: 'Field values A/B, source, and current handling status.', columns: [
-        { key: 'entity_id', label: 'Entity' }, { key: 'field_name', label: 'Field' },
-        { key: 'value_a', label: 'Value A' }, { key: 'value_b', label: 'Value B' }, { key: 'status', label: 'Status' },
+      props: { resource: 'conflicts', title: '数据冲突', description: '查看字段值 A/B、来源与当前处理状态。', columns: [
+        { key: 'entity_id', label: '实体' }, { key: 'field_name', label: '字段' },
+        { key: 'value_a', label: '值 A' }, { key: 'value_b', label: '值 B' }, { key: 'status', label: '状态' },
       ] },
     },
     { path: '/suggestions', name: 'suggestions', component: CustomerSuggestionsView },

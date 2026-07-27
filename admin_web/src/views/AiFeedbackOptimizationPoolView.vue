@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import {
-  apiErrorMessage,
-  listAiFeedbackAnalysisResults,
-  type AiFeedbackAnalysisResult,
-} from '../api/client'
+import { apiErrorMessage, listAiFeedbackAnalysisResults, type AiFeedbackAnalysisResult } from '../api/client'
 
 const results = ref<AiFeedbackAnalysisResult[]>([])
+const total = ref<number | null>(null)
 const selected = ref<AiFeedbackAnalysisResult | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -18,11 +15,11 @@ async function load(): Promise<void> {
   try {
     const response = await listAiFeedbackAnalysisResults()
     results.value = response.items
-    if (selected.value) {
-      selected.value = response.items.find((item) => item.feedback_id === selected.value?.feedback_id) || null
-    }
+    total.value = response.total
+    if (selected.value) selected.value = response.items.find((item) => item.feedback_id === selected.value?.feedback_id) || null
   } catch (reason: unknown) {
     results.value = []
+    total.value = null
     selected.value = null
     error.value = apiErrorMessage(reason)
   } finally {
@@ -30,13 +27,8 @@ async function load(): Promise<void> {
   }
 }
 
-function choose(item: AiFeedbackAnalysisResult): void {
-  selected.value = item
-}
-
-function formatted(value: unknown): string {
-  return JSON.stringify(value, null, 2)
-}
+function choose(item: AiFeedbackAnalysisResult): void { selected.value = item }
+function formatted(value: unknown): string { return JSON.stringify(value, null, 2) }
 
 onMounted(load)
 </script>
@@ -45,54 +37,49 @@ onMounted(load)
   <main class="page">
     <div class="page-header">
       <div>
-        <h1>AI optimization pool</h1>
-        <p>Read-only completed AI feedback analysis evidence. No prompt, knowledge, or business-action controls are available.</p>
+        <h1>AI 问题中心</h1>
+        <p>查看已完成 AI 分析的客服问题与改进建议。此页面只读，不提供 Prompt 修改、知识发布或业务自动执行。</p>
       </div>
+      <button class="button secondary" type="button" @click="load">刷新数据</button>
     </div>
 
-    <p v-if="loading" class="notice">Loading analyzed feedback…</p>
-    <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
-    <p v-else-if="results.length === 0" class="notice">No completed AI feedback analyses are available.</p>
+    <p class="notice trial-note">当前展示测试/试运行中的已分析问题；未分析的问题不会被错误展示为分析结果。</p>
+    <p v-if="loading" class="notice" role="status">正在读取已分析问题…</p>
+    <p v-else-if="error" class="notice error" role="alert">待启用：{{ error }}</p>
+    <p v-else-if="results.length === 0" class="notice">样本不足：{{ total === 0 ? '尚无已完成分析的 AI 问题。' : '未读取到可展示的问题。' }}</p>
 
     <section v-else class="pool-grid">
       <div class="card table-wrap">
         <table class="data-table">
-          <thead><tr><th>Question</th><th>Type</th><th>AI analysis</th><th>Status</th><th>Model</th><th>Prompt</th></tr></thead>
+          <thead><tr><th>客户问题</th><th>问题类型</th><th>分析结论</th><th>状态</th></tr></thead>
           <tbody>
             <tr v-for="item in results" :key="`${item.feedback_id}-${item.revision}`">
-              <td><button class="link-button" type="button" @click="choose(item)">{{ item.question }}</button><small>{{ item.feedback_id }}</small></td>
+              <td><button class="link-button" type="button" @click="choose(item)">{{ item.question }}</button></td>
               <td><span class="badge">{{ item.feedback_type }}</span></td>
-              <td>{{ formatted(item.analysis) }}</td>
+              <td class="analysis-cell">{{ formatted(item.analysis) }}</td>
               <td><span class="badge">{{ item.analysis_status }}</span></td>
-              <td>{{ item.model_version }}</td>
-              <td>{{ item.prompt_version }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
       <aside v-if="selected" class="card detail">
-        <h2>Analysis detail</h2>
-        <p><strong>Customer question</strong><br>{{ selected.question }}</p>
-        <p><strong>AI answer</strong><br>{{ selected.ai_answer }}</p>
-        <p><strong>Final service reply</strong><br>{{ selected.final_answer || 'No final reply supplied' }}</p>
-        <p><strong>AI analysis</strong></p><pre>{{ formatted(selected.analysis) }}</pre>
-        <p><strong>Suggestions</strong></p><pre>{{ formatted(selected.suggestions) }}</pre>
-        <p><strong>Evidence version</strong><br>Revision {{ selected.revision }} · {{ selected.content_hash }}<br>{{ selected.analysis_run_id }} · {{ selected.created_at }}</p>
+        <h2>问题详情</h2>
+        <p><strong>客户问题</strong><br>{{ selected.question }}</p>
+        <p><strong>AI 回答</strong><br>{{ selected.ai_answer }}</p>
+        <p><strong>人工回复</strong><br>{{ selected.final_answer || '未提供人工回复' }}</p>
+        <p><strong>AI 分析</strong></p><pre>{{ formatted(selected.analysis) }}</pre>
+        <p><strong>改进建议</strong></p><pre>{{ formatted(selected.suggestions) }}</pre>
+        <details class="technical-details">
+          <summary>技术信息</summary>
+          <dl><div><dt>证据版本</dt><dd>Revision {{ selected.revision }}</dd></div><div><dt>内容校验</dt><dd>{{ selected.content_hash }}</dd></div><div><dt>分析任务</dt><dd>{{ selected.analysis_run_id }}</dd></div><div><dt>模型 / Prompt</dt><dd>{{ selected.model_version }} / {{ selected.prompt_version }}</dd></div><div><dt>写入时间</dt><dd>{{ selected.created_at }}</dd></div></dl>
+        </details>
       </aside>
-      <aside v-else class="card detail"><h2>Analysis detail</h2><p>Select a completed feedback analysis to inspect its evidence.</p></aside>
+      <aside v-else class="card detail"><h2>问题详情</h2><p>选择一条已分析问题，查看客服反馈与 AI 分析证据。</p></aside>
     </section>
   </main>
 </template>
 
 <style scoped>
-.pool-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(310px, 1fr); gap: 20px; }
-.detail { display: grid; align-content: start; gap: 12px; }
-.detail h2, .detail p { margin: 0; }
-.detail p { line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
-.link-button { padding: 0; border: 0; color: #285493; background: transparent; font: inherit; text-align: left; cursor: pointer; }
-small { display: block; margin-top: 4px; color: #617087; }
-pre { max-width: 100%; margin: 0; padding: 10px; overflow: auto; border-radius: 8px; background: #f4f7fb; font-size: 12px; white-space: pre-wrap; }
-td:nth-child(3) { min-width: 180px; white-space: pre-wrap; }
-@media (max-width: 900px) { .pool-grid { grid-template-columns: 1fr; } }
+.trial-note { margin-bottom: 20px; color: #75570a; background: #fff8df; }.pool-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(310px, 1fr); gap: 20px; }.detail { display: grid; align-content: start; gap: 12px; }.detail h2, .detail p { margin: 0; }.detail h2 { color: #172554; }.detail p { line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }.link-button { padding: 0; border: 0; color: #285493; background: transparent; font: inherit; text-align: left; cursor: pointer; }.analysis-cell { min-width: 200px; white-space: pre-wrap; }pre { max-width: 100%; margin: 0; padding: 10px; overflow: auto; border-radius: 8px; background: #f4f7fb; font-size: 12px; white-space: pre-wrap; }.technical-details { margin-top: 3px; border-top: 1px solid #e6edf5; color: #526279; font-size: 13px; }.technical-details summary { padding-top: 12px; cursor: pointer; }.technical-details dl { display: grid; gap: 8px; margin: 11px 0 0; }.technical-details dt { color: #64748b; }.technical-details dd { margin: 2px 0 0; overflow-wrap: anywhere; }@media (max-width: 900px) { .pool-grid { grid-template-columns: 1fr; } }
 </style>

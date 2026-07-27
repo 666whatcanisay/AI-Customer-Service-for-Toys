@@ -1,92 +1,156 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+
+import { getAdminOverview, getHealth, listAiModules } from './api/client'
+
+type ServiceState = 'loading' | 'ready' | 'unavailable'
+
+const platformState = ref<ServiceState>('loading')
+const aiState = ref<ServiceState>('loading')
+const operationState = ref<ServiceState>('loading')
+const technicalOpen = ref(false)
+const checkedAt = ref('')
+const platformVersion = ref('')
+
+const platformLabel = computed(() => ({ loading: '检测中', ready: '可用', unavailable: '待连接' })[platformState.value])
+const aiLabel = computed(() => ({ loading: '检测中', ready: '可用', unavailable: '待连接' })[aiState.value])
+const operationLabel = computed(() => ({ loading: '读取中', ready: '数据已连接', unavailable: '待启用' })[operationState.value])
+
+async function loadSystemState(): Promise<void> {
+  const [overviewResult, healthResult, aiResult] = await Promise.allSettled([
+    getAdminOverview(),
+    getHealth(),
+    listAiModules(),
+  ])
+
+  operationState.value = overviewResult.status === 'fulfilled' ? 'ready' : 'unavailable'
+  platformState.value = healthResult.status === 'fulfilled' ? 'ready' : 'unavailable'
+  aiState.value = aiResult.status === 'fulfilled' ? 'ready' : 'unavailable'
+  if (healthResult.status === 'fulfilled') platformVersion.value = healthResult.value.version || ''
+  checkedAt.value = new Date().toLocaleString('zh-CN', { hour12: false })
+}
+
+onMounted(loadSystemState)
+</script>
+
 <template>
-  <header class="app-header">
-    <RouterLink class="brand" to="/overview">Mumu Operations Portal</RouterLink>
-    <nav aria-label="Main navigation">
-      <RouterLink to="/overview">Overview</RouterLink>
-      <RouterLink to="/ai-capabilities">AI capability center</RouterLink>
-      <RouterLink to="/stores">Stores</RouterLink>
-      <RouterLink to="/products">Products and SKUs</RouterLink>
-      <RouterLink to="/faqs">FAQs</RouterLink>
-      <RouterLink to="/safety-rules">Safety rules</RouterLink>
-      <RouterLink to="/sources">Source evidence</RouterLink>
-      <RouterLink to="/conflicts">Conflicts</RouterLink>
-      <RouterLink to="/imports">Data imports</RouterLink>
-      <RouterLink to="/suggestions">Customer suggestions</RouterLink>
-      <RouterLink to="/experience-cases">Experience cases</RouterLink>
-      <RouterLink to="/ai-optimization-pool">Experience evaluation pool</RouterLink>
-      <RouterLink to="/ai-feedback-optimization-pool">AI optimization pool</RouterLink>
-      <RouterLink to="/customer-efficiency">Customer efficiency</RouterLink>
-    </nav>
-  </header>
-  <p class="test-banner">Internal test administration portal. Formal permissions are not enabled.</p>
-  <RouterView />
+  <div class="product-shell">
+    <aside class="sidebar">
+      <RouterLink class="brand" to="/overview">
+        <span class="brand-mark">AI</span>
+        <span><strong>运营中心</strong><small>试运行管理台</small></span>
+      </RouterLink>
+
+      <nav class="side-nav" aria-label="运营中心导航">
+        <section class="nav-group">
+          <p>首页</p>
+          <RouterLink to="/overview">运营概览</RouterLink>
+        </section>
+        <section class="nav-group">
+          <p>客服运营</p>
+          <RouterLink to="/experience-cases">客服经验库</RouterLink>
+          <RouterLink to="/ai-feedback-optimization-pool">AI 问题中心</RouterLink>
+          <RouterLink to="/customer-efficiency">效率分析</RouterLink>
+          <RouterLink to="/suggestions">客户建议</RouterLink>
+        </section>
+        <section class="nav-group">
+          <p>商品知识中心</p>
+          <RouterLink to="/stores">店铺</RouterLink>
+          <RouterLink to="/products">商品与 SKU</RouterLink>
+          <RouterLink to="/faqs">FAQ</RouterLink>
+          <RouterLink to="/safety-rules">安全规则</RouterLink>
+          <RouterLink to="/imports/new">知识维护（导入）</RouterLink>
+          <RouterLink to="/sources">知识来源</RouterLink>
+          <RouterLink to="/conflicts">数据冲突</RouterLink>
+        </section>
+        <section class="nav-group">
+          <p>AI 管理</p>
+          <RouterLink to="/ai-capabilities">AI 服务状态</RouterLink>
+          <RouterLink to="/ai-optimization-pool">评测记录</RouterLink>
+          <RouterLink to="/ai-feedback-optimization-pool">Badcase 与优化</RouterLink>
+        </section>
+        <section class="nav-group">
+          <p>业务扩展</p>
+          <span class="nav-planned">ERP 镜像（规划）</span>
+          <span class="nav-planned">售后助手（规划）</span>
+          <span class="nav-planned">退款风险（规划）</span>
+        </section>
+        <section class="nav-group">
+          <p>系统</p>
+          <RouterLink to="/system-status">服务状态</RouterLink>
+          <RouterLink to="/imports">数据导入</RouterLink>
+          <RouterLink to="/test-data-packages">测试数据包</RouterLink>
+        </section>
+      </nav>
+    </aside>
+
+    <div class="stage">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AI 运营中心</p>
+          <p class="topbar-title">试运行观察与人工运营</p>
+        </div>
+        <div class="service-chips" aria-label="系统实时状态">
+          <span class="service-chip"><i :class="platformState"></i>C 平台：{{ platformLabel }}</span>
+          <span class="service-chip"><i :class="aiState"></i>AI 服务：{{ aiLabel }}</span>
+          <span class="service-chip"><i :class="operationState"></i>运营数据：{{ operationLabel }}</span>
+        </div>
+      </header>
+      <p class="trial-banner">当前为测试/试运行数据观察，不构成正式运营报表；正式权限与审计能力尚未启用。</p>
+      <main class="content"><RouterView /></main>
+      <footer class="app-footer">
+        <button class="technical-toggle" type="button" @click="technicalOpen = !technicalOpen">
+          {{ technicalOpen ? '收起技术信息' : '展开技术信息' }}
+        </button>
+        <div v-if="technicalOpen" class="technical-info">
+          <span>平台版本：{{ platformVersion || '未返回' }}</span>
+          <span>状态检查：{{ checkedAt || '尚未完成' }}</span>
+          <button type="button" class="inline-button" @click="loadSystemState">重新检查</button>
+        </div>
+      </footer>
+    </div>
+  </div>
 </template>
 
 <style>
+:root { color: #1e293b; background: #f5f7fb; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 * { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; background: #f5f7fb; }
+a { color: inherit; }
+button, input, select { font: inherit; }
 
-body {
-  margin: 0;
-  color: #172033;
-  background: #f3f6fb;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-a { color: #285493; }
-
-.app-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 16px clamp(20px, 5vw, 64px);
-  border-bottom: 1px solid #dce4ef;
-  background: #fff;
-}
-
-.app-header nav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 12px 18px;
-}
-
-.app-header a { text-decoration: none; }
-.app-header .router-link-active { color: #163c77; font-weight: 700; }
-.brand { color: #172033; font-weight: 800; white-space: nowrap; }
-
-.test-banner {
-  margin: 0;
-  padding: 9px clamp(20px, 5vw, 64px);
-  color: #6c5410;
-  background: #fff7df;
-  border-bottom: 1px solid #ecdca9;
-  font-size: 14px;
-}
-
-.page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
-.page-header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
-.page-header h1 { margin: 0 0 6px; }
-.page-header p { margin: 0; color: #617087; }
-
-.card { padding: 24px; border: 1px solid #dbe3ef; border-radius: 14px; background: #fff; box-shadow: 0 12px 30px rgb(30 52 86 / 7%); }
-.button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 16px; border: 0; border-radius: 8px; color: #fff; background: #284f8f; font: inherit; text-decoration: none; cursor: pointer; }
-.button.secondary { border: 1px solid #9fb2cc; color: #25466f; background: #fff; }
-.button:disabled { cursor: not-allowed; opacity: .55; }
-.notice { padding: 16px; border-radius: 9px; background: #edf3fb; }
-.notice.error { color: #8c2929; background: #fff0f0; }
-.notice.success { color: #176744; background: #edf9f3; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 12px 10px; border-bottom: 1px solid #e4e9f1; text-align: left; vertical-align: top; }
-.data-table th { color: #526279; font-size: 13px; }
-.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; color: #33445c; background: #edf1f6; font-size: 12px; font-weight: 700; }
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 20px 0; }
-.metric { padding: 14px; border-radius: 10px; background: #f5f7fb; }
-.metric strong { display: block; margin-top: 5px; font-size: 22px; }
-
-@media (max-width: 720px) {
-  .app-header, .page-header { align-items: flex-start; flex-direction: column; }
-  .app-header nav { justify-content: flex-start; }
-  .table-wrap { overflow-x: auto; }
-}
+.product-shell { display: grid; min-height: 100vh; grid-template-columns: 248px minmax(0, 1fr); }
+.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 22px 14px; color: #dbe7ff; background: #102547; }
+.brand { display: flex; gap: 11px; align-items: center; padding: 8px 10px 24px; color: #fff; text-decoration: none; }
+.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: #102547; background: #7dd3fc; font-weight: 800; letter-spacing: -1px; }
+.brand strong, .brand small { display: block; }
+.brand strong { font-size: 17px; }
+.brand small { margin-top: 2px; color: #9db4da; font-size: 12px; }
+.side-nav { display: grid; gap: 18px; }
+.nav-group { display: grid; gap: 3px; }
+.nav-group p { margin: 0 0 4px; padding: 0 10px; color: #88a4d1; font-size: 11px; font-weight: 800; letter-spacing: .09em; }
+.nav-group a, .nav-planned { padding: 8px 10px; border-radius: 7px; color: #dbe7ff; font-size: 14px; text-decoration: none; }
+.nav-group a:hover, .nav-group a.router-link-active { color: #fff; background: #244775; }
+.nav-planned { color: #8aa0c3; cursor: default; }
+.stage { display: grid; min-width: 0; grid-template-rows: auto auto 1fr auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 82px; padding: 15px clamp(20px, 4vw, 56px); border-bottom: 1px solid #e2e8f0; background: #fff; }
+.eyebrow { margin: 0 0 3px; color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.topbar-title { margin: 0; color: #0f172a; font-size: 17px; font-weight: 700; }
+.service-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.service-chip { display: inline-flex; gap: 6px; align-items: center; padding: 7px 9px; border: 1px solid #dbe4f0; border-radius: 999px; color: #475569; background: #f8fafc; font-size: 12px; }
+.service-chip i { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; }
+.service-chip i.ready { background: #22c55e; }.service-chip i.unavailable { background: #94a3b8; }.service-chip i.loading { background: #f59e0b; }
+.trial-banner { margin: 0; padding: 9px clamp(20px, 4vw, 56px); border-bottom: 1px solid #f3dd9d; color: #78570a; background: #fff8df; font-size: 13px; }
+.content { min-width: 0; }
+.page { width: min(1280px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 56px; }
+.page-header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }.page-header h1 { margin: 0 0 7px; color: #0f172a; font-size: clamp(24px, 3vw, 31px); }.page-header p { max-width: 760px; margin: 0; color: #64748b; line-height: 1.55; }
+.card { padding: 22px; border: 1px solid #dde6f0; border-radius: 13px; background: #fff; box-shadow: 0 9px 24px rgb(15 23 42 / 4%); }
+.button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 15px; border: 1px solid #214f91; border-radius: 8px; color: #fff; background: #214f91; cursor: pointer; text-decoration: none; }.button.secondary { border-color: #a9b9d0; color: #284568; background: #fff; }.button:disabled { cursor: not-allowed; opacity: .55; }
+.notice { padding: 15px; border-radius: 9px; color: #43546c; background: #edf3fb; }.notice.error { color: #8c2929; background: #fff0f0; }.notice.success { color: #176744; background: #edf9f3; }
+.data-table { width: 100%; border-collapse: collapse; }.data-table th, .data-table td { padding: 12px 10px; border-bottom: 1px solid #e7edf4; text-align: left; vertical-align: top; }.data-table th { color: #64748b; font-size: 12px; font-weight: 800; }.data-table td { color: #334155; }
+.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; color: #334155; background: #edf2f7; font-size: 12px; font-weight: 700; }.table-wrap { overflow-x: auto; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 13px; margin: 20px 0; }.metric { padding: 15px; border-radius: 10px; color: #64748b; background: #f6f8fc; }.metric strong { display: block; margin-top: 6px; color: #172554; font-size: 23px; }
+.app-footer { padding: 0 clamp(20px, 4vw, 56px) 18px; }.technical-toggle, .inline-button { padding: 0; border: 0; color: #526a8c; background: transparent; cursor: pointer; font-size: 12px; text-decoration: underline; }.technical-info { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 9px; color: #64748b; font-size: 12px; }
+@media (max-width: 900px) { .product-shell { grid-template-columns: 1fr; }.sidebar { position: static; height: auto; padding: 12px; }.brand { padding: 6px 6px 12px; }.side-nav { display: flex; flex-wrap: wrap; gap: 12px; }.nav-group { min-width: 140px; }.topbar { align-items: flex-start; flex-direction: column; }.service-chips { justify-content: flex-start; }.page { width: min(100% - 28px, 1280px); padding-top: 26px; } }
+@media (max-width: 600px) { .page-header { align-items: flex-start; flex-direction: column; }.service-chips { display: grid; width: 100%; }.service-chip { justify-content: center; }.side-nav { display: grid; grid-template-columns: 1fr 1fr; }.nav-group { min-width: 0; } }
 </style>

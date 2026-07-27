@@ -25,11 +25,10 @@ describe('CustomerEfficiencyDashboardView', () => {
     const wrapper = mount(CustomerEfficiencyDashboardView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('AI requests')
+    expect(wrapper.text()).toContain('AI 请求次数')
     expect(wrapper.text()).toContain('8')
     expect(wrapper.text()).toContain('50.0%')
     expect(wrapper.text()).toContain('customer-efficiency.v1')
-    expect(wrapper.text().toLowerCase()).not.toContain('leaderboard')
-    expect(wrapper.text().toLowerCase()).not.toContain('performance evaluation')
+    expect(wrapper.text()).toContain('不展示员工身份、排名或绩效评价')
   })
 })
