@@ -280,6 +280,7 @@
             <el-tag :type="actionTagType" data-testid="action-tag">{{ actionText }}</el-tag>
             <el-tag :type="riskTagType" data-testid="risk-tag">{{ riskText }}</el-tag>
           </div>
+          <p class="answer-trust-note" data-testid="answer-trust-note">{{ answerTrustNote }}</p>
         </div>
       </div>
 
@@ -322,10 +323,20 @@
             {{ copyStatus === 'copied' ? '✓ 已复制回复' : '复制回复' }}
           </el-button>
           <el-button data-testid="edit-reply-button" plain @click="editReply">编辑回复</el-button>
-          <el-button data-testid="collect-experience-case-button" plain @click="openExperienceCaseCapture">
+          <el-button
+            data-testid="collect-experience-case-button"
+            plain
+            :disabled="!adoption || adoption.type === 'REJECTED' || experienceCaseSubmitting"
+            @click="openExperienceCaseCapture"
+          >
             ⭐ 收藏优秀案例
           </el-button>
-          <el-button data-testid="feedback-problem-button" plain @click="openAiFeedbackCapture">
+          <el-button
+            data-testid="feedback-problem-button"
+            plain
+            :disabled="adoption?.type !== 'REJECTED' || aiFeedbackSubmitting"
+            @click="openAiFeedbackCapture"
+          >
             反馈问题
           </el-button>
         </div>
@@ -395,18 +406,18 @@
         <code>risk_level={{ result.riskLevel ?? '未分类' }}</code>
       </div>
 
-      <details class="feedback-section" data-testid="feedback-section">
-        <summary>记录这条建议有没有用（可选）</summary>
+      <details open class="feedback-section" data-testid="feedback-section">
+        <summary>选择采用结果，再继续收藏案例或反馈问题</summary>
         <div class="feedback-body">
           <p>当前采用反馈只记录在本页。保存经验案例时必须在表单中明确选择冻结的经验类型。</p>
           <div class="feedback-actions">
-            <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
+            <el-button data-testid="direct-accept" type="success" plain @click="recordAdoption('DIRECT_ACCEPT')">
               直接采用
             </el-button>
-            <el-button data-testid="edited-accept" text @click="recordAdoption('EDITED_ACCEPT')">
+            <el-button data-testid="edited-accept" type="warning" plain @click="recordAdoption('EDITED_ACCEPT')">
               修改后采用
             </el-button>
-            <el-button data-testid="reject" text @click="recordAdoption('REJECTED')">
+            <el-button data-testid="reject" type="danger" plain @click="recordAdoption('REJECTED')">
               未采用
             </el-button>
             <el-button
@@ -875,6 +886,13 @@ const platformHealthTagType = computed(() => {
 const actionText = computed(() =>
   result.value?.action ? actionLabels[result.value.action] : '动作未分类'
 )
+
+const answerTrustNote = computed(() => {
+  if (result.value?.action === 'DIRECT_ANSWER') return '资料匹配，可参考；发送前仍请核对依据和措辞。'
+  if (result.value?.action === 'CONTROLLED_ANSWER') return '建议确认限制条件后再发送，避免作出超出资料范围的承诺。'
+  if (result.value?.action === 'TRANSFER_HUMAN') return '当前不建议直接回复，请按人工流程继续处理。'
+  return '请结合下方处理提示和来源依据，再决定下一步。'
+})
 
 const riskText = computed(() =>
   result.value?.riskLevel ? riskLabels[result.value.riskLevel] : '风险未分类'
@@ -1513,6 +1531,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 
 .answer-heading { align-items: flex-start; }
 .result-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.answer-trust-note { margin: 7px 0 0; color: #52657e; font-size: 12px; line-height: 1.5; }
 .action-guide {
   display: flex; gap: 16px; margin-top: 18px; padding: 18px;
   border: 1px solid; border-radius: 14px;
@@ -1546,6 +1565,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .technical-toggle-row { margin-top: 16px; text-align: right; }
 
 .feedback-actions { display: flex; flex-wrap: wrap; margin: 16px 12px 14px 0; }
+.feedback-section summary { cursor: pointer; color: #284a73; font-size: 14px; font-weight: 800; }
 .feedback-section > .el-button { vertical-align: top; margin-top: 16px; }
 .feedback-result { margin-top: 12px; color: #246b3f !important; font-weight: 700; }
 .experience-case-entry-hint { margin-top: -2px !important; color: #47705d !important; }

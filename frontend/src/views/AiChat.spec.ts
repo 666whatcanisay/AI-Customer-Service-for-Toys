@@ -313,6 +313,8 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('当前店铺')
     expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('商品上下文')
     expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('SKU 上下文')
+    expect(wrapper.get('[data-testid="answer-trust-note"]').text()).toContain('资料匹配，可参考')
+    expect(wrapper.get('[data-testid="feedback-section"]').attributes('open')).toBeDefined()
     expect(useCustomerSessionActivity().aiAssists.value).toBe(1)
   })
 
@@ -380,6 +382,25 @@ describe('AiChat B-T04 three-step workbench', () => {
     )
     await wrapper.get('[data-testid="edit-reply-button"]').trigger('click')
     expect(focus).toHaveBeenCalled()
+  })
+
+  it('enables experience capture or problem feedback only after the matching adoption decision', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    const collect = wrapper.get('[data-testid="collect-experience-case-button"]')
+    const feedback = wrapper.get('[data-testid="feedback-problem-button"]')
+    expect(collect.attributes('disabled')).toBeDefined()
+    expect(feedback.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    expect(collect.attributes('disabled')).toBeUndefined()
+    expect(feedback.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    expect(collect.attributes('disabled')).toBeDefined()
+    expect(feedback.attributes('disabled')).toBeUndefined()
   })
 
   it('copies the customer-service edit and records all three page-local outcomes', async () => {
