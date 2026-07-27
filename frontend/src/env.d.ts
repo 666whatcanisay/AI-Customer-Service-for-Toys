@@ -8,7 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_CUSTOMER_ENTRY_URL?: string
   readonly VITE_FRONTEND_VERSION?: string
   readonly VITE_GIT_SHORT_SHA?: string
-  readonly VITE_BUILD_MODE?: string
+  readonly VITE_RUNTIME_RUN_MODE?: string
+  readonly VITE_RUNTIME_API_MODE?: 'SAME_ORIGIN_PROXY' | 'DIRECT' | 'HYBRID' | 'UNAVAILABLE'
 }
 
 interface ImportMeta {

@@ -116,7 +116,9 @@ async function refreshStatus(): Promise<void> {
 const runtimeDetails = {
   version: import.meta.env.VITE_ADMIN_VERSION ?? 'unavailable',
   gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
-  buildMode: import.meta.env.VITE_BUILD_MODE ?? 'development'
+  sourceState: import.meta.env.VITE_GIT_SOURCE_STATE ?? 'unavailable',
+  runMode: import.meta.env.VITE_RUNTIME_RUN_MODE ?? 'unavailable',
+  apiMode: import.meta.env.VITE_RUNTIME_API_MODE ?? 'unavailable'
 }
 
 onMounted(() => { void refreshStatus() })
@@ -145,6 +147,13 @@ onMounted(() => { void refreshStatus() })
       <div class="sidebar-boundary">
         <strong>内部测试管理</strong>
         <p>当前页面不提供正式认证、自动客户发送、订单修改、退款或 ERP 写入。</p>
+        <dl class="runtime-identity" data-testid="admin-runtime-identity">
+          <div><dt>产品</dt><dd>AI 客服平台运营管理中心</dd></div>
+          <div><dt>版本</dt><dd>{{ runtimeDetails.version }}</dd></div>
+          <div><dt>Git</dt><dd>{{ runtimeDetails.gitCommit }}</dd></div>
+          <div><dt>运行</dt><dd>{{ runtimeDetails.runMode }}</dd></div>
+          <div><dt>API</dt><dd>{{ runtimeDetails.apiMode }}</dd></div>
+        </dl>
       </div>
     </aside>
 
@@ -178,7 +187,9 @@ onMounted(() => { void refreshStatus() })
       <section v-if="showTechnicalDetails" class="technical-panel" data-testid="admin-technical-details">
         <div><span>管理端版本</span><code>{{ runtimeDetails.version }}</code></div>
         <div><span>Git Commit</span><code>{{ runtimeDetails.gitCommit }}</code></div>
-        <div><span>构建模式</span><code>{{ runtimeDetails.buildMode }}</code></div>
+        <div><span>Git 状态</span><code>{{ runtimeDetails.sourceState }}</code></div>
+        <div><span>运行模式</span><code>{{ runtimeDetails.runMode }}</code></div>
+        <div><span>API 模式</span><code>{{ runtimeDetails.apiMode }}</code></div>
         <div><span>平台版本</span><code>{{ health?.version ?? '未取得' }}</code></div>
         <div><span>检查时间</span><code>{{ checkedAt || '未检查' }}</code></div>
         <p>客服入口未检测，因为当前没有已冻结的客服健康接口；这不是“客服服务不可用”的判断。</p>
@@ -212,6 +223,10 @@ a { color: #285493; }
 .sidebar-boundary { margin-top: auto; padding: 13px; border: 1px solid rgb(160 183 220 / 22%); border-radius: 12px; background: rgb(255 255 255 / 6%); }
 .sidebar-boundary strong { font-size: 13px; }
 .sidebar-boundary p { margin: 6px 0 0; color: #9fb2d1; font-size: 11px; line-height: 1.55; }
+.runtime-identity { display: grid; gap: 5px; margin: 13px 0 0; padding-top: 11px; border-top: 1px solid rgb(160 183 220 / 22%); }
+.runtime-identity div { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; }
+.runtime-identity dt { color: #91a7ca; font-size: 10px; }
+.runtime-identity dd { min-width: 0; margin: 0; overflow: hidden; color: #d8e5fa; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .product-stage { min-width: 0; }
 .product-topbar { display: flex; min-width: 0; align-items: center; gap: 16px; min-height: 68px; padding: 10px 22px; border-bottom: 1px solid #d8e1ee; background: rgb(255 255 255 / 94%); }
 .product-topbar p { margin: 0 0 3px; color: #718096; font-size: 11px; }

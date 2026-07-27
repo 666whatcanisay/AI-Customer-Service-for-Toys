@@ -7,6 +7,14 @@
   "current_stage": "Draft PR #49 created: catalog readiness and recovery guidance, cross-store reset boundary, missing-knowledge warning, clipboard recovery and adoption next-step guidance are complete. The complete live success path remains blocked because A/RAG is unavailable.",
   "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
   "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
+  "runtime_qa_v2": {
+    "date": "2026-07-27",
+    "status": "PASS: isolated B runtime is provenance-verified by a managed PID record, Vite runtime identity, browser route checks and Runtime Gate; this is not a production or authorization claim.",
+    "delivery": "Draft PR #53 on codex/runtime-qa-v2",
+    "verified_identity": "1.0.0 / 32feb6108156 / LOCAL / DIRECT on port 15173",
+    "gate": "scripts/windows/Invoke-RuntimeGate.ps1; use Verify with ExpectedGitShortSha to reject stale 5173 instances",
+    "evidence": "docs/control/RUNTIME-QA-V2_任务卡与运行验收报告.md"
+  },
   "last_updated": "2026-07-27",
   "git": {
     "branch": "codex/customer-pilot-hardening-b-v4",
