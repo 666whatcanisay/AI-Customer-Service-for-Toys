@@ -50,16 +50,25 @@ try {
     } catch { $packageState = "无法检查（$($_.Exception.Message)）" }
     Write-Host "测试包 $($config.TestKnowledgePackageId)：$packageState"
 
-    $syncPath = Get-TestKnowledgeSyncRecordPath $config
-    if (Test-Path -LiteralPath $syncPath) {
-        try {
-            $sync = Get-Content -LiteralPath $syncPath -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ([string]$sync.packageId -eq [string]$config.TestKnowledgePackageId) {
-                $syncState = "最后验证 $($sync.syncedItems)/$($sync.collectionCount) 条（$($sync.verifiedUtc) UTC）"
-            } else { $syncState = '记录对应其他测试包' }
-        } catch { $syncState = '运行记录无法解析' }
-    } else { $syncState = '尚无成功同步记录' }
-    Write-Host "A 同步知识数量：$syncState"
+    $syncHistory = Get-TestKnowledgeSyncHistory $config
+    $syncState = switch ($syncHistory.State) {
+        'HISTORICAL_SYNC' { "历史同步记录：$($syncHistory.SyncedItems)/$($syncHistory.CollectionCount) 条（$($syncHistory.VerifiedUtc) UTC；不是当前运行时证明）" }
+        'OTHER_PACKAGE_HISTORY' { "历史记录对应其他测试包：$($syncHistory.PackageId)" }
+        'INVALID_HISTORY' { '历史同步记录无法解析' }
+        default { '尚无成功同步历史记录' }
+    }
+    Write-Host "A 同步知识历史：$syncState"
+
+    $knowledgeRuntime = Get-RagKnowledgeRuntimeStatistics $config
+    $knowledgeConsistency = Get-TestKnowledgeRuntimeConsistency $syncHistory $knowledgeRuntime
+    if ($knowledgeRuntime.State -eq 'AVAILABLE') {
+        Write-Host "A 当前运行时知识：状态=$knowledgeConsistency；collection=$($knowledgeRuntime.CollectionName)；chunks=$($knowledgeRuntime.ChunkCount)；documents=$($knowledgeRuntime.DocumentCount)；database=$($knowledgeRuntime.VectorDatabase)"
+        if ($knowledgeConsistency -eq 'MISMATCH') {
+            Write-Host "警告：A 当前运行时 chunks=$($knowledgeRuntime.ChunkCount) 与历史同步 collectionCount=$($syncHistory.CollectionCount) 不一致。不能将历史记录视为当前服务状态；请恢复可信运行记录后重新启动并同步。" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "警告：无法读取 A 当前运行时知识统计：$($knowledgeRuntime.Error)" -ForegroundColor Red
+    }
 
     try {
         $ragStatus = Get-Json (Get-ServiceUrl $config $config.RagPort '/api/status') 'A 状态'
