@@ -154,6 +154,28 @@ const aiClient = axios.create({
   timeout: 30000,
 })
 
+type OptionalQueryParam = string | number | undefined
+
+/**
+ * Omit an unselected filter instead of serializing it as an empty enum value.
+ *
+ * FastAPI correctly rejects values such as `review_status=` because an empty
+ * string is not a member of the review-status enum.  The Admin filter forms
+ * represent their "all" choice with an empty string, so normalize that UI
+ * state at the client boundary before sending the request.
+ */
+export function omitBlankQueryParams(
+  params?: Record<string, OptionalQueryParam>,
+): Record<string, string | number> | undefined {
+  if (!params) return undefined
+
+  const normalized = Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== '' && value !== undefined),
+  ) as Record<string, string | number>
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined
+}
+
 export interface AdminPage<T> {
   items: T[]
   page: number
@@ -450,7 +472,7 @@ export async function listAdminExperienceCases(
 ): Promise<AdminPage<AdminExperienceCase>> {
   const response = await apiClient.get<AdminPage<AdminExperienceCase>>(
     '/api/v1/admin/customer-experience-cases',
-    { params },
+    { params: omitBlankQueryParams(params) },
   )
   return response.data
 }
@@ -482,7 +504,7 @@ export async function listAiOptimizationCases(
 ): Promise<AdminPage<AiOptimizationCase>> {
   const response = await apiClient.get<AdminPage<AiOptimizationCase>>(
     '/api/v1/admin/ai-optimization/cases',
-    { params },
+    { params: omitBlankQueryParams(params) },
   )
   return response.data
 }
