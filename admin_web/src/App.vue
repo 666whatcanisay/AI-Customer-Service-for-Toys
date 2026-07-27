@@ -78,6 +78,7 @@ onMounted(loadSystemState)
         </section>
         <section class="nav-group">
           <p>系统</p>
+          <RouterLink to="/trial-governance">试运行治理</RouterLink>
           <RouterLink to="/system-status">服务状态</RouterLink>
           <RouterLink to="/imports">数据导入</RouterLink>
           <RouterLink to="/test-data-packages">测试数据包</RouterLink>
@@ -97,7 +98,7 @@ onMounted(loadSystemState)
           <span class="service-chip"><i :class="operationState"></i>运营数据：{{ operationLabel }}</span>
         </div>
       </header>
-      <p class="trial-banner">当前为测试/试运行数据观察，不构成正式运营报表；正式权限与审计能力尚未启用。</p>
+      <p class="trial-banner">当前为测试/试运行数据观察，不构成正式运营报表；仅启用无原文的试运行审计基础，正式身份、权限、留存与自动脱敏尚未启用。</p>
       <main class="content"><RouterView /></main>
       <footer class="app-footer">
         <button class="technical-toggle" type="button" @click="technicalOpen = !technicalOpen">

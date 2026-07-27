@@ -9,8 +9,16 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.api.admin_pilot_store_routes import require_pilot_store
+from app.admin.trial_governance import (
+    TrialActor,
+    TrialAuditReason,
+    TrialRole,
+    get_trial_reason,
+    record_trial_audit_event,
+    require_trial_roles,
+)
+from app.config import get_settings
 from app.database import get_db
 from app.errors import AppError
 from app.ingestion.models import ImportBatch, ImportRow
@@ -101,6 +109,8 @@ def download_product_sku_template() -> FileResponse:
 async def preflight_product_sku(
     file: UploadFile = File(...),
     target_store_code: str | None = Form(default=None),
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> ProductSkuPreflightResponse:
     target = target_store_code.strip() if target_store_code else None
@@ -113,12 +123,24 @@ async def preflight_product_sku(
         max_upload_bytes=settings.max_upload_bytes,
         max_import_rows=settings.max_import_rows,
     )
-    return service.preflight_upload(
+    result = service.preflight_upload(
         filename=file.filename or "upload.xlsx",
         content_type=file.content_type,
         content=content,
         target_store_code=target,
     )
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="PRODUCT_IMPORT_PREFLIGHT",
+        resource_type="IMPORT_BATCH",
+        resource_id=target or "unbound",
+        outcome="SUCCESS" if result.can_import else "REJECTED",
+        reason=reason,
+        metadata={"valid_rows": result.valid_rows, "invalid_rows": result.invalid_rows},
+    )
+    session.commit()
+    return result
 
 
 @router.post("/import-batches/product-sku", response_model=BatchSummary, status_code=201)
@@ -126,6 +148,8 @@ async def upload_product_sku(
     file: UploadFile = File(...),
     created_by: str = Form("manual-import"),
     target_store_code: str | None = Form(default=None),
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> BatchSummary:
     target = target_store_code.strip() if target_store_code else None
@@ -145,6 +169,17 @@ async def upload_product_sku(
         created_by=created_by,
         target_store_code=target,
     )
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="PRODUCT_IMPORT_CREATE",
+        resource_type="IMPORT_BATCH",
+        resource_id=batch.id,
+        outcome="SUCCESS" if batch.status != "REJECTED" else "REJECTED",
+        reason=reason,
+        metadata={"valid_rows": batch.valid_rows, "invalid_rows": batch.invalid_rows},
+    )
+    session.commit()
     return _summary(batch)
 
 

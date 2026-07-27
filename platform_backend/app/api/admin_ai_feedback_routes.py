@@ -8,6 +8,14 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.admin.trial_governance import (
+    TrialActor,
+    TrialAuditReason,
+    TrialRole,
+    get_trial_reason,
+    record_trial_audit_event,
+    require_trial_roles,
+)
 from app.ai_feedback.models import AIResponseFeedback, AIResponseFeedbackAnalysis, utc_now
 from app.ai_feedback.schemas import (
     AdminAIResponseFeedbackAnalysisResult,
@@ -133,6 +141,8 @@ def _same_analysis_payload(
 def confirm_ai_response_feedback(
     feedback_id: str,
     payload: AIResponseFeedbackConfirmation,
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> AdminAIResponseFeedbackConfirmationResponse:
     """C-only confirmation freezes v1 content before A can read it."""
@@ -149,6 +159,15 @@ def confirm_ai_response_feedback(
     item.content_hash = _content_hash(item)
     item.status = AIResponseFeedbackStatus.ANALYZING
     item.analysis_status = AIResponseFeedbackStatus.ANALYZING
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="AI_FEEDBACK_CONFIRM",
+        resource_type="AI_RESPONSE_FEEDBACK",
+        resource_id=item.feedback_id,
+        outcome="SUCCESS",
+        reason=reason,
+    )
     session.commit()
     session.refresh(item)
     return _confirmation_response(item)
@@ -296,6 +315,8 @@ def record_ai_response_feedback_analysis(
     "/analysis-results", response_model=AdminAIResponseFeedbackAnalysisResultListResponse
 )
 def list_admin_ai_response_feedback_analysis_results(
+    actor: TrialActor = Depends(require_trial_roles(TrialRole.ADMIN, TrialRole.OPERATOR)),
+    reason: TrialAuditReason = Depends(get_trial_reason),
     session: Session = Depends(get_db),
 ) -> AdminAIResponseFeedbackAnalysisResultListResponse:
     """Read completed evidence only; this internal Admin view has no lifecycle side effects."""
@@ -314,6 +335,17 @@ def list_admin_ai_response_feedback_analysis_results(
     rows = session.execute(
         statement.order_by(AIResponseFeedbackAnalysis.recorded_at.desc(), AIResponseFeedback.feedback_id.desc())
     ).all()
+    record_trial_audit_event(
+        session,
+        actor=actor,
+        action="AI_FEEDBACK_ANALYSIS_VIEW",
+        resource_type="AI_RESPONSE_FEEDBACK",
+        resource_id="analyzed-collection",
+        outcome="SUCCESS",
+        reason=reason,
+        metadata={"returned_count": len(rows)},
+    )
+    session.commit()
     return AdminAIResponseFeedbackAnalysisResultListResponse(
         items=[_admin_analysis_result(item, analysis) for item, analysis in rows], total=total
     )

@@ -4,9 +4,9 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "C-OPERATION-V1.1",
-  "current_stage": "Daily AI operations center with a C-internal content-free UTC-day snapshot and actionable Admin work queues",
-  "current_gate": "C-OPERATION-V1.1 verification PASS; Draft PR #44 is open against the completed UI-3 branch",
+  "current_task": "PILOT-HARDENING-C",
+  "current_stage": "C-internal test-only trial governance with fixed roles, content-free audit foundation, and role-gated sensitive Admin reads/writes",
+  "current_gate": "PILOT-HARDENING-C verification PASS; Draft PR #50 is open against agent/platform-pilot-c",
   "status": "ready_for_delivery",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
@@ -64,14 +64,16 @@
     "GET /api/v1/admin/ai-quality/customer-efficiency/summary",
     "C-owned internal GET /api/v1/admin/customer-efficiency/summary",
     "C-owned internal GET /api/v1/admin/operations/today (content-free daily Admin aggregation)",
+    "C-owned internal GET /api/v1/admin/trial-governance and administrator-only /audit-events (test-only role/audit status)",
     "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
   "required_interfaces": [
     "B submits with Idempotency-Key and consumes only its minimum status projection",
     "A consumes only manually confirmed C feedback snapshots and posts matching revision/hash/type analysis evidence",
     "No direct A/C database access, A model call, or cross-line automatic action",
-    "C-OPERATION-V1.1 adds no cross-line interface, shared schema, error-code, or contract-version change"
-    ,"B writes content-free efficiency event types; A consumes aggregate-only customer-efficiency summaries"
+    "C-OPERATION-V1.1 adds no cross-line interface, shared schema, error-code, or contract-version change",
+    "PILOT-HARDENING-C changes only C-internal Admin/test-only paths and does not revise B/A frozen interfaces or contracts/**",
+    "B writes content-free efficiency event types; A consumes aggregate-only customer-efficiency summaries"
   ],
   "cross_line_compatibility": {
     "affected_lines": ["A", "B"],
@@ -90,6 +92,10 @@
     "published_to_a_line": false,
     "a_b_live_integration_claimed": false,
     "formal_permissions_enabled": false,
+    "trial_role_context_enabled": true,
+    "trial_audit_foundation_enabled": true,
+    "trial_audit_contains_customer_content": false,
+    "retention_policy_configured": false,
     "automatic_training_enabled": false,
     "prompt_change_enabled": false,
     "knowledge_publication_enabled": false,
@@ -99,7 +105,7 @@
     "customer_efficiency_employee_identity_stored": false,
     "customer_efficiency_ranking_enabled": false
   },
-  "last_test_result": "2026-07-27 C-OPERATION-V1.1: real TestClient daily operations snapshot validated content-free UTC-day efficiency/case/feedback/analysis counts, queues, and zero knowledge state; seeded catalog verification validated knowledge inventory and conflict count. Full platform backend pytest passed (74 passed); Admin typecheck, Vitest (31 passed), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
+  "last_test_result": "2026-07-27 PILOT-HARDENING-C: isolated SQLite Alembic upgrade/downgrade/upgrade through 0009 passed. TestClient verified support safe-store read, sensitive case-read/write denial, operator case-view audit, administrator audit read, and unknown-actor denial with no raw case text in the audit projection. Full platform backend pytest passed (77); Admin typecheck, Vitest (38), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
@@ -109,7 +115,7 @@
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_admin_operations_api.py tests/test_admin_api.py"
   ],
   "known_risks": [
-    "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
+    "SQLite and the internal-test administration APIs have no formal authentication, production authorization, retention, deletion, recovery, or production security certification. The fixed trial-actor header and content-free audit table are a test-only governance foundation, not identity proof or formal access control.",
     "AI feedback text is not logged by the new modules, but v1-reminder-only is a reminder and not automatic redaction.",
     "Idempotency-Key and created_by scope B replay/history but do not verify an identity or grant authorization.",
     "A analysis evidence is stored only after C confirmation and matching revision/hash/type; C does not verify an A identity in this baseline.",
@@ -129,11 +135,11 @@
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-operation-v1-1",
-    "base": "agent/platform-ai-operations-ui-v1 4eb9e29 (UI-3 AI operations center)",
-    "commit": "e72d4da (C-OPERATION-V1.1 implementation)",
-    "draft_pr": "#44 against agent/platform-ai-operations-ui-v1"
+    "branch": "agent/platform-pilot-hardening-c",
+    "base": "agent/platform-pilot-c bcc9e61 (multi-store pilot operations center)",
+    "commit": "feat(platform): harden trial operations governance",
+    "draft_pr": "#50 against agent/platform-pilot-c"
   },
-  "next_recommended_task": "Review and merge the P0 customer-efficiency Provider, then UI-3, before merging this dependent C-OPERATION-V1.1 PR. Do not enable automatic actions, formal access claims, or planning-only extensions without separate approval.",
+  "next_recommended_task": "Review the dependent multi-store pilot PR before this child PR. Do not promote trial headers or content-free audit metadata into formal authentication, production authorization, retention, or automatic redaction without separately approved work.",
   "last_updated": "2026-07-27"
 }

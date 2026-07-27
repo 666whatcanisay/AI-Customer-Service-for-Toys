@@ -27,6 +27,7 @@ describe('App', () => {
     expect(wrapper.text()).toContain('AI 管理')
     expect(wrapper.text()).toContain('ERP 镜像（规划）')
     expect(wrapper.text()).toContain('退款风险（规划）')
-    expect(wrapper.text()).toContain('正式权限与审计能力尚未启用')
+    expect(wrapper.text()).toContain('仅启用无原文的试运行审计基础')
+    expect(wrapper.text()).toContain('正式身份、权限、留存与自动脱敏尚未启用')
   })
 })
