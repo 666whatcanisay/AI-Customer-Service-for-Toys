@@ -10,6 +10,7 @@ from app.config.settings import update_env_values
 from app.models.chat import (
     AIOnlineTestRequest,
     ChatRequest,
+    CustomerEfficiencyAnalysisRunRequest,
     ExperienceEvaluationRunRequest,
     FeedbackAnalysisRunRequest,
     ModelConfigUpdate,
@@ -22,6 +23,10 @@ from app.service.experience_evaluation import (
 from app.service.feedback_analysis import (
     FeedbackAnalysisError,
     FeedbackAnalysisService,
+)
+from app.service.efficiency_analysis import (
+    CustomerEfficiencyAnalysisService,
+    EfficiencyAnalysisError,
 )
 from app.service.ai_capability import (
     MODULE_DEFINITIONS,
@@ -75,6 +80,16 @@ def get_feedback_analysis_service(request: Request) -> FeedbackAnalysisService:
     if service is None:
         service = FeedbackAnalysisService(request.app.state.settings)
         request.app.state.feedback_analysis_service = service
+    return service
+
+
+def get_customer_efficiency_analysis_service(
+    request: Request,
+) -> CustomerEfficiencyAnalysisService:
+    service = getattr(request.app.state, "customer_efficiency_analysis_service", None)
+    if service is None:
+        service = CustomerEfficiencyAnalysisService(request.app.state.settings)
+        request.app.state.customer_efficiency_analysis_service = service
     return service
 
 
@@ -415,6 +430,46 @@ def run_feedback_analysis(
             content=envelope({"code": exc.code}, message=exc.message, success=False),
         )
     return envelope(recorded, message="Feedback analysis recorded")
+
+
+@router.post(
+    "/admin/ai/customer-efficiency-analysis/run",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_customer_efficiency_analysis(
+    request: Request,
+    analysis_request: CustomerEfficiencyAnalysisRunRequest,
+):
+    """Explicit loopback-only aggregate analysis; it starts no background work."""
+    require_loopback_client(request)
+    try:
+        recorded = get_customer_efficiency_analysis_service(request).run(
+            analysis_request.window_start,
+            analysis_request.window_end,
+        )
+    except EfficiencyAnalysisError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=envelope({"code": exc.code}, message=exc.message, success=False),
+        )
+    return envelope(recorded, message="Customer-efficiency analysis recorded")
+
+
+@router.get(
+    "/admin/ai/customer-efficiency-analysis/latest",
+    tags=["ai-admin"],
+)
+def get_latest_customer_efficiency_analysis(request: Request) -> dict[str, Any]:
+    """Return the latest local aggregate-only trace record, if one exists."""
+    require_loopback_client(request)
+    record = get_customer_efficiency_analysis_service(request).latest()
+    return envelope(
+        {
+            "status": "RECORDED" if record is not None else "NOT_AVAILABLE",
+            "analysis": record,
+        }
+    )
 
 
 @router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])

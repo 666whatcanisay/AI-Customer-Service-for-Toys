@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import (
@@ -136,6 +137,34 @@ class FeedbackAnalysisRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     maximum: int = Field(default=1, ge=1, le=100)
+
+
+class CustomerEfficiencyAnalysisRunRequest(BaseModel):
+    """Explicit local analysis of one C aggregate efficiency summary window."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    window_start: datetime | None = None
+    window_end: datetime | None = None
+
+    @field_validator("window_start", "window_end")
+    @classmethod
+    def summary_window_must_be_timezone_aware(
+        cls, value: datetime | None
+    ) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("summary window values must include a timezone")
+        return value
+
+    @model_validator(mode="after")
+    def summary_window_must_be_ordered(self) -> "CustomerEfficiencyAnalysisRunRequest":
+        if (
+            self.window_start is not None
+            and self.window_end is not None
+            and self.window_end <= self.window_start
+        ):
+            raise ValueError("window_end must be later than window_start")
+        return self
 
 
 class ModelConfigUpdate(BaseModel):
