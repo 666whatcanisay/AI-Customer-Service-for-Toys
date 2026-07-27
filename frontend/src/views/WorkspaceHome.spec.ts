@@ -6,7 +6,7 @@ import { TesterIdentityKey } from '@/workspace/testerIdentity'
 import WorkspaceHome from './WorkspaceHome.vue'
 
 describe('WorkspaceHome', () => {
-  it('shows all modules, their lifecycle status and the main AI entry', () => {
+  it('shows the daily AI entry, real-workflow links and clearly planned modules', () => {
     const wrapper = mount(WorkspaceHome, {
       global: {
         provide: {
@@ -23,11 +23,13 @@ describe('WorkspaceHome', () => {
       }
     })
 
-    expect(wrapper.findAll('[data-testid="module-card"]')).toHaveLength(12)
+    expect(wrapper.findAll('[data-testid="planned-module-card"]')).toHaveLength(3)
     expect(wrapper.text()).toContain('AI 客服')
-    expect(wrapper.text()).toContain('意见与建议')
-    expect(wrapper.text()).toContain('售后中心')
-    expect(wrapper.text()).toContain('开发中')
+    expect(wrapper.text()).toContain('我的案例')
+    expect(wrapper.text()).toContain('问题反馈')
+    expect(wrapper.text()).toContain('AI 帮助次数')
+    expect(wrapper.text()).toContain('待启用')
+    expect(wrapper.text()).toContain('售后助手')
     expect(wrapper.text()).toContain('规划中')
     expect(wrapper.get('[data-testid="enter-ai-chat"]').attributes('href')).toBe('/ai-chat')
   })
