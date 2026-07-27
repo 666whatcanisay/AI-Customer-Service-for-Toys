@@ -38,4 +38,6 @@ All responses use the existing `{success, message, data}` envelope. These endpoi
 
 Runtime metrics are thread-safe and reset on process restart. They contain no question, prompt, raw request body, source excerpt, or exception text; `last_error_summary` is only a controlled error category.
 
+For an implemented module, knowledge_count and the existing knowledge-statistics chunk_count both mean the total queryable chunks across the primary collection and the frozen test-knowledge collection. document_count remains the number of primary PDF documents, while collection_name remains the primary collection identifier. A failed initialization exposes only RAG_INITIALIZATION_FAILED and a safe retry/logs message; raw exception strings are not browser-facing API data.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。

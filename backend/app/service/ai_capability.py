@@ -17,6 +17,7 @@ AI_MODULE_STATUSES = {
     "PAUSED",
     "ERROR",
 }
+INITIALIZATION_FAILED_CODE = "RAG_INITIALIZATION_FAILED"
 
 
 @dataclass(frozen=True)
@@ -223,11 +224,29 @@ def not_available_module_detail(module: AIModuleDefinition) -> dict[str, Any]:
     return {**module_summary(module, "PLANNED"), **unavailable}
 
 
+def knowledge_collection_counts(rag: Any) -> tuple[int, int]:
+    """Return queryable primary and frozen-test collection counts."""
+    primary_stats = rag.vector_store.get_collection_stats()
+    test_stats = rag.test_vector_store.get_collection_stats()
+    primary_count = primary_stats.get("total_chunks")
+    test_count = test_stats.get("total_chunks")
+    if (
+        isinstance(primary_count, bool)
+        or not isinstance(primary_count, int)
+        or primary_count < 0
+        or isinstance(test_count, bool)
+        or not isinstance(test_count, int)
+        or test_count < 0
+    ):
+        raise ValueError("knowledge collection count is invalid")
+    return primary_count, test_count
+
+
 def safe_knowledge_count(rag: Any) -> int | None:
+    """Count every collection the RAG request path can query."""
     try:
-        stats = rag.vector_store.get_collection_stats()
-        count = stats.get("total_chunks")
-        return int(count) if isinstance(count, int | float) else None
+        primary_count, test_count = knowledge_collection_counts(rag)
+        return primary_count + test_count
     except Exception:
         return None
 
@@ -245,11 +264,18 @@ def unavailable_metrics() -> dict[str, Any]:
     }
 
 
+def safe_initialization_error(value: object) -> str | None:
+    """Return a stable public state code, never an exception string."""
+    return INITIALIZATION_FAILED_CODE if value else None
+
+
 def customer_service_detail(application: Any) -> dict[str, Any]:
     module = MODULES_BY_ID["ai_customer_service"]
     rag = getattr(application.state, "rag_service", None)
     ready = bool(getattr(application.state, "ready", False) and rag is not None)
-    initialization_error = getattr(application.state, "initialization_error", None)
+    initialization_error = safe_initialization_error(
+        getattr(application.state, "initialization_error", None)
+    )
     module_status = "RUNNING" if ready else ("ERROR" if initialization_error else "PAUSED")
     metrics = rag.runtime_metrics.snapshot() if rag is not None else unavailable_metrics()
     return {
