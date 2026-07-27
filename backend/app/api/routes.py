@@ -11,12 +11,17 @@ from app.models.chat import (
     AIOnlineTestRequest,
     ChatRequest,
     ExperienceEvaluationRunRequest,
+    FeedbackAnalysisRunRequest,
     ModelConfigUpdate,
     SearchRequest,
 )
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
+)
+from app.service.feedback_analysis import (
+    FeedbackAnalysisError,
+    FeedbackAnalysisService,
 )
 from app.service.ai_capability import (
     MODULE_DEFINITIONS,
@@ -62,6 +67,14 @@ def get_experience_evaluation_service(request: Request) -> ExperienceEvaluationS
     if service is None:
         service = ExperienceEvaluationService(request.app.state.settings)
         request.app.state.experience_evaluation_service = service
+    return service
+
+
+def get_feedback_analysis_service(request: Request) -> FeedbackAnalysisService:
+    service = getattr(request.app.state, "feedback_analysis_service", None)
+    if service is None:
+        service = FeedbackAnalysisService(request.app.state.settings)
+        request.app.state.feedback_analysis_service = service
     return service
 
 
@@ -381,6 +394,27 @@ def run_experience_evaluation(
             content=envelope({"code": exc.code}, message=exc.message, success=False),
         )
     return envelope(recorded, message="Experience evaluation recorded")
+
+
+@router.post(
+    "/admin/ai/feedback-analysis/run",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_feedback_analysis(
+    request: Request,
+    analysis_request: FeedbackAnalysisRunRequest,
+):
+    """Run one explicit local feedback-analysis batch; no background polling."""
+    require_loopback_client(request)
+    try:
+        recorded = get_feedback_analysis_service(request).run(analysis_request.maximum)
+    except FeedbackAnalysisError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=envelope({"code": exc.code}, message=exc.message, success=False),
+        )
+    return envelope(recorded, message="Feedback analysis recorded")
 
 
 @router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])

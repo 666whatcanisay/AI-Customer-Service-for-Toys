@@ -4,13 +4,13 @@
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "ready_for_integration",
-  "current_task": "MVP-PLUS-01 CONTRACT-FIX1 A experience-evaluation consumer",
-  "next_recommended_task": "Run the real B-to-C approval-to-A-to-C evaluation integration with the C experience-case branch; do not auto-merge this A branch.",
-  "current_stage": "Explicit C approved-snapshot consumer and controlled Ollama evaluation implementation are ready for real cross-service verification.",
-  "current_gate": "Focused A unit tests and local real qwen3.5:9b controlled-JSON smoke pass; real C export/writeback integration remains pending. A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
-  "last_test_result": "2026-07-25: focused experience-evaluation pytest 8 passed; full pytest backend 71 passed, 2 skipped, 30 warnings; git diff --check and machine-context JSON checks passed. A direct local qwen3.5:9b smoke returned a parsed KEEP result with zero suggestions and did not call C. C APPROVED export/writeback was intentionally left for isolated cross-line integration.",
-  "blockers": ["Real C APPROVED snapshot export/writeback remains required before the MVP-PLUS-01 end-to-end integration claim."],
+  "status": "integration_blocked",
+  "current_task": "AI-Agent MVP-PLUS-02 real C feedback analysis",
+  "next_recommended_task": "Configure an isolated C feedback-service PLATFORM_API_BASE_URL and provide one human-confirmed, de-identified ANALYZING feedback snapshot; then run the real qwen3.5:9b read/analyze/writeback/idempotency test. Do not auto-merge.",
+  "current_stage": "A-side explicit feedback consumer is implemented: it reads only frozen C badcases, invokes local qwen3.5:9b, validates bounded analysis evidence, and writes to C without polling or automatic action.",
+  "current_gate": "Local regression is PASS: full pytest backend is 71 passed and 3 opt-in real integration tests skipped. The real C feedback read, real qwen analysis, C writeback, and idempotent replay have not run because PLATFORM_API_BASE_URL is not configured. Cross-service delivery is BLOCKED; A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
+  "last_test_result": "2026-07-27: full pytest backend 71 passed, 3 skipped, 30 warnings; feedback-analysis E2E contains no HTTP/model substitute and skipped because RUN_REAL_FEEDBACK_ANALYSIS_E2E and a real C service are not configured. No C feedback content was read, logged, or written.",
+  "blockers": ["An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before this task can make a real cross-service claim."],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
     "Frozen rag-export omits or conflicts with required facts for CASE 007, 011, 019, 020, 023 and 027",
@@ -27,12 +27,12 @@
     "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
   ],
   "git": {
-    "branch": "agent/rag-experience-evaluation-fix1",
+    "branch": "agent/ai-feedback-analysis-mvp-plus-02",
     "clean": false,
-    "baseline_commit": "271c155",
+    "baseline_commit": "ea69c5f",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
-    "remote_branch": "origin/agent/rag-experience-evaluation-fix1",
+    "remote_branch": "origin/agent/ai-feedback-analysis-mvp-plus-02",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "checked_at": "2026-07-25T10:06:08+08:00",
@@ -41,6 +41,7 @@
     "backend/app/service/rag_service.py",
     "backend/app/service/ai_capability.py",
     "backend/app/service/experience_evaluation.py",
+    "backend/app/service/feedback_analysis.py",
     "backend/app/api/routes.py",
     "backend/app/models/chat.py"
   ],
@@ -56,6 +57,7 @@
   "test_commands": [
     "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
     "source read-only venv python -m pytest backend -q",
+    "RUN_REAL_FEEDBACK_ANALYSIS_E2E=1 with an isolated C service and human-confirmed de-identified feedback python -m pytest backend/tests/test_real_feedback_analysis_e2e.py -q -s",
     "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
     "PLATFORM_API_BASE_URL=http://127.0.0.1:8012 source read-only venv python backend/scripts/evaluate_test_knowledge.py PDD-SM-2026-001-TEST --output-dir docs/rag/evaluations/a-t03-v031-live"
   ],
@@ -76,7 +78,9 @@
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
     "GET C /api/v1/test-knowledge-packages/{package_id}/evaluations version V0.3.1 schema 0.3.1-test",
     "GET C /api/v1/admin/ai-optimization/cases/export approved immutable snapshots",
-    "POST C /api/v1/admin/ai-optimization/evaluation-results traceable evaluation evidence"
+    "POST C /api/v1/admin/ai-optimization/evaluation-results traceable evaluation evidence",
+    "GET C /api/v1/admin/ai-quality/badcases frozen manually confirmed feedback snapshots",
+    "POST C /api/v1/admin/ai-quality/analysis-results immutable feedback analysis evidence"
   ],
   "provided_interfaces": [
     "POST /api/chat with frozen question/context and data response",
@@ -90,7 +94,8 @@
     "GET /api/admin/ai/modules/{module_id}/prompt",
     "POST /api/admin/ai/modules/{module_id}/test",
     "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
-    "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation"
+    "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
+    "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }

@@ -130,6 +130,14 @@ class ExperienceEvaluationRunRequest(BaseModel):
         return value
 
 
+class FeedbackAnalysisRunRequest(BaseModel):
+    """An explicit, bounded local request to analyze C-confirmed feedback."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    maximum: int = Field(default=1, ge=1, le=100)
+
+
 class ModelConfigUpdate(BaseModel):
     provider: str = Field(default="ollama", min_length=1, max_length=40)
     model: str = Field(default="qwen3.5:9b", min_length=1, max_length=100)
