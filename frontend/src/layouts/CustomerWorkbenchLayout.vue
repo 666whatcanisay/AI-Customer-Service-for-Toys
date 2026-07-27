@@ -243,6 +243,16 @@ const dismissPilotGuide = () => {
 }
 
 const currentTitle = computed(() => String(route.meta.title ?? '客服智能工作台'))
+const currentRouteRequiresIdentity = computed(() => route.meta.requiresTesterIdentity === true)
+
+const syncRouteIdentityPrompt = () => {
+  if (identity.value.reporterName || !currentRouteRequiresIdentity.value) {
+    identityDialogOpen.value = false
+    return
+  }
+  identityError.value = ''
+  identityDialogOpen.value = true
+}
 
 const closeMobileMenu = () => {
   mobileMenuOpen.value = false
@@ -263,17 +273,22 @@ const saveIdentity = () => {
   identityStore.save(identityDraft.reporterName, identityDraft.defaultStoreCode)
   identityError.value = ''
   identityDialogOpen.value = false
-  pilotGuideOpen.value = shouldShowPilotGuide()
+  pilotGuideOpen.value = currentRouteRequiresIdentity.value && shouldShowPilotGuide()
 }
 
-watch(() => route.fullPath, closeMobileMenu)
+watch(() => route.fullPath, () => {
+  closeMobileMenu()
+  syncRouteIdentityPrompt()
+})
 
 onMounted(() => {
   identityStore.reload()
   identityDraft.reporterName = identity.value.reporterName
   identityDraft.defaultStoreCode = identity.value.defaultStoreCode
-  identityDialogOpen.value = !identity.value.reporterName
-  pilotGuideOpen.value = Boolean(identity.value.reporterName) && shouldShowPilotGuide()
+  syncRouteIdentityPrompt()
+  pilotGuideOpen.value = Boolean(identity.value.reporterName) &&
+    currentRouteRequiresIdentity.value &&
+    shouldShowPilotGuide()
   void systemStatus.refresh()
 })
 </script>

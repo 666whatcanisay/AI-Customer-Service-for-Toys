@@ -335,6 +335,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('商品上下文')
     expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('SKU 上下文')
     expect(wrapper.get('[data-testid="answer-trust-note"]').text()).toContain('资料匹配，可参考')
+    expect(wrapper.get('[data-testid="consultation-readiness"]').text()).toContain('先核对建议和来源')
     expect(wrapper.get('[data-testid="feedback-section"]').attributes('open')).toBeDefined()
     expect(useCustomerSessionActivity().aiAssists.value).toBe(1)
   })
@@ -652,6 +653,20 @@ describe('AiChat B-T04 three-step workbench', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="request-error"]').text()).toContain(
       'AI 服务请求超时，请稍后重试或按原客服流程处理。'
+    )
+  })
+
+  it('explains the next action for a network-level AI request failure', async () => {
+    apiMocks.chat.mockRejectedValueOnce(new RagClientError('unknown', '网络连接异常'))
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(wrapper.get('[data-testid="request-error"]').text()).toContain(
+      '网络或服务连接异常，请检查网络和 AI 状态后重试。'
+    )
+    expect(wrapper.get('[data-testid="request-recovery-card"]').text()).toContain(
+      '当前客户问题和商品上下文会保留'
     )
   })
 

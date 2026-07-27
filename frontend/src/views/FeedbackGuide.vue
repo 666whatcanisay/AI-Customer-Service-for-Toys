@@ -2,9 +2,20 @@
   <main class="feedback-guide" data-testid="feedback-guide">
     <section class="guide-hero">
       <p class="eyebrow">AI 客服平台 · 问题反馈</p>
-      <h1>反馈一条需要改进的 AI 建议</h1>
-      <p>请先在 AI 客服中完成一条咨询，并明确选择“未采用”。系统会在你确认原因后保存真实反馈。</p>
-      <RouterLink to="/ai-chat" class="primary-action">进入 AI 客服</RouterLink>
+      <h1>这条 AI 建议为什么没有采用？</h1>
+      <p>先在 AI 客服中完成一条咨询，再选择“未采用”。确认原因后才会提交真实反馈，不会把问题反馈记成优秀案例。</p>
+      <RouterLink to="/ai-chat" class="primary-action">去处理这条咨询</RouterLink>
+    </section>
+
+    <section class="feedback-intent" data-testid="feedback-intent">
+      <div>
+        <strong>适合反馈</strong>
+        <p>建议有事实错误、缺少关键信息、表达不适合发送，或存在处理风险。</p>
+      </div>
+      <div>
+        <strong>暂时不用反馈</strong>
+        <p>还没有生成建议、只是暂未处理，或只是需要先补充客户信息时，先继续咨询流程。</p>
+      </div>
     </section>
 
     <section class="feedback-path" data-testid="feedback-path">
@@ -36,7 +47,7 @@
         <li>选择最接近的原因：事实错误、缺少信息、表达问题、风险问题或其他。</li>
         <li>不要填写客户姓名、电话、地址、完整订单号或隐私截图内容。</li>
       </ol>
-      <p class="boundary">反馈提交后由中台保存并进入后续人工确认与分析；不会自动修改 Prompt、知识或客户消息。</p>
+      <p class="boundary">反馈提交后由中台保存并进入后续人工确认与分析；不会自动改写系统规则、知识内容或客户消息。</p>
     </section>
 
     <section class="reason-card" data-testid="feedback-reason-guide">
@@ -68,9 +79,15 @@ h2 { margin: 0 0 12px; font-size: 20px; }
 .guide-hero > p:not(.eyebrow), li { color: #60708a; line-height: 1.65; }
 ol { display: grid; gap: 9px; margin: 0; padding-left: 23px; }
 .primary-action { display: inline-flex; margin-top: 18px; padding: 10px 16px; border-radius: 10px; background: #2e63d5; color: #fff; font-weight: 800; text-decoration: none; }
+.feedback-intent { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.feedback-intent > div { padding: 15px; border: 1px solid #d9e4f1; border-radius: 14px; background: #fafdff; }
+.feedback-intent > div:first-child { border-left: 3px solid #d18445; }
+.feedback-intent > div:last-child { border-left: 3px solid #7d9bca; }
+.feedback-intent strong { color: #254671; font-size: 14px; }
+.feedback-intent p { margin: 6px 0 0; color: #60708a; font-size: 12px; line-height: 1.55; }
 .boundary { margin: 18px 0 0; padding: 12px; border-radius: 10px; background: #fff8e7; color: #77510a; font-size: 13px; line-height: 1.6; }
 .feedback-path { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }.feedback-path > div { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 14px; border: 1px solid #d9e4f1; border-radius: 14px; background: #fafdff; }.feedback-path span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e8f1ff; color: #285fc8; font-size: 12px; font-weight: 900; }.feedback-path strong { font-size: 13px; }.feedback-path p { grid-column: 2; margin: -3px 0 0; color: #60708a; font-size: 12px; line-height: 1.5; }
 .decision-card h2 { margin-bottom: 16px; }.decision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }.decision-grid article { padding: 14px; border: 1px solid #e0e8f3; border-radius: 12px; background: #fbfdff; }.decision-grid article:first-child { border-left: 3px solid #41a271; }.decision-grid article:last-child { border-left: 3px solid #dc8a46; }.decision-grid strong { color: #254671; font-size: 14px; }.decision-grid p { margin: 7px 0 0; color: #68758a; font-size: 12px; line-height: 1.55; }
 .reason-card h2 { margin-bottom: 16px; }.reason-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }.reason-grid article { display: grid; gap: 5px; padding: 13px; border: 1px solid #e0e8f3; border-radius: 12px; background: #fbfdff; }.reason-grid article:last-child { grid-column: span 2; }.reason-grid strong { color: #254671; font-size: 13px; }.reason-grid span { color: #68758a; font-size: 12px; line-height: 1.5; }
-@media (max-width: 680px) { .feedback-path, .decision-grid, .reason-grid { grid-template-columns: 1fr; }.reason-grid article:last-child { grid-column: auto; } }
+@media (max-width: 680px) { .feedback-path, .decision-grid, .reason-grid, .feedback-intent { grid-template-columns: 1fr; }.reason-grid article:last-child { grid-column: auto; } }
 </style>

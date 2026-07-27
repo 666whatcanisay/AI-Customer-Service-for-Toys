@@ -2,9 +2,9 @@
   <div class="experience-page" data-testid="experience-cases-page">
     <header>
       <p class="eyebrow">客服经验沉淀</p>
-      <h1>我的案例</h1>
-      <p>这里只显示本次浏览器会话中，经真实提交接口确认的最小摘要；不会保存问题、AI 回复或最终回复。</p>
-      <RouterLink to="/ai-chat" class="capture-link">去收藏一条优秀案例</RouterLink>
+      <h1>我的案例（本次会话）</h1>
+      <p>这里只显示经真实提交接口确认的最小摘要；不会保存问题、AI 回复或最终回复，也不会把页面状态当作审核结果。</p>
+      <RouterLink to="/ai-chat" class="capture-link">去处理咨询并收藏案例</RouterLink>
     </header>
 
     <el-alert
@@ -32,6 +32,10 @@
     </section>
 
     <section v-if="submissions.length" class="case-list" data-testid="experience-case-list">
+      <div class="case-list-summary" data-testid="experience-case-summary">
+        <strong>本次会话已确认 {{ submissions.length }} 条提交</strong>
+        <span>后续状态以人工审核为准。</span>
+      </div>
       <article v-for="item in submissions" :key="`${item.submittedAt}-${item.productId}`">
         <div class="case-title">
           <strong>{{ item.productId }}</strong>
@@ -72,8 +76,8 @@ h1 { margin: 0 0 8px; font-size: 30px; } header > p:last-child { margin: 0; colo
 .case-journey span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e8f1ff; color: #285fc8; font-size: 12px; font-weight: 900; }
 .case-journey p { margin: 0; color: #68758a; font-size: 12px; line-height: 1.55; }.case-journey strong { color: #243b5c; }
 .case-status-guide { display: flex; align-items: center; gap: 16px; margin-top: 12px; padding: 12px; border: 1px solid #e0e8f3; border-radius: 12px; background: #fff; color: #243b5c; font-size: 12px; }.case-status-guide ul { display: flex; flex: 1; flex-wrap: wrap; gap: 8px 14px; margin: 0; padding: 0; list-style: none; }.case-status-guide li { display: flex; align-items: center; gap: 5px; color: #68758a; }.case-status-guide b { padding: 3px 6px; border-radius: 999px; font-size: 11px; }.status-new { background: #eef4fd; color: #315fbd; }.status-reviewing { background: #fff4dc; color: #8a5d00; }.status-approved { background: #eaf8f0; color: #1e7247; }.status-rejected { background: #fff0ef; color: #a33c36; }
-.case-list { display: grid; gap: 12px; margin-top: 16px; } article, .empty-card { padding: 18px; border: 1px solid #dbe4ef; border-radius: 15px; background: #fff; }
+.case-list { display: grid; gap: 12px; margin-top: 16px; } .case-list-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border-radius: 11px; background: #edf7f1; color: #286648; font-size: 12px; }.case-list-summary span { color: #567362; } article, .empty-card { padding: 18px; border: 1px solid #dbe4ef; border-radius: 15px; background: #fff; }
 .case-title { display: flex; justify-content: space-between; gap: 12px; } .case-title span { padding: 4px 8px; border-radius: 999px; background: #eef4fd; color: #315fbd; font-size: 11px; font-weight: 800; }.case-title .status-new { background: #eef4fd; color: #315fbd; }.case-title .status-reviewing { background: #fff4dc; color: #8a5d00; }.case-title .status-approved { background: #eaf8f0; color: #1e7247; }.case-title .status-rejected { background: #fff0ef; color: #a33c36; }
 dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; } dt { color: #7a8799; font-size: 11px; } dd { margin: 4px 0 0; overflow-wrap: anywhere; font-size: 13px; }
-.empty-card { margin-top: 16px; color: #68758a; line-height: 1.65; }.empty-card p { margin: 0; }.empty-link { display: inline-flex; margin-top: 12px; color: #285fc8; font-size: 13px; font-weight: 800; text-decoration: none; } @media (max-width: 680px) { dl, .case-journey { grid-template-columns: 1fr 1fr; }.case-status-guide { align-items: flex-start; flex-direction: column; gap: 8px; } } @media (max-width: 480px) { .case-journey { grid-template-columns: 1fr; } }
+.empty-card { margin-top: 16px; color: #68758a; line-height: 1.65; }.empty-card p { margin: 0; }.empty-link { display: inline-flex; margin-top: 12px; color: #285fc8; font-size: 13px; font-weight: 800; text-decoration: none; } @media (max-width: 680px) { dl, .case-journey { grid-template-columns: 1fr 1fr; }.case-status-guide, .case-list-summary { align-items: flex-start; flex-direction: column; gap: 8px; } } @media (max-width: 480px) { .case-journey { grid-template-columns: 1fr; } }
 </style>

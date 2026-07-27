@@ -3,16 +3,18 @@
     <section class="welcome-panel">
       <div>
         <p class="eyebrow">AI客服平台 · 客服工作台</p>
-        <h1>{{ identity.reporterName ? `${identity.reporterName}，从一条咨询开始` : '从一条咨询开始' }}</h1>
-        <p>选择商品和 SKU，获取 AI 建议，再由你核对、编辑和复制。系统不会自动向客户发送消息。</p>
+        <h1>{{ identity.reporterName ? `${identity.reporterName}，今天先处理哪条咨询？` : '今天先处理哪条咨询？' }}</h1>
+        <p>确认店铺和商品后获取 AI 建议；由你核对、编辑并复制发送，系统不会自动向客户发送消息。</p>
         <div class="hero-actions">
-          <RouterLink to="/ai-chat" class="primary-link" data-testid="enter-ai-chat">开始 AI 客服</RouterLink>
+          <RouterLink to="/ai-chat" class="primary-link" data-testid="enter-ai-chat">开始处理咨询</RouterLink>
           <RouterLink to="/experience-cases" class="secondary-link">查看我的案例</RouterLink>
         </div>
       </div>
-      <div class="today-card">
-        <strong>今天的工作边界</strong>
-        <p>仅使用测试或已去标识化信息。涉及商品、回复和引用时，请在复制前人工核对。</p>
+      <div class="today-card" data-testid="home-readiness">
+        <small>当前工作状态</small>
+        <strong>{{ readiness.title }}</strong>
+        <p>{{ readiness.description }}</p>
+        <RouterLink to="/ai-chat">{{ readiness.actionLabel }}</RouterLink>
       </div>
     </section>
 
@@ -113,6 +115,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import ProductEmptyState from '@/components/ProductEmptyState.vue'
 import { useCustomerSessionActivity } from '@/workspace/customerSessionActivity'
@@ -124,6 +127,35 @@ const { identity } = useTesterIdentity()
 const systemStatus = useSystemStatus()
 const activity = useCustomerSessionActivity()
 const { submissions } = useExperienceCaseSubmissions(identity.value.reporterId)
+
+const readiness = computed(() => {
+  if (systemStatus.aiReady.value && systemStatus.dataReady.value) {
+    return {
+      title: '可以开始处理新咨询',
+      description: '确认商品上下文后生成建议，发送前仍需人工核对来源和措辞。',
+      actionLabel: '去处理咨询'
+    }
+  }
+  if (systemStatus.dataReady.value) {
+    return {
+      title: '商品资料可用，AI 正在连接',
+      description: '可先确认商品；AI 恢复前请按原客服流程处理客户问题。',
+      actionLabel: '查看 AI 状态'
+    }
+  }
+  if (systemStatus.aiReady.value) {
+    return {
+      title: 'AI 可用，商品资料正在连接',
+      description: '请等待或刷新商品目录；不要绕过商品上下文直接生成建议。',
+      actionLabel: '查看商品状态'
+    }
+  }
+  return {
+    title: '服务正在连接',
+    description: '暂时无法开始新的 AI 咨询；可以先整理去标识化的客户问题。',
+    actionLabel: '查看恢复说明'
+  }
+})
 </script>
 
 <style scoped>
@@ -137,8 +169,10 @@ h2, h3, p { margin-top: 0; }
 .primary-link, .secondary-link { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 14px; border: 1px solid #c8d7eb; border-radius: 10px; color: #31537f; text-decoration: none; font-weight: 700; }
 .primary-link { border-color: #2e63d5; background: #2e63d5; color: #fff; }
 .today-card { align-self: stretch; padding: 18px; border-radius: 16px; background: #fff7df; color: #74500d; }
-.today-card strong { font-size: 15px; }
+.today-card small { display: block; margin-bottom: 7px; color: #8f6921; font-size: 11px; font-weight: 800; letter-spacing: .05em; }
+.today-card strong { display: block; font-size: 16px; }
 .today-card p { margin: 8px 0 0; font-size: 13px; line-height: 1.65; }
+.today-card a { display: inline-flex; margin-top: 12px; color: #72500e; font-size: 13px; font-weight: 800; text-decoration: none; }
 .summary-section, .quick-section, .start-section, .work-rhythm-section { margin-top: 26px; }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
 .section-heading h2 { margin-bottom: 0; font-size: 21px; }
