@@ -75,6 +75,47 @@ try {
         throw 'Legacy config did not receive the required optional defaults.'
     }
 
+    New-Item -ItemType Directory -Force -Path $config.RuntimeDirectory | Out-Null
+    [ordered]@{
+        packageId = $config.TestKnowledgePackageId
+        syncedItems = 47
+        collectionCount = 47
+        verifiedUtc = '2026-07-27T00:00:00.0000000Z'
+    } | ConvertTo-Json | Set-Content -LiteralPath (Get-TestKnowledgeSyncRecordPath $config) -Encoding UTF8
+    $syncHistory = Get-TestKnowledgeSyncHistory $config
+    if ($syncHistory.State -ne 'HISTORICAL_SYNC' -or $syncHistory.CollectionCount -ne 47) {
+        throw 'Test knowledge history did not retain its historical count.'
+    }
+
+    function Get-Json([string]$Url, [string]$Label) {
+        if ($Url -like '*/api/knowledge/statistics') {
+            return [pscustomobject]@{
+                data = [pscustomobject]@{
+                    document_count = 0
+                    chunk_count = 0
+                    collection_name = 'documents'
+                    vector_database = 'ChromaDB'
+                }
+            }
+        }
+        return [pscustomobject]@{ ready=$true; model_configured=$true; initialization_error=$null }
+    }
+    $runtimeStatistics = Get-RagKnowledgeRuntimeStatistics $config
+    if ($runtimeStatistics.State -ne 'AVAILABLE' -or $runtimeStatistics.ChunkCount -ne 0 -or $runtimeStatistics.CollectionName -ne 'documents') {
+        throw 'Runtime knowledge statistics were not read from the live statistics response.'
+    }
+    if ((Get-TestKnowledgeRuntimeConsistency $syncHistory $runtimeStatistics) -ne 'MISMATCH') {
+        throw 'Historical sync and runtime statistics mismatch was not detected.'
+    }
+    Remove-Item -LiteralPath Function:\Get-Json -Force
+
+    function Get-Json([string]$Url, [string]$Label) { throw 'statistics endpoint unavailable' }
+    $unavailableStatistics = Get-RagKnowledgeRuntimeStatistics $config
+    if ($unavailableStatistics.State -ne 'UNAVAILABLE' -or (Get-TestKnowledgeRuntimeConsistency $syncHistory $unavailableStatistics) -ne 'STATISTICS_UNAVAILABLE') {
+        throw 'Unavailable runtime statistics were not represented explicitly.'
+    }
+    Remove-Item -LiteralPath Function:\Get-Json -Force
+
     Assert-Throws { Assert-OllamaReady @{ OllamaBaseUrl='http://127.0.0.1:1'; OllamaModel='qwen3.5:9b' } | Out-Null } 'Unavailable Ollama check'
     Assert-Throws { Assert-OllamaReady @{ OllamaBaseUrl='http://127.0.0.1:11434'; OllamaModel='does-not-exist:0' } | Out-Null } 'Missing Ollama model check'
 

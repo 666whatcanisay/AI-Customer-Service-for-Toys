@@ -1288,6 +1288,83 @@ function Import-TestDataPackage($Config) {
 
 function Get-TestKnowledgeSyncRecordPath($Config) { Join-Path $Config.RuntimeDirectory 'test-knowledge-sync.json' }
 
+function Get-TestKnowledgeSyncHistory($Config) {
+    $recordPath = Get-TestKnowledgeSyncRecordPath $Config
+    if (-not (Test-Path -LiteralPath $recordPath)) {
+        return [pscustomobject]@{
+            State = 'NO_HISTORY'
+            PackageId = $null
+            SyncedItems = $null
+            CollectionCount = $null
+            VerifiedUtc = $null
+        }
+    }
+
+    try {
+        $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    } catch {
+        return [pscustomobject]@{
+            State = 'INVALID_HISTORY'
+            PackageId = $null
+            SyncedItems = $null
+            CollectionCount = $null
+            VerifiedUtc = $null
+        }
+    }
+
+    if ([string]$record.packageId -ne [string]$Config.TestKnowledgePackageId) {
+        return [pscustomobject]@{
+            State = 'OTHER_PACKAGE_HISTORY'
+            PackageId = [string]$record.packageId
+            SyncedItems = $null
+            CollectionCount = $null
+            VerifiedUtc = $null
+        }
+    }
+
+    return [pscustomobject]@{
+        State = 'HISTORICAL_SYNC'
+        PackageId = [string]$record.packageId
+        SyncedItems = [int]$record.syncedItems
+        CollectionCount = [int]$record.collectionCount
+        VerifiedUtc = [string]$record.verifiedUtc
+    }
+}
+
+function Get-RagKnowledgeRuntimeStatistics($Config) {
+    $runtimeUrl = Get-ServiceUrl $Config $Config.RagPort '/api/knowledge/statistics'
+    try {
+        $response = Get-Json $runtimeUrl 'A 运行时知识统计'
+        $data = if ($null -ne $response.data) { $response.data } else { $response }
+        return [pscustomobject]@{
+            State = 'AVAILABLE'
+            RuntimeUrl = $runtimeUrl
+            DocumentCount = [int]$data.document_count
+            ChunkCount = [int]$data.chunk_count
+            CollectionName = [string]$data.collection_name
+            VectorDatabase = [string]$data.vector_database
+            Error = $null
+        }
+    } catch {
+        return [pscustomobject]@{
+            State = 'UNAVAILABLE'
+            RuntimeUrl = $runtimeUrl
+            DocumentCount = $null
+            ChunkCount = $null
+            CollectionName = $null
+            VectorDatabase = $null
+            Error = $_.Exception.Message
+        }
+    }
+}
+
+function Get-TestKnowledgeRuntimeConsistency($SyncHistory, $RuntimeStatistics) {
+    if ($RuntimeStatistics.State -ne 'AVAILABLE') { return 'STATISTICS_UNAVAILABLE' }
+    if ($SyncHistory.State -ne 'HISTORICAL_SYNC') { return 'NO_HISTORICAL_COMPARISON' }
+    if ($RuntimeStatistics.ChunkCount -ne $SyncHistory.CollectionCount) { return 'MISMATCH' }
+    return 'MATCH'
+}
+
 function Sync-TestKnowledge($Config) {
     if (-not [bool]$Config.AutoSyncTestKnowledge) { Write-Host 'AutoSyncTestKnowledge=false，跳过 A 测试知识同步。'; return $null }
     $response = Invoke-RestMethod -UseBasicParsing -Method Post -Uri (Get-ServiceUrl $Config $Config.RagPort "/api/test-knowledge/sync/$($Config.TestKnowledgePackageId)") -TimeoutSec 120
