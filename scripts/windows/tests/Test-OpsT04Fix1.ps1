@@ -70,7 +70,13 @@ try {
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
-    if ($startExitCode -eq 0 -or ($startOutput -join "`n") -notmatch 'A \.ve\s*nv' -or ($startOutput -join "`n") -notmatch 'C：未启动' -or ($startOutput -join "`n") -notmatch 'B：未启动') { throw '缺少 A .venv 时未给出完整安全提示。' }
+    $startOutputText = $startOutput -join "`n"
+    # PowerShell may line-wrap a non-terminating error before the test captures it.
+    # Collapse that presentation-only whitespace before checking the safety summary.
+    $normalizedStartOutput = $startOutputText -replace '\s+', ' '
+    if ($startExitCode -eq 0 -or $normalizedStartOutput -notmatch 'A \.venv' -or $normalizedStartOutput -notmatch 'C：未启动' -or $normalizedStartOutput -notmatch 'B：未启动') {
+        throw "缺少 A .venv 时未给出完整安全提示。实际输出：`n$startOutputText"
+    }
     Write-Host 'OPS-T04-FIX1 测试：PASS（状态未运行、仅 C、过期 PID、$PID 冲突、缺少 .runtime、缺少 A .venv 与语法）。' -ForegroundColor Green
 } finally {
     if ($fakeProcess -and -not $fakeProcess.HasExited) { Stop-Process -Id $fakeProcess.Id -Force -ErrorAction SilentlyContinue }

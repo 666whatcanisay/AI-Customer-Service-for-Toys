@@ -422,7 +422,7 @@ function Get-ManagedServiceExpectedListenerAddress($Config, [string]$Name, [int]
 function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
     $record = Test-RecordedProcess $Config $Name
     if (-not $record -or -not $record.Valid) { return $false }
-    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    $listeners = @(Get-TcpListeningConnection $Port)
     $owners = @(if ($listeners.Count -gt 0) { @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) } else { @(Get-PortOwner $Port) })
     $listenerPid = if ($record.ListenerProcess) { [int]$record.ListenerProcess.Id } else { 0 }
     if ($listenerPid -gt 0) {
@@ -630,18 +630,42 @@ function Stop-VerifiedProcessTree([int]$ProcessId, [int]$ListenerProcessId = 0) 
     $descendants = @(Get-ProcessDescendantIds $ProcessId)
     $processIds = @($descendants | Sort-Object -Descending) + @($ListenerProcessId, $ProcessId) | Where-Object { $_ -gt 0 } | Select-Object -Unique
     foreach ($id in $processIds) {
-        if (Get-Process -Id $id -ErrorAction SilentlyContinue) { Stop-Process -Id $id -ErrorAction Stop }
+        if (Get-Process -Id $id -ErrorAction SilentlyContinue) {
+            try {
+                Stop-Process -Id $id -ErrorAction Stop
+            } catch {
+                # A verified child may exit after the existence check. Treat only
+                # that completed exit as success; preserve real stop failures.
+                if (Get-Process -Id $id -ErrorAction SilentlyContinue) { throw }
+            }
+        }
     }
     Start-Sleep -Milliseconds 500
     return @($processIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
 }
 
-function Get-PortOwner([int]$Port) {
-    $owners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)
-    if ($owners.Count -gt 0) { return $owners }
+function Get-TcpListeningConnection([int]$Port) {
     $netstat = Join-Path $env:SystemRoot 'System32\netstat.exe'
-    $pattern = '^\s*TCP\s+\S+:' + [regex]::Escape([string]$Port) + '\s+\S+\s+LISTENING\s+(\d+)\s*$'
-    return @(& $netstat -ano -p tcp 2>$null | Where-Object { $_ -match $pattern } | ForEach-Object { [int]$Matches[1] } | Select-Object -Unique)
+    $lines = @(& $netstat -ano -p tcp)
+    if ($LASTEXITCODE -ne 0) { throw '无法读取 TCP 监听状态；为避免错误启动或停止进程，操作已拒绝。' }
+    $listeners = @()
+    foreach ($line in $lines) {
+        $columns = @(([string]$line).Trim() -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        if ($columns.Count -lt 5 -or [string]$columns[0] -ne 'TCP' -or [string]$columns[3] -ne 'LISTENING') { continue }
+        $localEndpoint = [string]$columns[1]
+        $separator = $localEndpoint.LastIndexOf(':')
+        if ($separator -lt 1) { continue }
+        $localPort = 0
+        if (-not [int]::TryParse($localEndpoint.Substring($separator + 1), [ref]$localPort) -or $localPort -ne $Port) { continue }
+        $owningProcess = 0
+        if (-not [int]::TryParse([string]$columns[4], [ref]$owningProcess) -or $owningProcess -le 0) { continue }
+        $listeners += [pscustomobject]@{ LocalAddress=$localEndpoint.Substring(0, $separator); LocalPort=$localPort; OwningProcess=$owningProcess }
+    }
+    return @($listeners | Sort-Object LocalAddress, OwningProcess -Unique)
+}
+
+function Get-PortOwner([int]$Port) {
+    return @(Get-TcpListeningConnection $Port | Select-Object -ExpandProperty OwningProcess -Unique)
 }
 function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
     $owners = @(Get-PortOwner $Port)
@@ -748,6 +772,156 @@ function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUr
     $portState = if ($portOwners.Count -gt 0) { "监听（LISTENING；PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（LISTENING；health 已确认；未能读取端口 PID）' } else { '未监听' }
     $healthState = if ($healthOk) { '可用' } else { '不可用' }
     return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; Record=$record }
+}
+
+function Get-TargetPilotHttpProbe([string]$Url) {
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 5
+        return [pscustomobject]@{ Url=$Url; Reachable=($response.StatusCode -ge 200 -and $response.StatusCode -lt 400); StatusCode=[int]$response.StatusCode }
+    } catch {
+        # Do not preserve response bodies or exception details in a pilot report.
+        return [pscustomobject]@{ Url=$Url; Reachable=$false; StatusCode=0 }
+    }
+}
+
+function Test-TargetPilotTcpProbe([string]$TargetHost, [int]$Port) {
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $connect = $client.ConnectAsync($TargetHost, $Port)
+        if (-not $connect.Wait(5000)) { return $false }
+        return $client.Connected
+    } catch {
+        return $false
+    } finally {
+        $client.Dispose()
+    }
+}
+
+function Get-TargetPilotServiceStatuses($Config) {
+    return @(
+        [pscustomobject]@{ Label='C'; Status=(Get-ServiceStatus $Config 'platform' $Config.PlatformPort (Get-ManagedServiceHealthUrl $Config 'platform')) },
+        [pscustomobject]@{ Label='A'; Status=(Get-ServiceStatus $Config 'rag' $Config.RagPort (Get-ManagedServiceHealthUrl $Config 'rag')) },
+        [pscustomobject]@{ Label='B'; Status=(Get-ServiceStatus $Config 'customer-web' $Config.CustomerWebPort (Get-ManagedServiceHealthUrl $Config 'customer-web')) },
+        [pscustomobject]@{ Label='Admin'; Status=(Get-ServiceStatus $Config 'admin-web' $Config.AdminWebPort (Get-ManagedServiceHealthUrl $Config 'admin-web')) }
+    )
+}
+
+function Get-TargetPilotReadiness($Config, [ValidateSet('Lan','Local')] [string]$Mode = 'Lan', [object[]]$ServiceStatuses = $null, [scriptblock]$HttpProbe = $null, [scriptblock]$TcpProbe = $null) {
+    $customerUri = [uri]$Config.CustomerWebUrl
+    $customerAuthority = $customerUri.GetLeftPart([System.UriPartial]::Authority)
+    $customerHost = [string]$customerUri.Host
+    $customerPort = [int]$customerUri.Port
+    $adminUri = [uri]$Config.AdminWebUrl
+    $loopbackHosts = @('127.0.0.1', '::1', 'localhost')
+    $adminLoopback = -not [bool]$Config.AdminEnableLanMode -and
+        [string]$Config.AdminWebBindAddress -in $loopbackHosts -and
+        [string]$adminUri.Host -in $loopbackHosts
+
+    $networkReady = $true
+    if ($Mode -eq 'Lan') {
+        $hasLanSelection = $Config.ContainsKey('LanSelection') -and $null -ne $Config.LanSelection
+        $privateCustomerHost = Test-PrivateLanIpv4 $customerHost
+        $bindMatchesCustomer = $Config.ContainsKey('CustomerWebBindAddress') -and [string]$Config.CustomerWebBindAddress -eq $customerHost
+        $networkCategory = if ($Config.ContainsKey('LanNetworkProfile') -and $null -ne $Config.LanNetworkProfile) { [string]$Config.LanNetworkProfile.NetworkCategory } else { '' }
+        $networkReady = $hasLanSelection -and $privateCustomerHost -and $bindMatchesCustomer -and $networkCategory -in @('Private', 'DomainAuthenticated')
+    } else {
+        $networkReady = $customerHost -in $loopbackHosts
+    }
+
+    if ($null -eq $ServiceStatuses) { $ServiceStatuses = Get-TargetPilotServiceStatuses $Config }
+    $serviceFailures = @($ServiceStatuses | Where-Object {
+        $status = $_.Status
+        $recordValid = $status.Record -and $status.Record.Valid
+        $status.State -ne '运行中（RUNNING）' -or $status.HealthState -ne '可用' -or -not $recordValid
+    })
+
+    $tcpReachable = if ($TcpProbe) { [bool](& $TcpProbe $customerHost $customerPort) } else { Test-TargetPilotTcpProbe $customerHost $customerPort }
+    $customerPage = if ($HttpProbe) { & $HttpProbe ([string]$Config.CustomerWebUrl) } else { Get-TargetPilotHttpProbe $Config.CustomerWebUrl }
+    $ragProxy = if ($HttpProbe) { & $HttpProbe "$customerAuthority/rag-api/api/health" } else { Get-TargetPilotHttpProbe "$customerAuthority/rag-api/api/health" }
+    $platformProxy = if ($HttpProbe) { & $HttpProbe "$customerAuthority/platform-api/health" } else { Get-TargetPilotHttpProbe "$customerAuthority/platform-api/health" }
+
+    $state = if (-not $adminLoopback) {
+        'ADMIN_LOOPBACK_REQUIRED'
+    } elseif (-not $networkReady) {
+        if ($Mode -eq 'Lan') { 'LAN_CONFIGURATION_REQUIRED' } else { 'LOCAL_CONFIGURATION_REQUIRED' }
+    } elseif ($serviceFailures.Count -gt 0) {
+        'SERVICE_NOT_READY'
+    } elseif (-not $tcpReachable) {
+        'NETWORK_SEGMENTED'
+    } elseif (-not $customerPage.Reachable -or -not $ragProxy.Reachable -or -not $platformProxy.Reachable) {
+        'CUSTOMER_PATH_UNAVAILABLE'
+    } else {
+        'READY_FOR_CUSTOMER_PILOT'
+    }
+
+    return [pscustomobject]@{
+        SchemaVersion = 'target-pilot-readiness.v1'
+        CheckedUtc = [DateTime]::UtcNow.ToString('o')
+        Mode = $Mode
+        State = $state
+        Ready = $state -eq 'READY_FOR_CUSTOMER_PILOT'
+        SimulationScope = if ($Mode -eq 'Lan') { 'server-side LAN endpoint probe only; a second customer computer must still be accepted manually' } else { 'server-local endpoint probe only' }
+        CustomerUrl = [string]$Config.CustomerWebUrl
+        AdminUrl = [string]$Config.AdminWebUrl
+        AdminLoopback = $adminLoopback
+        NetworkReady = $networkReady
+        Services = $ServiceStatuses
+        ServiceFailures = @($serviceFailures | ForEach-Object { $_.Label })
+        Probes = [pscustomobject]@{ TcpReachable=$tcpReachable; CustomerPage=$customerPage; RagProxy=$ragProxy; PlatformProxy=$platformProxy }
+    }
+}
+
+function Save-TargetPilotReadinessReport($Config, $Readiness) {
+    $directory = Join-Path $Config.RuntimeDirectory 'pilot-readiness'
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $path = Join-Path $directory ("target-pilot-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
+    $safeServices = @($Readiness.Services | ForEach-Object {
+        $status = $_.Status
+        [ordered]@{ label=$_.Label; state=$status.State; port=$status.Port; portState=$status.PortState; healthState=$status.HealthState; managedPid=$status.ManagedProcessId; listenerPid=$status.ListenerProcessId; recordValid=[bool]($status.Record -and $status.Record.Valid) }
+    })
+    $safeReport = [ordered]@{
+        schemaVersion = $Readiness.SchemaVersion
+        checkedUtc = $Readiness.CheckedUtc
+        mode = $Readiness.Mode
+        state = $Readiness.State
+        ready = [bool]$Readiness.Ready
+        simulationScope = $Readiness.SimulationScope
+        customerUrl = $Readiness.CustomerUrl
+        adminUrl = $Readiness.AdminUrl
+        adminLoopback = [bool]$Readiness.AdminLoopback
+        networkReady = [bool]$Readiness.NetworkReady
+        serviceFailures = @($Readiness.ServiceFailures)
+        services = $safeServices
+        probes = [ordered]@{
+            tcpReachable = [bool]$Readiness.Probes.TcpReachable
+            customerPage = [ordered]@{ reachable=[bool]$Readiness.Probes.CustomerPage.Reachable; statusCode=[int]$Readiness.Probes.CustomerPage.StatusCode }
+            ragProxy = [ordered]@{ reachable=[bool]$Readiness.Probes.RagProxy.Reachable; statusCode=[int]$Readiness.Probes.RagProxy.StatusCode }
+            platformProxy = [ordered]@{ reachable=[bool]$Readiness.Probes.PlatformProxy.Reachable; statusCode=[int]$Readiness.Probes.PlatformProxy.StatusCode }
+        }
+    }
+    $safeReport | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $path -Encoding UTF8
+    return $path
+}
+
+function Write-TargetPilotReadiness($Readiness, [string]$ReportPath = '') {
+    Write-Host "试运行就绪状态：$($Readiness.State)" -ForegroundColor $(if ($Readiness.Ready) { 'Green' } else { 'Yellow' })
+    foreach ($service in $Readiness.Services) {
+        $status = $service.Status
+        Write-Host "$($service.Label)：$($status.State)；受管 PID $($status.ManagedProcessId)；监听 PID $($status.ListenerProcessId)；health：$($status.HealthState)"
+    }
+    Write-Host "客服入口：$($Readiness.CustomerUrl)；TCP：$($Readiness.Probes.TcpReachable)；页面：$($Readiness.Probes.CustomerPage.Reachable)；/rag-api：$($Readiness.Probes.RagProxy.Reachable)；/platform-api：$($Readiness.Probes.PlatformProxy.Reachable)"
+    Write-Host "运营后台：$($Readiness.AdminUrl)；仅本机：$($Readiness.AdminLoopback)"
+    Write-Host "模拟范围：$($Readiness.SimulationScope)"
+    if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { Write-Host "已写入脱敏就绪报告：$ReportPath" }
+    if (-not $Readiness.Ready) {
+        switch ($Readiness.State) {
+            'SERVICE_NOT_READY' { Write-Host "下一步：先运行 检查局域网客服状态.bat；仅在核对运行记录后使用 停止AI客服.bat，再重新启动。未通过服务：$($Readiness.ServiceFailures -join '、')" -ForegroundColor Yellow }
+            'NETWORK_SEGMENTED' { Write-Host '下一步：核对 Private 网络、5173 专用防火墙规则和同网段设备；仍不可达时记录 NETWORK_SEGMENTED，不开放 8000/8011/5174。' -ForegroundColor Yellow }
+            'CUSTOMER_PATH_UNAVAILABLE' { Write-Host '下一步：保留服务进程，检查 B 的 Vite 代理与 A/C health；不要在客服电脑直连 8000、8011 或 5174。' -ForegroundColor Yellow }
+            'ADMIN_LOOPBACK_REQUIRED' { Write-Host '下一步：将 AdminWebBindAddress 和 AdminWebUrl 恢复为 127.0.0.1，且保持 AdminEnableLanMode=false；本轮不开放 5174。' -ForegroundColor Yellow }
+            default { Write-Host '下一步：检查 LAN 网卡选择和 Private 网络配置；脚本未修改防火墙、网络或未知进程。' -ForegroundColor Yellow }
+        }
+    }
 }
 
 function Assert-Dependencies($Config) {
