@@ -5,6 +5,7 @@ import {
   apiErrorMessage,
   getAdminOperationsToday,
   getHealth,
+  listPilotStores,
   listAiModules,
   type AdminOperationsToday,
 } from '../api/client'
@@ -16,6 +17,8 @@ const platformState = ref<Availability>('loading')
 const aiState = ref<Availability>('loading')
 const isLoading = ref(true)
 const error = ref('')
+const pilotStoreState = ref<'loading' | 'ready' | 'unavailable'>('loading')
+const pilotStores = ref<{ total: number; needsProduct: number; needsKnowledge: number; observable: number }>({ total: 0, needsProduct: 0, needsKnowledge: 0, observable: 0 })
 
 function zeroAware(value: number | null, suffix = ''): string {
   if (value === null) return '待启用'
@@ -62,14 +65,27 @@ const windowLabel = computed(() => {
 async function load(): Promise<void> {
   isLoading.value = true
   error.value = ''
-  const [operationsResult, healthResult, aiResult] = await Promise.allSettled([
+  const [operationsResult, healthResult, aiResult, pilotStoresResult] = await Promise.allSettled([
     getAdminOperationsToday(),
     getHealth(),
     listAiModules(),
+    listPilotStores(),
   ])
   operations.value = operationsResult.status === 'fulfilled' ? operationsResult.value : null
   platformState.value = healthResult.status === 'fulfilled' ? 'ready' : 'unavailable'
   aiState.value = aiResult.status === 'fulfilled' ? 'ready' : 'unavailable'
+  if (pilotStoresResult.status === 'fulfilled') {
+    pilotStoreState.value = 'ready'
+    const items = pilotStoresResult.value.items
+    pilotStores.value = {
+      total: pilotStoresResult.value.total,
+      needsProduct: items.filter((item) => item.setup_status === 'NEEDS_PRODUCT_IMPORT').length,
+      needsKnowledge: items.filter((item) => item.setup_status === 'NEEDS_KNOWLEDGE').length,
+      observable: items.filter((item) => item.setup_status === 'OBSERVABLE').length,
+    }
+  } else {
+    pilotStoreState.value = 'unavailable'
+  }
   if (operationsResult.status === 'rejected') error.value = apiErrorMessage(operationsResult.reason)
   isLoading.value = false
 }
@@ -122,6 +138,13 @@ onMounted(load)
       </article>
     </section>
 
+    <section class="card multi-store-card">
+      <div class="section-heading"><div><h2>多店铺准备状态</h2><p>试运行店铺遵循创建、目标绑定导入、知识维护、观察的受控流程。</p></div><RouterLink to="/store-center">进入店铺中心</RouterLink></div>
+      <p v-if="pilotStoreState === 'unavailable'" class="notice compact">待启用：未读取到试运行店铺状态。</p>
+      <div v-else class="store-summary"><div><span>试运行店铺</span><strong>{{ pilotStoreState === 'loading' ? '读取中' : pilotStores.total }}</strong></div><div><span>待导入商品</span><strong>{{ pilotStoreState === 'loading' ? '读取中' : pilotStores.needsProduct }}</strong></div><div><span>待维护知识</span><strong>{{ pilotStoreState === 'loading' ? '读取中' : pilotStores.needsKnowledge }}</strong></div><div><span>可观察</span><strong>{{ pilotStoreState === 'loading' ? '读取中' : pilotStores.observable }}</strong></div></div>
+      <p class="subtle">单店 AI 使用待启用：现有效率事件是无店铺字段的全局汇总，不能据此推断单店指标。</p>
+    </section>
+
     <section class="card operating-note">
       <h2>运营口径</h2>
       <p>“今日 AI 使用”仅统计无客服内容的效率事件；“今日案例”和“今日问题”按创建时间统计；“已完成分析”按分析证据写入时间统计。页面不展示员工排名、绩效评价、Prompt 修改、知识发布或业务自动执行。</p>
@@ -130,5 +153,5 @@ onMounted(load)
 </template>
 
 <style scoped>
-.trial-note { margin-bottom: 20px; color: #76580e; background: #fff8df; }.dashboard-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }.status-card { display: grid; min-height: 151px; align-content: start; gap: 9px; padding: 18px; border: 1px solid #dfe7f2; border-radius: 13px; color: #475569; background: #fff; box-shadow: 0 9px 24px rgb(15 23 42 / 4%); text-decoration: none; transition: border-color .15s ease, transform .15s ease; }.status-card:hover { border-color: #86a8d6; transform: translateY(-1px); }.status-card strong { color: #172554; font-size: 21px; }.status-card small { color: #64748b; line-height: 1.45; }.operations-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 18px; }.section-heading { display: flex; justify-content: space-between; gap: 15px; }.section-heading h2, .operating-note h2 { margin: 0 0 4px; color: #172554; font-size: 18px; }.section-heading p, .subtle, .operating-note p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.55; }.section-heading a { color: #285493; font-size: 13px; white-space: nowrap; }.work-list { display: grid; gap: 9px; margin-top: 17px; }.work-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 11px; border-radius: 9px; color: inherit; background: #f6f8fc; text-decoration: none; }.work-list a:hover { background: #eef4ff; }.work-list span { color: #475569; font-size: 13px; }.work-list strong { grid-row: span 2; align-self: center; color: #172554; font-size: 20px; }.work-list small { color: #64748b; font-size: 12px; }.knowledge-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 18px; }.knowledge-metrics div { padding: 11px; border-radius: 9px; background: #f6f8fc; }.knowledge-metrics span { display: block; color: #64748b; font-size: 12px; }.knowledge-metrics strong { display: block; margin-top: 4px; color: #172554; font-size: 20px; }.subtle { margin-top: 13px; }.compact { margin: 18px 0 0; }.operating-note { margin-top: 18px; }.operating-note p { max-width: 900px; }@media (max-width: 1100px) { .dashboard-grid { grid-template-columns: repeat(3, 1fr); }.knowledge-metrics { grid-template-columns: repeat(3, 1fr); } }@media (max-width: 760px) { .dashboard-grid, .operations-grid { grid-template-columns: 1fr; }.knowledge-metrics { grid-template-columns: repeat(2, 1fr); } }
+.trial-note { margin-bottom: 20px; color: #76580e; background: #fff8df; }.dashboard-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }.status-card { display: grid; min-height: 151px; align-content: start; gap: 9px; padding: 18px; border: 1px solid #dfe7f2; border-radius: 13px; color: #475569; background: #fff; box-shadow: 0 9px 24px rgb(15 23 42 / 4%); text-decoration: none; transition: border-color .15s ease, transform .15s ease; }.status-card:hover { border-color: #86a8d6; transform: translateY(-1px); }.status-card strong { color: #172554; font-size: 21px; }.status-card small { color: #64748b; line-height: 1.45; }.operations-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 18px; }.section-heading { display: flex; justify-content: space-between; gap: 15px; }.section-heading h2, .operating-note h2 { margin: 0 0 4px; color: #172554; font-size: 18px; }.section-heading p, .subtle, .operating-note p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.55; }.section-heading a { color: #285493; font-size: 13px; white-space: nowrap; }.work-list { display: grid; gap: 9px; margin-top: 17px; }.work-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 11px; border-radius: 9px; color: inherit; background: #f6f8fc; text-decoration: none; }.work-list a:hover { background: #eef4ff; }.work-list span { color: #475569; font-size: 13px; }.work-list strong { grid-row: span 2; align-self: center; color: #172554; font-size: 20px; }.work-list small { color: #64748b; font-size: 12px; }.knowledge-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 18px; }.knowledge-metrics div, .store-summary div { padding: 11px; border-radius: 9px; background: #f6f8fc; }.knowledge-metrics span, .store-summary span { display: block; color: #64748b; font-size: 12px; }.knowledge-metrics strong, .store-summary strong { display: block; margin-top: 4px; color: #172554; font-size: 20px; }.subtle { margin-top: 13px; }.compact { margin: 18px 0 0; }.multi-store-card, .operating-note { margin-top: 18px; }.store-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 18px; }.operating-note p { max-width: 900px; }@media (max-width: 1100px) { .dashboard-grid { grid-template-columns: repeat(3, 1fr); }.knowledge-metrics { grid-template-columns: repeat(3, 1fr); } }@media (max-width: 760px) { .dashboard-grid, .operations-grid { grid-template-columns: 1fr; }.knowledge-metrics, .store-summary { grid-template-columns: repeat(2, 1fr); } }
 </style>

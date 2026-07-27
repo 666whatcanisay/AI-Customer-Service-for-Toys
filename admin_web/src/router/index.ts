@@ -11,6 +11,7 @@ import CustomerExperienceCasesView from '../views/CustomerExperienceCasesView.vu
 import AiOptimizationPoolView from '../views/AiOptimizationPoolView.vue'
 import AiFeedbackOptimizationPoolView from '../views/AiFeedbackOptimizationPoolView.vue'
 import CustomerEfficiencyDashboardView from '../views/CustomerEfficiencyDashboardView.vue'
+import PilotStoreCenterView from '../views/PilotStoreCenterView.vue'
 import OperationsOverviewView from '../views/OperationsOverviewView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ReadonlyListView from '../views/ReadonlyListView.vue'
@@ -21,6 +22,7 @@ export const router = createRouter({
     { path: '/', redirect: '/overview' },
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
+    { path: '/store-center', name: 'store-center', component: PilotStoreCenterView },
     {
       path: '/stores', name: 'stores', component: ReadonlyListView,
       props: { resource: 'stores', title: '店铺', description: '查看平台、店铺编码、试运行标记与商品数量。', columns: [

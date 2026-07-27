@@ -86,6 +86,7 @@ async function chooseZip(wrapper: ReturnType<typeof mount>): Promise<void> {
 
 describe('TestDataPackagesView', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/')
     mockedList.mockReset()
     mockedPreflight.mockReset()
     mockedImport.mockReset()
@@ -159,5 +160,19 @@ describe('TestDataPackagesView', () => {
     await flushPromises()
     expect(mockedImport).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('IMPORTED_TEST_ONLY')
+  })
+
+  it('keeps a store-targeted knowledge import bound to its declared store code', async () => {
+    window.history.replaceState({}, '', '/test-data-packages?store_code=STORE-ONE')
+    mockedPreflight.mockResolvedValue(preflight(true))
+    const wrapper = mount(TestDataPackagesView)
+    await flushPromises()
+    await chooseZip(wrapper)
+    await wrapper.get('[data-testid="package-preflight"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('目标试运行店铺：STORE-ONE')
+    expect(wrapper.text()).toContain('不能导入')
+    expect(wrapper.get('[data-testid="package-import"]').attributes()).toHaveProperty('disabled')
   })
 })

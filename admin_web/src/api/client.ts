@@ -30,6 +30,7 @@ export interface ImportBatch {
   id: string
   batch_id: string
   tenant_id: string
+  target_store_code: string | null
   import_type: string
   original_filename: string
   file_sha256: string
@@ -488,6 +489,27 @@ export interface AdminOperationsToday {
   production_usable: boolean
 }
 
+export type PilotStoreSetupStatus = 'NEEDS_PRODUCT_IMPORT' | 'NEEDS_KNOWLEDGE' | 'OBSERVABLE'
+
+export interface PilotStore {
+  store_code: string
+  store_name: string
+  platform: string
+  created_at: string
+  setup_status: PilotStoreSetupStatus
+  catalog_product_count: number
+  catalog_sku_count: number
+  staged_product_count: number
+  staged_sku_count: number
+  faq_count: number
+  safety_rule_count: number
+  experience_case_count: number
+  ai_feedback_count: number
+  latest_product_imported_at: string | null
+  test_data_mode: boolean
+  production_usable: boolean
+}
+
 export async function listAdminExperienceCases(
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<AdminExperienceCase>> {
@@ -547,6 +569,20 @@ export async function getAdminCustomerEfficiencySummary(): Promise<CustomerEffic
 /** C-internal landing-page projection. It returns metrics and timestamps only. */
 export async function getAdminOperationsToday(): Promise<AdminOperationsToday> {
   const response = await apiClient.get<AdminOperationsToday>('/api/v1/admin/operations/today')
+  return response.data
+}
+
+export async function listPilotStores(): Promise<{ items: PilotStore[]; total: number }> {
+  const response = await apiClient.get<{ items: PilotStore[]; total: number }>('/api/v1/admin/pilot-stores')
+  return response.data
+}
+
+export async function createPilotStore(payload: {
+  store_code: string
+  store_name: string
+  platform: string
+}): Promise<PilotStore> {
+  const response = await apiClient.post<PilotStore>('/api/v1/admin/pilot-stores', payload)
   return response.data
 }
 
@@ -622,10 +658,12 @@ export async function listImportRows(
 export async function uploadProductSku(
   file: File,
   onProgress?: (percent: number) => void,
+  targetStoreCode?: string,
 ): Promise<ImportBatch> {
   const form = new FormData()
   form.append('file', file)
   form.append('created_by', 'admin-web-manual-import')
+  if (targetStoreCode) form.append('target_store_code', targetStoreCode)
   const response = await apiClient.post<ImportBatch>(
     '/api/v1/import-batches/product-sku',
     form,
@@ -640,9 +678,13 @@ export async function uploadProductSku(
   return response.data
 }
 
-export async function preflightProductSku(file: File): Promise<ProductSkuPreflight> {
+export async function preflightProductSku(
+  file: File,
+  targetStoreCode?: string,
+): Promise<ProductSkuPreflight> {
   const form = new FormData()
   form.append('file', file)
+  if (targetStoreCode) form.append('target_store_code', targetStoreCode)
   const response = await apiClient.post<ProductSkuPreflight>(
     '/api/v1/import-batches/product-sku/preflight',
     form,

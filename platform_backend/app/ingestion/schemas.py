@@ -44,6 +44,7 @@ class ErrorCode(StrEnum):
     INVALID_TEMPLATE = "INVALID_TEMPLATE"
     FORMULA_NOT_ALLOWED = "FORMULA_NOT_ALLOWED"
     INTERNAL_PARSE_ERROR = "INTERNAL_PARSE_ERROR"
+    STORE_CODE_MISMATCH = "STORE_CODE_MISMATCH"
 
 
 class ValidationIssue(BaseModel):
@@ -102,6 +103,7 @@ class BatchSummary(BaseModel):
     id: str
     batch_id: str
     tenant_id: str
+    target_store_code: str | None
     import_type: str
     original_filename: str
     file_sha256: str
