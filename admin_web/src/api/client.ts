@@ -445,6 +445,18 @@ export interface AiFeedbackAnalysisResultList {
   total: number
 }
 
+export interface CustomerEfficiencySummary {
+  summary_version: string
+  generated_at: string
+  window_start: string
+  window_end: string
+  ai_request_count: number
+  direct_adoption_count: number
+  edited_adoption_count: number
+  not_adopted_count: number
+  adoption_rate: number
+}
+
 export async function listAdminExperienceCases(
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<AdminExperienceCase>> {
@@ -490,6 +502,13 @@ export async function listAiOptimizationCases(
 export async function listAiFeedbackAnalysisResults(): Promise<AiFeedbackAnalysisResultList> {
   const response = await apiClient.get<AiFeedbackAnalysisResultList>(
     '/api/v1/admin/ai-quality/analysis-results',
+  )
+  return response.data
+}
+
+export async function getAdminCustomerEfficiencySummary(): Promise<CustomerEfficiencySummary> {
+  const response = await apiClient.get<CustomerEfficiencySummary>(
+    '/api/v1/admin/customer-efficiency/summary',
   )
   return response.data
 }

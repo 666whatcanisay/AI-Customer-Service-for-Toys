@@ -71,6 +71,13 @@ async def validation_exception_handler(
             "/api/v1/admin/ai-quality",
         )
     )
+    customer_efficiency_path = request.url.path.startswith(
+        (
+            "/api/v1/customer-efficiency-events",
+            "/api/v1/admin/ai-quality/customer-efficiency",
+            "/api/v1/admin/customer-efficiency",
+        )
+    )
     analysis_output_invalid = (
         request.url.path == "/api/v1/admin/ai-quality/analysis-results"
         and any(
@@ -88,11 +95,15 @@ async def validation_exception_handler(
                 if analysis_output_invalid
                 else "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
                 if ai_feedback_path
+                else "CUSTOMER_EFFICIENCY_VALIDATION_FAILED"
+                if customer_efficiency_path
                 else "EXPERIENCE_CASE_VALIDATION_FAILED"
                 if experience_case_path
                 else "VALIDATION_ERROR"
             ),
-            message="The request is invalid." if ai_feedback_path else "Request validation failed",
+            message="The request is invalid."
+            if ai_feedback_path or customer_efficiency_path
+            else "Request validation failed",
             details=exc.errors(),
         ),
     )
