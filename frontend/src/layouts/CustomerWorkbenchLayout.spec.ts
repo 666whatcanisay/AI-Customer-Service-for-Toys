@@ -12,7 +12,9 @@ vi.mock('@/api/platformClient', () => ({ platformClient: { getHealth: healthMock
 const mountLayout = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/', component: { template: '<div>首页内容</div>' } }]
+    routes: [
+      '/', '/ai-chat', '/experience-cases', '/feedback', '/suggestions', '/suggestions/mine'
+    ].map((path) => ({ path, component: { template: '<div>页面内容</div>' } }))
   })
   await router.push('/')
   await router.isReady()
@@ -27,16 +29,22 @@ describe('CustomerWorkbenchLayout', () => {
     healthMocks.platform.mockResolvedValue({ status: 'ok' })
   })
 
-  it('shows the platform navigation, global status and safety banner', async () => {
+  it('shows the unified product navigation, honest status labels and safety banner', async () => {
     localStorage.setItem(TESTER_IDENTITY_STORAGE_KEY, JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }))
     const wrapper = await mountLayout()
     await flushPromises()
-    expect(wrapper.get('nav').text()).toContain('工作台首页')
+    expect(wrapper.get('nav').text()).toContain('首页')
     expect(wrapper.get('nav').text()).toContain('AI 客服')
-    expect(wrapper.get('nav').text()).toContain('我的建议')
     expect(wrapper.get('nav').text()).toContain('我的案例')
+    expect(wrapper.get('nav').text()).toContain('问题反馈')
+    expect(wrapper.text()).toContain('AI客服平台')
     expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('AI 可用')
+    expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('平台 可用')
+    expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('客服 当前页面')
     expect(wrapper.get('[data-testid="global-test-banner"]').text()).toContain('禁止填写真实客户隐私')
+    expect(wrapper.find('[data-testid="product-technical-details"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="product-technical-toggle"]').trigger('click')
+    expect(wrapper.get('[data-testid="product-technical-details"]').text()).toContain('Git Commit')
     wrapper.unmount()
   })
 

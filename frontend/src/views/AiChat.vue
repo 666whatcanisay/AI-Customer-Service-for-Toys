@@ -76,6 +76,16 @@
       :closable="false"
       show-icon
     />
+    <section v-if="ragHealthError || platformError" class="service-recovery-card" data-testid="service-recovery-card">
+      <div>
+        <strong>暂时无法完成新的 AI 咨询</strong>
+        <p>刷新对应服务后再继续；已有人工客服流程不受页面状态影响。</p>
+      </div>
+      <div class="service-recovery-actions">
+        <el-button v-if="ragHealthError" :loading="ragHealthLoading" plain @click="refreshRagHealth">刷新 AI 状态</el-button>
+        <el-button v-if="platformError" :loading="platformHealthLoading" plain @click="refreshPlatform">刷新商品目录</el-button>
+      </div>
+    </section>
 
     <nav class="workflow-progress" aria-label="操作步骤">
       <div :class="{ active: workflowStep === 1, done: workflowStep > 1 }">
@@ -171,11 +181,44 @@
         </label>
       </div>
 
+      <section
+        class="catalog-guidance"
+        :class="`is-${catalogGuidance.tone}`"
+        data-testid="catalog-guidance"
+      >
+        <div>
+          <strong>{{ catalogGuidance.title }}</strong>
+          <p>{{ catalogGuidance.description }}</p>
+        </div>
+        <el-button
+          v-if="catalogGuidance.canRefresh"
+          data-testid="catalog-refresh-button"
+          plain
+          :loading="platformHealthLoading || storesLoading || productsLoading"
+          @click="refreshPlatform"
+        >
+          刷新商品目录
+        </el-button>
+      </section>
+      <p class="store-scope-note" data-testid="store-scope-note">
+        切换店铺会清空商品、SKU 和当前建议，避免把一个店铺的回答用于另一个店铺。
+      </p>
+
       <div v-if="selectedStore && selectedProduct" class="selection-confirmed" data-testid="context-summary">
         <span class="check-mark">✓</span>
-        <div>
-          <strong>已选择：{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
-          <p>{{ selectedProduct.displayName }}<template v-if="selectedSku"> · {{ selectedSku.displayName }}</template></p>
+        <div class="context-summary-grid">
+          <div>
+            <small>当前店铺</small>
+            <strong>{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
+          </div>
+          <div>
+            <small>商品上下文</small>
+            <strong>{{ selectedProduct.displayName }}</strong>
+          </div>
+          <div>
+            <small>SKU 上下文</small>
+            <strong>{{ selectedSku?.displayName ?? '待确认（可留空）' }}</strong>
+          </div>
         </div>
         <el-button link @click="showTechnicalDetails = !showTechnicalDetails">
           {{ showTechnicalDetails ? '隐藏技术信息' : '查看技术信息' }}
@@ -209,6 +252,7 @@
         show-word-limit
         placeholder="例如：这个款式适合几岁的小朋友？"
         :disabled="loading"
+        @input="handleQuestionInput"
         @keydown.enter.exact.prevent="submitQuestion"
       />
       <div class="example-row">
@@ -250,6 +294,15 @@
       :closable="false"
       show-icon
     />
+    <el-alert
+      v-if="nextQuestionNotice"
+      data-testid="next-question-notice"
+      class="status-alert"
+      :title="nextQuestionNotice"
+      type="info"
+      :closable="false"
+      show-icon
+    />
 
     <section v-if="loading" class="loading-card" data-testid="loading-state">
       <div class="loading-dot" />
@@ -270,6 +323,7 @@
             <el-tag :type="actionTagType" data-testid="action-tag">{{ actionText }}</el-tag>
             <el-tag :type="riskTagType" data-testid="risk-tag">{{ riskText }}</el-tag>
           </div>
+          <p class="answer-trust-note" data-testid="answer-trust-note">{{ answerTrustNote }}</p>
         </div>
       </div>
 
@@ -295,6 +349,7 @@
       <label class="reply-label" for="reply-draft">建议回复 <span>可以直接修改</span></label>
       <el-input
         id="reply-draft"
+        ref="replyEditor"
         v-model="replyDraft"
         data-testid="reply-draft"
         class="reply-editor"
@@ -302,14 +357,39 @@
         :rows="7"
         maxlength="8000"
         show-word-limit
-        @input="copyStatus = 'idle'"
+        @input="handleReplyInput"
       />
-      <div class="copy-row">
-        <span>复制的是上方当前内容，包括你的修改。</span>
-        <el-button data-testid="copy-button" type="primary" size="large" @click="copyReply">
-          {{ copyStatus === 'copied' ? '✓ 已复制修改后的回复' : '复制修改后的回复' }}
-        </el-button>
+      <div class="reply-action-bar" aria-label="回复操作">
+        <span>复制的是上方当前内容，包括你的修改。先记录采用结果，再收藏案例或反馈问题。</span>
+        <div class="reply-actions">
+          <el-button data-testid="copy-button" type="primary" size="large" @click="copyReply">
+            {{ copyStatus === 'copied' ? '✓ 已复制回复' : '复制回复' }}
+          </el-button>
+          <el-button data-testid="edit-reply-button" plain @click="editReply">编辑回复</el-button>
+          <el-button data-testid="next-consultation-button" plain @click="startNextConsultation">
+            处理下一条咨询
+          </el-button>
+          <el-button
+            data-testid="collect-experience-case-button"
+            plain
+            :disabled="!adoption || adoption.type === 'REJECTED' || experienceCaseSubmitting"
+            @click="openExperienceCaseCapture"
+          >
+            ⭐ 收藏优秀案例
+          </el-button>
+          <el-button
+            data-testid="feedback-problem-button"
+            plain
+            :disabled="adoption?.type !== 'REJECTED' || aiFeedbackSubmitting"
+            @click="openAiFeedbackCapture"
+          >
+            反馈问题
+          </el-button>
+        </div>
       </div>
+      <p v-if="copyError" class="copy-recovery-note" data-testid="copy-recovery-note">
+        {{ copyError }} 回复仍保留在编辑框中，手动选择文本即可继续人工发送。
+      </p>
 
       <el-alert
         v-if="result.warnings.length"
@@ -325,6 +405,15 @@
         class="result-alert"
         :title="`还需要向客户确认：${requiredFieldText}`"
         type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-alert
+        v-if="!result.citations.length"
+        data-testid="no-knowledge-warning"
+        class="result-alert"
+        title="本次未返回可核对的知识依据，请不要直接采用；请补充信息或转人工处理。"
+        type="warning"
         :closable="false"
         show-icon
       />
@@ -375,18 +464,18 @@
         <code>risk_level={{ result.riskLevel ?? '未分类' }}</code>
       </div>
 
-      <details class="feedback-section" data-testid="feedback-section">
-        <summary>记录这条建议有没有用（可选）</summary>
+      <details open class="feedback-section" data-testid="feedback-section">
+        <summary>选择采用结果，再继续收藏案例或反馈问题</summary>
         <div class="feedback-body">
           <p>当前采用反馈只记录在本页。保存经验案例时必须在表单中明确选择冻结的经验类型。</p>
           <div class="feedback-actions">
-            <el-button data-testid="direct-accept" text @click="recordAdoption('DIRECT_ACCEPT')">
+            <el-button data-testid="direct-accept" type="success" plain @click="recordAdoption('DIRECT_ACCEPT')">
               直接采用
             </el-button>
-            <el-button data-testid="edited-accept" text @click="recordAdoption('EDITED_ACCEPT')">
+            <el-button data-testid="edited-accept" type="warning" plain @click="recordAdoption('EDITED_ACCEPT')">
               修改后采用
             </el-button>
-            <el-button data-testid="reject" text @click="recordAdoption('REJECTED')">
+            <el-button data-testid="reject" type="danger" plain @click="recordAdoption('REJECTED')">
               未采用
             </el-button>
             <el-button
@@ -408,6 +497,9 @@
             </el-button>
           </div>
           <p class="experience-case-entry-hint">优秀回复用于经验沉淀，帮助系统持续优化。</p>
+          <p class="adoption-next-step" data-testid="adoption-next-step">
+            {{ adoptionNextStep }}
+          </p>
           <p v-if="adoption?.type === 'REJECTED'" class="ai-feedback-entry-hint">
             未采用请通过“AI 问题反馈”单独记录原因，不会进入优秀案例。
           </p>
@@ -580,7 +672,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ragClient } from '@/api/ragClient'
 import { platformClient } from '@/api/platformClient'
@@ -618,6 +710,10 @@ import {
   NOT_ADOPTED_REASON_LABELS,
   type NotAdoptedReason
 } from '@/workspace/adoptionFeedback'
+import {
+  recordAiAssist,
+  recordAiFeedbackSubmission
+} from '@/workspace/customerSessionActivity'
 import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
 import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
 import { useTesterIdentity } from '@/workspace/testerIdentity'
@@ -625,7 +721,7 @@ import { useTesterIdentity } from '@/workspace/testerIdentity'
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
 
 const actionLabels: Record<RagAction, string> = {
-  DIRECT_ANSWER: '🟢 可以参考',
+  DIRECT_ANSWER: '🟢 可直接参考',
   CONTROLLED_ANSWER: '🟡 建议确认',
   ASK_CLARIFY: '需要补充信息',
   REQUIRE_LOOKUP: '需要查询系统',
@@ -752,7 +848,11 @@ const platformError = ref('')
 const requestError = ref('')
 const result = ref<RagChatResult | null>(null)
 const replyDraft = ref('')
+const lastAnsweredQuestion = ref('')
+const nextQuestionNotice = ref('')
+const replyEditor = ref<{ focus: () => void } | null>(null)
 const copyStatus = ref<'idle' | 'copied'>('idle')
+const copyError = ref('')
 const adoption = ref<AdoptionRecord | null>(null)
 const experienceCaseDialogOpen = ref(false)
 const experienceCaseSubmitting = ref(false)
@@ -811,6 +911,71 @@ const workflowStep = computed(() => {
   return 1
 })
 
+const catalogGuidance = computed(() => {
+  if (storesLoading.value) {
+    return {
+      tone: 'loading',
+      title: '正在加载可用店铺',
+      description: '目录加载完成后会自动带入常用测试店铺。',
+      canRefresh: false
+    }
+  }
+  if (platformError.value) {
+    return {
+      tone: 'error',
+      title: '商品目录暂不可用',
+      description: '刷新后再继续；不要绕过商品上下文直接生成建议。',
+      canRefresh: true
+    }
+  }
+  if (!stores.value.length) {
+    return {
+      tone: 'warning',
+      title: '暂无可用测试店铺',
+      description: '请刷新商品目录；恢复前请按原客服流程处理。',
+      canRefresh: true
+    }
+  }
+  if (!selectedStore.value) {
+    return {
+      tone: 'info',
+      title: '先确认客户来源店铺',
+      description: '选定店铺后再选择商品，避免跨店使用商品资料。',
+      canRefresh: false
+    }
+  }
+  if (productsLoading.value) {
+    return {
+      tone: 'loading',
+      title: '正在加载该店铺的商品',
+      description: '商品加载完成后即可继续；SKU 可在知道具体款式时再选。',
+      canRefresh: false
+    }
+  }
+  if (!products.value.length) {
+    return {
+      tone: 'warning',
+      title: '该店铺暂无可用于 AI 建议的商品',
+      description: '请刷新目录或切换店铺；恢复前不要绕过商品上下文提问。',
+      canRefresh: true
+    }
+  }
+  if (!selectedProduct.value) {
+    return {
+      tone: 'info',
+      title: '请选择客户正在咨询的商品',
+      description: 'SKU 不确定可留空，系统会在建议中提示补充信息。',
+      canRefresh: false
+    }
+  }
+  return {
+    tone: 'ready',
+    title: '商品上下文已就绪',
+    description: '可以输入客户原话。SKU 不确定时保留为空，不要猜测款式。',
+    canRefresh: false
+  }
+})
+
 const platformName = (platform: string) => platformLabels[platform] ?? platform
 const storeOptionLabel = (store: CatalogStore) =>
   `${platformName(store.platform)} → ${store.name}${store.testDataMode ? '（测试数据）' : ''}`
@@ -850,6 +1015,13 @@ const platformHealthTagType = computed(() => {
 const actionText = computed(() =>
   result.value?.action ? actionLabels[result.value.action] : '动作未分类'
 )
+
+const answerTrustNote = computed(() => {
+  if (result.value?.action === 'DIRECT_ANSWER') return '资料匹配，可参考；发送前仍请核对依据和措辞。'
+  if (result.value?.action === 'CONTROLLED_ANSWER') return '建议确认限制条件后再发送，避免作出超出资料范围的承诺。'
+  if (result.value?.action === 'TRANSFER_HUMAN') return '当前不建议直接回复，请按人工流程继续处理。'
+  return '请结合下方处理提示和来源依据，再决定下一步。'
+})
 
 const riskText = computed(() =>
   result.value?.riskLevel ? riskLabels[result.value.riskLevel] : '风险未分类'
@@ -894,9 +1066,17 @@ const adoptionMessage = computed(() =>
       : `已在本页记录：${adoptionLabels[adoption.value.type]}。未发送到远端反馈服务。`
 )
 
+const adoptionNextStep = computed(() => {
+  if (!adoption.value) return '先选择采用结果，系统才会开放对应的收藏案例或问题反馈入口。'
+  if (adoption.value.type === 'REJECTED') return '未采用时请提交 AI 问题反馈；这条记录不会进入优秀案例。'
+  return '采用后的好回复可以收藏为优秀案例，经验沉淀与 AI 问题反馈保持独立。'
+})
+
 const clearAnswer = () => {
   result.value = null
   replyDraft.value = ''
+  lastAnsweredQuestion.value = ''
+  nextQuestionNotice.value = ''
   adoption.value = null
   aiFeedbackDialogOpen.value = false
   aiFeedbackType.value = ''
@@ -905,6 +1085,7 @@ const clearAnswer = () => {
   aiFeedbackError.value = ''
   aiFeedbackStatus.value = ''
   copyStatus.value = 'idle'
+  copyError.value = ''
   requestError.value = ''
 }
 
@@ -925,8 +1106,32 @@ const rememberStore = (value: string) => {
   }
 }
 
+const handleQuestionInput = (value: string) => {
+  copyStatus.value = 'idle'
+  copyError.value = ''
+  if (!result.value || value.trim() === lastAnsweredQuestion.value) return
+
+  clearAnswer()
+  nextQuestionNotice.value = '已清空上一条建议。请为当前客户问题重新生成回复。'
+}
+
+const handleReplyInput = () => {
+  copyStatus.value = 'idle'
+  copyError.value = ''
+}
+
 const useExample = (question: string) => {
-  if (!loading.value) customerQuestion.value = question
+  if (loading.value) return
+  handleQuestionInput(question)
+  customerQuestion.value = question
+}
+
+const startNextConsultation = async () => {
+  if (loading.value) return
+  clearAnswer()
+  customerQuestion.value = ''
+  await nextTick()
+  document.getElementById('customer-question')?.focus()
 }
 
 const refreshRagHealth = async () => {
@@ -948,7 +1153,7 @@ const loadStores = async () => {
   activeCatalogController = controller
   storesLoading.value = true
   platformError.value = ''
-  let shouldRestoreStore = false
+  let storeKeyToLoad = ''
   try {
     const nextStores = await platformClient.listStores(controller.signal)
     const unsafeStore = nextStores.find((store) =>
@@ -965,7 +1170,16 @@ const loadStores = async () => {
       )
     }
     stores.value = nextStores
-    shouldRestoreStore = !selectedStoreKey.value && Boolean(readRememberedStore())
+    const currentStoreKey = selectedStoreKey.value
+    const rememberedStoreKey = readRememberedStore()
+    const defaultStoreKey = nextStores.find(
+      (store) => store.storeCode === identity.value.defaultStoreCode
+    )
+    storeKeyToLoad = [
+      currentStoreKey,
+      rememberedStoreKey,
+      defaultStoreKey ? storeKey(defaultStoreKey) : ''
+    ].find((value) => nextStores.some((store) => storeKey(store) === value)) ?? ''
   } catch (error) {
     if (!controller.signal.aborted) {
       stores.value = []
@@ -976,14 +1190,12 @@ const loadStores = async () => {
     storesLoading.value = false
   }
 
-  if (shouldRestoreStore) {
-    const rememberedKey = readRememberedStore()
-    if (stores.value.some((store) => storeKey(store) === rememberedKey)) {
-      selectedStoreKey.value = rememberedKey
-      await handleStoreChange()
-    } else {
-      rememberStore('')
-    }
+  if (storeKeyToLoad) {
+    const shouldLoadProducts = selectedStoreKey.value !== storeKeyToLoad || !products.value.length
+    selectedStoreKey.value = storeKeyToLoad
+    if (shouldLoadProducts) await handleStoreChange()
+  } else if (readRememberedStore()) {
+    rememberStore('')
   }
 }
 
@@ -1115,6 +1327,8 @@ const submitQuestion = async () => {
     }
     result.value = response
     replyDraft.value = response.answer
+    lastAnsweredQuestion.value = message
+    recordAiAssist()
   } catch (error) {
     const clientError = toRagClientError(error)
     if (controller.signal.aborted || clientError.kind === 'canceled') {
@@ -1143,11 +1357,17 @@ const copyReply = async () => {
   try {
     await navigator.clipboard.writeText(text)
     copyStatus.value = 'copied'
+    copyError.value = ''
     ElMessage.success('已复制当前回复，请核对后人工发送')
   } catch {
     copyStatus.value = 'idle'
+    copyError.value = '浏览器未能自动复制。'
     ElMessage.error('复制失败，请手动选择回复文本')
   }
+}
+
+const editReply = () => {
+  replyEditor.value?.focus()
 }
 
 const recordAdoption = (type: AdoptionType) => {
@@ -1241,6 +1461,7 @@ const submitAiFeedback = async () => {
       finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
       createdBy: identity.value.reporterId
     }, idempotencyKey)
+    recordAiFeedbackSubmission()
     aiFeedbackStatus.value = '反馈已记录。'
   } catch (error) {
     aiFeedbackError.value = error instanceof Error ? error.message : 'AI 问题反馈服务当前不可用。'
@@ -1317,7 +1538,7 @@ onBeforeUnmount(() => {
 .workspace-header,
 .section-heading,
 .question-actions,
-.copy-row,
+.reply-action-bar,
 .evidence-heading,
 .selection-confirmed {
   display: flex;
@@ -1340,7 +1561,7 @@ onBeforeUnmount(() => {
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 42px); }
 h2 { margin-bottom: 7px; font-size: 21px; }
-.subtitle, .section-heading p, .system-summary p, .input-hint, .copy-row span,
+.subtitle, .section-heading p, .system-summary p, .input-hint, .reply-action-bar > span,
 .feedback-section p, .empty-card p, .loading-card p, .evidence-heading p {
   color: #697386;
 }
@@ -1401,6 +1622,8 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 }
 .step-card { padding: 26px; }
 .status-alert { margin-top: 16px; }
+.service-recovery-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 13px 15px; border: 1px solid #efc5a6; border-radius: 12px; background: #fff9f3; color: #7a4318; }
+.service-recovery-card strong { font-size: 14px; }.service-recovery-card p { margin: 4px 0 0; color: #8a5a35; font-size: 12px; line-height: 1.5; }.service-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .context-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1419,6 +1642,31 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .context-grid label em.optional { color: #697386; }
 .context-grid label small { color: #7b8496; }
 .context-grid .el-select { width: 100%; }
+.catalog-guidance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid #cdd9ee;
+  border-radius: 12px;
+  background: #f7f9fe;
+}
+.catalog-guidance strong { display: block; color: #294c85; font-size: 13px; }
+.catalog-guidance p, .store-scope-note, .copy-recovery-note, .adoption-next-step {
+  margin: 4px 0 0;
+  color: #61708a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.catalog-guidance.is-ready { border-color: #b7dfc8; background: #f1fbf5; }
+.catalog-guidance.is-ready strong { color: #19633f; }
+.catalog-guidance.is-warning { border-color: #efd49a; background: #fffaf0; }
+.catalog-guidance.is-warning strong { color: #8a5a00; }
+.catalog-guidance.is-error { border-color: #efc5c2; background: #fff7f6; }
+.catalog-guidance.is-error strong { color: #ad3730; }
+.store-scope-note { padding-left: 2px; }
 
 .selection-confirmed {
   justify-content: flex-start;
@@ -1428,7 +1676,10 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   background: #ecf8f2;
   color: #19633f;
 }
-.selection-confirmed p { margin: 3px 0 0; color: #356d53; }
+.context-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; gap: 10px; }
+.context-summary-grid > div { display: grid; gap: 2px; min-width: 0; }
+.context-summary-grid small { color: #4e8669; font-size: 11px; font-weight: 800; }
+.context-summary-grid strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .selection-confirmed .el-button { margin-left: auto; }
 .check-mark {
   display: grid; place-items: center; width: 32px; height: 32px;
@@ -1465,7 +1716,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   padding: 5px 10px; border: 1px solid #cbd7ef; border-radius: 999px;
   background: #f6f8ff; color: #3157c8; cursor: pointer;
 }
-.question-actions, .copy-row { margin-top: 16px; }
+.question-actions, .reply-action-bar { margin-top: 16px; }
 
 .loading-card, .empty-card { display: flex; align-items: center; gap: 16px; padding: 28px; }
 .loading-dot {
@@ -1479,6 +1730,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 
 .answer-heading { align-items: flex-start; }
 .result-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.answer-trust-note { margin: 7px 0 0; color: #52657e; font-size: 12px; line-height: 1.5; }
 .action-guide {
   display: flex; gap: 16px; margin-top: 18px; padding: 18px;
   border: 1px solid; border-radius: 14px;
@@ -1493,7 +1745,10 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .action-guide p { margin: 5px 0 8px; }
 .action-guide ul { margin: 0; padding-left: 20px; line-height: 1.75; }
 .result-alert, .reply-editor { margin-top: 15px; }
-.copy-row { justify-content: flex-end; }
+.reply-action-bar { align-items: center; justify-content: space-between; }
+.reply-action-bar > span { max-width: 420px; font-size: 12px; line-height: 1.5; }
+.reply-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.copy-recovery-note { color: #a64b1e; font-weight: 700; }
 
 .evidence-section, .feedback-section {
   margin-top: 28px;
@@ -1510,9 +1765,11 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .technical-toggle-row { margin-top: 16px; text-align: right; }
 
 .feedback-actions { display: flex; flex-wrap: wrap; margin: 16px 12px 14px 0; }
+.feedback-section summary { cursor: pointer; color: #284a73; font-size: 14px; font-weight: 800; }
 .feedback-section > .el-button { vertical-align: top; margin-top: 16px; }
 .feedback-result { margin-top: 12px; color: #246b3f !important; font-weight: 700; }
 .experience-case-entry-hint { margin-top: -2px !important; color: #47705d !important; }
+.adoption-next-step { color: #495a78 !important; }
 .ai-feedback-entry-hint { margin-top: 8px !important; color: #315fbd !important; }
 .customer-friendly-notice {
   display: flex;
@@ -1540,10 +1797,13 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 
 @media (max-width: 700px) {
   .workspace-shell { width: min(100% - 20px, 1120px); padding-top: 18px; }
-  .workspace-header, .section-heading, .question-actions, .copy-row, .evidence-heading {
+  .workspace-header, .section-heading, .question-actions, .reply-action-bar, .evidence-heading {
     align-items: flex-start; flex-direction: column;
   }
-  .system-summary, .question-actions .el-button, .copy-row .el-button { width: 100%; }
+  .system-summary, .question-actions .el-button, .reply-actions .el-button { width: 100%; }
+  .catalog-guidance { align-items: flex-start; flex-direction: column; }
+  .reply-actions { width: 100%; }
+  .context-summary-grid { grid-template-columns: 1fr; gap: 6px; }
   .connection-card { grid-template-columns: 1fr; }
   .workflow-progress strong { display: none; }
 }
@@ -1606,7 +1866,7 @@ h2 {
 .section-heading p,
 .system-summary p,
 .input-hint,
-.copy-row span,
+.reply-action-bar > span,
 .feedback-section p,
 .empty-card p,
 .loading-card p,
@@ -1723,7 +1983,8 @@ h2 {
 }
 
 .selection-confirmed strong { font-size: 13px; }
-.selection-confirmed p { font-size: 12px; }
+.context-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.context-summary-grid strong { font-size: 12px; }
 .check-mark { width: 26px; height: 26px; font-size: 13px; }
 
 .technical-box {
@@ -1745,7 +2006,7 @@ h2 {
 .example-row { gap: 6px; margin-top: 9px; font-size: 12px; }
 .example-row button { padding: 4px 8px; font-size: 12px; }
 .question-actions,
-.copy-row { margin-top: 10px; }
+.reply-action-bar { margin-top: 10px; }
 .input-hint { font-size: 12px; }
 
 .loading-card,
@@ -1801,8 +2062,8 @@ h2 {
   resize: vertical;
 }
 
-.copy-row { align-items: center; }
-.copy-row .el-button,
+.reply-action-bar { align-items: center; }
+.reply-actions .el-button,
 .question-actions .el-button { min-height: 34px; }
 
 .evidence-section,
@@ -1939,8 +2200,8 @@ h2 {
   height: 118px !important;
 }
 
-.copy-row { margin-top: 7px; }
-.copy-row span { font-size: 12px; }
+.reply-action-bar { margin-top: 7px; }
+.reply-action-bar > span { font-size: 12px; }
 
 .evidence-section { margin-top: 10px; padding-top: 10px; }
 .feedback-section { margin-top: 10px; padding-top: 10px; }
@@ -1973,4 +2234,5 @@ h2 {
 .ai-feedback-field small { color: #748198; font-weight: 400; }
 .ai-feedback-error { margin-top: 14px; color: #b83b32 !important; }
 .ai-feedback-success { margin-top: 14px; color: #1c6a49 !important; font-weight: 700; }
+@media (max-width: 700px) { .service-recovery-card { align-items: flex-start; flex-direction: column; } }
 </style>

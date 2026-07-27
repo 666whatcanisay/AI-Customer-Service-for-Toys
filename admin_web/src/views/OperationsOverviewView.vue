@@ -8,20 +8,21 @@ import {
   listAiModules,
   type AdminOverview,
 } from '../api/client'
+import ProductEmptyState from '../components/ProductEmptyState.vue'
 
 const overview = ref<AdminOverview | null>(null)
 const platformStatus = ref<'loading' | 'ok' | 'unavailable'>('loading')
 const aiStatus = ref<'loading' | 'ok' | 'unavailable'>('loading')
 const error = ref('')
 const metrics = computed(() => overview.value ? [
-  ['Stores', overview.value.counts.stores],
-  ['Products', overview.value.counts.products],
-  ['SKUs', overview.value.counts.skus],
-  ['FAQs', overview.value.counts.faqs],
-  ['Safety rules', overview.value.counts.safety_rules],
-  ['Sources', overview.value.counts.sources],
-  ['Open conflicts', overview.value.counts.conflicts],
-  ['Import batches', overview.value.counts.import_batches],
+  ['店铺', overview.value.counts.stores],
+  ['商品', overview.value.counts.products],
+  ['SKU', overview.value.counts.skus],
+  ['FAQ', overview.value.counts.faqs],
+  ['安全规则', overview.value.counts.safety_rules],
+  ['来源', overview.value.counts.sources],
+  ['待处理冲突', overview.value.counts.conflicts],
+  ['导入批次', overview.value.counts.import_batches],
 ] : [])
 
 async function load(): Promise<void> {
@@ -44,8 +45,9 @@ onMounted(load)
   <main class="page">
     <div class="page-header">
       <div>
-        <h1>运营概览</h1>
-        <p>只展示本地已导入的测试数据；不包含虚构趋势或生产指标。</p>
+        <p class="eyebrow">AI客服平台 · 首页</p>
+        <h1>AI 运营中心</h1>
+        <p>只展示本地已导入的测试或试运行事实；不包含虚构趋势或正式运营指标。</p>
       </div>
       <button class="button secondary" type="button" @click="load">刷新</button>
     </div>
@@ -71,6 +73,14 @@ onMounted(load)
       </section>
     </template>
 
+    <ProductEmptyState
+      v-if="!error && !overview && platformStatus !== 'loading'"
+      title="暂无可显示的运营数据"
+      description="平台已响应，但当前没有可展示的运营事实。请先确认测试数据导入状态，不能用虚构的零值趋势代替。"
+      action-label="查看数据导入"
+      to="/imports"
+    />
+
     <section class="card service-status">
       <h2>服务状态</h2>
       <p><span class="badge">C 平台</span> {{ platformStatus === 'ok' ? '可用' : platformStatus === 'loading' ? '检测中' : '不可用' }}</p>
@@ -80,6 +90,7 @@ onMounted(load)
 </template>
 
 <style scoped>
+.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .warning { color: #75570a; background: #fff8df; }
 .overview-details, .service-status { margin-top: 20px; }
 dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }

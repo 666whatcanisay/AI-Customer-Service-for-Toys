@@ -2,30 +2,33 @@
   <div class="workbench-layout" data-testid="workbench-layout">
     <aside class="workbench-sidebar" :class="{ open: mobileMenuOpen }" data-testid="workbench-sidebar">
       <div class="brand-block">
-        <span class="brand-mark">木</span>
+        <span class="brand-mark" aria-hidden="true">AI</span>
         <div>
-          <strong>木木小栈</strong>
-          <small>客服智能工作台</small>
+          <strong>AI客服平台</strong>
+          <small>客服工作台</small>
         </div>
       </div>
 
       <nav class="primary-nav" aria-label="工作台导航">
         <RouterLink to="/" class="nav-link" exact-active-class="active" @click="closeMobileMenu">
-          <span>⌂</span><span>工作台首页</span>
+          <span>⌂</span><span>首页</span>
         </RouterLink>
         <RouterLink to="/ai-chat" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>AI</span><span>AI 客服</span>
         </RouterLink>
-        <RouterLink to="/suggestions" class="nav-link" active-class="active" @click="closeMobileMenu">
-          <span>✎</span><span>提交意见建议</span>
-        </RouterLink>
-        <RouterLink to="/suggestions/mine" class="nav-link" active-class="active" @click="closeMobileMenu">
-          <span>☷</span><span>我的建议</span>
-        </RouterLink>
         <RouterLink to="/experience-cases" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>☆</span><span>我的案例</span>
         </RouterLink>
+        <RouterLink to="/feedback" class="nav-link" active-class="active" @click="closeMobileMenu">
+          <span>!</span><span>问题反馈</span>
+        </RouterLink>
       </nav>
+
+      <div class="secondary-nav" aria-label="帮助与改进">
+        <small>帮助与改进</small>
+        <RouterLink to="/suggestions" @click="closeMobileMenu">提交意见建议</RouterLink>
+        <RouterLink to="/suggestions/mine" @click="closeMobileMenu">我的建议</RouterLink>
+      </div>
 
       <div class="sidebar-boundary">
         <strong>测试工作台</strong>
@@ -55,7 +58,7 @@
         </button>
 
         <div class="current-module">
-          <small>当前位置</small>
+          <small>AI客服平台 · 当前位置</small>
           <strong>{{ currentTitle }}</strong>
         </div>
 
@@ -64,8 +67,9 @@
             <i />AI {{ systemStatus.aiReady.value ? '可用' : '待连接' }}
           </span>
           <span :class="{ ready: systemStatus.dataReady.value }">
-            <i />数据 {{ systemStatus.dataReady.value ? '可用' : '待连接' }}
+            <i />平台 {{ systemStatus.dataReady.value ? '可用' : '待连接' }}
           </span>
+          <span class="local-status"><i />客服 当前页面</span>
           <button type="button" :disabled="systemStatus.loading.value" @click="systemStatus.refresh">
             {{ systemStatus.loading.value ? '检查中' : '刷新' }}
           </button>
@@ -82,12 +86,30 @@
           </div>
           <button type="button" @click="openIdentityEditor">修改</button>
         </div>
+        <button
+          class="technical-toggle"
+          type="button"
+          :aria-expanded="showProductDetails"
+          data-testid="product-technical-toggle"
+          @click="showProductDetails = !showProductDetails"
+        >
+          {{ showProductDetails ? '收起技术信息' : '技术信息' }}
+        </button>
       </header>
 
       <div class="test-banner" data-testid="global-test-banner">
         <strong>测试环境</strong>
         <span>仅供内部验证，禁止填写真实客户隐私；所有业务动作都需要人工确认。</span>
       </div>
+
+      <section v-if="showProductDetails" class="product-technical-panel" data-testid="product-technical-details">
+        <div><span>产品版本</span><code>{{ runtimeDetails.frontendVersion }}</code></div>
+        <div><span>Git Commit</span><code>{{ runtimeDetails.gitCommit }}</code></div>
+        <div><span>启动模式</span><code>{{ runtimeDetails.startMode }}</code></div>
+        <div><span>API 模式</span><code>{{ runtimeDetails.apiMode }}</code></div>
+        <div><span>客服入口</span><code>{{ runtimeDetails.customerEntry }}</code></div>
+        <p>AI 与平台状态来自现有健康检查；“客服当前页面”仅表示本页面已打开，不代表新增客服服务健康接口。</p>
+      </section>
 
       <main class="workbench-content">
         <RouterView />
@@ -180,6 +202,7 @@ const mobileMenuOpen = ref(false)
 const identityDialogOpen = ref(false)
 const identityError = ref('')
 const pilotGuideOpen = ref(false)
+const showProductDetails = ref(false)
 const identityStore = createTesterIdentityStore()
 const identity = identityStore.identity
 const systemStatus = createSystemStatusStore()
@@ -193,6 +216,14 @@ const identityDraft = reactive({
 })
 
 const PILOT_GUIDE_STORAGE_KEY = 'mumu-customer-workspace:pilot-guide-seen'
+
+const runtimeDetails = {
+  frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'unavailable',
+  gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
+  startMode: import.meta.env.VITE_START_MODE ?? 'LOCAL',
+  apiMode: import.meta.env.VITE_API_MODE ?? 'SAME_ORIGIN_PROXY',
+  customerEntry: import.meta.env.VITE_CUSTOMER_ENTRY_URL ?? `${window.location.origin}/`
+}
 
 const shouldShowPilotGuide = () => {
   try {
@@ -287,7 +318,7 @@ onMounted(() => {
   border-radius: 13px;
   background: linear-gradient(135deg, #6fa1ff, #53d1b1);
   color: #0e2344;
-  font-size: 22px;
+  font-size: 13px;
   font-weight: 900;
 }
 
@@ -303,6 +334,29 @@ onMounted(() => {
   display: grid;
   gap: 7px;
 }
+
+.secondary-nav {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 0 10px;
+}
+
+.secondary-nav small {
+  color: #91a7ca;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.secondary-nav a {
+  color: #b9c9e0;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.secondary-nav a:hover,
+.secondary-nav a.router-link-active { color: #fff; }
 
 .nav-link {
   display: grid;
@@ -407,8 +461,11 @@ onMounted(() => {
 
 .global-status span.ready { color: #20704d; }
 .global-status span.ready i { background: #2da875; }
+.global-status .local-status { color: #536981; }
+.global-status .local-status i { background: #7c8ca3; }
 .global-status button,
-.tester-summary button {
+.tester-summary button,
+.technical-toggle {
   padding: 5px 8px;
   border: 1px solid #ccd8e8;
   border-radius: 8px;
@@ -438,6 +495,23 @@ onMounted(() => {
   color: #77510a;
   font-size: 12px;
 }
+
+.technical-toggle { flex: 0 0 auto; }
+
+.product-technical-panel {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 12px 22px;
+  border-bottom: 1px solid #dce6f2;
+  background: #f7faff;
+}
+
+.product-technical-panel div { display: grid; gap: 3px; min-width: 0; }
+.product-technical-panel span,
+.product-technical-panel p { color: #6b7b91; font-size: 11px; }
+.product-technical-panel code { overflow: hidden; color: #2d4364; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.product-technical-panel p { grid-column: 1 / -1; margin: 0; line-height: 1.5; }
 
 .test-banner strong {
   padding: 2px 7px;
@@ -497,6 +571,7 @@ onMounted(() => {
   }
   .menu-button { display: block; }
   .global-status { margin-left: auto; }
+  .product-technical-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
@@ -507,7 +582,9 @@ onMounted(() => {
   .global-status span::after { font-size: 11px; content: '状态'; }
   .tester-summary { gap: 8px; padding-left: 8px; }
   .tester-summary > div:nth-child(2) { display: none; }
+  .technical-toggle { display: none; }
   .test-banner { align-items: flex-start; padding: 7px 12px; line-height: 1.4; }
   .workbench-content { padding: 12px; }
+  .product-technical-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
 }
 </style>
