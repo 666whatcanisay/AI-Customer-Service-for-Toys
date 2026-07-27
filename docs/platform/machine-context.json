@@ -4,10 +4,10 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "TARGET-P0-EFFICIENCY",
-  "current_stage": "Content-free customer-efficiency event Provider, aggregate C-to-A summary, and read-only C Admin dashboard",
-  "current_gate": "C migration/API/Admin verification PASS; customer-efficiency Draft PR pending review against develop",
-  "status": "ready_for_review",
+  "current_task": "UI-3 LONG RUN",
+  "current_stage": "AI operations center productization over existing C Providers and Admin interfaces",
+  "current_gate": "UI-only Admin verification PASS; dependent Draft PR pending creation against the P0 customer-efficiency Provider branch",
+  "status": "ready_for_delivery",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
@@ -44,6 +44,8 @@
     ,"platform_backend/app/customer_efficiency/models.py",
     "platform_backend/app/api/customer_efficiency_routes.py",
     "platform_backend/migrations/versions/0007_p0_customer_efficiency_events.py",
+    "admin_web/src/App.vue",
+    "admin_web/src/views/OperationsOverviewView.vue",
     "admin_web/src/views/CustomerEfficiencyDashboardView.vue",
     "docs/platform/14_客服效率接口说明.md"
   ],
@@ -109,21 +111,23 @@
     "A analysis evidence is stored only after C confirmation and matching revision/hash/type; C does not verify an A identity in this baseline.",
     "The Admin analysis-results route is a C internal namespace boundary only; formal authentication, authorization, sensitive-view audit, retention, and automatic redaction are not enabled.",
     "The customer-efficiency provider has no formal authentication, authorization, audit, retention, or production-security certification; aggregate-only output does not establish a personnel-performance capability.",
-    "CORS is not authentication or authorization."
+    "CORS is not authentication or authorization.",
+    "UI-3 preserves the existing internal-test Admin boundary; it does not add formal authentication, authorization, audit, retention, or sensitive-data controls."
   ],
   "out_of_scope": [
     "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, and A model invocation",
     "Formal login, roles, retention, access audit, and production data",
     "A/B business code and shared contract changes"
-    ,"Employee rankings, performance evaluations, raw customer-service content, and efficiency-event detail APIs"
+    ,"Employee rankings, performance evaluations, raw customer-service content, and efficiency-event detail APIs",
+    "Prompt modification, knowledge publication, automatic model training, ERP writes, order changes, and implementation of planning-only business extensions"
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-customer-efficiency",
-    "base": "origin/develop 3b9f3e63700ba1d5bcc27b54c5be7aabee28e252",
-    "commit": "12533e8 (P0 customer-efficiency Provider implementation)",
-    "draft_pr": "pending creation against develop"
+    "branch": "agent/platform-ai-operations-ui-v1",
+    "base": "agent/platform-customer-efficiency 12533e8 (P0 customer-efficiency Provider implementation)",
+    "commit": "pending UI-3 delivery commit",
+    "draft_pr": "pending creation against agent/platform-customer-efficiency"
   },
-  "next_recommended_task": "Review the customer-efficiency Draft PR; reconcile docs/platform/14 against the Interface Owner frozen copy before any contracts/** promotion. Do not merge or enable automatic actions without separate approval.",
+  "next_recommended_task": "Review and merge the P0 customer-efficiency Provider before merging this dependent UI-only PR. Do not enable automatic actions, formal access claims, or planning-only extensions without separate approval.",
   "last_updated": "2026-07-27"
 }

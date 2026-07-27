@@ -37,7 +37,7 @@ describe('CustomerExperienceCasesView', () => {
     expect(wrapper.text()).toContain('CEC-TEST-1')
     await wrapper.get('.link-button').trigger('click')
     expect(wrapper.text()).toContain('What age is appropriate?')
-    await wrapper.get('input[aria-label="Test operator ID"]').setValue('ops-1')
+    await wrapper.get('input[aria-label="试运行操作人 ID"]').setValue('ops-1')
     await wrapper.get('textarea').setValue('Started.')
     await wrapper.get('.actions .button').trigger('click')
     await flushPromises()
