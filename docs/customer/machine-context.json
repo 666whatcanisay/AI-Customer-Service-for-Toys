@@ -3,23 +3,18 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "MVP-PLUS-02-B-CONTRACT-ADAPT AI response feedback consumer adaptation",
-  "current_stage": "MVP-PLUS-02-B-CONTRACT-ADAPT implemented, locally verified and validated against an isolated current-C instance",
-  "current_gate": "PASS: B sends Idempotency-Key and consumes the frozen feedback_id/status=NEW creation receipt; five real submissions and same-key replay passed",
-  "status": "draft_pr_open",
+  "current_task": "PILOT-HARDENING-B daily customer-service workbench hardening",
+  "current_stage": "Draft PR #49 created: catalog readiness and recovery guidance, cross-store reset boundary, missing-knowledge warning, clipboard recovery and adoption next-step guidance are complete. The complete live success path remains blocked because A/RAG is unavailable.",
+  "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
+  "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
   "last_updated": "2026-07-27",
   "git": {
-    "branch": "codex/customer-pilot-experience",
-    "base_commit": "68796a9",
+    "branch": "codex/customer-pilot-hardening-b-v4",
+    "base_commit": "348c875",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "pull_request": {
-      "number": 34,
-      "url": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys/pull/34",
-      "draft": true,
-      "base": "develop"
-    },
-    "clean": true,
-    "task_commit": "HEAD (this commit)"
+    "delivery": "DRAFT_PR_49",
+    "clean": false,
+    "task_commit": "89f9ead"
   },
   "owned_paths": [
     "frontend/**",
@@ -38,6 +33,9 @@
     "frontend/src/layouts/CustomerWorkbenchLayout.vue",
     "frontend/src/views/AiChat.vue",
     "frontend/src/views/ExperienceCases.vue",
+    "frontend/src/views/WorkspaceHome.vue",
+    "frontend/src/views/FeedbackGuide.vue",
+    "frontend/src/components/ProductEmptyState.vue",
     "frontend/src/api/experienceCaseClient.ts",
     "frontend/src/api/experienceCaseAdapter.ts",
     "frontend/src/api/aiResponseFeedbackClient.ts",
@@ -62,8 +60,10 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 MVP-PLUS-02-B-CONTRACT-ADAPT: vue-tsc --noEmit PASS; Vitest 22 files / 89 tests PASS; vite build PASS. Isolated current-C health 200; all five feedback types POSTed with Idempotency-Key returned 201 feedback_id/status=NEW; same-key replay returned the same feedback_id; GET history returned total=5/items=5.",
-  "blockers": [],
+  "last_test_result": "2026-07-27 PILOT-HARDENING-B: vue-tsc --noEmit PASS; Vitest 24 files / 99 tests PASS; vite build PASS. Browser verified the real test store/catalog, catalog readiness guidance, cross-store reset warning and no-product submission guard. A/RAG was unavailable, so no answer/copy/case/feedback success was fabricated. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "blockers": [
+    "A/RAG service was unavailable during browser validation and the actual de-identified consultation request failed, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
+  ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
     "Tester identity is local browser state and is not authentication or authorization",
@@ -82,7 +82,11 @@
     "MVP-PLUS-02 customer pilot experience improvement",
     "MVP-PLUS-02-FEEDBACK AI response feedback capture frontend",
     "MVP-PLUS-02-B-C-SMOKE real integration evidence (BLOCKED; no code changes)",
-    "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS"
+    "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS",
+    "UI-1 unified customer product shell (local UI verification PASS; delivery pending)",
+    "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)",
+    "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
+    "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
