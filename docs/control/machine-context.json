@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "environment_blocked",
-  "current_task": "OPS-T05 local admin web runtime management",
-  "current_stage": "Admin Web is integrated into the Windows C → A → B → Admin lifecycle with loopback-safe defaults, diagnostics, and PID-safe stop. OPS recovery extends managed/listener PID records to C, A, B, and Admin because Windows launch wrappers can exit before the listener.",
-  "current_gate": "OPS recovery L2: core isolated lifecycle and Admin checks pass. A formal main-repository start/stop/restart remains pending PR #26 update, review, merge, and real host closure. Admin remains loopback-only by default and no 5174 firewall rule was created.",
+  "status": "pilot_hardening_v1_conditional",
+  "current_task": "OPS-PILOT-HARDENING-V1 internal customer-service pilot hardening",
+  "current_stage": "The pilot now has a scoped firewall readiness gate, controlled-client access check, A/C/B component recovery rehearsal, sanitised operation events, and a local SQLite online backup entrypoint. A real host rehearsal passed for all three components.",
+  "current_gate": "CONDITIONAL PASS: C/A/B/Admin, fixed proxies, server-side access simulation, A/C/B recovery, sanitised events, and a local backup passed. The required Private TCP 5173 firewall rule is absent and this session has no administrator rights; a second controlled customer computer must also complete browser and TCP acceptance. Do not expand 8000, 8011, or 5174 exposure.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -20,7 +20,11 @@
     "ops_lan_record_fix1_squash_commit": "56acf9792bf728eaad12f8025be658a6dcfdbbcc",
     "origin_develop_after_feature_push": "56acf9792bf728eaad12f8025be658a6dcfdbbcc",
     "ops_admin_runtime_t05_branch": "control/admin-runtime-t05",
-    "ops_admin_runtime_t05_base": "36ec2d326d1613f62cb647ad9ef5835315e4db21"
+    "ops_admin_runtime_t05_base": "36ec2d326d1613f62cb647ad9ef5835315e4db21",
+    "ops_target_pilot_ready_branch": "codex/ops-target-pilot-ready",
+    "ops_target_pilot_ready_base": "3b9f3e63700ba1d5bcc27b54c5be7aabee28e252",
+    "ops_pilot_hardening_v1_branch": "codex/ops-pilot-hardening-v1",
+    "ops_pilot_hardening_v1_base": "a502360"
   },
   "pull_requests": {
     "3": {
@@ -65,7 +69,9 @@
     "OPS_LAN_RECOVERY2": "At the 844dbe6 baseline, A/C/B health checks passed and the repaired OPS code was present. Two established local connections to 5173 preceded health probes. PID 21816 listened on 8011 and had the expected uvicorn command, but its executable and parent paths did not match the task-specified AI-CS-platform-center C worktree. A no-secret verification record was written under ignored .runtime/recovery-backup; no process, existing service record, database or code was changed.",
     "MVP_BATCH_05": "PR #20 was squash merged as dc48646. Real Windows host smoke discovered and repaired a one-default-gateway collection issue (PR #21, f21eed9) and a diagnostic-report PowerShell expression issue (PR #22, ca587d9). On Private Ethernet 192.168.1.11/24, iKuuuVPN was detected but excluded; A/C/B listened on 127.0.0.1:8000, 127.0.0.1:8011, and 192.168.1.11:5173. Page and fixed proxies returned HTTP 200; catalog 1/5, 47/47 sync, sourced qwen3.5:9b CONTROLLED_ANSWER, 1366x768 two-pane UI, diagnostics, safe stop/restart, and Ollama preservation passed. Second-computer manual verification remains pending.",
     "OPS_T05_ADMIN_RUNTIME": "Configuration compatibility, real-package-script isolated start/status/open/stop/restart tests, PID-tamper refusal, unknown-port protection, PowerShell syntax, and diff checks passed. No real host closure was run because admin_web/node_modules is absent in this worktree and OPS-T05 does not permit dependency installation.",
-    "CONTROL_MVP_BATCH_06_OPS_RECOVERY": "PR #26 originally added Admin dual-PID lifecycle handling. Review found that A/C/B still recorded only an exiting Windows launcher PID, so the same branch now records and verifies managed_pid plus listener_pid, listener path, start time and parent PID for all four services. A detached-wrapper regression verifies exact listener stop after the wrapper exits; unknown and tampered records remain rejected."
+    "CONTROL_MVP_BATCH_06_OPS_RECOVERY": "PR #26 originally added Admin dual-PID lifecycle handling. Review found that A/C/B still recorded only an exiting Windows launcher PID, so the same branch now records and verifies managed_pid plus listener_pid, listener path, start time and parent PID for all four services. A detached-wrapper regression verifies exact listener stop after the wrapper exits; unknown and tampered records remain rejected.",
+    "OPS_TARGET_PILOT_READY": "The daily pilot wrapper starts C/A/B/Admin and then probes trusted service state, TCP 5173, the customer page, /rag-api/api/health, and /platform-api/health. A real Private-network host closure passed twice across explicit safe stop and recovery: migrations, test-package idempotency, 47-item sync, real Ollama smoke, all four health checks, customer entry, fixed proxies, and loopback-only Admin passed. Runtime evidence is sanitised; a second customer computer remains a manual acceptance gate.",
+    "OPS_PILOT_HARDENING_V1": "The hardening pass introduced a read-only gate for one enabled Private/current-subnet/TCP-5173 firewall rule, a second-computer client check, sanitised JSONL operation events, and a local SQLite online backup entrypoint. The real host completed A, C, and B stop-to-full-recovery rehearsals; after each, all four services, the customer page, and both fixed proxies recovered. The server-side client emulation passed. No scoped firewall rule exists and the current session is non-administrator, so second-computer reachability remains unverified."
   },
   "agent_worktrees": {
     "A": {
@@ -96,7 +102,9 @@
     "CONTROL-LAN-BATCH-05-PREP",
     "CONTROL-LAN-BATCH-05-INTEGRATION",
     "MVP-BATCH-05",
-    "OPS-T05 local admin web runtime management (script and isolated lifecycle verification)"
+    "OPS-T05 local admin web runtime management (script and isolated lifecycle verification)",
+    "OPS-TARGET-PILOT-READY real host preparation and controlled customer-entry simulation",
+    "OPS-PILOT-HARDENING-V1 internal pilot hardening and recovery rehearsal"
   ],
   "next_tasks": {
     "A": "May be dispatched separately; preserve the runtime and real-test blockers",
@@ -105,8 +113,9 @@
   },
   "t02_executed": false,
   "blockers": [
-    "Second-computer manual acceptance remains pending. If company Wi-Fi and wired clients cannot route to the selected 5173 address after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure.",
-    "OPS-T05 real lifecycle closure requires a pre-existing admin_web/node_modules in the target worktree; dependency installation is outside this task's authority."
+    "A second controlled customer computer must run browser and TCP 5173 acceptance. If company Wi-Fi and wired clients cannot route after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure.",
+    "The required AI Customer Service LAN 5173 (Private) rule is not configured. The current session has no administrator rights, so no UAC bypass or firewall change was attempted.",
+    "The historical OPS-T05 isolated worktree lacks admin_web/node_modules, but OPS-TARGET-PILOT-READY completed the host closure using pre-existing primary-worktree dependencies without installing anything."
   ],
-  "last_updated": "2026-07-24"
+  "last_updated": "2026-07-27"
 }

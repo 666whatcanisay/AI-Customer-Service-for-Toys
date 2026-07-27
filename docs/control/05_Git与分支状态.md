@@ -49,3 +49,14 @@
 
 - `control/admin-runtime-t05` 保持基于 `develop` 的 `36ec2d326d1613f62cb647ad9ef5835315e4db21`；PR #26 继续使用同一分支，不创建重复 PR。
 - 为修复实际 Windows 启动包装层 PID 与监听子进程 PID 分离的阻塞，分支将标准服务记录扩展为受管 PID 与监听 PID 的双身份记录，并将相同身份验证用于 C、A、B、Admin 的启动、状态、重复启动保护和安全停止。
+
+## 2026-07-27 OPS-TARGET-PILOT-READY
+
+- 独立 Worktree `AI-CS-ops-target-pilot-ready` 从 `origin/develop@3b9f3e63700ba1d5bcc27b54c5be7aabee28e252` 创建，分支为 `codex/ops-target-pilot-ready`。
+- 变更仅限 `scripts/windows/**`、`docs/control/**`，不读取或提交本地配置内容、运行日志、测试数据、数据库、依赖或构建产物。
+- 真实主机闭环使用已存在的被忽略本地配置和依赖；所有新增运行证据仅落在被忽略的 `.runtime/pilot-readiness/`，不会进入提交。
+
+## 2026-07-27 OPS-PILOT-HARDENING-V1
+
+- 独立 Worktree `AI-CS-ops-pilot-hardening-v1` 基于 `codex/ops-target-pilot-ready@a502360` 创建，分支为 `codex/ops-pilot-hardening-v1`。该分支是 PR #48 的叠加交付，避免复制尚未合并的试运行基线。
+- 变更仍只限 `scripts/windows/**`、`docs/control/**`；本轮产生的事件、报告、服务日志与 SQLite 备份均保留在被忽略的 `.runtime/`，不会暂存或提交。
