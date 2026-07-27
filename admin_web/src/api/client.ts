@@ -420,6 +420,31 @@ export interface AiOptimizationCase {
   latest_evaluation: ExperienceCaseEvaluation | null
 }
 
+export type AiResponseFeedbackType = 'FACT_ERROR' | 'MISSING_INFO' | 'STYLE_ISSUE' | 'RISK_ISSUE' | 'OTHER'
+export type AiResponseFeedbackAnalysisStatus = 'ANALYZED'
+
+export interface AiFeedbackAnalysisResult {
+  feedback_id: string
+  revision: number
+  content_hash: string
+  feedback_type: AiResponseFeedbackType
+  analysis_run_id: string
+  analysis_status: AiResponseFeedbackAnalysisStatus
+  model_version: string
+  prompt_version: string
+  analysis: Record<string, unknown>
+  suggestions: Array<Record<string, unknown>>
+  created_at: string
+  question: string
+  ai_answer: string
+  final_answer: string | null
+}
+
+export interface AiFeedbackAnalysisResultList {
+  items: AiFeedbackAnalysisResult[]
+  total: number
+}
+
 export async function listAdminExperienceCases(
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<AdminExperienceCase>> {
@@ -458,6 +483,13 @@ export async function listAiOptimizationCases(
   const response = await apiClient.get<AdminPage<AiOptimizationCase>>(
     '/api/v1/admin/ai-optimization/cases',
     { params },
+  )
+  return response.data
+}
+
+export async function listAiFeedbackAnalysisResults(): Promise<AiFeedbackAnalysisResultList> {
+  const response = await apiClient.get<AiFeedbackAnalysisResultList>(
+    '/api/v1/admin/ai-quality/analysis-results',
   )
   return response.data
 }

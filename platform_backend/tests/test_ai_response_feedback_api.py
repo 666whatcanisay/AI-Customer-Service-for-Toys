@@ -187,3 +187,51 @@ def test_a_badcases_export_and_writeback_validate_frozen_snapshot_idempotently(c
     after_analysis = client.get("/api/v1/admin/ai-quality/badcases")
     assert after_analysis.status_code == 200
     assert after_analysis.json() == {"items": [], "next_cursor": None}
+
+
+def test_admin_analysis_results_show_completed_evidence_only_without_b_history_leak(
+    client: TestClient,
+) -> None:
+    pending_id = str(_create(client, idempotency_key="feedback-pending")["feedback_id"])
+    completed_id = str(_create(client, idempotency_key="feedback-completed")["feedback_id"])
+
+    before_confirmation = client.get("/api/v1/admin/ai-quality/analysis-results")
+    assert before_confirmation.status_code == 200
+    assert before_confirmation.json() == {"items": [], "total": 0}
+
+    confirmed = _confirm(client, completed_id)
+    while_analyzing = client.get("/api/v1/admin/ai-quality/analysis-results")
+    assert while_analyzing.status_code == 200
+    assert while_analyzing.json() == {"items": [], "total": 0}
+
+    snapshot = client.get("/api/v1/admin/ai-quality/badcases").json()["items"][0]
+    recorded = client.post("/api/v1/admin/ai-quality/analysis-results", json=_analysis_payload(snapshot))
+    assert recorded.status_code == 201
+
+    results = client.get("/api/v1/admin/ai-quality/analysis-results")
+    assert results.status_code == 200
+    body = results.json()
+    assert body["total"] == 1
+    assert [item["feedback_id"] for item in body["items"]] == [completed_id]
+    item = body["items"][0]
+    assert item["revision"] == 1
+    assert item["content_hash"] == confirmed["content_hash"]
+    assert item["feedback_type"] == "MISSING_INFO"
+    assert item["analysis_run_id"] == "AQR-test-001"
+    assert item["analysis_status"] == "ANALYZED"
+    assert item["model_version"] == "synthetic-model-v1"
+    assert item["prompt_version"] == "ai-quality-feedback-v1"
+    assert item["analysis"] == _analysis_payload(snapshot)["analysis"]
+    assert item["suggestions"] == _analysis_payload(snapshot)["suggestions"]
+    assert item["question"] == _payload()["question"]
+    assert item["ai_answer"] == _payload()["ai_answer"]
+    assert item["final_answer"] == _payload()["final_answer"]
+    assert item["created_at"]
+    assert pending_id not in str(body)
+
+    b_history = client.get(
+        "/api/v1/ai-response-feedback", params={"created_by": "support-tester"}
+    )
+    assert b_history.status_code == 200
+    assert "analysis" not in b_history.json()["items"][0]
+    assert "suggestions" not in str(b_history.json())

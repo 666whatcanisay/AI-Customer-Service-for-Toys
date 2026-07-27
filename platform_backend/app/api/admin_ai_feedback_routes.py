@@ -4,12 +4,14 @@ import hashlib
 import json
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.ai_feedback.models import AIResponseFeedback, AIResponseFeedbackAnalysis, utc_now
 from app.ai_feedback.schemas import (
+    AdminAIResponseFeedbackAnalysisResult,
+    AdminAIResponseFeedbackAnalysisResultListResponse,
     AdminAIResponseFeedbackConfirmationResponse,
     AIResponseFeedbackAnalysisCreate,
     AIResponseFeedbackAnalysisResponse,
@@ -85,6 +87,28 @@ def _analysis_response(
         analysis=analysis.analysis_json,
         suggestions=analysis.suggestions_json,
         recorded_at=analysis.recorded_at,
+    )
+
+
+def _admin_analysis_result(
+    item: AIResponseFeedback, analysis: AIResponseFeedbackAnalysis
+) -> AdminAIResponseFeedbackAnalysisResult:
+    """Project only completed evidence for the internal read-only Admin pool."""
+    return AdminAIResponseFeedbackAnalysisResult(
+        feedback_id=item.feedback_id,
+        revision=item.revision,
+        content_hash=analysis.content_hash,
+        feedback_type=analysis.feedback_type,
+        analysis_run_id=analysis.analysis_run_id,
+        analysis_status=item.analysis_status,
+        model_version=analysis.model_version,
+        prompt_version=analysis.prompt_version,
+        analysis=analysis.analysis_json,
+        suggestions=analysis.suggestions_json,
+        created_at=analysis.recorded_at,
+        question=item.question,
+        ai_answer=item.ai_answer,
+        final_answer=item.final_answer,
     )
 
 
@@ -266,3 +290,30 @@ def record_ai_response_feedback_analysis(
     session.refresh(item)
     session.refresh(analysis)
     return _analysis_response(item, analysis)
+
+
+@ai_quality_router.get(
+    "/analysis-results", response_model=AdminAIResponseFeedbackAnalysisResultListResponse
+)
+def list_admin_ai_response_feedback_analysis_results(
+    session: Session = Depends(get_db),
+) -> AdminAIResponseFeedbackAnalysisResultListResponse:
+    """Read completed evidence only; this internal Admin view has no lifecycle side effects."""
+    statement = (
+        select(AIResponseFeedback, AIResponseFeedbackAnalysis)
+        .join(
+            AIResponseFeedbackAnalysis,
+            AIResponseFeedbackAnalysis.feedback_record_id == AIResponseFeedback.id,
+        )
+        .where(
+            AIResponseFeedback.status == AIResponseFeedbackStatus.ANALYZED,
+            AIResponseFeedback.analysis_status == AIResponseFeedbackStatus.ANALYZED,
+        )
+    )
+    total = session.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    rows = session.execute(
+        statement.order_by(AIResponseFeedbackAnalysis.recorded_at.desc(), AIResponseFeedback.feedback_id.desc())
+    ).all()
+    return AdminAIResponseFeedbackAnalysisResultListResponse(
+        items=[_admin_analysis_result(item, analysis) for item, analysis in rows], total=total
+    )

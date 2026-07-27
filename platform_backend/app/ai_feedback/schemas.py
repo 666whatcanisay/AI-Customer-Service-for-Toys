@@ -144,6 +144,30 @@ class AIResponseFeedbackAnalysisResponse(BaseModel):
     recorded_at: datetime
 
 
+class AdminAIResponseFeedbackAnalysisResult(BaseModel):
+    """Read-only C Admin projection of completed A analysis evidence."""
+
+    feedback_id: str
+    revision: int
+    content_hash: str
+    feedback_type: AIResponseFeedbackType
+    analysis_run_id: str
+    analysis_status: AIResponseFeedbackStatus
+    model_version: str
+    prompt_version: str
+    analysis: dict[str, Any]
+    suggestions: list[dict[str, Any]]
+    created_at: datetime
+    question: str
+    ai_answer: str
+    final_answer: str | None
+
+
+class AdminAIResponseFeedbackAnalysisResultListResponse(BaseModel):
+    items: list[AdminAIResponseFeedbackAnalysisResult]
+    total: int
+
+
 class AdminAIResponseFeedbackConfirmationResponse(BaseModel):
     feedback_id: str
     revision: int
