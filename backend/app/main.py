@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import router
 from app.config.settings import Settings, get_settings
+from app.service.ai_capability import INITIALIZATION_FAILED_CODE
 from app.service.rag_service import RAGService
 
 
@@ -58,8 +59,10 @@ def create_app(
                 logger.info("RAG 服务初始化完成")
             except Exception as exc:
                 logger.exception("RAG 服务初始化失败")
-                application.state.initialization_error = str(exc)
-                application.state.loading_message = f"初始化失败：{exc}"
+                application.state.initialization_error = INITIALIZATION_FAILED_CODE
+                application.state.loading_message = (
+                    "AI service initialization failed. Check service logs."
+                )
 
         init_thread = threading.Thread(
             target=initialize_rag,

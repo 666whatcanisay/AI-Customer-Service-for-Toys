@@ -1,15 +1,15 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-night-p1",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-v12-1-ai",
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "local_hardened_cross_service_pending",
-  "current_task": "NIGHT-SHIFT A P1 AI control and feedback-analysis structured-output hardening",
-  "next_recommended_task": "Use only an isolated C feedback service with one human-confirmed, de-identified ANALYZING snapshot to run the explicit real qwen3.5:9b C-read/analyze/writeback/idempotency test. Do not auto-merge.",
-  "current_stage": "A preserves its existing AI control envelope and controlled feedback consumer. Model output is now bounded before JSON decoding and strictly normalized without polling or automatic action.",
-  "current_gate": "A P1 local gate is PASS: focused parser regression is 6 passed, full pytest backend is 77 passed and 3 opt-in real integration tests are skipped. A synthetic local qwen smoke passed without reading or writing C. The real C feedback read, qwen analysis, writeback, and idempotent replay remain unverified; A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
-  "last_test_result": "2026-07-27: parser regression 6 passed; full pytest backend 77 passed, 3 skipped, 30 warnings; local qwen3.5:9b synthetic smoke returned a 945-character JSON object with all five assessment keys and one bounded suggestion. No C feedback content was read, logged, or written.",
+  "status": "source_fixed_runtime_restart_pending",
+  "current_task": "V12.1 A internal-pilot status accuracy and browser-safe initialization errors",
+  "next_recommended_task": "After review/merge, use the formal OPS restart and verify A reports 47 queryable knowledge chunks. Only then, with an isolated C service and one human-confirmed de-identified ANALYZING snapshot, run the explicit C-read/qwen/writeback/idempotency test. Do not auto-merge.",
+  "current_stage": "A preserves the existing control envelope and feedback consumer. Knowledge projections now aggregate primary and frozen test collections; initialization failures expose only a stable safe code.",
+  "current_gate": "A V12.1 source gate is PASS: focused API/parser tests are 27 passed, full pytest backend is 79 passed and 3 opt-in real integration tests are skipped. A synthetic local qwen smoke passed without reading or writing C. The currently running pre-fix instance still projects 0 knowledge chunks; formal restart verification, real C feedback analysis and the historical A-T03 19/28 data-quality gate remain separate.",
+  "last_test_result": "2026-07-27: focused API/parser tests 27 passed; full pytest backend 79 passed, 3 skipped, 32 warnings; local qwen3.5:9b synthetic smoke returned a 776-character JSON object with five assessment keys and one bounded suggestion. A runtime read-only audit found ready=true, model_configured=true, and a pre-fix zero knowledge projection. C badcase export returned zero candidates; raw feedback was not emitted or persisted.",
   "blockers": ["An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before this task can make a real cross-service claim."],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -27,12 +27,12 @@
     "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
   ],
   "git": {
-    "branch": "codex/rag-night-p1",
+    "branch": "codex/rag-v12-1-ai",
     "clean": true,
-    "baseline_commit": "32feb6108156f5fb4ec297417537d60452d0743f",
+    "baseline_commit": "f5fccfd9685440f0e43ee5be35207ab4372f6a2d",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
-    "remote_branch": "origin/codex/rag-night-p1",
+    "remote_branch": "origin/codex/rag-v12-1-ai",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
   "checked_at": "2026-07-27",
@@ -73,7 +73,8 @@
     "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
     "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
-    "NIGHT-SHIFT A P1 bounded feedback-analysis JSON parsing and synthetic local qwen smoke"
+    "NIGHT-SHIFT A P1 bounded feedback-analysis JSON parsing and synthetic local qwen smoke",
+    "V12.1 A combined knowledge-count projection and browser-safe initialization error normalization"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",

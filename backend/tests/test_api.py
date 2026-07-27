@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+import time
 
+from fastapi.testclient import TestClient
+
+from app.config.settings import Settings
+from app.main import create_app
 from app.service.rag_service import MODEL_NOT_CONFIGURED_MESSAGE, REFUSAL_MESSAGE
 
 
@@ -28,6 +34,53 @@ def test_status_reports_ready(api_client):
     assert response.json()["ready"] is True
 
 
+def test_browser_visible_initialization_failure_is_stable_and_safe(tmp_path: Path):
+    settings = replace(
+        Settings.from_env(),
+        backend_root=tmp_path,
+        project_root=tmp_path,
+        knowledge_base_path=tmp_path / "knowledge_base",
+        vector_db_path=tmp_path / "vector_db",
+        log_dir=tmp_path / "logs",
+    )
+    private_failure = r"C:\\private-runtime\\model-cache\\failure-token"
+
+    def failing_factory(_settings):
+        raise RuntimeError(private_failure)
+
+    app = create_app(settings=settings, rag_factory=failing_factory)
+    with TestClient(app) as client:
+        for _ in range(100):
+            payload = client.get("/api/status").json()
+            if payload["data"]["initialization_error"]:
+                break
+            time.sleep(0.01)
+
+        status_response = client.get("/api/status")
+        module_response = client.get("/api/admin/ai/modules/ai_customer_service")
+        unavailable_response = client.get("/api/knowledge/statistics")
+
+    for response in (status_response, module_response, unavailable_response):
+        assert private_failure not in response.text
+    assert status_response.status_code == 200
+    assert status_response.json()["data"] == {
+        "ready": False,
+        "message": "AI service initialization failed. Check service logs.",
+        "model_configured": False,
+        "initialization_error": "RAG_INITIALIZATION_FAILED",
+    }
+    assert module_response.status_code == 200
+    assert module_response.json()["data"]["status"] == "ERROR"
+    assert (
+        module_response.json()["data"]["initialization_error"]
+        == "RAG_INITIALIZATION_FAILED"
+    )
+    assert unavailable_response.status_code == 503
+    assert unavailable_response.json()["detail"] == (
+        "AI service initialization failed. Check service logs."
+    )
+
+
 def test_knowledge_statistics_is_available(api_client):
     client, _ = api_client
     response = client.get("/api/knowledge/statistics")
@@ -36,6 +89,30 @@ def test_knowledge_statistics_is_available(api_client):
     assert data["document_count"] == 1
     assert data["chunk_count"] == 2
     assert data["collection_name"] == "test_documents"
+
+
+def test_knowledge_counts_include_the_queryable_test_collection(api_client):
+    client, _ = api_client
+    rag = client.app.state.rag_service
+    rag.test_vector_store.upsert_records(
+        documents=["synthetic frozen test knowledge"],
+        metadatas=[
+            {
+                "file": "test-package:synthetic",
+                "page": 0,
+                "chunk_id": "synthetic-test-knowledge",
+            }
+        ],
+        ids=["synthetic-test-knowledge"],
+    )
+
+    statistics_response = client.get("/api/knowledge/statistics")
+    module_response = client.get("/api/admin/ai/modules/ai_customer_service")
+
+    assert statistics_response.status_code == 200
+    assert statistics_response.json()["data"]["chunk_count"] == 3
+    assert module_response.status_code == 200
+    assert module_response.json()["data"]["knowledge_count"] == 3
 
 
 def test_recommended_questions_are_available(api_client):

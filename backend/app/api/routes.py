@@ -24,13 +24,16 @@ from app.service.feedback_analysis import (
     FeedbackAnalysisService,
 )
 from app.service.ai_capability import (
+    INITIALIZATION_FAILED_CODE,
     MODULE_DEFINITIONS,
     MODULES_BY_ID,
     customer_service_detail,
+    knowledge_collection_counts,
     latest_evaluation,
     module_summary,
     not_available_module_detail,
     prompt_metadata,
+    safe_initialization_error,
 )
 from app.service.test_knowledge import (
     PlatformIntegrationUnavailable,
@@ -54,7 +57,13 @@ def envelope(data: Any, message: str = "ok", success: bool = True) -> dict[str, 
 
 def get_rag(request: Request):
     if not getattr(request.app.state, "ready", False):
-        message = getattr(request.app.state, "loading_message", "系统正在初始化")
+        message = (
+            "AI service initialization failed. Check service logs."
+            if safe_initialization_error(
+                getattr(request.app.state, "initialization_error", None)
+            )
+            else "AI service is initializing."
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=message,
@@ -106,11 +115,20 @@ def model_config_data(rag) -> dict[str, Any]:
 def status_data(request: Request) -> dict[str, Any]:
     ready = bool(getattr(request.app.state, "ready", False))
     rag = getattr(request.app.state, "rag_service", None)
+    initialization_error = safe_initialization_error(
+        getattr(request.app.state, "initialization_error", None)
+    )
     return {
         "ready": ready,
-        "message": getattr(request.app.state, "loading_message", "未知状态"),
+        "message": (
+            "System ready."
+            if ready
+            else "AI service initialization failed. Check service logs."
+            if initialization_error == INITIALIZATION_FAILED_CODE
+            else "AI service is initializing."
+        ),
         "model_configured": bool(rag and rag.model_configured),
-        "initialization_error": getattr(request.app.state, "initialization_error", None),
+        "initialization_error": initialization_error,
     }
 
 
@@ -118,6 +136,7 @@ def statistics_data(request: Request) -> dict[str, Any]:
     rag = get_rag(request)
     settings = request.app.state.settings
     stats = rag.vector_store.get_collection_stats()
+    primary_chunk_count, test_knowledge_chunk_count = knowledge_collection_counts(rag)
     document_count = (
         len(list(settings.knowledge_base_path.glob("*.pdf")))
         if settings.knowledge_base_path.exists()
@@ -125,7 +144,7 @@ def statistics_data(request: Request) -> dict[str, Any]:
     )
     return {
         "document_count": document_count,
-        "chunk_count": stats["total_chunks"],
+        "chunk_count": primary_chunk_count + test_knowledge_chunk_count,
         "embedding_model": stats["model_name"],
         "vector_database": "ChromaDB",
         "collection_name": stats["collection_name"],
