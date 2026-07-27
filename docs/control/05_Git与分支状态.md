@@ -60,3 +60,10 @@
 
 - 独立 Worktree `AI-CS-ops-pilot-hardening-v1` 基于 `codex/ops-target-pilot-ready@a502360` 创建，分支为 `codex/ops-pilot-hardening-v1`。该分支是 PR #48 的叠加交付，避免复制尚未合并的试运行基线。
 - 变更仍只限 `scripts/windows/**`、`docs/control/**`；本轮产生的事件、报告、服务日志与 SQLite 备份均保留在被忽略的 `.runtime/`，不会暂存或提交。
+
+## 2026-07-27 CONTROL-PILOT-BASELINE-MERGE
+
+- 合并前以当前 `origin/develop@3b9f3e63700ba1d5bcc27b54c5be7aabee28e252` 为共同审查点，所有候选 Head 均在合并前重新读取；不对已验收提交执行 reset、rebase 或历史重写。
+- PR #49 的 Head `cff2923bbe91c9a9046c4f73213d27884869b2c0` 已改为直接指向 `develop` 后 squash merge，合并提交为 `b6e7b4708d787210b58d135d760edf91a38145bc`。它是 PR #40、#41、#45、#46 的累计顶端链，故这些父 Draft 未重复合并。
+- PR #51 的 Head `6f7973f32e52bd97a5c5950707fa3d432049603d` 已在 #49 合并后重新确认 clean，再 squash merge 为 `3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4`。它是 PR #48 的累计顶端链，故 #48 未重复合并。
+- 本轮 `develop` 基线：`3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4`。开放的未合并 Draft 保留原分支和审查证据，不自动关闭或删除。

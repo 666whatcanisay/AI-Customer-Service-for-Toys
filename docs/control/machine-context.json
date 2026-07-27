@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "pilot_hardening_v1_conditional",
-  "current_task": "OPS-PILOT-HARDENING-V1 internal customer-service pilot hardening",
-  "current_stage": "The pilot now has a scoped firewall readiness gate, controlled-client access check, A/C/B component recovery rehearsal, sanitised operation events, and a local SQLite online backup entrypoint. A real host rehearsal passed for all three components.",
-  "current_gate": "CONDITIONAL PASS: C/A/B/Admin, fixed proxies, server-side access simulation, A/C/B recovery, sanitised events, and a local backup passed. The required Private TCP 5173 firewall rule is absent and this session has no administrator rights; a second controlled customer computer must also complete browser and TCP acceptance. Do not expand 8000, 8011, or 5174 exposure.",
+  "status": "conditional_pilot_baseline",
+  "current_task": "CONTROL-PILOT-BASELINE-MERGE stable internal-pilot baseline",
+  "current_stage": "PR #49 and PR #51 were squash merged after dependency, scope, artifact, credential-pattern and isolated merge checks. An isolated C -> A -> B -> Admin run verified fixed same-origin proxies, real Ollama, the experience-case state machine, feedback analysis writeback and safe managed stop.",
+  "current_gate": "CONDITIONAL PILOT BASELINE: develop@3dd5c03 is stable for controlled internal testing. The required current-subnet Private TCP 5173 firewall rule and a second controlled customer-computer browser/TCP acceptance remain mandatory. Customer-efficiency PRs are excluded because C Provider fields/enums drift from the frozen v1 agreement. Do not expose 8000, 8011 or 5174.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -24,7 +24,10 @@
     "ops_target_pilot_ready_branch": "codex/ops-target-pilot-ready",
     "ops_target_pilot_ready_base": "3b9f3e63700ba1d5bcc27b54c5be7aabee28e252",
     "ops_pilot_hardening_v1_branch": "codex/ops-pilot-hardening-v1",
-    "ops_pilot_hardening_v1_base": "a502360"
+    "ops_pilot_hardening_v1_base": "a502360",
+    "pilot_baseline_pr49_squash_commit": "b6e7b4708d787210b58d135d760edf91a38145bc",
+    "pilot_baseline_pr51_squash_commit": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
+    "pilot_baseline_develop": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4"
   },
   "pull_requests": {
     "3": {
@@ -56,6 +59,18 @@
       "line": "CONTROL",
       "merge_commit": "ca587d974e6eaf4a4158b12ed545186429ea2e73",
       "merged_at": "2026-07-24T13:45:12+08:00"
+    },
+    "49": {
+      "line": "B/CONTROL-UI",
+      "merge_commit": "b6e7b4708d787210b58d135d760edf91a38145bc",
+      "merged_at": "2026-07-27T14:05:42+08:00",
+      "note": "Cumulative top chain for Draft PRs #40, #41, #45, #46 and #49; parents were not merged again."
+    },
+    "51": {
+      "line": "OPS",
+      "merge_commit": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
+      "merged_at": "2026-07-27T14:06:51+08:00",
+      "note": "Cumulative top chain for Draft PRs #48 and #51; parent was not merged again."
     }
   },
   "verification": {
@@ -71,7 +86,8 @@
     "OPS_T05_ADMIN_RUNTIME": "Configuration compatibility, real-package-script isolated start/status/open/stop/restart tests, PID-tamper refusal, unknown-port protection, PowerShell syntax, and diff checks passed. No real host closure was run because admin_web/node_modules is absent in this worktree and OPS-T05 does not permit dependency installation.",
     "CONTROL_MVP_BATCH_06_OPS_RECOVERY": "PR #26 originally added Admin dual-PID lifecycle handling. Review found that A/C/B still recorded only an exiting Windows launcher PID, so the same branch now records and verifies managed_pid plus listener_pid, listener path, start time and parent PID for all four services. A detached-wrapper regression verifies exact listener stop after the wrapper exits; unknown and tampered records remain rejected.",
     "OPS_TARGET_PILOT_READY": "The daily pilot wrapper starts C/A/B/Admin and then probes trusted service state, TCP 5173, the customer page, /rag-api/api/health, and /platform-api/health. A real Private-network host closure passed twice across explicit safe stop and recovery: migrations, test-package idempotency, 47-item sync, real Ollama smoke, all four health checks, customer entry, fixed proxies, and loopback-only Admin passed. Runtime evidence is sanitised; a second customer computer remains a manual acceptance gate.",
-    "OPS_PILOT_HARDENING_V1": "The hardening pass introduced a read-only gate for one enabled Private/current-subnet/TCP-5173 firewall rule, a second-computer client check, sanitised JSONL operation events, and a local SQLite online backup entrypoint. The real host completed A, C, and B stop-to-full-recovery rehearsals; after each, all four services, the customer page, and both fixed proxies recovered. The server-side client emulation passed. No scoped firewall rule exists and the current session is non-administrator, so second-computer reachability remains unverified."
+    "OPS_PILOT_HARDENING_V1": "The hardening pass introduced a read-only gate for one enabled Private/current-subnet/TCP-5173 firewall rule, a second-computer client check, sanitised JSONL operation events, and a local SQLite online backup entrypoint. The real host completed A, C, and B stop-to-full-recovery rehearsals; after each, all four services, the customer page, and both fixed proxies recovered. The server-side client emulation passed. No scoped firewall rule exists and the current session is non-administrator, so second-computer reachability remains unverified.",
+    "CONTROL_PILOT_BASELINE_MERGE": "After merging PR #49 and #51, an isolated SQLite verification completed Alembic, original-test-package import, 47-item sync, real qwen3.5:9b chat, 5173 /rag-api and /platform-api HTTP 200, one de-identified experience case NEW->REVIEWING->APPROVED, one de-identified feedback NEW->ANALYZING->ANALYZED, Admin HTTP 200, and managed stop with all four ports released. The readiness state correctly remained FIREWALL_CONFIGURATION_REQUIRED because no current-subnet Private TCP 5173 rule exists."
   },
   "agent_worktrees": {
     "A": {
@@ -104,18 +120,20 @@
     "MVP-BATCH-05",
     "OPS-T05 local admin web runtime management (script and isolated lifecycle verification)",
     "OPS-TARGET-PILOT-READY real host preparation and controlled customer-entry simulation",
-    "OPS-PILOT-HARDENING-V1 internal pilot hardening and recovery rehearsal"
+    "OPS-PILOT-HARDENING-V1 internal pilot hardening and recovery rehearsal",
+    "CONTROL-PILOT-BASELINE-MERGE PR consolidation, isolated real smoke and baseline handoff"
   ],
   "next_tasks": {
-    "A": "May be dispatched separately; preserve the runtime and real-test blockers",
-    "B": "May be dispatched separately",
-    "C": "May be dispatched separately; recommended C-T02 direction is data ingestion and standardization foundations"
+    "A": "Do not start a new A change for this baseline; real feedback analysis is verified. Any efficiency-analysis work remains blocked behind the frozen Provider compatibility repair.",
+    "B": "Second controlled customer-computer acceptance may be performed after the scoped firewall rule is explicitly configured; do not start efficiency events until the Provider contract is repaired.",
+    "C": "Create a separate Interface Owner repair task for customer-efficiency.v1 before merging PR #37 or its dependent C chain. Preserve migration rollback evidence and do not invent enum mappings."
   },
   "t02_executed": false,
   "blockers": [
     "A second controlled customer computer must run browser and TCP 5173 acceptance. If company Wi-Fi and wired clients cannot route after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure.",
     "The required AI Customer Service LAN 5173 (Private) rule is not configured. The current session has no administrator rights, so no UAC bypass or firewall change was attempted.",
-    "The historical OPS-T05 isolated worktree lacks admin_web/node_modules, but OPS-TARGET-PILOT-READY completed the host closure using pre-existing primary-worktree dependencies without installing anything."
+    "Customer-efficiency.v1 is interface-blocked: C PR #37 uses DIRECT_ADOPTION/EDITED_ADOPTION/NOT_ADOPTED and a reduced payload, while frozen B fields are AI_DIRECT_ADOPT/AI_EDIT_ADOPT/AI_REJECT with required correlation and privacy fields. PRs #37/#38/#39 and C descendants #43/#44/#47/#50 remain unmerged.",
+    "PR #32 is stale, PR #33 is DIRTY, and PR #42 conflicts with the cumulative B/UI chain and crosses A/B ownership. They require separate review rather than forced baseline inclusion."
   ],
   "last_updated": "2026-07-27"
 }
