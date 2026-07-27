@@ -175,3 +175,44 @@ class AdminOverviewResponse(BaseModel):
     recent_imported_at: datetime | None
     test_data_mode: bool
     production_usable: bool
+
+
+class TodayOperationsMetrics(BaseModel):
+    """One fixed UTC-day, content-free operating snapshot for the C Admin UI."""
+
+    generated_at: datetime
+    window_start: datetime
+    window_end: datetime
+    ai_request_count: int
+    direct_adoption_count: int
+    edited_adoption_count: int
+    not_adopted_count: int
+    adoption_rate: float
+    experience_case_submission_count: int
+    ai_feedback_submission_count: int
+    completed_ai_analysis_count: int
+
+
+class OperationsWorkQueue(BaseModel):
+    pending_experience_review_count: int
+    pending_ai_analysis_count: int
+    open_knowledge_conflict_count: int
+
+
+class OperationsKnowledgeStatus(BaseModel):
+    store_count: int
+    product_count: int
+    sku_count: int
+    faq_count: int
+    safety_rule_count: int
+    recent_imported_at: datetime | None
+
+
+class AdminOperationsTodayResponse(BaseModel):
+    """C-only, read-only aggregation; it contains no customer-service content."""
+
+    today: TodayOperationsMetrics
+    work_queue: OperationsWorkQueue
+    knowledge: OperationsKnowledgeStatus
+    test_data_mode: bool
+    production_usable: bool

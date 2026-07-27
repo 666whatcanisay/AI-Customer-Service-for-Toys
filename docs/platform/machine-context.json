@@ -4,9 +4,9 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "UI-3 LONG RUN",
-  "current_stage": "AI operations center productization over existing C Providers and Admin interfaces",
-  "current_gate": "UI-only Admin verification PASS; dependent Draft PR pending creation against the P0 customer-efficiency Provider branch",
+  "current_task": "C-OPERATION-V1.1",
+  "current_stage": "Daily AI operations center with a C-internal content-free UTC-day snapshot and actionable Admin work queues",
+  "current_gate": "C-OPERATION-V1.1 verification PASS; Draft PR #44 is open against the completed UI-3 branch",
   "status": "ready_for_delivery",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
@@ -44,6 +44,7 @@
     ,"platform_backend/app/customer_efficiency/models.py",
     "platform_backend/app/api/customer_efficiency_routes.py",
     "platform_backend/migrations/versions/0007_p0_customer_efficiency_events.py",
+    "platform_backend/app/api/admin_operations_routes.py",
     "admin_web/src/App.vue",
     "admin_web/src/views/OperationsOverviewView.vue",
     "admin_web/src/views/CustomerEfficiencyDashboardView.vue",
@@ -62,20 +63,22 @@
     "POST /api/v1/customer-efficiency-events with Idempotency-Key",
     "GET /api/v1/admin/ai-quality/customer-efficiency/summary",
     "C-owned internal GET /api/v1/admin/customer-efficiency/summary",
+    "C-owned internal GET /api/v1/admin/operations/today (content-free daily Admin aggregation)",
     "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
   "required_interfaces": [
     "B submits with Idempotency-Key and consumes only its minimum status projection",
     "A consumes only manually confirmed C feedback snapshots and posts matching revision/hash/type analysis evidence",
-    "No direct A/C database access, A model call, or cross-line automatic action"
+    "No direct A/C database access, A model call, or cross-line automatic action",
+    "C-OPERATION-V1.1 adds no cross-line interface, shared schema, error-code, or contract-version change"
     ,"B writes content-free efficiency event types; A consumes aggregate-only customer-efficiency summaries"
   ],
   "cross_line_compatibility": {
     "affected_lines": ["A", "B"],
-    "change": "P0 customer-efficiency C Provider adds B content-free event intake and A aggregate-only summary paths, documented in docs/platform/14 because the frozen document itself is absent from this worktree; no shared-contract file or version changes.",
+    "change": "P0 customer-efficiency C Provider adds B content-free event intake and A aggregate-only summary paths, documented in docs/platform/14 because the frozen document itself is absent from this worktree; C-OPERATION-V1.1 adds only a C-internal Admin read aggregation in docs/platform/15. No shared-contract file or version changes.",
     "shared_contract_version": "0.1.0 unchanged",
     "database_change": true,
-    "verified": "C real TestClient event write/idempotency, aggregate-window and A/Admin summary tests passed; B/A controlled integration remains consumer-owned follow-up."
+    "verified": "C real TestClient event write/idempotency, aggregate-window and A/Admin summary tests passed; C-OPERATION-V1.1 verified daily experience/feedback/analysis/efficiency aggregation, knowledge inventory, UTC window and no-content response. B/A controlled integration remains consumer-owned follow-up."
   },
   "data_boundaries": {
     "source": "Synthetic local test values only",
@@ -96,13 +99,14 @@
     "customer_efficiency_employee_identity_stored": false,
     "customer_efficiency_ranking_enabled": false
   },
-  "last_test_result": "2026-07-27 P0 customer-efficiency: real TestClient B event write/idempotency, invalid-field rejection, explicit-window aggregation, A/Admin summary equality, invalid-window rejection, and zero-denominator checks passed. Alembic upgrade -> downgrade 0006 -> upgrade reached 0007 on an isolated SQLite database that was removed. Full platform backend pytest passed (73 passed); Admin typecheck, Vitest (29 passed), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
+  "last_test_result": "2026-07-27 C-OPERATION-V1.1: real TestClient daily operations snapshot validated content-free UTC-day efficiency/case/feedback/analysis counts, queues, and zero knowledge state; seeded catalog verification validated knowledge inventory and conflict count. Full platform backend pytest passed (74 passed); Admin typecheck, Vitest (31 passed), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0006_mvp_plus_02_ai_feedback_idempotency; upgrade head",
-    "cd admin_web; pnpm typecheck; pnpm test; pnpm build"
+    "cd admin_web; npm.cmd run typecheck; npm.cmd test; npm.cmd run build",
+    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_admin_operations_api.py tests/test_admin_api.py"
   ],
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
@@ -112,22 +116,24 @@
     "The Admin analysis-results route is a C internal namespace boundary only; formal authentication, authorization, sensitive-view audit, retention, and automatic redaction are not enabled.",
     "The customer-efficiency provider has no formal authentication, authorization, audit, retention, or production-security certification; aggregate-only output does not establish a personnel-performance capability.",
     "CORS is not authentication or authorization.",
-    "UI-3 preserves the existing internal-test Admin boundary; it does not add formal authentication, authorization, audit, retention, or sensitive-data controls."
+    "UI-3 preserves the existing internal-test Admin boundary; it does not add formal authentication, authorization, audit, retention, or sensitive-data controls.",
+    "C-OPERATION-V1.1 returns aggregate-only daily metrics but does not add formal Admin access control, audit logging, retention, or production-report certification."
   ],
   "out_of_scope": [
     "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, and A model invocation",
     "Formal login, roles, retention, access audit, and production data",
     "A/B business code and shared contract changes"
     ,"Employee rankings, performance evaluations, raw customer-service content, and efficiency-event detail APIs",
-    "Prompt modification, knowledge publication, automatic model training, ERP writes, order changes, and implementation of planning-only business extensions"
+    "Prompt modification, knowledge publication, automatic model training, ERP writes, order changes, and implementation of planning-only business extensions",
+    "Relabelling cumulative totals as daily metrics or inferring unavailable service state from another source"
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-ai-operations-ui-v1",
-    "base": "agent/platform-customer-efficiency 12533e8 (P0 customer-efficiency Provider implementation)",
-    "commit": "pending UI-3 delivery commit",
-    "draft_pr": "pending creation against agent/platform-customer-efficiency"
+    "branch": "agent/platform-operation-v1-1",
+    "base": "agent/platform-ai-operations-ui-v1 4eb9e29 (UI-3 AI operations center)",
+    "commit": "e72d4da (C-OPERATION-V1.1 implementation)",
+    "draft_pr": "#44 against agent/platform-ai-operations-ui-v1"
   },
-  "next_recommended_task": "Review and merge the P0 customer-efficiency Provider before merging this dependent UI-only PR. Do not enable automatic actions, formal access claims, or planning-only extensions without separate approval.",
+  "next_recommended_task": "Review and merge the P0 customer-efficiency Provider, then UI-3, before merging this dependent C-OPERATION-V1.1 PR. Do not enable automatic actions, formal access claims, or planning-only extensions without separate approval.",
   "last_updated": "2026-07-27"
 }

@@ -7,6 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import Settings, get_settings
 from app.api.admin_routes import router as admin_router
+from app.api.admin_operations_routes import router as admin_operations_router
 from app.api.admin_suggestion_routes import router as admin_suggestion_router
 from app.api.customer_suggestion_routes import router as customer_suggestion_router
 from app.api.customer_experience_case_routes import router as customer_experience_case_router
@@ -69,6 +70,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(ai_quality_router)
     application.include_router(customer_efficiency_ai_quality_router)
     application.include_router(customer_efficiency_admin_router)
+    application.include_router(admin_operations_router)
     application.include_router(admin_router)
 
     @application.get("/health")
