@@ -17,6 +17,7 @@ from app.models.chat import (
 )
 from app.models.ai_control import AiControlCenterResponse
 from app.models.ai_operations import AiOperationsOverviewResponse
+from app.models.quality_baseline import QualityBaselineResponse
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
@@ -37,6 +38,7 @@ from app.service.ai_capability import (
     prompt_metadata,
     summarize_feedback_analysis_run,
 )
+from app.service.quality_baseline import latest_quality_baseline
 from app.service.test_knowledge import (
     PlatformIntegrationUnavailable,
     TestKnowledgeValidationError,
@@ -332,6 +334,21 @@ def get_ai_operations_overview(request: Request) -> dict[str, Any]:
     return envelope(
         operations_overview_snapshot(request.app).model_dump(),
         message="AI operations overview",
+    )
+
+
+@router.get(
+    "/admin/ai/quality-baseline/latest",
+    tags=["ai-admin"],
+    response_model=QualityBaselineResponse,
+)
+def get_latest_quality_baseline(request: Request) -> dict[str, Any]:
+    """Diagnose saved evaluation signals without running a model or changing AI state."""
+    return envelope(
+        latest_quality_baseline(
+            request.app.state.settings.project_root / "docs" / "rag" / "evaluations"
+        ).model_dump(),
+        message="AI quality baseline diagnosis",
     )
 
 

@@ -5,15 +5,16 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "draft_delivery_pending_external_validation",
-  "current_task": "AI-Agent TARGET-PILOT-A AI operations foundation",
-  "next_recommended_task": "Provide a reachable isolated C PLATFORM_API_BASE_URL with one human-confirmed, de-identified ANALYZING feedback snapshot to run the existing explicit feedback read/qwen/writeback/idempotency E2E; separately register a versioned aggregate-only C efficiency summary contract with schema/version/changelog/compatibility/affected-line review before A consumes efficiency data. Do not add automatic actions or merge automatically.",
-  "current_stage": "A versioned read-only ai-operations.v1 overview reports process action aggregates, saved evaluation quality and evidence coverage, safe Badcase empty state, model configuration state, and explicit C feedback/efficiency dependency notices without reading raw customer content or triggering model/C work on GET.",
-  "current_gate": "CONDITIONAL PASS: TARGET-PILOT-A backend regression is 77 passed and 3 opt-in E2Es skipped; real scoped qwen3.5:9b smoke passes. Saved live evaluation is 19/28; real C feedback read/writeback is BLOCKED by absent configuration/snapshot and C efficiency consumption is BLOCKED by no registered aggregate contract.",
-  "last_test_result": "2026-07-27 TARGET-PILOT-A: targeted operations/control/API tests 25 passed; full pytest backend 77 passed, 3 skipped, 35 warnings; explicit real scoped qwen3.5:9b smoke 1 passed (1373.9 ms). latest_evaluation read a-t03-v031-live 19/28. PLATFORM_API_BASE_URL was not configured and no A-scope registered C efficiency summary contract was found.",
+  "current_task": "AI-Agent PILOT-HARDENING-A quality baseline diagnosis",
+  "next_recommended_task": "Ask the C/knowledge governance owner to provide an auditable revised governed export/source catalog and explicit approval for a remediation task; then run the existing explicit 28-case evaluation and compare action, source_ids, key_facts, risk_level, scope and latency. Do not modify Prompt, knowledge, rules, vectors, or models automatically.",
+  "current_stage": "A versioned read-only ai-quality-baseline.v1 diagnosis converts the newest saved live_c_api evaluation into safe failed-case signals and manual recommendations without running qwen/C/retrieval or exposing report raw content.",
+  "current_gate": "CONDITIONAL PASS: PILOT-HARDENING-A backend regression is 79 passed and 3 opt-in E2Es skipped; real scoped qwen3.5:9b smoke passes. The saved live evaluation remains 19/28 and diagnosis finds data/metadata signals in 9 cases, key-fact signals in 5, one structured decision signal, and no direct retrieval or prompt/model signal. Quality remediation and a new live evaluation remain BLOCKED pending governed C data and separate authorization.",
+  "last_test_result": "2026-07-27 PILOT-HARDENING-A: targeted quality/control/operations/API tests 27 passed; full pytest backend 79 passed, 3 skipped, 37 warnings; explicit real scoped qwen3.5:9b smoke 1 passed (1436.9 ms). latest_quality_baseline read a-t03-v031-live: 19/28, data=9, knowledge=5, rule=1, retrieval=0, prompt_model=0; no raw evaluation content was emitted.",
   "blockers": [
     "A service at the default UI base URL http://127.0.0.1:8000 is unreachable, so direct browser-to-A control-center smoke remains unverified.",
     "An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before the feedback-analysis real read/qwen/writeback/idempotency claim can be made.",
-    "No approved versioned aggregate-only C customer-efficiency summary contract is registered in A scope, so efficiency data cannot be read or inferred."
+    "No approved versioned aggregate-only C customer-efficiency summary contract is registered in A scope, so efficiency data cannot be read or inferred.",
+    "An auditable revised governed C export/source catalog and explicit remediation authorization are required before fixing the 19/28 historical quality baseline or rerunning the 28-case live evaluation."
   ],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -32,32 +33,36 @@
     "The control-center snapshot is process-local operational state, not a durable audit or monitoring system; call and feedback-summary values reset on A restart.",
     "Badcase counts intentionally remain null until a browser-safe, de-identified aggregate interface is versioned and approved.",
     "AI operations action/latency/error metrics are current-process aggregates only; they reset on restart and must not be used as durable monitoring, audit, SLA, or employee-evaluation evidence.",
-    "Saved evaluation pass and source-attribution rates are test-evaluation evidence, not production-wide customer-answer quality or business-knowledge coverage."
+    "Saved evaluation pass and source-attribution rates are test-evaluation evidence, not production-wide customer-answer quality or business-knowledge coverage.",
+    "Quality-baseline categories are evaluator evidence signals and can overlap; a zero retrieval or prompt/model count is not proof that those causes are impossible outside the saved report."
   ],
   "git": {
     "branch": "agent/ai-control-center-ui-v1",
     "clean": false,
-    "baseline_commit": "ac213e5",
+    "baseline_commit": "db47e31",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
     "remote_branch": "origin/agent/ai-control-center-ui-v1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-27T12:36:00+08:00",
+  "checked_at": "2026-07-27T13:38:00+08:00",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "ai-control-center.v1.1 A-to-necessary-UI read-only OpenAPI projection (no shared contract change)",
-    "ai-operations.v1 A read-only OpenAPI projection (no shared contract change; C efficiency consumption intentionally not implemented)"
+    "ai-operations.v1 A read-only OpenAPI projection (no shared contract change; C efficiency consumption intentionally not implemented)",
+    "ai-quality-baseline.v1 A read-only OpenAPI projection over saved live evaluation reports (no shared contract change)"
   ],
   "entrypoints": [
     "backend/app/service/rag_service.py",
     "backend/app/service/ai_capability.py",
     "backend/app/service/experience_evaluation.py",
     "backend/app/service/feedback_analysis.py",
+    "backend/app/service/quality_baseline.py",
     "backend/app/api/routes.py",
     "backend/app/models/chat.py",
     "backend/app/models/ai_control.py",
     "backend/app/models/ai_operations.py",
+    "backend/app/models/quality_baseline.py",
     "frontend/src/api/aiControlCenterClient.ts",
     "frontend/src/api/aiControlCenterAdapter.ts",
     "frontend/src/views/AiControlCenter.vue"
@@ -73,7 +78,7 @@
   ],
   "test_commands": [
     "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
-    "source read-only venv python -m pytest backend/tests/test_ai_operations.py backend/tests/test_ai_control_center.py backend/tests/test_api.py -q",
+    "source read-only venv python -m pytest backend/tests/test_quality_baseline.py backend/tests/test_ai_operations.py backend/tests/test_ai_control_center.py backend/tests/test_api.py -q",
     "source read-only venv python -m pytest backend -q",
     "RUN_REAL_FEEDBACK_ANALYSIS_E2E=1 with an isolated C service and human-confirmed de-identified feedback python -m pytest backend/tests/test_real_feedback_analysis_e2e.py -q -s",
     "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
@@ -92,7 +97,8 @@
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
     "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
     "AI-CONTROL-V1.1 read-only technical-lead control center (local and real-qwen verification complete; external A/C validation blocked)",
-    "TARGET-PILOT-A AI operations foundation (local and real-qwen verification complete; C feedback/efficiency external validation blocked)"
+    "TARGET-PILOT-A AI operations foundation (local and real-qwen verification complete; C feedback/efficiency external validation blocked)",
+    "PILOT-HARDENING-A quality baseline diagnosis (19/28 cause evidence and local/real-qwen verification complete; governed remediation blocked)"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -117,7 +123,8 @@
     "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
     "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
     "GET /api/admin/ai/control-center ai-control-center.v1.1 read-only management snapshot",
-    "GET /api/admin/ai/operations/overview ai-operations.v1 read-only operational metrics snapshot"
+    "GET /api/admin/ai/operations/overview ai-operations.v1 read-only operational metrics snapshot",
+    "GET /api/admin/ai/quality-baseline/latest ai-quality-baseline.v1 read-only saved-evaluation diagnosis"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }

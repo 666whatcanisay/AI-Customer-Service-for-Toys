@@ -55,4 +55,14 @@ Returns the versioned `ai-operations.v1` read-only operations metric snapshot. I
 
 The route never calls Ollama or C, and never returns customer content, feedback IDs, case IDs, content hashes, prompt text, platform URLs, secrets, raw errors, or individual evaluation records. It does not modify Prompt, knowledge, model, or C data.
 
+### GET /api/admin/ai/quality-baseline/latest
+
+Returns the versioned `ai-quality-baseline.v1` diagnosis of the newest saved `live_c_api` evaluation report. Its OpenAPI `response_model` is `QualityBaselineResponse`.
+
+- `summary` contains only aggregate case/check counts and an internal evaluation identifier. `failed_cases` contains internal case IDs, safe evaluator failure classes, failed check names and numeric source/fact counts; it never contains the underlying question, answer, expected fact, source ID or source text.
+- `cause_findings` maps recorded evaluator signals to `DATA_PROBLEM`, `KNOWLEDGE_PROBLEM`, `RETRIEVAL_PROBLEM`, `PROMPT_OR_MODEL_PROBLEM`, and `RULE_DECISION_PROBLEM`. Findings may overlap and a zero count means no direct signal in this report, not proof that the cause is impossible.
+- `recommendations` are manual verification steps only. Each has `automatic_change_allowed=false`; the response itself has `model_or_prompt_changed=false` and `raw_content_exposed=false`.
+
+The route does not run qwen, retrieval or a new evaluation; it does not contact C and cannot modify Prompt, knowledge, rules, models, vectors or reports.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。
