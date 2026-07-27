@@ -422,6 +422,8 @@ function Get-ManagedServiceExpectedListenerAddress($Config, [string]$Name, [int]
 function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
     $record = Test-RecordedProcess $Config $Name
     if (-not $record -or -not $record.Valid) { return $false }
+    $runtimeIdentity = Test-ManagedServiceRuntimeIdentity $Config $record.Record
+    if (-not $runtimeIdentity.Valid) { return $false }
     $listeners = @(Get-TcpListeningConnection $Port)
     $owners = @(if ($listeners.Count -gt 0) { @($listeners | Select-Object -ExpandProperty OwningProcess -Unique) } else { @(Get-PortOwner $Port) })
     $listenerPid = if ($record.ListenerProcess) { [int]$record.ListenerProcess.Id } else { 0 }
@@ -466,6 +468,88 @@ function Get-CommandFeatureSha256([string]$Value) {
         return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
     } finally {
         $sha.Dispose()
+    }
+}
+
+function Get-RepositoryRuntimeIdentity([string]$RepositoryRoot) {
+    if ([string]::IsNullOrWhiteSpace($RepositoryRoot) -or -not (Test-Path -LiteralPath $RepositoryRoot -PathType Container)) {
+        return [pscustomobject]@{ Available=$false; RepositoryRoot=$RepositoryRoot; GitSha=$null; SourceState='UNAVAILABLE'; SourceFingerprint=$null; Reason='RepositoryRoot 不存在或未配置' }
+    }
+    try {
+        $configuredRoot = [IO.Path]::GetFullPath($RepositoryRoot)
+        $gitRoot = [string](& git -C $configuredRoot rev-parse --show-toplevel 2>$null | Select-Object -Last 1)
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitRoot)) { throw '无法解析 Git 仓库根目录' }
+        $gitRoot = [IO.Path]::GetFullPath($gitRoot.Trim())
+        if (-not [string]::Equals($gitRoot, $configuredRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'RepositoryRoot 不是 Git 工作树根目录' }
+
+        $gitSha = [string](& git -C $gitRoot rev-parse HEAD 2>$null | Select-Object -Last 1)
+        if ($LASTEXITCODE -ne 0 -or $gitSha -notmatch '^[0-9a-fA-F]{40}$') { throw '无法解析 Git HEAD' }
+        $statusLines = @(& git -C $gitRoot status --porcelain=v1 --untracked-files=all 2>$null)
+        if ($LASTEXITCODE -ne 0) { throw '无法读取 Git 工作树状态' }
+        # Disable safecrlf diagnostics only for this read-only fingerprint command:
+        # PowerShell treats Git's line-ending warning as a terminating native error.
+        $diffLines = @(& git -c core.safecrlf=false -C $gitRoot diff --no-ext-diff --binary HEAD 2>$null)
+        if ($LASTEXITCODE -ne 0) { throw '无法读取 Git 工作树差异' }
+        $untrackedFiles = @(& git -C $gitRoot ls-files --others --exclude-standard 2>$null)
+        if ($LASTEXITCODE -ne 0) { throw '无法读取 Git 未跟踪文件列表' }
+
+        # Only an opaque digest is persisted. It detects tracked edits and
+        # untracked-file content changes without writing source content to records.
+        $fingerprintParts = [Collections.Generic.List[string]]::new()
+        $fingerprintParts.Add("head=$($gitSha.Trim().ToLowerInvariant())")
+        $fingerprintParts.Add("status=$($statusLines -join "`n")")
+        $fingerprintParts.Add("diff=$($diffLines -join "`n")")
+        foreach ($relativePath in @($untrackedFiles | Sort-Object)) {
+            $candidatePath = [IO.Path]::GetFullPath((Join-Path $gitRoot $relativePath))
+            if (-not $candidatePath.StartsWith($gitRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Git 未跟踪文件路径超出仓库根目录' }
+            if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) { throw '无法读取 Git 未跟踪文件' }
+            $fingerprintParts.Add("untracked=${relativePath}:$((Get-FileHash -LiteralPath $candidatePath -Algorithm SHA256).Hash.ToLowerInvariant())")
+        }
+        return [pscustomobject]@{
+            Available=$true
+            RepositoryRoot=$gitRoot
+            GitSha=$gitSha.Trim().ToLowerInvariant()
+            SourceState=if ($statusLines.Count -eq 0) { 'CLEAN' } else { 'DIRTY' }
+            SourceFingerprint=(Get-CommandFeatureSha256 ($fingerprintParts -join "`n"))
+            Reason='已解析'
+        }
+    } catch {
+        return [pscustomobject]@{ Available=$false; RepositoryRoot=$RepositoryRoot; GitSha=$null; SourceState='UNAVAILABLE'; SourceFingerprint=$null; Reason=$_.Exception.Message }
+    }
+}
+
+function Test-ManagedServiceRuntimeIdentity($Config, $Record) {
+    $requiredFields = @('repository_root','repository_git_sha','repository_source_state','repository_source_fingerprint','runtime_mode')
+    if ($null -eq $Record -or @($requiredFields | Where-Object { $Record.PSObject.Properties.Name -notcontains $_ }).Count -gt 0) {
+        return [pscustomobject]@{ Valid=$false; Reason='运行记录缺少仓库版本身份字段'; Current=$null }
+    }
+    $repositoryRoot = if ($Config.ContainsKey('RepositoryRoot')) { [string]$Config.RepositoryRoot } else { '' }
+    $current = Get-RepositoryRuntimeIdentity $repositoryRoot
+    if (-not $current.Available) {
+        return [pscustomobject]@{ Valid=$false; Reason="当前仓库版本身份不可用：$($current.Reason)"; Current=$current }
+    }
+    $expectedMode = if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) { 'LAN' } else { 'LOCAL' }
+    $sameRoot = [string]::Equals([IO.Path]::GetFullPath([string]$Record.repository_root), $current.RepositoryRoot, [StringComparison]::OrdinalIgnoreCase)
+    $sameSha = [string]::Equals([string]$Record.repository_git_sha, $current.GitSha, [StringComparison]::OrdinalIgnoreCase)
+    $sameFingerprint = [string]::Equals([string]$Record.repository_source_fingerprint, $current.SourceFingerprint, [StringComparison]::OrdinalIgnoreCase)
+    $sameMode = [string]$Record.runtime_mode -eq $expectedMode
+    if ($sameRoot -and $sameSha -and $sameFingerprint -and $sameMode) {
+        return [pscustomobject]@{ Valid=$true; Reason='仓库版本身份已验证'; Current=$current }
+    }
+    return [pscustomobject]@{ Valid=$false; Reason="repositoryRoot=$sameRoot; gitSha=$sameSha; sourceFingerprint=$sameFingerprint; runtimeMode=$sameMode"; Current=$current }
+}
+
+function Assert-ManagedRuntimeSourceConsistency($Config, $Services) {
+    $mismatches = [Collections.Generic.List[string]]::new()
+    foreach ($service in @($Services)) {
+        $check = Test-RecordedProcess $Config ([string]$service.Name)
+        if ($check -and $check.Valid) {
+            $identity = Test-ManagedServiceRuntimeIdentity $Config $check.Record
+            if (-not $identity.Valid) { $mismatches.Add("$($service.Name)：$($identity.Reason)") }
+        }
+    }
+    if ($mismatches.Count -gt 0) {
+        throw "已登记服务不是当前仓库版本或缺少版本身份：$($mismatches -join '；')。请先使用停止AI客服.bat 安全停止已验证服务，再重新启动；不会按端口结束未知进程。"
     }
 }
 
@@ -560,7 +644,10 @@ function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$Executabl
     New-Item -ItemType Directory -Force -Path $Config.RuntimeDirectory, (Get-ServiceLogDirectory $Config) | Out-Null
     $metadata = Get-ProcessMetadata $Process.Id
     $parentProcessId = if ($metadata) { [int]$metadata.ParentProcessId } else { 0 }
-    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config) }
+    $repositoryRoot = if ($Config.ContainsKey('RepositoryRoot')) { [string]$Config.RepositoryRoot } else { '' }
+    $runtimeIdentity = Get-RepositoryRuntimeIdentity $repositoryRoot
+    $runtimeMode = if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) { 'LAN' } else { 'LOCAL' }
+    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config); repository_root=$runtimeIdentity.RepositoryRoot; repository_git_sha=$runtimeIdentity.GitSha; repository_source_state=$runtimeIdentity.SourceState; repository_source_fingerprint=$runtimeIdentity.SourceFingerprint; runtime_mode=$runtimeMode }
     $record | ConvertTo-Json | Set-Content -LiteralPath (Get-ServiceRecordPath $Config $Name) -Encoding UTF8
 }
 
@@ -763,6 +850,7 @@ function Get-PlatformMigrationStatus($Config) {
 
 function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl) {
     $record = Test-RecordedProcess $Config $Name
+    $runtimeIdentity = if ($record -and $record.Record) { Test-ManagedServiceRuntimeIdentity $Config $record.Record } else { $null }
     $serviceProcessId = if ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'managed_pid')) { [string]$record.Record.managed_pid } elseif ($record -and $record.Process) { [string]$record.Process.Id } else { '-' }
     $listenerProcessId = if ($record -and $record.ListenerProcess) { [string]$record.ListenerProcess.Id } else { '-' }
     $portOwners = @(Get-PortOwner $Port)
@@ -771,7 +859,11 @@ function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUr
     $healthOk = Test-HttpOk $HealthUrl
     $portState = if ($portOwners.Count -gt 0) { "监听（LISTENING；PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（LISTENING；health 已确认；未能读取端口 PID）' } else { '未监听' }
     $healthState = if ($healthOk) { '可用' } else { '不可用' }
-    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; Record=$record }
+    $runtimeIdentityState = if ($null -eq $runtimeIdentity) { '未登记' } elseif ($runtimeIdentity.Valid) { '已验证' } else { '不一致' }
+    $runtimeGitShortSha = if ($runtimeIdentity -and $runtimeIdentity.Current -and $runtimeIdentity.Current.GitSha) { $runtimeIdentity.Current.GitSha.Substring(0, 12) } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_git_sha') -and -not [string]::IsNullOrWhiteSpace([string]$record.Record.repository_git_sha)) { ([string]$record.Record.repository_git_sha).Substring(0, [Math]::Min(12, ([string]$record.Record.repository_git_sha).Length)) } else { '不可用' }
+    $runtimeSourceState = if ($runtimeIdentity -and $runtimeIdentity.Current) { [string]$runtimeIdentity.Current.SourceState } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_source_state')) { [string]$record.Record.repository_source_state } else { '不可用' }
+    $runtimeIdentityDetail = if ($runtimeIdentity) { [string]$runtimeIdentity.Reason } else { '没有运行记录' }
+    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; RuntimeIdentityState=$runtimeIdentityState; RuntimeGitShortSha=$runtimeGitShortSha; RuntimeSourceState=$runtimeSourceState; RuntimeIdentityDetail=$runtimeIdentityDetail; Record=$record }
 }
 
 function Get-TargetPilotHttpProbe([string]$Url) {

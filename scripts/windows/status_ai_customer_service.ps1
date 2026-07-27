@@ -21,6 +21,7 @@ try {
     )) {
         $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url
         Write-Host "$($item.Label)：$($serviceStatus.State)；受管 PID $($serviceStatus.ManagedProcessId)；监听 PID $($serviceStatus.ListenerProcessId)；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
+        Write-Host "  运行版本：$($serviceStatus.RuntimeIdentityState)；SHA $($serviceStatus.RuntimeGitShortSha)；源码 $($serviceStatus.RuntimeSourceState)；$($serviceStatus.RuntimeIdentityDetail)"
     }
     $adminCheck = Test-RecordedProcess $config 'admin-web'
     $adminRecord = if ($adminCheck) { $adminCheck.Record } else { $null }
