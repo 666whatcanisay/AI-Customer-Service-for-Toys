@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "night_shift_conditional_pass",
-  "current_task": "CONTROL-NIGHT-SHIFT-EXECUTION Pilot Hardening delivery",
-  "current_stage": "P0/P1 candidates were delivered in isolated worktrees and their scope/tests were reviewed. C #55 fixes real Admin blank-filter and A envelope parsing; B #57 guards /feedback; A 2ac537f bounds qwen structured output; OPS #56 records source provenance. None has been merged or deployed.",
-  "current_gate": "CONDITIONAL_PASS / INTEGRATION_BLOCKED: origin/develop@32feb610 remains the dispatch baseline while official services run old develop@3b9f3e6. Before a safe restart, candidates require review/merge, OPS needs a full-suite resolution, and the operator must confirm no active user. The Private TCP 5173 firewall rule and second controlled customer-computer acceptance remain mandatory; do not expose 8000, 8011 or 5174.",
+  "status": "pilot_candidate_ready",
+  "current_task": "CONTROL-BASELINE-MERGE-V2 Pilot candidate baseline",
+  "current_stage": "Interface #58, C #55, B #57, A 2ac537f and OPS #56 were reviewed and merged in the declared order. An isolated real runtime closure passed for C/A/B/Admin, sourced qwen chat, experience-case review and feedback analysis writeback.",
+  "current_gate": "PILOT_CANDIDATE_READY: develop@d1d2ba2 is a verified internal-pilot candidate. INTERNAL_PILOT_READY still requires an explicitly configured current-subnet Private TCP 5173 firewall rule plus second controlled customer-computer TCP/browser acceptance. Do not expose 8000, 8011 or 5174.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -27,7 +27,9 @@
     "ops_pilot_hardening_v1_base": "a502360",
     "pilot_baseline_pr49_squash_commit": "b6e7b4708d787210b58d135d760edf91a38145bc",
     "pilot_baseline_pr51_squash_commit": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
-    "pilot_baseline_develop": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4"
+    "pilot_baseline_develop": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
+    "pilot_candidate_baseline_v2": "d1d2ba281cc1a05a04cdd4349ec74e100e05f947",
+    "pilot_candidate_baseline_v2_merge_branch": "codex/pilot-baseline-v2-merge"
   },
   "pull_requests": {
     "3": {
@@ -87,7 +89,8 @@
     "CONTROL_MVP_BATCH_06_OPS_RECOVERY": "PR #26 originally added Admin dual-PID lifecycle handling. Review found that A/C/B still recorded only an exiting Windows launcher PID, so the same branch now records and verifies managed_pid plus listener_pid, listener path, start time and parent PID for all four services. A detached-wrapper regression verifies exact listener stop after the wrapper exits; unknown and tampered records remain rejected.",
     "OPS_TARGET_PILOT_READY": "The daily pilot wrapper starts C/A/B/Admin and then probes trusted service state, TCP 5173, the customer page, /rag-api/api/health, and /platform-api/health. A real Private-network host closure passed twice across explicit safe stop and recovery: migrations, test-package idempotency, 47-item sync, real Ollama smoke, all four health checks, customer entry, fixed proxies, and loopback-only Admin passed. Runtime evidence is sanitised; a second customer computer remains a manual acceptance gate.",
     "OPS_PILOT_HARDENING_V1": "The hardening pass introduced a read-only gate for one enabled Private/current-subnet/TCP-5173 firewall rule, a second-computer client check, sanitised JSONL operation events, and a local SQLite online backup entrypoint. The real host completed A, C, and B stop-to-full-recovery rehearsals; after each, all four services, the customer page, and both fixed proxies recovered. The server-side client emulation passed. No scoped firewall rule exists and the current session is non-administrator, so second-computer reachability remains unverified.",
-    "CONTROL_PILOT_BASELINE_MERGE": "After merging PR #49 and #51, an isolated SQLite verification completed Alembic, original-test-package import, 47-item sync, real qwen3.5:9b chat, 5173 /rag-api and /platform-api HTTP 200, one de-identified experience case NEW->REVIEWING->APPROVED, one de-identified feedback NEW->ANALYZING->ANALYZED, Admin HTTP 200, and managed stop with all four ports released. The readiness state correctly remained FIREWALL_CONFIGURATION_REQUIRED because no current-subnet Private TCP 5173 rule exists."
+    "CONTROL_PILOT_BASELINE_MERGE": "After merging PR #49 and #51, an isolated SQLite verification completed Alembic, original-test-package import, 47-item sync, real qwen3.5:9b chat, 5173 /rag-api and /platform-api HTTP 200, one de-identified experience case NEW->REVIEWING->APPROVED, one de-identified feedback NEW->ANALYZING->ANALYZED, Admin HTTP 200, and managed stop with all four ports released. The readiness state correctly remained FIREWALL_CONFIGURATION_REQUIRED because no current-subnet Private TCP 5173 rule exists.",
+    "CONTROL_BASELINE_MERGE_V2": "Reviewed candidates were squash merged in the frozen order Interface #58, C #55, B #57, A 2ac537f and OPS #56 to develop@d1d2ba2. Backend 77 passed/3 skipped, C Admin 33 Vitest passed, B 100 Vitest passed and selected OPS lifecycle suites exited 0. Official scripts in an isolated worktree verified migration 0006, package import, 47/47 sync, four verified runtime records, fixed proxy health, sourced real qwen3.5:9b answer, case approval/evaluation, feedback analysis and Admin visibility. External firewall and second-computer gates remain."
   },
   "agent_worktrees": {
     "A": {
@@ -121,7 +124,8 @@
     "OPS-T05 local admin web runtime management (script and isolated lifecycle verification)",
     "OPS-TARGET-PILOT-READY real host preparation and controlled customer-entry simulation",
     "OPS-PILOT-HARDENING-V1 internal pilot hardening and recovery rehearsal",
-    "CONTROL-PILOT-BASELINE-MERGE PR consolidation, isolated real smoke and baseline handoff"
+    "CONTROL-PILOT-BASELINE-MERGE PR consolidation, isolated real smoke and baseline handoff",
+    "CONTROL-BASELINE-MERGE-V2 reviewed candidate merge and real closure"
   ],
   "next_tasks": {
     "A": "Do not start a new A change for this baseline; real feedback analysis is verified. Any efficiency-analysis work remains blocked behind the frozen Provider compatibility repair.",
