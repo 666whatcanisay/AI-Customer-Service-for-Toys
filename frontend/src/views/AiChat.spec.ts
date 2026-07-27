@@ -260,6 +260,15 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
   })
 
+  it('loads the tester default store product list on a first visit', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' })
+    expect(selects[0]?.props('modelValue')).toBe('TENANT-PDD-SM-TEST::pdd::PDD-SM')
+    expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
+  })
+
   it('clears product and SKU on store switch, and clears SKU on product switch', async () => {
     const wrapper = mountPage()
     await flushPromises()
@@ -374,6 +383,7 @@ describe('AiChat B-T04 three-step workbench', () => {
 
     expect(wrapper.get('[data-testid="copy-button"]').text()).toContain('复制回复')
     expect(wrapper.get('[data-testid="edit-reply-button"]').text()).toContain('编辑回复')
+    expect(wrapper.get('[data-testid="next-consultation-button"]').text()).toContain('处理下一条咨询')
     expect(wrapper.get('[data-testid="collect-experience-case-button"]').text()).toContain('收藏优秀案例')
     expect(wrapper.get('[data-testid="feedback-problem-button"]').text()).toContain('反馈问题')
     const focus = vi.spyOn(
@@ -382,6 +392,31 @@ describe('AiChat B-T04 three-step workbench', () => {
     )
     await wrapper.get('[data-testid="edit-reply-button"]').trigger('click')
     expect(focus).toHaveBeenCalled()
+  })
+
+  it('clears a stale answer when the next customer question changes while keeping product context', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="question-input"]').setValue('下一位客户想问库存')
+
+    expect(wrapper.find('[data-testid="answer-card"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="next-question-notice"]').text()).toContain('已清空上一条建议')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('商品上下文')
+  })
+
+  it('starts the next consultation without discarding the selected store, product, or SKU', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="next-consultation-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="answer-card"]').exists()).toBe(false)
+    expect((wrapper.get('[data-testid="question-input"]').element as HTMLTextAreaElement).value).toBe('')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('SKU 上下文')
   })
 
   it('enables experience capture or problem feedback only after the matching adoption decision', async () => {
@@ -548,6 +583,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="platform-error"]').text()).toContain(
       '数据服务不可用，请联系技术人员检查中台。'
     )
+    expect(wrapper.get('[data-testid="service-recovery-card"]').text()).toContain('刷新商品目录')
     expect(wrapper.get('[data-testid="system-summary"]').text()).toContain('系统正在连接')
   })
 

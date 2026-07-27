@@ -40,6 +40,21 @@
       </ol>
     </section>
 
+    <section class="work-rhythm-section" aria-labelledby="work-rhythm-title" data-testid="work-rhythm-guide">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">日常使用</p>
+          <h2 id="work-rhythm-title">不同节奏，同一安全流程</h2>
+        </div>
+        <RouterLink to="/ai-chat" class="text-link">开始一条咨询</RouterLink>
+      </div>
+      <div class="work-rhythm-grid">
+        <article><strong>第一次使用</strong><p>按上方三步走，不确定 SKU 时留空，不要猜款式。</p></article>
+        <article><strong>熟练使用</strong><p>先看 AI 处理等级和来源，再决定直接采用、修改或未采用。</p></article>
+        <article><strong>高频使用</strong><p>同一商品连续咨询时，使用“处理下一条咨询”保留商品上下文并清空旧回答。</p></article>
+      </div>
+    </section>
+
     <section class="summary-section" aria-labelledby="today-summary-title">
       <div class="section-heading">
         <div>
@@ -124,7 +139,7 @@ h2, h3, p { margin-top: 0; }
 .today-card { align-self: stretch; padding: 18px; border-radius: 16px; background: #fff7df; color: #74500d; }
 .today-card strong { font-size: 15px; }
 .today-card p { margin: 8px 0 0; font-size: 13px; line-height: 1.65; }
-.summary-section, .quick-section, .start-section { margin-top: 26px; }
+.summary-section, .quick-section, .start-section, .work-rhythm-section { margin-top: 26px; }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
 .section-heading h2 { margin-bottom: 0; font-size: 21px; }
 .section-heading > span { color: #718096; font-size: 12px; }
@@ -134,6 +149,7 @@ h2, h3, p { margin-top: 0; }
 .start-grid > li > span { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #e8f1ff; color: #285fc8; font-size: 13px; font-weight: 900; }
 .start-grid strong { font-size: 14px; }
 .start-grid p { margin: 5px 0 0; color: #68758a; font-size: 12px; line-height: 1.55; }
+.work-rhythm-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }.work-rhythm-grid article { padding: 15px; border-left: 3px solid #94b8ef; border-radius: 0 12px 12px 0; background: #f8fbff; }.work-rhythm-grid strong { color: #284a73; font-size: 14px; }.work-rhythm-grid p { margin: 6px 0 0; color: #68758a; font-size: 12px; line-height: 1.55; }
 .overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .overview-grid article { display: grid; gap: 6px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }
 .overview-grid small, .overview-grid span { color: #718096; font-size: 12px; line-height: 1.55; }
@@ -151,6 +167,6 @@ h2, h3, p { margin-top: 0; }
 .quick-card.planned > span { background: #eef1f6; color: #718096; }
 .quick-card.planned b { color: #718096; }
 .empty-section { margin-top: 22px; }
-@media (max-width: 1020px) { .quick-grid, .start-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .welcome-panel, .overview-grid, .quick-grid, .start-grid { grid-template-columns: 1fr; } .welcome-panel { padding: 18px; } .section-heading { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 1020px) { .quick-grid, .start-grid, .work-rhythm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .welcome-panel, .overview-grid, .quick-grid, .start-grid, .work-rhythm-grid { grid-template-columns: 1fr; } .welcome-panel { padding: 18px; } .section-heading { align-items: flex-start; flex-direction: column; } }
 </style>

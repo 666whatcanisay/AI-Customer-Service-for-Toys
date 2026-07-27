@@ -76,6 +76,16 @@
       :closable="false"
       show-icon
     />
+    <section v-if="ragHealthError || platformError" class="service-recovery-card" data-testid="service-recovery-card">
+      <div>
+        <strong>暂时无法完成新的 AI 咨询</strong>
+        <p>刷新对应服务后再继续；已有人工客服流程不受页面状态影响。</p>
+      </div>
+      <div class="service-recovery-actions">
+        <el-button v-if="ragHealthError" :loading="ragHealthLoading" plain @click="refreshRagHealth">刷新 AI 状态</el-button>
+        <el-button v-if="platformError" :loading="platformHealthLoading" plain @click="refreshPlatform">刷新商品目录</el-button>
+      </div>
+    </section>
 
     <nav class="workflow-progress" aria-label="操作步骤">
       <div :class="{ active: workflowStep === 1, done: workflowStep > 1 }">
@@ -219,6 +229,7 @@
         show-word-limit
         placeholder="例如：这个款式适合几岁的小朋友？"
         :disabled="loading"
+        @input="handleQuestionInput"
         @keydown.enter.exact.prevent="submitQuestion"
       />
       <div class="example-row">
@@ -257,6 +268,15 @@
       class="status-alert"
       :title="requestError"
       type="error"
+      :closable="false"
+      show-icon
+    />
+    <el-alert
+      v-if="nextQuestionNotice"
+      data-testid="next-question-notice"
+      class="status-alert"
+      :title="nextQuestionNotice"
+      type="info"
       :closable="false"
       show-icon
     />
@@ -323,6 +343,9 @@
             {{ copyStatus === 'copied' ? '✓ 已复制回复' : '复制回复' }}
           </el-button>
           <el-button data-testid="edit-reply-button" plain @click="editReply">编辑回复</el-button>
+          <el-button data-testid="next-consultation-button" plain @click="startNextConsultation">
+            处理下一条咨询
+          </el-button>
           <el-button
             data-testid="collect-experience-case-button"
             plain
@@ -611,7 +634,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ragClient } from '@/api/ragClient'
 import { platformClient } from '@/api/platformClient'
@@ -787,6 +810,8 @@ const platformError = ref('')
 const requestError = ref('')
 const result = ref<RagChatResult | null>(null)
 const replyDraft = ref('')
+const lastAnsweredQuestion = ref('')
+const nextQuestionNotice = ref('')
 const replyEditor = ref<{ focus: () => void } | null>(null)
 const copyStatus = ref<'idle' | 'copied'>('idle')
 const adoption = ref<AdoptionRecord | null>(null)
@@ -940,6 +965,8 @@ const adoptionMessage = computed(() =>
 const clearAnswer = () => {
   result.value = null
   replyDraft.value = ''
+  lastAnsweredQuestion.value = ''
+  nextQuestionNotice.value = ''
   adoption.value = null
   aiFeedbackDialogOpen.value = false
   aiFeedbackType.value = ''
@@ -968,8 +995,26 @@ const rememberStore = (value: string) => {
   }
 }
 
+const handleQuestionInput = (value: string) => {
+  copyStatus.value = 'idle'
+  if (!result.value || value.trim() === lastAnsweredQuestion.value) return
+
+  clearAnswer()
+  nextQuestionNotice.value = '已清空上一条建议。请为当前客户问题重新生成回复。'
+}
+
 const useExample = (question: string) => {
-  if (!loading.value) customerQuestion.value = question
+  if (loading.value) return
+  handleQuestionInput(question)
+  customerQuestion.value = question
+}
+
+const startNextConsultation = async () => {
+  if (loading.value) return
+  clearAnswer()
+  customerQuestion.value = ''
+  await nextTick()
+  document.getElementById('customer-question')?.focus()
 }
 
 const refreshRagHealth = async () => {
@@ -991,7 +1036,7 @@ const loadStores = async () => {
   activeCatalogController = controller
   storesLoading.value = true
   platformError.value = ''
-  let shouldRestoreStore = false
+  let storeKeyToLoad = ''
   try {
     const nextStores = await platformClient.listStores(controller.signal)
     const unsafeStore = nextStores.find((store) =>
@@ -1008,7 +1053,16 @@ const loadStores = async () => {
       )
     }
     stores.value = nextStores
-    shouldRestoreStore = !selectedStoreKey.value && Boolean(readRememberedStore())
+    const currentStoreKey = selectedStoreKey.value
+    const rememberedStoreKey = readRememberedStore()
+    const defaultStoreKey = nextStores.find(
+      (store) => store.storeCode === identity.value.defaultStoreCode
+    )
+    storeKeyToLoad = [
+      currentStoreKey,
+      rememberedStoreKey,
+      defaultStoreKey ? storeKey(defaultStoreKey) : ''
+    ].find((value) => nextStores.some((store) => storeKey(store) === value)) ?? ''
   } catch (error) {
     if (!controller.signal.aborted) {
       stores.value = []
@@ -1019,14 +1073,12 @@ const loadStores = async () => {
     storesLoading.value = false
   }
 
-  if (shouldRestoreStore) {
-    const rememberedKey = readRememberedStore()
-    if (stores.value.some((store) => storeKey(store) === rememberedKey)) {
-      selectedStoreKey.value = rememberedKey
-      await handleStoreChange()
-    } else {
-      rememberStore('')
-    }
+  if (storeKeyToLoad) {
+    const shouldLoadProducts = selectedStoreKey.value !== storeKeyToLoad || !products.value.length
+    selectedStoreKey.value = storeKeyToLoad
+    if (shouldLoadProducts) await handleStoreChange()
+  } else if (readRememberedStore()) {
+    rememberStore('')
   }
 }
 
@@ -1158,6 +1210,7 @@ const submitQuestion = async () => {
     }
     result.value = response
     replyDraft.value = response.answer
+    lastAnsweredQuestion.value = message
     recordAiAssist()
   } catch (error) {
     const clientError = toRagClientError(error)
@@ -1450,6 +1503,8 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 }
 .step-card { padding: 26px; }
 .status-alert { margin-top: 16px; }
+.service-recovery-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 13px 15px; border: 1px solid #efc5a6; border-radius: 12px; background: #fff9f3; color: #7a4318; }
+.service-recovery-card strong { font-size: 14px; }.service-recovery-card p { margin: 4px 0 0; color: #8a5a35; font-size: 12px; line-height: 1.5; }.service-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .context-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2032,4 +2087,5 @@ h2 {
 .ai-feedback-field small { color: #748198; font-weight: 400; }
 .ai-feedback-error { margin-top: 14px; color: #b83b32 !important; }
 .ai-feedback-success { margin-top: 14px; color: #1c6a49 !important; font-weight: 700; }
+@media (max-width: 700px) { .service-recovery-card { align-items: flex-start; flex-direction: column; } }
 </style>

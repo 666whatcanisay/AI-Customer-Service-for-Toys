@@ -3,18 +3,18 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "B-PRODUCT-V1.1 daily customer workbench experience",
-  "current_stage": "Implementation and UI browser verification complete: guided consultation path, action-specific human-check note, adoption-gated follow-up actions, experience-case journey and feedback reason guide. The complete live consultation path is blocked because the current A/RAG service is unavailable.",
-  "current_gate": "CONDITIONAL_LOCAL_PASS_PENDING_DELIVERY: typecheck, 24 Vitest files / 93 tests and production build passed. Browser verified homepage, platform availability, AI unavailable-state, experience-case and feedback pages. No successful answer/copy/case/feedback result was fabricated.",
-  "status": "customer_product_v1_1_ready_for_draft_pr_with_rag_blocker",
+  "current_task": "TARGET-PILOT-B independent daily customer consultation",
+  "current_stage": "Implementation, error and empty-state review complete: default-store catalog load, safe next-consultation reset, stale-answer protection, daily-mode guidance, case status guidance, feedback-path distinction and service recovery actions. The complete live success path is blocked because A/RAG is unavailable.",
+  "current_gate": "CONDITIONAL_LOCAL_PASS_PENDING_DELIVERY: typecheck, 24 Vitest files / 96 tests and production build passed. Browser verified homepage, live C catalog product selection, AI unavailable state, service recovery, experience-case empty state and feedback guide. No answer/copy/case/feedback success result was fabricated.",
+  "status": "target_pilot_b_ready_for_draft_pr_with_rag_blocker",
   "last_updated": "2026-07-27",
   "git": {
-    "branch": "codex/customer-product-v1-1",
-    "base_commit": "3f0d967",
+    "branch": "codex/customer-pilot-b-v3",
+    "base_commit": "348c875",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "DRAFT_PR_45",
+    "delivery": "DRAFT_PR_46",
     "clean": false,
-    "task_commit": "55e96ae"
+    "task_commit": "fdec128"
   },
   "owned_paths": [
     "frontend/**",
@@ -60,9 +60,9 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 B-PRODUCT-V1.1: vue-tsc --noEmit PASS; Vitest 24 files / 93 tests PASS; vite build PASS. Browser verified the homepage, live platform label, AI unavailable state, experience-case page and feedback page. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "last_test_result": "2026-07-27 TARGET-PILOT-B: vue-tsc --noEmit PASS; Vitest 24 files / 96 tests PASS; vite build PASS. Browser verified homepage guidance, live C catalog product selection, AI unavailable state, recovery actions, experience-case empty state and feedback guide. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
   "blockers": [
-    "A/RAG service was unavailable during browser validation, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
+    "A/RAG service was unavailable during browser validation and the actual de-identified consultation request failed, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
   ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
@@ -84,7 +84,8 @@
     "MVP-PLUS-02-B-C-SMOKE real integration evidence (BLOCKED; no code changes)",
     "MVP-PLUS-02-B-CONTRACT-ADAPT consumer adaptation and real integration PASS",
     "UI-1 unified customer product shell (local UI verification PASS; delivery pending)",
-    "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)"
+    "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)",
+    "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
