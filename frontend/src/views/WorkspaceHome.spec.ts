@@ -1,12 +1,39 @@
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  clearCustomerSessionActivity,
+  recordAiAssist,
+  recordAiFeedbackSubmission
+} from '@/workspace/customerSessionActivity'
+import {
+  clearExperienceCaseSubmissions,
+  recordExperienceCaseSubmission
+} from '@/workspace/experienceCaseSession'
 import { SystemStatusKey } from '@/workspace/systemStatus'
 import { TesterIdentityKey } from '@/workspace/testerIdentity'
 import WorkspaceHome from './WorkspaceHome.vue'
 
 describe('WorkspaceHome', () => {
+  afterEach(() => {
+    clearCustomerSessionActivity()
+    clearExperienceCaseSubmissions()
+  })
+
   it('shows the daily AI entry, real-workflow links and clearly planned modules', () => {
+    recordAiAssist()
+    recordAiAssist()
+    recordAiFeedbackSubmission()
+    recordExperienceCaseSubmission({
+      storeCode: 'PDD-SM',
+      productId: 'PROD-001',
+      skuId: 'SKU-RED',
+      caseId: 'CEC-001',
+      feedbackType: 'ADOPTED',
+      createdBy: 'TESTER-ONE',
+      reviewStatus: 'NEW',
+      submittedAt: '2026-07-27 12:00:00'
+    })
     const wrapper = mount(WorkspaceHome, {
       global: {
         provide: {
@@ -27,8 +54,11 @@ describe('WorkspaceHome', () => {
     expect(wrapper.text()).toContain('AI 客服')
     expect(wrapper.text()).toContain('我的案例')
     expect(wrapper.text()).toContain('问题反馈')
-    expect(wrapper.text()).toContain('AI 帮助次数')
-    expect(wrapper.text()).toContain('待启用')
+    expect(wrapper.text()).toContain('今日 AI 辅助')
+    expect(wrapper.text()).toContain('本次会话')
+    expect(wrapper.get('[data-testid="today-ai-assist-count"]').text()).toBe('2')
+    expect(wrapper.get('[data-testid="experience-case-count"]').text()).toBe('1')
+    expect(wrapper.get('[data-testid="feedback-count"]').text()).toBe('1')
     expect(wrapper.text()).toContain('售后助手')
     expect(wrapper.text()).toContain('规划中')
     expect(wrapper.get('[data-testid="enter-ai-chat"]').attributes('href')).toBe('/ai-chat')

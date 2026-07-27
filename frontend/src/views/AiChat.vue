@@ -173,9 +173,19 @@
 
       <div v-if="selectedStore && selectedProduct" class="selection-confirmed" data-testid="context-summary">
         <span class="check-mark">✓</span>
-        <div>
-          <strong>已选择：{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
-          <p>{{ selectedProduct.displayName }}<template v-if="selectedSku"> · {{ selectedSku.displayName }}</template></p>
+        <div class="context-summary-grid">
+          <div>
+            <small>当前店铺</small>
+            <strong>{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
+          </div>
+          <div>
+            <small>商品上下文</small>
+            <strong>{{ selectedProduct.displayName }}</strong>
+          </div>
+          <div>
+            <small>SKU 上下文</small>
+            <strong>{{ selectedSku?.displayName ?? '待确认（可留空）' }}</strong>
+          </div>
         </div>
         <el-button link @click="showTechnicalDetails = !showTechnicalDetails">
           {{ showTechnicalDetails ? '隐藏技术信息' : '查看技术信息' }}
@@ -295,6 +305,7 @@
       <label class="reply-label" for="reply-draft">建议回复 <span>可以直接修改</span></label>
       <el-input
         id="reply-draft"
+        ref="replyEditor"
         v-model="replyDraft"
         data-testid="reply-draft"
         class="reply-editor"
@@ -304,11 +315,20 @@
         show-word-limit
         @input="copyStatus = 'idle'"
       />
-      <div class="copy-row">
-        <span>复制的是上方当前内容，包括你的修改。</span>
-        <el-button data-testid="copy-button" type="primary" size="large" @click="copyReply">
-          {{ copyStatus === 'copied' ? '✓ 已复制修改后的回复' : '复制修改后的回复' }}
-        </el-button>
+      <div class="reply-action-bar" aria-label="回复操作">
+        <span>复制的是上方当前内容，包括你的修改。先记录采用结果，再收藏案例或反馈问题。</span>
+        <div class="reply-actions">
+          <el-button data-testid="copy-button" type="primary" size="large" @click="copyReply">
+            {{ copyStatus === 'copied' ? '✓ 已复制回复' : '复制回复' }}
+          </el-button>
+          <el-button data-testid="edit-reply-button" plain @click="editReply">编辑回复</el-button>
+          <el-button data-testid="collect-experience-case-button" plain @click="openExperienceCaseCapture">
+            ⭐ 收藏优秀案例
+          </el-button>
+          <el-button data-testid="feedback-problem-button" plain @click="openAiFeedbackCapture">
+            反馈问题
+          </el-button>
+        </div>
       </div>
 
       <el-alert
@@ -618,6 +638,10 @@ import {
   NOT_ADOPTED_REASON_LABELS,
   type NotAdoptedReason
 } from '@/workspace/adoptionFeedback'
+import {
+  recordAiAssist,
+  recordAiFeedbackSubmission
+} from '@/workspace/customerSessionActivity'
 import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
 import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
 import { useTesterIdentity } from '@/workspace/testerIdentity'
@@ -625,7 +649,7 @@ import { useTesterIdentity } from '@/workspace/testerIdentity'
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
 
 const actionLabels: Record<RagAction, string> = {
-  DIRECT_ANSWER: '🟢 可以参考',
+  DIRECT_ANSWER: '🟢 可直接参考',
   CONTROLLED_ANSWER: '🟡 建议确认',
   ASK_CLARIFY: '需要补充信息',
   REQUIRE_LOOKUP: '需要查询系统',
@@ -752,6 +776,7 @@ const platformError = ref('')
 const requestError = ref('')
 const result = ref<RagChatResult | null>(null)
 const replyDraft = ref('')
+const replyEditor = ref<{ focus: () => void } | null>(null)
 const copyStatus = ref<'idle' | 'copied'>('idle')
 const adoption = ref<AdoptionRecord | null>(null)
 const experienceCaseDialogOpen = ref(false)
@@ -1115,6 +1140,7 @@ const submitQuestion = async () => {
     }
     result.value = response
     replyDraft.value = response.answer
+    recordAiAssist()
   } catch (error) {
     const clientError = toRagClientError(error)
     if (controller.signal.aborted || clientError.kind === 'canceled') {
@@ -1148,6 +1174,10 @@ const copyReply = async () => {
     copyStatus.value = 'idle'
     ElMessage.error('复制失败，请手动选择回复文本')
   }
+}
+
+const editReply = () => {
+  replyEditor.value?.focus()
 }
 
 const recordAdoption = (type: AdoptionType) => {
@@ -1241,6 +1271,7 @@ const submitAiFeedback = async () => {
       finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
       createdBy: identity.value.reporterId
     }, idempotencyKey)
+    recordAiFeedbackSubmission()
     aiFeedbackStatus.value = '反馈已记录。'
   } catch (error) {
     aiFeedbackError.value = error instanceof Error ? error.message : 'AI 问题反馈服务当前不可用。'
@@ -1317,7 +1348,7 @@ onBeforeUnmount(() => {
 .workspace-header,
 .section-heading,
 .question-actions,
-.copy-row,
+.reply-action-bar,
 .evidence-heading,
 .selection-confirmed {
   display: flex;
@@ -1340,7 +1371,7 @@ onBeforeUnmount(() => {
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 42px); }
 h2 { margin-bottom: 7px; font-size: 21px; }
-.subtitle, .section-heading p, .system-summary p, .input-hint, .copy-row span,
+.subtitle, .section-heading p, .system-summary p, .input-hint, .reply-action-bar > span,
 .feedback-section p, .empty-card p, .loading-card p, .evidence-heading p {
   color: #697386;
 }
@@ -1428,7 +1459,10 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   background: #ecf8f2;
   color: #19633f;
 }
-.selection-confirmed p { margin: 3px 0 0; color: #356d53; }
+.context-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; gap: 10px; }
+.context-summary-grid > div { display: grid; gap: 2px; min-width: 0; }
+.context-summary-grid small { color: #4e8669; font-size: 11px; font-weight: 800; }
+.context-summary-grid strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .selection-confirmed .el-button { margin-left: auto; }
 .check-mark {
   display: grid; place-items: center; width: 32px; height: 32px;
@@ -1465,7 +1499,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   padding: 5px 10px; border: 1px solid #cbd7ef; border-radius: 999px;
   background: #f6f8ff; color: #3157c8; cursor: pointer;
 }
-.question-actions, .copy-row { margin-top: 16px; }
+.question-actions, .reply-action-bar { margin-top: 16px; }
 
 .loading-card, .empty-card { display: flex; align-items: center; gap: 16px; padding: 28px; }
 .loading-dot {
@@ -1493,7 +1527,9 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .action-guide p { margin: 5px 0 8px; }
 .action-guide ul { margin: 0; padding-left: 20px; line-height: 1.75; }
 .result-alert, .reply-editor { margin-top: 15px; }
-.copy-row { justify-content: flex-end; }
+.reply-action-bar { align-items: center; justify-content: space-between; }
+.reply-action-bar > span { max-width: 420px; font-size: 12px; line-height: 1.5; }
+.reply-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 .evidence-section, .feedback-section {
   margin-top: 28px;
@@ -1540,10 +1576,12 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 
 @media (max-width: 700px) {
   .workspace-shell { width: min(100% - 20px, 1120px); padding-top: 18px; }
-  .workspace-header, .section-heading, .question-actions, .copy-row, .evidence-heading {
+  .workspace-header, .section-heading, .question-actions, .reply-action-bar, .evidence-heading {
     align-items: flex-start; flex-direction: column;
   }
-  .system-summary, .question-actions .el-button, .copy-row .el-button { width: 100%; }
+  .system-summary, .question-actions .el-button, .reply-actions .el-button { width: 100%; }
+  .reply-actions { width: 100%; }
+  .context-summary-grid { grid-template-columns: 1fr; gap: 6px; }
   .connection-card { grid-template-columns: 1fr; }
   .workflow-progress strong { display: none; }
 }
@@ -1606,7 +1644,7 @@ h2 {
 .section-heading p,
 .system-summary p,
 .input-hint,
-.copy-row span,
+.reply-action-bar > span,
 .feedback-section p,
 .empty-card p,
 .loading-card p,
@@ -1723,7 +1761,8 @@ h2 {
 }
 
 .selection-confirmed strong { font-size: 13px; }
-.selection-confirmed p { font-size: 12px; }
+.context-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.context-summary-grid strong { font-size: 12px; }
 .check-mark { width: 26px; height: 26px; font-size: 13px; }
 
 .technical-box {
@@ -1745,7 +1784,7 @@ h2 {
 .example-row { gap: 6px; margin-top: 9px; font-size: 12px; }
 .example-row button { padding: 4px 8px; font-size: 12px; }
 .question-actions,
-.copy-row { margin-top: 10px; }
+.reply-action-bar { margin-top: 10px; }
 .input-hint { font-size: 12px; }
 
 .loading-card,
@@ -1801,8 +1840,8 @@ h2 {
   resize: vertical;
 }
 
-.copy-row { align-items: center; }
-.copy-row .el-button,
+.reply-action-bar { align-items: center; }
+.reply-actions .el-button,
 .question-actions .el-button { min-height: 34px; }
 
 .evidence-section,
@@ -1939,8 +1978,8 @@ h2 {
   height: 118px !important;
 }
 
-.copy-row { margin-top: 7px; }
-.copy-row span { font-size: 12px; }
+.reply-action-bar { margin-top: 7px; }
+.reply-action-bar > span { font-size: 12px; }
 
 .evidence-section { margin-top: 10px; padding-top: 10px; }
 .feedback-section { margin-top: 10px; padding-top: 10px; }
