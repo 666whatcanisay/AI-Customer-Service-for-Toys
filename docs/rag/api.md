@@ -38,4 +38,10 @@ All responses use the existing `{success, message, data}` envelope. These endpoi
 
 Runtime metrics are thread-safe and reset on process restart. They contain no question, prompt, raw request body, source excerpt, or exception text; `last_error_summary` is only a controlled error category.
 
+### GET /api/admin/ai/control-center
+
+Returns the versioned `ai-control-center.v1.1` management snapshot. It is a read-only summary of A process runtime state, safe Prompt metadata, the newest saved `live_c_api` evaluation summary, fixed Badcase empty-state metadata, and a process-memory-only aggregate of successfully completed feedback-analysis runs. Its `response_model` is `AiControlCenterResponse`, so the complete field schema is available in `/openapi.json`.
+
+The route does not probe C, call Ollama, run analysis/evaluation, expose C URLs, or return feedback IDs, content hashes, raw question/answer text, analyses, suggestions, full prompts, environment values, or secrets. Existing module endpoints remain available for V1.0 clients.
+
 原 `/api/health`、`/api/status`、统计、配置和 `/api/ai/*` 兼容路由继续保留。

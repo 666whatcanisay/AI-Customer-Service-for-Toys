@@ -1,5 +1,6 @@
 import axios from 'axios'
 import {
+  adaptAiControlCenterResponse,
   adaptAiLatestEvaluationResponse,
   adaptAiModuleDetailResponse,
   adaptAiModulesResponse,
@@ -24,6 +25,15 @@ const moduleEndpoint = (moduleId: string) => `/api/admin/ai/modules/${encodeURIC
 // has no fallback records: unavailable or malformed upstream data is shown as
 // an unavailable state by the view instead of being substituted with fixtures.
 export const aiControlCenterClient: AiControlCenterApiClient = {
+  async getControlCenter(signal) {
+    try {
+      const response = await http.get('/api/admin/ai/control-center', { signal })
+      return adaptAiControlCenterResponse(response.data)
+    } catch (error) {
+      throw toRagClientError(error)
+    }
+  },
+
   async listModules(signal) {
     try {
       const response = await http.get('/api/admin/ai/modules', { signal })

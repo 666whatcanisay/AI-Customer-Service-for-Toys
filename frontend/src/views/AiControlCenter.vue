@@ -5,8 +5,8 @@
         <p class="eyebrow">AI CONTROL CENTER · V1</p>
         <h1>AI 控制中心</h1>
         <p>
-          汇总已接入的 AI 客服运行状态、知识规模、评测和只读 Prompt 元数据。
-          本页不执行 Prompt、知识或模型修改。
+          技术负责人可在一个只读快照中查看 RAG、qwen、评测、Badcase 与反馈分析的状态。
+          本页不执行 Prompt、知识、模型或业务数据修改。
         </p>
       </div>
       <div class="hero-actions">
@@ -33,6 +33,29 @@
         <h2>AI 概览</h2>
       </div>
       <span>{{ overviewScope }}</span>
+    </section>
+
+    <section class="section-heading">
+      <div>
+        <p class="eyebrow">CAPABILITY INVENTORY</p>
+        <h2>AI 能力盘点</h2>
+      </div>
+      <span>运行、数据可用性和人工边界分开显示</span>
+    </section>
+
+    <section class="capability-grid" data-testid="ai-capability-inventory">
+      <article v-for="item in snapshot?.capabilities ?? []" :key="item.capabilityId" class="capability-card">
+        <div class="module-title">
+          <h3>{{ item.name }}</h3>
+          <span :class="['status-pill', `status-${item.status}`]">{{ controlStatusLabel(item.status) }}</span>
+        </div>
+        <p>{{ item.summary }}</p>
+        <div class="capability-meta">
+          <span>数据：{{ dataStatusLabel(item.dataStatus) }}</span>
+          <span>操作：{{ operatorModeLabel(item.operatorMode) }}</span>
+        </div>
+      </article>
+      <div v-if="!snapshot" class="empty-state">暂无数据</div>
     </section>
 
     <section class="overview-grid" data-testid="ai-overview">
@@ -130,12 +153,12 @@
           </div>
         </div>
         <div class="evaluation-version-row">
-          <div><small>当前模块模型版本</small><strong>{{ displayText(capability?.modelName) }}</strong></div>
-          <div><small>当前模块 Prompt 版本</small><strong>{{ displayText(prompt?.promptVersion ?? capability?.promptVersion) }}</strong></div>
+          <div><small>当前模块模型版本</small><strong>{{ displayText(snapshot?.evaluation.currentModelVersion) }}</strong></div>
+          <div><small>当前评测 Prompt 版本</small><strong>{{ displayText(snapshot?.evaluation.currentPromptVersion) }}</strong></div>
           <div><small>未通过案例</small><strong>{{ failedCases }}</strong></div>
         </div>
         <p class="evaluation-caveat">
-          当前评测读取契约未提供评测快照专属的模型/PROMPT 版本；上述版本为当前 AI 客服模块的只读元数据，不将其表述为历史评测记录。
+          {{ snapshot?.evaluation.versionNote || '暂无数据' }}
         </p>
         <div class="check-grid">
           <div v-for="check in evaluationChecks" :key="check.key">
@@ -157,16 +180,52 @@
 
     <section class="badcase-panel" data-testid="badcase-center">
       <div class="badcase-intro">
-        <strong>暂无数据</strong>
-        <span>当前没有面向浏览器的脱敏 Badcase 聚合读取契约；不会从 C 侧原始反馈快照推断或伪造统计。</span>
+        <strong>{{ snapshot ? '暂无数据' : '加载失败' }}</strong>
+        <span>{{ snapshot?.badcase.reason || '未读取到控制中心快照。' }}</span>
       </div>
       <div class="badcase-grid">
-        <article v-for="category in badcaseCategories" :key="category.code">
-          <small>{{ category.code }}</small>
-          <strong>暂无数据</strong>
-          <span>{{ category.label }}</span>
+        <article v-for="category in snapshot?.badcase.categories ?? badcaseCategories" :key="category.category">
+          <small>{{ category.category }}</small>
+          <strong>{{ displayNumber(category.count) }}</strong>
+          <span>{{ badcaseCategoryLabel(category.category) }}</span>
         </article>
       </div>
+      <details v-if="snapshot" class="technical-details">
+        <summary>技术信息</summary>
+        <p>原始客户内容：{{ snapshot.badcase.rawContentExposed ? '已暴露' : '未暴露' }}</p>
+        <p>状态：{{ controlStatusLabel(snapshot.badcase.status) }}</p>
+      </details>
+    </section>
+
+    <section class="section-heading">
+      <div>
+        <p class="eyebrow">FEEDBACK ANALYSIS</p>
+        <h2>反馈分析</h2>
+      </div>
+      <span>仅记录成功写回后的进程内聚合回执</span>
+    </section>
+
+    <section class="feedback-panel" data-testid="feedback-analysis-center">
+      <template v-if="snapshot">
+        <div class="feedback-summary">
+          <div><small>执行方式</small><strong>{{ feedbackModeLabel(snapshot.feedbackAnalysis.status) }}</strong><span>不自动轮询或运行</span></div>
+          <div><small>C 集成</small><strong>{{ configurationLabel(snapshot.feedbackAnalysis.platformIntegrationStatus) }}</strong><span>只由显式本机任务使用</span></div>
+          <div><small>最近分析</small><strong>{{ snapshot.feedbackAnalysis.latestRun ? displayDate(snapshot.feedbackAnalysis.latestRun.completedAt) : '暂无数据' }}</strong><span>{{ snapshot.feedbackAnalysis.latestRun ? `${displayNumber(snapshot.feedbackAnalysis.latestRun.completedAnalysisCount)} 条安全回执` : '没有进程内回执' }}</span></div>
+        </div>
+        <div v-if="snapshot.feedbackAnalysis.latestRun" class="feedback-run-grid">
+          <div><small>输入反馈</small><strong>{{ displayNumber(snapshot.feedbackAnalysis.latestRun.inputFeedbackCount) }}</strong></div>
+          <div><small>成功写回</small><strong>{{ displayNumber(snapshot.feedbackAnalysis.latestRun.analyzedWritebackCount) }}</strong></div>
+          <div><small>幂等验证</small><strong>{{ displayNumber(snapshot.feedbackAnalysis.latestRun.idempotencyVerifiedCount) }}</strong></div>
+        </div>
+        <details class="technical-details">
+          <summary>技术信息</summary>
+          <p>配置模型：{{ displayText(snapshot.feedbackAnalysis.configuredModelVersion) }}</p>
+          <p>Prompt 版本：{{ displayText(snapshot.feedbackAnalysis.promptVersion) }}</p>
+          <p>结果留存：{{ snapshot.feedbackAnalysis.resultRetention === 'PROCESS_MEMORY_ONLY' ? '仅当前 A 进程内聚合' : snapshot.feedbackAnalysis.resultRetention }}</p>
+          <p>原始客户内容：{{ snapshot.feedbackAnalysis.rawContentExposed ? '已暴露' : '未暴露' }}</p>
+        </details>
+      </template>
+      <div v-else class="empty-state">暂无数据</div>
     </section>
 
     <section class="section-heading">
@@ -179,7 +238,7 @@
 
     <section class="prompt-panel" data-testid="prompt-readonly-center">
       <div class="prompt-meta-grid">
-        <div><small>当前版本</small><strong>{{ displayText(prompt?.promptVersion ?? capability?.promptVersion) }}</strong></div>
+        <div><small>当前版本</small><strong>{{ displayText(prompt?.promptVersion) }}</strong></div>
         <div><small>更新时间</small><strong>{{ displayText(prompt?.updatedAt) }}</strong></div>
         <div><small>管理方式</small><strong>{{ displayText(prompt?.sourceType) }}</strong></div>
         <div><small>效果</small><strong>{{ displayText(prompt?.safePreview) }}</strong></div>
@@ -188,6 +247,11 @@
         <li v-for="rule in prompt.answerStyleRules" :key="rule">{{ rule }}</li>
       </ul>
       <div v-else class="empty-inline">暂无数据</div>
+      <details v-if="prompt" class="technical-details">
+        <summary>技术信息</summary>
+        <p>模块：{{ prompt.moduleId }}</p>
+        <p>Prompt 指纹：{{ prompt.promptHash }}</p>
+      </details>
       <el-alert
         title="Prompt 管理为只读展示"
         description="本页没有编辑、发布或自动修改 Prompt 的能力，也不会更新知识或模型。"
@@ -199,13 +263,13 @@
 
     <details class="data-source-details">
       <summary>数据来源与展示边界</summary>
-      <ul>
-        <li><code>GET /api/admin/ai/modules</code>：已接入模块状态。</li>
-        <li><code>GET /api/admin/ai/modules/ai_customer_service</code>：模型、知识块和进程内调用指标。</li>
-        <li><code>GET /api/admin/ai/modules/ai_customer_service/prompt</code>：安全的 Prompt 元数据，不读取完整 Prompt。</li>
-        <li><code>GET /api/admin/ai/modules/ai_customer_service/evaluations/latest</code>：最近保存的真实评测摘要。</li>
-        <li>未发布的 Badcase 聚合与历史调用接口均显示“暂无数据”，不以零值或示例替代。</li>
+      <ul v-if="snapshot">
+        <li v-for="source in snapshot.dataSources" :key="source.sourceId">
+          <code>{{ source.readPath }}</code>：{{ source.purpose }}
+        </li>
+        <li>控制中心快照由 <code>GET /api/admin/ai/control-center</code> 提供；未发布的 Badcase 聚合显示“暂无数据”。</li>
       </ul>
+      <p v-else>暂无数据</p>
     </details>
   </div>
 </template>
@@ -214,20 +278,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { aiControlCenterClient } from '@/api/aiControlCenterClient'
 import { toRagClientError } from '@/api/errorMapper'
-import type {
-  AiCapabilityDetail,
-  AiEvaluation,
-  AiModuleStatus,
-  AiModuleSummary,
-  AiPromptMetadata
-} from '@/api/aiControlCenterTypes'
+import type { AiControlCenterSnapshot, AiControlCenterStatus } from '@/api/aiControlCenterTypes'
 
-const AI_CUSTOMER_SERVICE_ID = 'ai_customer_service'
-
-const modules = ref<AiModuleSummary[]>([])
-const capability = ref<AiCapabilityDetail | null>(null)
-const prompt = ref<AiPromptMetadata | null>(null)
-const evaluation = ref<AiEvaluation | null>(null)
+const snapshot = ref<AiControlCenterSnapshot | null>(null)
 const loading = ref(false)
 const loadError = ref('')
 let activeController: AbortController | null = null
@@ -239,10 +292,10 @@ const productPlans = [
 ]
 
 const badcaseCategories = [
-  { code: 'FACT_ERROR', label: '事实问题' },
-  { code: 'MISSING_INFO', label: '信息缺失' },
-  { code: 'STYLE_ISSUE', label: '表达问题' },
-  { code: 'RISK_ISSUE', label: '风险问题' }
+  { category: 'FACT_ERROR' as const, count: null },
+  { category: 'MISSING_INFO' as const, count: null },
+  { category: 'STYLE_ISSUE' as const, count: null },
+  { category: 'RISK_ISSUE' as const, count: null }
 ]
 
 const evaluationChecks = [
@@ -255,26 +308,30 @@ const evaluationChecks = [
 ]
 
 const modelStatus = computed(() => {
-  if (!capability.value) return '暂无数据'
-  if (capability.value.ready === true) return '运行中'
-  if (capability.value.status === 'ERROR') return '异常'
-  if (capability.value.status === 'PAUSED') return '已暂停'
+  if (!snapshot.value) return '暂无数据'
+  if (snapshot.value.customerService.ready === true) return '运行中'
+  if (snapshot.value.customerService.status === 'ERROR') return '异常'
+  if (snapshot.value.customerService.status === 'PAUSED') return '已暂停'
   return '未就绪'
 })
 
 const modelDescriptor = computed(() => {
-  if (!capability.value) return '暂无数据'
-  return [capability.value.modelProvider, capability.value.modelName].filter(Boolean).join(' · ') || '暂无数据'
+  if (!snapshot.value) return '暂无数据'
+  return [snapshot.value.customerService.modelProvider, snapshot.value.customerService.modelName].filter(Boolean).join(' · ') || '暂无数据'
 })
 
 const callScope = computed(() => {
-  if (!capability.value?.metricsScope) return '暂无数据'
-  return capability.value.metricsScope === 'since_start' ? '当前进程启动以来' : capability.value.metricsScope
+  if (!snapshot.value?.customerService.metricsScope) return '暂无数据'
+  return snapshot.value.customerService.metricsScope === 'since_start' ? '当前进程启动以来' : snapshot.value.customerService.metricsScope
 })
 
 const overviewScope = computed(() =>
-  modules.value.length ? `已读取 ${modules.value.length} 个 A 侧模块定义` : '暂无模块数据'
+  snapshot.value ? `统一快照 · ${displayDate(snapshot.value.generatedAt)}` : '暂无数据'
 )
+
+const capability = computed(() => snapshot.value?.customerService ?? null)
+const prompt = computed(() => snapshot.value?.prompt ?? null)
+const evaluation = computed(() => snapshot.value?.evaluation.evaluation ?? null)
 
 const failedCases = computed(() => {
   if (!evaluation.value) return '暂无数据'
@@ -294,7 +351,7 @@ const displayDate = (value: string | null | undefined) => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('zh-CN', { hour12: false })
 }
 
-const statusLabels: Record<AiModuleStatus, string> = {
+const statusLabels: Record<'RUNNING' | 'PAUSED' | 'ERROR' | 'TESTING' | 'DEVELOPING' | 'PLANNED', string> = {
   RUNNING: '运行中',
   PAUSED: '已暂停',
   ERROR: '异常',
@@ -303,8 +360,26 @@ const statusLabels: Record<AiModuleStatus, string> = {
   PLANNED: '规划中'
 }
 
-const statusLabel = (status: AiModuleStatus | undefined) =>
+const statusLabel = (status: 'RUNNING' | 'PAUSED' | 'ERROR' | 'TESTING' | 'DEVELOPING' | 'PLANNED' | undefined) =>
   status ? statusLabels[status] : '暂无数据'
+
+const controlStatusLabel = (status: AiControlCenterStatus) => ({
+  RUNNING: '运行中', PAUSED: '已暂停', ERROR: '异常', PLANNED: '规划中',
+  CONFIGURED: '已配置', NOT_CONFIGURED: '未配置', AVAILABLE: '可用',
+  NOT_AVAILABLE: '暂无数据', MANUAL_ONLY: '人工显式运行'
+}[status])
+
+const dataStatusLabel = (status: 'AVAILABLE' | 'NOT_AVAILABLE') =>
+  status === 'AVAILABLE' ? '可读' : '暂无数据'
+const operatorModeLabel = (mode: 'READ_ONLY' | 'EXPLICIT_MANUAL') =>
+  mode === 'READ_ONLY' ? '只读' : '人工显式运行'
+const configurationLabel = (status: 'CONFIGURED' | 'NOT_CONFIGURED') =>
+  status === 'CONFIGURED' ? '已配置' : '未配置'
+const feedbackModeLabel = (status: 'MANUAL_ONLY' | 'NOT_CONFIGURED') =>
+  status === 'MANUAL_ONLY' ? '人工显式运行' : '未配置'
+const badcaseCategoryLabel = (category: string) => ({
+  FACT_ERROR: '事实问题', MISSING_INFO: '信息缺失', STYLE_ISSUE: '表达问题', RISK_ISSUE: '风险问题'
+}[category] ?? category)
 
 const load = async () => {
   activeController?.abort()
@@ -312,37 +387,14 @@ const load = async () => {
   activeController = controller
   loading.value = true
   loadError.value = ''
-  modules.value = []
-  capability.value = null
-  prompt.value = null
-  evaluation.value = null
-
-  const [moduleResult, detailResult, promptResult, evaluationResult] = await Promise.allSettled([
-    aiControlCenterClient.listModules(controller.signal),
-    aiControlCenterClient.getModule(AI_CUSTOMER_SERVICE_ID, controller.signal),
-    aiControlCenterClient.getPrompt(AI_CUSTOMER_SERVICE_ID, controller.signal),
-    aiControlCenterClient.getLatestEvaluation(AI_CUSTOMER_SERVICE_ID, controller.signal)
-  ])
-
-  if (controller.signal.aborted) return
-
-  const errors: string[] = []
-  if (moduleResult.status === 'fulfilled') modules.value = moduleResult.value
-  else errors.push(toRagClientError(moduleResult.reason).message)
-
-  if (detailResult.status === 'fulfilled') capability.value = detailResult.value
-  else errors.push(toRagClientError(detailResult.reason).message)
-
-  if (promptResult.status === 'fulfilled') prompt.value = promptResult.value
-  else errors.push(toRagClientError(promptResult.reason).message)
-
-  if (evaluationResult.status === 'fulfilled') evaluation.value = evaluationResult.value.evaluation
-  else errors.push(toRagClientError(evaluationResult.reason).message)
-
-  if (errors.length) {
-    loadError.value = [...new Set(errors)].join('；')
+  snapshot.value = null
+  try {
+    snapshot.value = await aiControlCenterClient.getControlCenter(controller.signal)
+  } catch (error) {
+    if (!controller.signal.aborted) loadError.value = toRagClientError(error).message
+  } finally {
+    if (activeController === controller) loading.value = false
   }
-  loading.value = false
 }
 
 onMounted(() => { void load() })
@@ -364,7 +416,7 @@ h1 { margin-bottom: 9px; font-size: clamp(26px, 3vw, 38px); }
 .section-heading h2 { margin-bottom: 0; font-size: 21px; }
 .section-heading > span { color: #748198; font-size: 12px; text-align: right; }
 .overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
-.metric-card, .module-card, .evaluation-panel, .badcase-panel, .prompt-panel { border: 1px solid #d9e4f0; border-radius: 15px; background: #fff; box-shadow: 0 7px 18px rgb(31 61 109 / 4%); }
+.metric-card, .module-card, .capability-card, .evaluation-panel, .badcase-panel, .feedback-panel, .prompt-panel { border: 1px solid #d9e4f0; border-radius: 15px; background: #fff; box-shadow: 0 7px 18px rgb(31 61 109 / 4%); }
 .metric-card { display: grid; gap: 6px; min-height: 132px; padding: 18px; }
 .metric-card small, .module-card small, .evaluation-panel small, .badcase-panel small, .prompt-panel small { color: #728099; font-size: 12px; }
 .metric-card strong { color: #56677d; font-size: 22px; }
@@ -372,6 +424,11 @@ h1 { margin-bottom: 9px; font-size: clamp(26px, 3vw, 38px); }
 .metric-card strong.negative { color: #af3d36; }
 .metric-card span { color: #728099; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .module-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+.capability-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 13px; }
+.capability-card { display: grid; min-width: 0; gap: 11px; min-height: 185px; padding: 17px; }
+.capability-card h3 { margin: 0; font-size: 15px; }
+.capability-card p { margin: 0; color: #66768c; font-size: 12px; line-height: 1.55; }
+.capability-meta { display: grid; gap: 5px; margin-top: auto; color: #718096; font-size: 11px; }
 .module-card { display: flex; min-width: 0; min-height: 205px; flex-direction: column; padding: 18px; }
 .active-module { border-color: #9bcdb5; background: linear-gradient(145deg, #fff, #f4fffa); }
 .planned-module { background: #fbfcfe; }
@@ -387,7 +444,7 @@ h1 { margin-bottom: 9px; font-size: clamp(26px, 3vw, 38px); }
 .module-card dt { color: #7b879a; }
 .module-card dd { margin: 0; color: #31445f; overflow-wrap: anywhere; }
 .plan-note { margin-top: auto; color: #8692a3; font-size: 11px; line-height: 1.5; }
-.evaluation-panel, .badcase-panel, .prompt-panel { padding: 20px; }
+.evaluation-panel, .badcase-panel, .feedback-panel, .prompt-panel { padding: 20px; }
 .evaluation-summary, .evaluation-version-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .evaluation-summary > div, .evaluation-version-row > div { display: grid; gap: 5px; min-width: 0; padding: 13px; border-radius: 11px; background: #f6f9fd; }
 .evaluation-summary strong, .evaluation-version-row strong { color: #263b59; font-size: 16px; overflow-wrap: anywhere; }
@@ -405,15 +462,23 @@ h1 { margin-bottom: 9px; font-size: clamp(26px, 3vw, 38px); }
 .badcase-grid article { display: grid; gap: 5px; padding: 14px; border: 1px solid #e1e7f0; border-radius: 11px; background: #fbfcfe; }
 .badcase-grid strong { color: #7c899b; font-size: 15px; }
 .badcase-grid span { color: #596a81; font-size: 12px; }
+.feedback-summary, .feedback-run-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.feedback-summary > div, .feedback-run-grid > div { display: grid; gap: 5px; min-width: 0; padding: 13px; border-radius: 11px; background: #f6f9fd; }
+.feedback-summary strong, .feedback-run-grid strong { color: #263b59; font-size: 15px; overflow-wrap: anywhere; }
+.feedback-summary span { color: #728099; font-size: 12px; line-height: 1.45; }
+.feedback-run-grid { margin-top: 12px; }
 .prompt-meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .prompt-meta-grid > div { display: grid; gap: 6px; min-width: 0; padding: 13px; border-radius: 11px; background: #f6f9fd; }
 .prompt-meta-grid strong { color: #263b59; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .prompt-rules { display: grid; gap: 6px; margin: 15px 0; padding: 13px 13px 13px 32px; border-radius: 11px; background: #fbfcfe; color: #5d6e84; font-size: 12px; line-height: 1.5; }
 .prompt-panel :deep(.el-alert) { margin-top: 15px; }
+.technical-details { margin-top: 14px; padding: 11px 13px; border: 1px solid #e0e7f0; border-radius: 10px; background: #fbfcfe; color: #617088; font-size: 12px; line-height: 1.55; }
+.technical-details summary { color: #395985; font-weight: 800; cursor: pointer; }
+.technical-details p { margin: 8px 0 0; overflow-wrap: anywhere; }
 .data-source-details { margin-top: 22px; padding: 15px 18px; border: 1px solid #d9e4f0; border-radius: 13px; background: rgb(255 255 255 / 72%); color: #617088; font-size: 12px; line-height: 1.65; }
 .data-source-details summary { color: #395985; font-weight: 800; cursor: pointer; }
 .data-source-details ul { margin: 10px 0 0; padding-left: 19px; }
 .data-source-details code { color: #315fc0; font-family: Consolas, monospace; }
-@media (max-width: 1120px) { .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .check-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .hero { flex-direction: column; padding: 20px; } .hero-actions { width: 100%; justify-content: space-between; } .section-heading { align-items: flex-start; flex-direction: column; } .section-heading > span { text-align: left; } .overview-grid, .module-grid, .evaluation-summary, .evaluation-version-row, .badcase-grid, .prompt-meta-grid, .check-grid { grid-template-columns: 1fr; } .badcase-intro { align-items: flex-start; flex-direction: column; gap: 5px; } }
+@media (max-width: 1120px) { .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .module-grid, .capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .check-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .hero { flex-direction: column; padding: 20px; } .hero-actions { width: 100%; justify-content: space-between; } .section-heading { align-items: flex-start; flex-direction: column; } .section-heading > span { text-align: left; } .overview-grid, .module-grid, .capability-grid, .evaluation-summary, .evaluation-version-row, .badcase-grid, .feedback-summary, .feedback-run-grid, .prompt-meta-grid, .check-grid { grid-template-columns: 1fr; } .badcase-intro { align-items: flex-start; flex-direction: column; gap: 5px; } }
 </style>

@@ -8,6 +8,20 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from app.models.ai_control import (
+    AiControlCenterSnapshot,
+    AiCustomerServiceState,
+    AiOperationalCapability,
+    BadcaseCategoryState,
+    BadcaseReadOnlyState,
+    ControlCenterDataSource,
+    EvaluationReadOnlyState,
+    EvaluationSummary,
+    FeedbackAnalysisReadOnlyState,
+    FeedbackAnalysisRunSummary,
+    PromptReadOnlyState,
+)
+
 
 AI_MODULE_STATUSES = {
     "PLANNED",
@@ -318,3 +332,216 @@ def latest_evaluation(evaluations_root: Path) -> dict[str, Any]:
             "report_path": path.parent.name,
         },
     }
+
+
+def summarize_feedback_analysis_run(recorded: dict[str, Any]) -> dict[str, Any]:
+    """Keep only aggregate writeback evidence for the current A process.
+
+    The source run has already completed its C writeback.  This helper never
+    retains question text, answers, feedback IDs, content hashes, analyses, or
+    suggestions.  It is intentionally process-local, so a restart produces an
+    explicit no-data state rather than an invented history.
+    """
+
+    analyses = recorded.get("analyses")
+    if not isinstance(analyses, list):
+        return {}
+    input_count = recorded.get("input_feedback_count")
+    if isinstance(input_count, bool) or not isinstance(input_count, int):
+        input_count = len(analyses)
+
+    analyzed_writebacks = 0
+    idempotency_verified = 0
+    model_versions: set[str] = set()
+    prompt_versions: set[str] = set()
+    for item in analyses:
+        if not isinstance(item, dict):
+            continue
+        if item.get("writeback_status") == "ANALYZED":
+            analyzed_writebacks += 1
+        if item.get("idempotency_verified") is True:
+            idempotency_verified += 1
+        model_version = item.get("model_version")
+        prompt_version = item.get("prompt_version")
+        if isinstance(model_version, str) and model_version.strip():
+            model_versions.add(model_version.strip())
+        if isinstance(prompt_version, str) and prompt_version.strip():
+            prompt_versions.add(prompt_version.strip())
+
+    return FeedbackAnalysisRunSummary(
+        completed_at=datetime.now(timezone.utc).isoformat(),
+        input_feedback_count=max(0, input_count),
+        completed_analysis_count=len(analyses),
+        analyzed_writeback_count=analyzed_writebacks,
+        idempotency_verified_count=idempotency_verified,
+        model_version=next(iter(model_versions)) if len(model_versions) == 1 else None,
+        prompt_version=next(iter(prompt_versions)) if len(prompt_versions) == 1 else None,
+    ).model_dump()
+
+
+def _feedback_summary(application: Any) -> FeedbackAnalysisRunSummary | None:
+    value = getattr(application.state, "latest_feedback_analysis_summary", None)
+    if not isinstance(value, dict):
+        return None
+    try:
+        return FeedbackAnalysisRunSummary.model_validate(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def control_center_snapshot(application: Any) -> AiControlCenterSnapshot:
+    """Return a safe operational snapshot for the AI control-center UI.
+
+    It only reads A process state and an existing saved evaluation summary.  It
+    does not probe C, start a model, run evaluation/analysis, or read raw
+    customer feedback as part of a GET request.
+    """
+
+    settings = application.state.settings
+    detail = customer_service_detail(application)
+    latest = latest_evaluation(
+        settings.project_root / "docs" / "rag" / "evaluations"
+    )
+    raw_evaluation = latest.get("evaluation")
+    evaluation = (
+        EvaluationSummary.model_validate(raw_evaluation)
+        if isinstance(raw_evaluation, dict)
+        else None
+    )
+    platform_status = "CONFIGURED" if settings.platform_api_base_url else "NOT_CONFIGURED"
+    configured_local_model = (
+        settings.llm_provider == "ollama" and settings.llm_model == "qwen3.5:9b"
+    )
+    feedback_summary = _feedback_summary(application)
+    prompt = prompt_metadata()
+
+    customer_service = AiCustomerServiceState(
+        module_id="ai_customer_service",
+        name=detail["name"],
+        description=detail["description"],
+        status=detail["status"],
+        ready=bool(detail["ready"]),
+        model_provider=detail["model_provider"],
+        model_name=detail["model_name"],
+        model_configured=detail["model_configured"],
+        knowledge_count=detail["knowledge_count"],
+        metrics_scope=detail["metrics_scope"],
+        call_count=detail["call_count"],
+        success_count=detail["success_count"],
+        error_count=detail["error_count"],
+        average_latency_ms=detail["average_latency_ms"],
+        last_called_at=detail["last_called_at"],
+        last_error_summary=detail["last_error_summary"],
+        supported_actions=detail["supported_actions"],
+    )
+    prompt_state = PromptReadOnlyState(
+        module_id="ai_customer_service",
+        prompt_version=prompt["prompt_version"],
+        prompt_hash=prompt["prompt_hash"],
+        updated_at=prompt["updated_at"],
+        source_type=prompt["source_type"],
+        safe_preview=prompt["safe_preview"],
+        answer_style_rules=prompt["answer_style_rules"],
+    )
+    evaluation_state = EvaluationReadOnlyState(
+        module_id="ai_customer_service",
+        status=latest["status"],
+        evaluation=evaluation,
+        platform_integration_status=platform_status,
+        current_model_version=detail["model_name"],
+        current_prompt_version=settings.experience_evaluation_prompt_version,
+        version_note=(
+            "评测摘要未暴露历史模型或 Prompt 快照；版本字段仅代表当前 A 配置。"
+        ),
+    )
+    badcase_state = BadcaseReadOnlyState(
+        reason=(
+            "没有面向浏览器的去标识化 Badcase 聚合读接口；控制中心不会读取或推断原始反馈。"
+        ),
+        categories=[
+            BadcaseCategoryState(category="FACT_ERROR"),
+            BadcaseCategoryState(category="MISSING_INFO"),
+            BadcaseCategoryState(category="STYLE_ISSUE"),
+            BadcaseCategoryState(category="RISK_ISSUE"),
+        ],
+    )
+    feedback_state = FeedbackAnalysisReadOnlyState(
+        status="MANUAL_ONLY" if platform_status == "CONFIGURED" else "NOT_CONFIGURED",
+        platform_integration_status=platform_status,
+        configured_model_version=settings.llm_model if configured_local_model else None,
+        prompt_version=settings.feedback_analysis_prompt_version,
+        latest_run=feedback_summary,
+    )
+
+    rag_data_status = "AVAILABLE" if customer_service.ready else "NOT_AVAILABLE"
+    model_status = "RUNNING" if customer_service.ready else (
+        "CONFIGURED" if configured_local_model else "NOT_CONFIGURED"
+    )
+    evaluation_data_status = "AVAILABLE" if evaluation is not None else "NOT_AVAILABLE"
+    return AiControlCenterSnapshot(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        customer_service=customer_service,
+        prompt=prompt_state,
+        evaluation=evaluation_state,
+        badcase=badcase_state,
+        feedback_analysis=feedback_state,
+        capabilities=[
+            AiOperationalCapability(
+                capability_id="rag",
+                name="RAG 客服回答",
+                status=customer_service.status,
+                data_status=rag_data_status,
+                operator_mode="READ_ONLY",
+                summary="范围隔离的知识检索与客户回答能力；当前状态来自 A 进程。",
+            ),
+            AiOperationalCapability(
+                capability_id="qwen_local_model",
+                name="qwen3.5:9b 本地模型",
+                status=model_status,
+                data_status=rag_data_status,
+                operator_mode="READ_ONLY",
+                summary="只显示配置和服务就绪状态；控制中心不会发起模型调用。",
+            ),
+            AiOperationalCapability(
+                capability_id="experience_evaluation",
+                name="AI 评测",
+                status=latest["status"],
+                data_status=evaluation_data_status,
+                operator_mode="EXPLICIT_MANUAL",
+                summary="仅显示最近保存的评测摘要；运行评测必须由操作人显式触发。",
+            ),
+            AiOperationalCapability(
+                capability_id="badcase_analysis",
+                name="Badcase 分类",
+                status="NOT_AVAILABLE",
+                data_status="NOT_AVAILABLE",
+                operator_mode="READ_ONLY",
+                summary="未发布浏览器安全的分类聚合数据，因此不读取或展示反馈原文。",
+            ),
+            AiOperationalCapability(
+                capability_id="feedback_analysis",
+                name="反馈分析",
+                status=feedback_state.status,
+                data_status="AVAILABLE" if feedback_summary else "NOT_AVAILABLE",
+                operator_mode="EXPLICIT_MANUAL",
+                summary="C 确认反馈经本地模型分析后回写 C；控制中心仅保留当前进程的聚合回执。",
+            ),
+        ],
+        data_sources=[
+            ControlCenterDataSource(
+                source_id="a_runtime",
+                read_path="A process state",
+                purpose="模型、知识块与进程内调用聚合。",
+            ),
+            ControlCenterDataSource(
+                source_id="saved_evaluation",
+                read_path="docs/rag/evaluations/*/a-t03-evaluation.json",
+                purpose="最近保存且标记为 live_c_api 的评测摘要。",
+            ),
+            ControlCenterDataSource(
+                source_id="feedback_summary",
+                read_path="A process memory",
+                purpose="最近一次成功反馈分析的无原文聚合回执；重启后为空。",
+            ),
+        ],
+    )

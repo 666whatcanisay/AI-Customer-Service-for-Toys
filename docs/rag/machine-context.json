@@ -4,13 +4,16 @@
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "integration_blocked",
-  "current_task": "AI-Agent MVP-PLUS-02 real C feedback analysis",
-  "next_recommended_task": "Configure an isolated C feedback-service PLATFORM_API_BASE_URL and provide one human-confirmed, de-identified ANALYZING feedback snapshot; then run the real qwen3.5:9b read/analyze/writeback/idempotency test. Do not auto-merge.",
-  "current_stage": "A-side explicit feedback consumer is implemented: it reads only frozen C badcases, invokes local qwen3.5:9b, validates bounded analysis evidence, and writes to C without polling or automatic action.",
-  "current_gate": "Local regression is PASS: full pytest backend is 71 passed and 3 opt-in real integration tests skipped. The real C feedback read, real qwen analysis, C writeback, and idempotent replay have not run because PLATFORM_API_BASE_URL is not configured. Cross-service delivery is BLOCKED; A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
-  "last_test_result": "2026-07-27: full pytest backend 71 passed, 3 skipped, 30 warnings; feedback-analysis E2E contains no HTTP/model substitute and skipped because RUN_REAL_FEEDBACK_ANALYSIS_E2E and a real C service are not configured. No C feedback content was read, logged, or written.",
-  "blockers": ["An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before this task can make a real cross-service claim."],
+  "status": "draft_delivery_pending_external_validation",
+  "current_task": "AI-Agent AI-CONTROL-V1.1 technical-lead AI control center",
+  "next_recommended_task": "Provide a reachable isolated A service for HTTP UI smoke and an isolated C PLATFORM_API_BASE_URL with one human-confirmed, de-identified ANALYZING feedback snapshot; then execute the existing explicit feedback read/qwen/writeback/idempotency E2E. Do not add automatic actions or merge automatically.",
+  "current_stage": "A versioned read-only control-center snapshot and necessary UI present RAG, qwen, evaluation, Badcase safety state, and feedback-analysis aggregate evidence without reading raw customer content or triggering model/C work on GET.",
+  "current_gate": "CONDITIONAL PASS: backend regression is 74 passed and 3 opt-in E2Es skipped; frontend typecheck, 22-file/89-test Vitest and build pass; real scoped qwen3.5:9b smoke passes. Existing live evaluation is 19/28 and both direct A HTTP smoke plus real C feedback read/writeback remain BLOCKED.",
+  "last_test_result": "2026-07-27 AI-CONTROL-V1.1: full pytest backend 74 passed, 3 skipped, 32 warnings; frontend typecheck PASS, Vitest 22 files/89 tests PASS, Vite build PASS; explicit real scoped qwen3.5:9b smoke 1 passed (1430.8 ms). latest_evaluation read a-t03-v031-live 19/28/0.6786. Default A :8000 management GETs timed out; no C feedback service/snapshot was available.",
+  "blockers": [
+    "A service at the default UI base URL http://127.0.0.1:8000 is unreachable, so direct browser-to-A control-center smoke remains unverified.",
+    "An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before the feedback-analysis real read/qwen/writeback/idempotency claim can be made."
+  ],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
     "Frozen rag-export omits or conflicts with required facts for CASE 007, 011, 019, 020, 023 and 027",
@@ -24,26 +27,35 @@
     "A-T03 remains historically blocked at 19/28 frozen fact/source attribution quality; A-REPLY-QUALITY-FIX1 does not alter that Gate",
     "The reply-quality smoke and live C integration use frozen non-production test knowledge and do not establish production knowledge quality",
     "AI capability metrics are intentionally process-local and reset on restart; they are not historical monitoring or an audit store",
-    "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
+    "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made",
+    "The control-center snapshot is process-local operational state, not a durable audit or monitoring system; call and feedback-summary values reset on A restart.",
+    "Badcase counts intentionally remain null until a browser-safe, de-identified aggregate interface is versioned and approved."
   ],
   "git": {
-    "branch": "agent/ai-feedback-analysis-mvp-plus-02",
+    "branch": "agent/ai-control-center-ui-v1",
     "clean": false,
-    "baseline_commit": "ea69c5f",
+    "baseline_commit": "1346abd",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
-    "remote_branch": "origin/agent/ai-feedback-analysis-mvp-plus-02",
+    "remote_branch": "origin/agent/ai-control-center-ui-v1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-25T10:06:08+08:00",
-  "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
+  "checked_at": "2026-07-27T12:00:00+08:00",
+  "contracts": [
+    "contracts/version.json 0.1.0 (unchanged)",
+    "ai-control-center.v1.1 A-to-necessary-UI read-only OpenAPI projection (no shared contract change)"
+  ],
   "entrypoints": [
     "backend/app/service/rag_service.py",
     "backend/app/service/ai_capability.py",
     "backend/app/service/experience_evaluation.py",
     "backend/app/service/feedback_analysis.py",
     "backend/app/api/routes.py",
-    "backend/app/models/chat.py"
+    "backend/app/models/chat.py",
+    "backend/app/models/ai_control.py",
+    "frontend/src/api/aiControlCenterClient.ts",
+    "frontend/src/api/aiControlCenterAdapter.ts",
+    "frontend/src/views/AiControlCenter.vue"
   ],
   "owned_paths": ["backend/**", "docs/rag/**"],
   "forbidden_paths": [
@@ -72,7 +84,8 @@
     "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
     "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
-    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)"
+    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
+    "AI-CONTROL-V1.1 read-only technical-lead control center (local and real-qwen verification complete; external A/C validation blocked)"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -95,7 +108,8 @@
     "POST /api/admin/ai/modules/{module_id}/test",
     "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
     "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
-    "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis"
+    "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
+    "GET /api/admin/ai/control-center ai-control-center.v1.1 read-only management snapshot"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }
