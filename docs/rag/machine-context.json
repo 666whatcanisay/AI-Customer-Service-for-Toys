@@ -1,15 +1,15 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-core",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-night-p1",
   "project_id": "mumu-A",
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "integration_blocked",
-  "current_task": "AI-Agent MVP-PLUS-02 real C feedback analysis",
-  "next_recommended_task": "Configure an isolated C feedback-service PLATFORM_API_BASE_URL and provide one human-confirmed, de-identified ANALYZING feedback snapshot; then run the real qwen3.5:9b read/analyze/writeback/idempotency test. Do not auto-merge.",
-  "current_stage": "A-side explicit feedback consumer is implemented: it reads only frozen C badcases, invokes local qwen3.5:9b, validates bounded analysis evidence, and writes to C without polling or automatic action.",
-  "current_gate": "Local regression is PASS: full pytest backend is 71 passed and 3 opt-in real integration tests skipped. The real C feedback read, real qwen analysis, C writeback, and idempotent replay have not run because PLATFORM_API_BASE_URL is not configured. Cross-service delivery is BLOCKED; A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
-  "last_test_result": "2026-07-27: full pytest backend 71 passed, 3 skipped, 30 warnings; feedback-analysis E2E contains no HTTP/model substitute and skipped because RUN_REAL_FEEDBACK_ANALYSIS_E2E and a real C service are not configured. No C feedback content was read, logged, or written.",
+  "status": "local_hardened_cross_service_pending",
+  "current_task": "NIGHT-SHIFT A P1 AI control and feedback-analysis structured-output hardening",
+  "next_recommended_task": "Use only an isolated C feedback service with one human-confirmed, de-identified ANALYZING snapshot to run the explicit real qwen3.5:9b C-read/analyze/writeback/idempotency test. Do not auto-merge.",
+  "current_stage": "A preserves its existing AI control envelope and controlled feedback consumer. Model output is now bounded before JSON decoding and strictly normalized without polling or automatic action.",
+  "current_gate": "A P1 local gate is PASS: focused parser regression is 6 passed, full pytest backend is 77 passed and 3 opt-in real integration tests are skipped. A synthetic local qwen smoke passed without reading or writing C. The real C feedback read, qwen analysis, writeback, and idempotent replay remain unverified; A-T03 historical 19/28 data-quality Gate remains independently BLOCKED.",
+  "last_test_result": "2026-07-27: parser regression 6 passed; full pytest backend 77 passed, 3 skipped, 30 warnings; local qwen3.5:9b synthetic smoke returned a 945-character JSON object with all five assessment keys and one bounded suggestion. No C feedback content was read, logged, or written.",
   "blockers": ["An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before this task can make a real cross-service claim."],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -27,15 +27,15 @@
     "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
   ],
   "git": {
-    "branch": "agent/ai-feedback-analysis-mvp-plus-02",
-    "clean": false,
-    "baseline_commit": "ea69c5f",
+    "branch": "codex/rag-night-p1",
+    "clean": true,
+    "baseline_commit": "32feb6108156f5fb4ec297417537d60452d0743f",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
-    "remote_branch": "origin/agent/ai-feedback-analysis-mvp-plus-02",
+    "remote_branch": "origin/codex/rag-night-p1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-25T10:06:08+08:00",
+  "checked_at": "2026-07-27",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/service/rag_service.py",
@@ -72,7 +72,8 @@
     "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
     "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
-    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)"
+    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
+    "NIGHT-SHIFT A P1 bounded feedback-analysis JSON parsing and synthetic local qwen smoke"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
