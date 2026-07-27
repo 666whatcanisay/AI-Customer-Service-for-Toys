@@ -17,7 +17,9 @@ const apiMocks = vi.hoisted(() => ({
   listStores: vi.fn(),
   listProducts: vi.fn(),
   listSkus: vi.fn(),
-  submitExperienceCase: vi.fn()
+  submitExperienceCase: vi.fn(),
+  submitAiFeedback: vi.fn(),
+  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key')
 }))
 
 vi.mock('@/api/ragClient', () => ({
@@ -38,6 +40,11 @@ vi.mock('@/api/platformClient', () => ({
 
 vi.mock('@/api/experienceCaseClient', () => ({
   experienceCaseClient: { submit: apiMocks.submitExperienceCase }
+}))
+
+vi.mock('@/api/aiResponseFeedbackClient', () => ({
+  aiResponseFeedbackClient: { submit: apiMocks.submitAiFeedback },
+  createAiResponseFeedbackIdempotencyKey: apiMocks.createAiFeedbackIdempotencyKey
 }))
 
 const store = {
@@ -159,6 +166,14 @@ const selectExperienceCaseFeedbackType = async (wrapper: VueWrapper, value: stri
   await flushPromises()
 }
 
+const selectAiFeedbackType = async (wrapper: VueWrapper, value: string) => {
+  const reasonSelect = wrapper.findAllComponents({ name: 'ElSelect' })
+    .find((component) => component.attributes('data-testid') === 'ai-feedback-type')
+  if (!reasonSelect) throw new Error('Missing AI feedback type selector')
+  reasonSelect.vm.$emit('update:modelValue', value)
+  await flushPromises()
+}
+
 const submit = async (wrapper: VueWrapper, withSku = true) => {
   await selectContext(wrapper, withSku)
   await wrapper.get('[data-testid="question-input"]').setValue('这个款式适合几岁？')
@@ -186,6 +201,9 @@ describe('AiChat B-T04 three-step workbench', () => {
     apiMocks.listSkus.mockResolvedValue([sku])
     apiMocks.chat.mockResolvedValue(resultFor())
     apiMocks.submitExperienceCase.mockResolvedValue({ caseId: 'CEC-001', reviewStatus: 'NEW' })
+    apiMocks.submitAiFeedback.mockResolvedValue({
+      feedbackId: 'ARF-001', status: 'NEW'
+    })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) }
@@ -199,6 +217,11 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="safety-notice"]').text()).toContain(
       '当前为测试数据，仅供内部验证，禁止直接用于真实客户。'
     )
+    expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('AI 辅助客服')
+    expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('需要人工确认')
+    expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('不自动发送')
+    expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('不自动退款')
+    expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('不修改订单')
     expect(wrapper.text()).toContain('第 1 步')
     expect(wrapper.text()).toContain('第 2 步')
     expect(wrapper.text()).toContain('建议回复会显示在这里')
@@ -279,7 +302,7 @@ describe('AiChat B-T04 three-step workbench', () => {
         sku_id: 'SKU-RED'
       }
     }, expect.any(AbortSignal))
-    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe('可以直接参考')
+    expect(wrapper.get('[data-testid="action-tag"]').text()).toBe('🟢 可以参考')
     expect(wrapper.get('[data-testid="sources-details"]').attributes('open')).toBeUndefined()
     expect(wrapper.get('[data-testid="citation-item"]').text()).toContain('toy-guide.pdf')
   })
@@ -297,11 +320,11 @@ describe('AiChat B-T04 three-step workbench', () => {
   })
 
   it.each([
-    ['DIRECT_ANSWER', '可以直接参考'],
-    ['CONTROLLED_ANSWER', '请核对后使用'],
+    ['DIRECT_ANSWER', '🟢 可以参考'],
+    ['CONTROLLED_ANSWER', '🟡 建议确认'],
     ['ASK_CLARIFY', '需要补充信息'],
     ['REQUIRE_LOOKUP', '需要查询系统'],
-    ['TRANSFER_HUMAN', '需要人工处理'],
+    ['TRANSFER_HUMAN', '🔴 建议人工处理'],
     ['REFUSE', '不能作出该承诺']
   ] as const)('displays %s as %s', async (action, label) => {
     apiMocks.chat.mockResolvedValue(resultFor(action))
@@ -351,12 +374,81 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
   })
 
+  it('submits a rejected answer to the independent AI feedback endpoint', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    expect(wrapper.get('[data-testid="open-ai-feedback"]').text()).toContain('AI 问题反馈')
+    expect(wrapper.get('[data-testid="save-experience-case"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
+    expect(wrapper.get('[data-testid="ai-feedback-dialog"]').text()).toContain('为什么未采用？')
+    await selectAiFeedbackType(wrapper, 'RISK_ISSUE')
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.submitAiFeedback).toHaveBeenCalledWith({
+      storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
+      aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', feedbackType: 'RISK_ISSUE',
+      feedbackNote: null, finalAnswer: null, createdBy: 'TESTER-ONE'
+    }, expect.stringMatching(/^ai-feedback-/))
+    expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
+    expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
+  })
+
+  it('reuses an in-flight feedback Idempotency-Key and displays C replay as the recorded result', async () => {
+    apiMocks.submitAiFeedback
+      .mockRejectedValueOnce(new Error('网络暂时不可用'))
+      .mockResolvedValueOnce({ feedbackId: 'ARF-001', status: 'NEW' })
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
+    await selectAiFeedbackType(wrapper, 'FACT_ERROR')
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+    const idempotencyKey = apiMocks.submitAiFeedback.mock.calls[0]?.[1]
+    expect(wrapper.get('[data-testid="ai-feedback-error"]').text()).toContain('网络暂时不可用')
+
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+    expect(apiMocks.submitAiFeedback).toHaveBeenCalledTimes(2)
+    expect(apiMocks.submitAiFeedback.mock.calls[1]?.[1]).toBe(idempotencyKey)
+    expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
+  })
+
+  it('requires an OTHER note and shows the feedback endpoint failure without a local success', async () => {
+    apiMocks.submitAiFeedback.mockRejectedValue(new Error('AI 反馈接口尚未发布'))
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
+    await selectAiFeedbackType(wrapper, 'OTHER')
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="ai-feedback-error"]').text()).toContain('选择“其他”时请填写')
+    expect(apiMocks.submitAiFeedback).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="ai-feedback-note"]').setValue('无法归类的测试问题')
+    await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="ai-feedback-error"]').text()).toContain('反馈接口尚未发布')
+    expect(wrapper.find('[data-testid="ai-feedback-success"]').exists()).toBe(false)
+  })
+
   it('requires an explicit frozen experience type and shows the actual returned review status', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
 
     expect(wrapper.get('[data-testid="save-experience-case"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="save-experience-case"]').text()).toContain('收藏为优秀案例')
+    expect(wrapper.text()).toContain('帮助系统持续优化')
     await wrapper.get('[data-testid="edited-accept"]').trigger('click')
     await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
     await flushPromises()
