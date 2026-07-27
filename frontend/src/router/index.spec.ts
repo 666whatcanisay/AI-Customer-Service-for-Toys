@@ -7,7 +7,7 @@ describe('customer workbench router', () => {
     const paths = createCustomerRouter(createMemoryHistory()).getRoutes().map((route) => route.path)
 
     expect(paths).toEqual(expect.arrayContaining([
-      '/', '/ai-chat', '/suggestions', '/suggestions/mine', '/experience-cases', '/modules/:moduleKey'
+      '/', '/ai-chat', '/suggestions', '/suggestions/mine', '/experience-cases', '/feedback', '/modules/:moduleKey'
     ]))
   })
 
@@ -16,5 +16,13 @@ describe('customer workbench router', () => {
     await router.push('/chat')
     await router.isReady()
     expect(router.currentRoute.value.path).toBe('/ai-chat')
+  })
+
+  it('keeps the feedback guidance route available without changing the AI chat workflow', async () => {
+    const router = createCustomerRouter(createMemoryHistory())
+    await router.push('/feedback')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('FeedbackGuide')
   })
 })
