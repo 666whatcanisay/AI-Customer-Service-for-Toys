@@ -112,6 +112,17 @@ http.createServer((_request, response) => {
 }).listen(port, host);
 '@
     $serverSource | Set-Content -LiteralPath (Join-Path $adminDirectory 'server.mjs') -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $temporaryRepository '.gitignore') -Value 'admin_web/node_modules/' -Encoding UTF8
+    & git -C $temporaryRepository init --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the isolated test repository.' }
+    & git -C $temporaryRepository config user.email 'ops-test@example.invalid'
+    & git -C $temporaryRepository config user.name 'OPS Test'
+    & git -C $temporaryRepository add --all
+    & git -C $temporaryRepository commit --quiet -m 'test fixture'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not commit the isolated test repository fixture.' }
+    # pnpm may rewrite this deliberately minimal fixture lockfile. It is not
+    # source under test, so exclude that tool mutation from the source snapshot.
+    & git -C $temporaryRepository update-index --assume-unchanged admin_web/pnpm-lock.yaml
 
     $nodeModulesPath = Join-Path $adminDirectory 'node_modules'
     Rename-Item -LiteralPath $nodeModulesPath -NewName 'node_modules.missing'
@@ -135,14 +146,18 @@ http.createServer((_request, response) => {
     $script:activeConfig = $config
     $recordPath = Get-ServiceRecordPath $config 'admin-web'
     $recordOnDisk = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($field in @('service_name','managed_pid','listener_pid','parent_pid','creation_time','executable_path','command_summary','working_directory','bind_address','port','url','started_at')) {
+    foreach ($field in @('service_name','managed_pid','listener_pid','parent_pid','creation_time','executable_path','command_summary','working_directory','bind_address','port','url','started_at','repository_root','repository_git_sha','repository_source_state','repository_source_fingerprint','runtime_mode')) {
         if ($recordOnDisk.PSObject.Properties.Name -notcontains $field) { throw "Admin runtime record is missing $field." }
     }
     if ($recordOnDisk.service_name -ne 'admin-web' -or [int]$recordOnDisk.port -ne $adminPort -or $recordOnDisk.url -ne "http://127.0.0.1:$adminPort/") { throw 'Admin runtime record values are incorrect.' }
     if (-not (Test-Path -LiteralPath (Join-Path (Get-ServiceLogDirectory $config) 'admin-web.out.log')) -or -not (Test-Path -LiteralPath (Join-Path (Get-ServiceLogDirectory $config) 'admin-web.err.log'))) { throw 'Admin log files were not created.' }
     $status = Get-ServiceStatus $config 'admin-web' $adminPort $config.AdminWebUrl
     if (-not $status.Record.Valid) { throw "Admin status identity validation failed: $($status.State)." }
-    if (-not (Test-ManagedServiceRunning $config 'admin-web' $adminPort)) { throw 'Admin repeat-start trust check did not accept the registered listener.' }
+    if (-not (Test-ManagedServiceRunning $config 'admin-web' $adminPort)) {
+        $runtimeIdentity = Test-ManagedServiceRuntimeIdentity $config $recordOnDisk
+        $statusLines = @(& git -C $temporaryRepository status --porcelain=v1 --untracked-files=all 2>$null)
+        throw "Admin repeat-start trust check did not accept the registered listener: $($runtimeIdentity.Reason); Git status: $($statusLines -join ', ')"
+    }
     $statusScript = Join-Path $repositoryRoot 'scripts\windows\status_ai_customer_service.ps1'
     $statusOutput = & $statusScript -ConfigPath $configPath *>&1 | Out-String
     if ($statusOutput -notmatch 'Admin' -or $statusOutput -notmatch [regex]::Escape($config.AdminWebUrl)) { throw 'Status entry did not report the admin runtime.' }

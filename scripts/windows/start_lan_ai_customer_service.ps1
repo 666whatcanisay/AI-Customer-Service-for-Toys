@@ -28,6 +28,7 @@ try {
     Assert-Dependencies $config
     Assert-AdminWebDependencies $config | Out-Null
     $services = @(@{Name='platform';Port=$config.PlatformPort},@{Name='rag';Port=$config.RagPort},@{Name='customer-web';Port=$config.CustomerWebPort},@{Name='admin-web';Port=$config.AdminWebPort})
+    Assert-ManagedRuntimeSourceConsistency $config $services
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })
     if ($alreadyRunning.Count -eq $services.Count) {
         Write-Host "局域网 AI 客服已运行：$($config.CustomerWebUrl)" -ForegroundColor Green
