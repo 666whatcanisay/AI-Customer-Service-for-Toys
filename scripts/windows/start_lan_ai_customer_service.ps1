@@ -13,6 +13,8 @@ try {
     $baseConfig = Get-LocalConfig $ConfigPath
     # This dedicated entry explicitly enables LAN mode without changing the local-mode entry or config file.
     $config = Resolve-LanRuntimeConfig $baseConfig
+    & (Join-Path $PSScriptRoot 'Invoke-RuntimeGate.ps1') -Action Preflight -ConfigPath $ConfigPath -LanMode
+    if ($LASTEXITCODE -ne 0) { throw 'Runtime Gate 启动前检查失败。' }
     $network = $config.LanNetworkProfile
 
     $selection = $config.LanSelection

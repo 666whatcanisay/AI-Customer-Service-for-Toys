@@ -5,6 +5,14 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "integration_blocked",
+  "runtime_qa_v2": {
+    "date": "2026-07-27",
+    "status": "PASS: isolated A API entry is provenance-verified by a managed PID record, health/OpenAPI response and Runtime Gate; no A business code changed and this is not a model or production claim.",
+    "delivery": "Draft PR #53 on codex/runtime-qa-v2",
+    "verified_identity": "OpenAPI 1.0.0 / 32feb6108156 / API_ENTRY / DIRECT on port 18000",
+    "gate": "scripts/windows/Invoke-RuntimeGate.ps1; use Verify with ExpectedGitShortSha to reject stale 8000 instances",
+    "evidence": "docs/control/RUNTIME-QA-V2_任务卡与运行验收报告.md"
+  },
   "current_task": "AI-Agent MVP-PLUS-02 real C feedback analysis",
   "next_recommended_task": "Configure an isolated C feedback-service PLATFORM_API_BASE_URL and provide one human-confirmed, de-identified ANALYZING feedback snapshot; then run the real qwen3.5:9b read/analyze/writeback/idempotency test. Do not auto-merge.",
   "current_stage": "A-side explicit feedback consumer is implemented: it reads only frozen C badcases, invokes local qwen3.5:9b, validates bounded analysis evidence, and writes to C without polling or automatic action.",

@@ -304,6 +304,8 @@ function Get-LanFrontendEnvironment($Config) {
     return @{
         VITE_RAG_API_BASE_URL = '/rag-api'
         VITE_PLATFORM_API_BASE_URL = '/platform-api'
+        VITE_RAG_PROXY_TARGET = "http://127.0.0.1:$($Config.RagPort)"
+        VITE_PLATFORM_PROXY_TARGET = "http://127.0.0.1:$($Config.PlatformPort)"
         VITE_START_MODE = 'LAN'
         VITE_API_MODE = 'SAME_ORIGIN_PROXY'
         VITE_CUSTOMER_ENTRY_URL = [string]$Config.CustomerWebUrl
@@ -314,9 +316,21 @@ function Get-LocalFrontendEnvironment($Config) {
     return @{
         VITE_RAG_API_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
         VITE_PLATFORM_API_BASE_URL = "http://127.0.0.1:$($Config.PlatformPort)"
+        VITE_RAG_PROXY_TARGET = "http://127.0.0.1:$($Config.RagPort)"
+        VITE_PLATFORM_PROXY_TARGET = "http://127.0.0.1:$($Config.PlatformPort)"
         VITE_START_MODE = 'LOCAL'
         VITE_API_MODE = 'DIRECT'
         VITE_CUSTOMER_ENTRY_URL = [string]$Config.CustomerWebUrl
+    }
+}
+
+function Get-AdminWebEnvironment($Config) {
+    return @{
+        VITE_PLATFORM_API_BASE_URL = '/platform-api'
+        VITE_AI_API_BASE_URL = '/ai-api'
+        VITE_PLATFORM_PROXY_TARGET = "http://127.0.0.1:$($Config.PlatformPort)"
+        VITE_AI_PROXY_TARGET = "http://127.0.0.1:$($Config.RagPort)"
+        VITE_START_MODE = if ([bool]$Config.LanMode) { 'LAN' } else { 'LOCAL' }
     }
 }
 
@@ -711,7 +725,7 @@ function Start-AdminWebService($Config) {
     if ([bool]$Config.AdminEnableLanMode) {
         Write-Warning "AdminEnableLanMode=true：管理后台将使用 $($Config.AdminWebUrl)。本轮不会创建或修改任何防火墙规则。"
     }
-    $process = Start-ManagedService $Config 'admin-web' $dependency.PnpmExecutable @('dev','--host',$Config.AdminWebBindAddress,'--port',$Config.AdminWebPort,'--strictPort') $dependency.Directory 'pnpm' ([int]$Config.AdminWebPort)
+    $process = Start-ManagedServiceWithEnvironment $Config 'admin-web' $dependency.PnpmExecutable @('dev','--host',$Config.AdminWebBindAddress,'--port',$Config.AdminWebPort,'--strictPort') $dependency.Directory 'pnpm' ([int]$Config.AdminWebPort) (Get-AdminWebEnvironment $Config)
     Wait-HttpOk ([string]$Config.AdminWebUrl) 45 '管理后台'
     return Update-AdminWebServiceRecord $Config $process
 }

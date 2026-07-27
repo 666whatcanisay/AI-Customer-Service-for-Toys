@@ -33,6 +33,13 @@
       <div class="sidebar-boundary">
         <strong>测试工作台</strong>
         <p>不是正式登录系统，不执行退款、补发或自动发送。</p>
+        <dl class="runtime-identity" data-testid="customer-runtime-identity">
+          <div><dt>产品</dt><dd>{{ runtimeIdentity.productName }}</dd></div>
+          <div><dt>版本</dt><dd>{{ runtimeIdentity.version }}</dd></div>
+          <div><dt>Git</dt><dd>{{ runtimeIdentity.gitShortSha }}</dd></div>
+          <div><dt>运行</dt><dd>{{ runtimeIdentity.runMode }}</dd></div>
+          <div><dt>API</dt><dd>{{ runtimeIdentity.apiMode }}</dd></div>
+        </dl>
       </div>
     </aside>
 
@@ -217,11 +224,19 @@ const identityDraft = reactive({
 
 const PILOT_GUIDE_STORAGE_KEY = 'mumu-customer-workspace:pilot-guide-seen'
 
+const runtimeIdentity = {
+  productName: '木木小树 AI 客服工作台',
+  version: import.meta.env.VITE_FRONTEND_VERSION ?? 'unavailable',
+  gitShortSha: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
+  runMode: import.meta.env.VITE_RUNTIME_RUN_MODE ?? 'unavailable',
+  apiMode: import.meta.env.VITE_RUNTIME_API_MODE ?? 'unavailable'
+}
+
 const runtimeDetails = {
   frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'unavailable',
   gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
-  startMode: import.meta.env.VITE_START_MODE ?? 'LOCAL',
-  apiMode: import.meta.env.VITE_API_MODE ?? 'SAME_ORIGIN_PROXY',
+  startMode: import.meta.env.VITE_RUNTIME_RUN_MODE ?? 'unavailable',
+  apiMode: import.meta.env.VITE_RUNTIME_API_MODE ?? 'unavailable',
   customerEntry: import.meta.env.VITE_CUSTOMER_ENTRY_URL ?? `${window.location.origin}/`
 }
 
@@ -399,6 +414,10 @@ onMounted(() => {
 
 .sidebar-boundary strong { font-size: 13px; }
 .sidebar-boundary p { margin: 6px 0 0; color: #9fb2d1; font-size: 11px; line-height: 1.55; }
+.runtime-identity { display: grid; gap: 5px; margin: 13px 0 0; padding-top: 11px; border-top: 1px solid rgb(160 183 220 / 22%); }
+.runtime-identity div { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; }
+.runtime-identity dt { color: #91a7ca; font-size: 10px; }
+.runtime-identity dd { min-width: 0; margin: 0; overflow: hidden; color: #d8e5fa; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
 .workbench-stage {
   display: grid;

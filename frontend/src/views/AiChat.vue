@@ -875,10 +875,10 @@ let activeCatalogController: AbortController | null = null
 const { identity } = useTesterIdentity()
 
 const runtimeDetails = {
-  frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'development',
+  frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'unavailable',
   gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
-  startMode: import.meta.env.VITE_START_MODE ?? 'LOCAL',
-  apiMode: import.meta.env.VITE_API_MODE ?? 'SAME_ORIGIN_PROXY',
+  startMode: import.meta.env.VITE_RUNTIME_RUN_MODE ?? 'unavailable',
+  apiMode: import.meta.env.VITE_RUNTIME_API_MODE ?? 'unavailable',
   customerEntry: import.meta.env.VITE_CUSTOMER_ENTRY_URL ?? `${window.location.origin}/`
 }
 

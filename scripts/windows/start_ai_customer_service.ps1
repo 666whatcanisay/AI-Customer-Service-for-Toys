@@ -9,6 +9,8 @@ $config = $null
 $startedServices = @()
 try {
     $config = Get-LocalConfig $ConfigPath
+    & (Join-Path $PSScriptRoot 'Invoke-RuntimeGate.ps1') -Action Preflight -ConfigPath $ConfigPath
+    if ($LASTEXITCODE -ne 0) { throw 'Runtime Gate 启动前检查失败。' }
     Assert-RagVirtualEnvironment $config
     Assert-Dependencies $config
     Assert-AdminWebDependencies $config | Out-Null
