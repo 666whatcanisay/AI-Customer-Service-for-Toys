@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 
 import { listAiModules, type AiModule } from '../api/client'
 import ProductEmptyState from '../components/ProductEmptyState.vue'
+import { displayStatus } from '../presentation'
 
 const modules = ref<AiModule[]>([])
 const state = ref<'loading' | 'available' | 'unavailable'>('loading')
@@ -26,7 +27,7 @@ onMounted(() => { void load() })
     <div class="page-header"><div><p class="eyebrow">AI客服平台 · AI 管理</p><h1>AI 控制中心</h1><p>只读探测 A 线已声明接口；不提供 Prompt 编辑、发布、模型切换或回滚。</p></div><button class="button secondary" @click="load">重试</button></div>
     <p v-if="state === 'loading'" class="notice" role="status">正在连接 AI 服务…</p>
     <section v-else-if="state === 'unavailable'" class="card unavailable" role="alert"><h2>AI 服务不可用或接口尚未合并</h2><p>当前 C 线页面没有本地 Mock 回退；其余运营页面仍可正常使用。</p><p>待 A 线提供并合并版本化的模块详情与在线测试契约后，再启用真实调用。</p></section>
-    <template v-else><ProductEmptyState v-if="modules.length === 0" title="暂无可显示的 AI 模块" description="AI 服务已响应，但未返回模块。请先确认 A 侧模块注册状态；页面不会生成 Mock 模块。" action-label="返回运营概览" to="/overview" /><section v-else class="module-grid"><article v-for="module in modules" :key="module.id" class="card"><h2>{{ module.name }}</h2><p><span class="badge">{{ module.status }}</span></p><p>{{ module.description || '未提供描述。' }}</p><details v-if="module.promptMetadata"><summary>Prompt 元数据（只读）</summary><pre>{{ JSON.stringify(module.promptMetadata, null, 2) }}</pre></details><details><summary>最近评测（{{ module.recentEvaluations.length }}）</summary><pre>{{ JSON.stringify(module.recentEvaluations, null, 2) }}</pre></details></article></section>
+    <template v-else><ProductEmptyState v-if="modules.length === 0" title="暂无可显示的 AI 模块" description="AI 服务已响应，但未返回模块。请先确认 A 侧模块注册状态；页面不会生成 Mock 模块。" action-label="返回运营概览" to="/overview" /><section v-else class="module-grid"><article v-for="module in modules" :key="module.id" class="card"><h2>{{ module.name }}</h2><p><span class="badge">{{ displayStatus(module.status) }}</span></p><p>{{ module.description || '未提供描述。' }}</p><details v-if="module.promptMetadata"><summary>Prompt 元数据（只读）</summary><pre>{{ JSON.stringify(module.promptMetadata, null, 2) }}</pre></details><details><summary>最近评测（{{ module.recentEvaluations.length }}）</summary><pre>{{ JSON.stringify(module.recentEvaluations, null, 2) }}</pre></details></article></section>
       <section class="card online-test"><h2>在线测试</h2><p>当前基线尚未提供 A 线的版本化在线测试请求/响应契约，测试不会发送请求或展示 Mock 结果。</p><label>问题<textarea disabled placeholder="等待 A 线测试契约" /></label><label>上下文<textarea disabled /></label><div class="result-grid"><span>answer：—</span><span>action：—</span><span>risk：—</span><span>sources：—</span><span>latency：—</span></div><button class="button" disabled>运行在线测试</button><details><summary>技术详情</summary><p>等待受版本控制的 A 线接口定义。</p></details></section>
     </template>
   </main>
