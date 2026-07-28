@@ -33,6 +33,40 @@ const selectionError = ref('')
 
 const selectedModule = computed(() => modules.value.find((item) => item.id === selectedModuleId.value) ?? null)
 
+type ModulePresentation = { name: string; description: string }
+
+// A 服务提供模块标识和运行事实；运营端负责把稳定标识翻译成客服可理解的产品语言。
+// 这只影响展示层，不改变 A 的接口、字段或模块能力。
+const modulePresentation: Record<string, ModulePresentation> = {
+  ai_customer_service: {
+    name: 'AI客服',
+    description: '基于已导入商品知识生成客服回复建议，客服确认、编辑后再使用。',
+  },
+  aftersales_intent: {
+    name: '售后意图识别',
+    description: '识别售后咨询的处理意图，当前仍处于规划中，尚未提供自动执行能力。',
+  },
+  shipping_note_extractor: {
+    name: '物流信息提取',
+    description: '从物流相关文本中提取关键信息，当前仍处于规划中。',
+  },
+  appeal_writer: {
+    name: '申诉文案助手',
+    description: '协助整理订单申诉文案，当前仍处于规划中，所有内容需人工复核。',
+  },
+  risk_checker: {
+    name: '回复风险检查',
+    description: '辅助识别客服回复中的风险提示，当前仍处于规划中，不会自动拦截或发送回复。',
+  },
+}
+
+function moduleDisplay(moduleId: string): ModulePresentation {
+  return modulePresentation[moduleId] ?? {
+    name: `AI 模块（${moduleId}）`,
+    description: 'A 服务暂未提供该模块的中文业务说明，请联系技术管理员确认。',
+  }
+}
+
 const runtimeLabel = computed(() => {
   if (!runtime.value) return '未取得运行状态'
   if (runtime.value.initializationError) return `初始化异常：${runtime.value.initializationError}`
@@ -156,15 +190,15 @@ onMounted(() => { void load() })
             type="button"
             @click="selectModule(item.id)"
           >
-            {{ item.name }} <small>{{ displayStatus(item.status) }}</small>
+            {{ moduleDisplay(item.id).name }} <small>{{ displayStatus(item.status) }}</small>
           </button>
         </div>
       </section>
 
       <section v-if="selectedModule" class="detail-grid">
         <article class="card module-detail">
-          <div class="section-title"><div><p class="card-label">当前模块</p><h2>{{ selectedModule.name }}</h2></div><span class="badge">{{ displayStatus(detail?.status ?? selectedModule.status) }}</span></div>
-          <p>{{ detail?.description || selectedModule.description || 'A 服务未提供模块说明。' }}</p>
+          <div class="section-title"><div><p class="card-label">当前模块</p><h2>{{ moduleDisplay(selectedModule.id).name }}</h2></div><span class="badge">{{ displayStatus(detail?.status ?? selectedModule.status) }}</span></div>
+          <p>{{ moduleDisplay(selectedModule.id).description }}</p>
           <p v-if="selectionLoading" class="notice" role="status">正在读取模块详情…</p>
           <p v-else-if="selectionError" class="notice error" role="alert">{{ selectionError }}</p>
           <template v-else-if="detail">
