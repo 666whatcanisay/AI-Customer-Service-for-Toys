@@ -5,10 +5,10 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "draft_delivery_pending_external_validation",
-  "current_task": "A-AI-CONTROL-SUPPORT-V1 delivery",
+  "current_task": "A-AI-CONTROL-SUPPORT-V1 delivered",
   "next_recommended_task": "C/Admin may independently adopt the additive ai-control-center.product.v1 endpoint after validating the shared 0.1.1 schema. Separately, ask the C/knowledge governance owner for an auditable revised governed export/source catalog and explicit remediation authorization before any quality-baseline repair or rerun. Do not modify Prompt, knowledge, rules, vectors, or models automatically.",
   "current_stage": "A provides a strict Chinese product-data projection at GET /api/admin/ai/control-center/product-overview for the 5174 AI control center. It composes safe local A state and the newest saved live_c_api evaluation without C access, model calls, raw content, or writes; port 8000 root explicitly identifies itself as the AI API service rather than the operations console.",
-  "current_gate": "PASS for A-AI-CONTROL-SUPPORT-V1 implementation and verification: product projection, root guidance, CORS, shared additive contract, full pytest and real qwen smoke pass. Commit, push and existing Draft PR update remain as delivery mechanics. The independent historical quality remediation gate remains BLOCKED at saved live evaluation 19/28 pending governed C data and separate authorization.",
+  "current_gate": "PASS for A-AI-CONTROL-SUPPORT-V1: product projection, root guidance, CORS, shared additive contract, full pytest and real qwen smoke pass. Commit 058eb41 is pushed and Draft PR #42 targets develop. The independent historical quality remediation gate remains BLOCKED at saved live evaluation 19/28 pending governed C data and separate authorization.",
   "last_test_result": "2026-07-28 A-AI-CONTROL-SUPPORT-V1: targeted projection/control-center/operations/CORS tests 29 passed; full pytest backend 86 passed, 3 skipped, 44 warnings; explicit real qwen3.5:9b scoped smoke 1 passed (1428.7 ms). Actual local projection after A readiness returned ai-control-center.product.v1, RUNNING service, READY model, AVAILABLE knowledge, saved evaluation 19/28, and all read-only flags false.",
   "blockers": [
     "A service at the default UI base URL http://127.0.0.1:8000 is unreachable, so direct browser-to-A control-center smoke remains unverified; TestClient validates the root direction and product projection only.",
@@ -40,12 +40,12 @@
     "branch": "agent/ai-control-center-ui-v1",
     "clean": false,
     "baseline_commit": "3015098",
-    "commit": "PENDING_DELIVERY",
-    "task_commit": "PENDING_DELIVERY",
+    "commit": "058eb41",
+    "task_commit": "058eb41",
     "remote_branch": "origin/agent/ai-control-center-ui-v1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-28T09:11:00+08:00",
+  "checked_at": "2026-07-28T09:14:00+08:00",
   "contracts": [
     "ai-control-center.v1.1 A-to-necessary-UI read-only OpenAPI projection (no shared contract change)",
     "ai-operations.v1 A read-only OpenAPI projection (no shared contract change; C efficiency consumption intentionally not implemented)",
