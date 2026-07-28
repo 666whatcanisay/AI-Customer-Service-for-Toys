@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { displayStatus } from '../src/presentation'
+import { displayPassRate, displayStatus } from '../src/presentation'
 
 describe('displayStatus', () => {
   it('keeps API enum values in transport while showing pilot operators Chinese business labels', () => {
@@ -16,5 +16,12 @@ describe('displayStatus', () => {
     expect(displayStatus('REJECTED')).toBe('已拒绝')
     expect(displayStatus('UNKNOWN_API_VALUE')).toBe('UNKNOWN_API_VALUE')
     expect(displayStatus(null)).toBe('未设置')
+  })
+})
+
+describe('displayPassRate', () => {
+  it('renders fractional provider values as percentages without changing already-percent values', () => {
+    expect(displayPassRate(0.6786)).toBe('67.86%')
+    expect(displayPassRate(92.9)).toBe('92.9%')
   })
 })

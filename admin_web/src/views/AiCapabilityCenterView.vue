@@ -6,7 +6,7 @@ import {
   getAiControlCenterOverview,
   type AiControlCenterOverview,
 } from '../api/client'
-import { displayStatus } from '../presentation'
+import { displayPassRate, displayStatus } from '../presentation'
 
 const overview = ref<AiControlCenterOverview | null>(null)
 const loading = ref(false)
@@ -39,7 +39,7 @@ const evaluationSummary = computed(() => {
   const latest = overview.value?.latestEvaluation
   if (!latest || latest.status !== 'AVAILABLE' || !latest.evaluation) return '暂无已保存评测'
   if (latest.evaluation.passRate === null) return '已有评测，结果暂无法读取'
-  return `通过率 ${latest.evaluation.passRate}%`
+  return `通过率 ${displayPassRate(latest.evaluation.passRate)}`
 })
 
 function displayValue(value: string | number | null): string {
@@ -137,7 +137,7 @@ onMounted(() => { void load() })
               <div><dt>评测时间</dt><dd>{{ formatDate(overview.latestEvaluation.evaluation.executedAt) }}</dd></div>
               <div><dt>覆盖用例</dt><dd>{{ displayValue(overview.latestEvaluation.evaluation.totalCases) }}</dd></div>
               <div><dt>通过用例</dt><dd>{{ displayValue(overview.latestEvaluation.evaluation.passedCases) }}</dd></div>
-              <div><dt>通过率</dt><dd>{{ overview.latestEvaluation.evaluation.passRate === null ? '暂无法读取' : `${overview.latestEvaluation.evaluation.passRate}%` }}</dd></div>
+              <div><dt>通过率</dt><dd>{{ overview.latestEvaluation.evaluation.passRate === null ? '暂无法读取' : displayPassRate(overview.latestEvaluation.evaluation.passRate) }}</dd></div>
             </dl>
           </template>
           <p v-else class="notice">暂无已保存评测。这不代表评测失败，也不会自动触发新的评测。</p>

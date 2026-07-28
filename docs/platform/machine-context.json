@@ -77,7 +77,7 @@
     "customer_message_enabled": false,
     "order_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-28 TARGET MODE V5: Admin pnpm typecheck passed; Vitest passed 19 files / 39 tests; production build passed; git diff --check passed. The AI control overview adapter has focused tests for frozen data-envelope extraction and failed-envelope rejection. Browser/provider smoke remains pending the stacked A candidate.",
+  "last_test_result": "2026-07-28 TARGET MODE V5: Admin pnpm typecheck passed; Vitest passed 19 files / 40 tests; production build and git diff --check passed. The AI control overview adapter has focused tests for frozen data-envelope extraction, failed-envelope rejection, and display-only fractional pass_rate conversion (0.6786 → 67.86%). Browser/provider smoke remains pending the stacked A candidate.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_knowledge_material_api.py tests/test_ai_response_feedback_api.py",
     "cd platform_backend; isolated DATABASE_URL; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0006_mvp_plus_02_ai_feedback_idempotency; upgrade head",

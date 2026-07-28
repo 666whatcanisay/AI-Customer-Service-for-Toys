@@ -67,3 +67,13 @@ export function displayStatus(value: string | null | undefined, empty = '未设�
   if (!value) return empty
   return STATUS_LABELS[value] || value
 }
+
+/**
+ * A providers may serialize a pass rate as a fraction (0..1) or as an
+ * already-percent value. Keep the transport value unchanged and normalize
+ * only its operator-facing label.
+ */
+export function displayPassRate(value: number): string {
+  const percentage = value >= 0 && value <= 1 ? value * 100 : value
+  return `${Number(percentage.toFixed(2))}%`
+}
