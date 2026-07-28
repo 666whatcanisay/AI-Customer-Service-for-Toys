@@ -4,7 +4,7 @@
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
   "current_task": "LONG RUN TARGET MODE V5 / AI-CS PRODUCTIZATION V2 B customer usability",
-  "current_stage": "The customer workbench adds a visible consultation scope, non-blocking AI reference readiness guidance, and a human review-to-copy path using only the frozen customer knowledge-status response. It awaits cross-service browser QA against the matching C Provider candidate.",
+  "current_stage": "Draft PR #75 adds a visible consultation scope, non-blocking AI reference readiness guidance, and a human review-to-copy path using only the frozen customer knowledge-status response. It awaits cross-service browser QA against the matching C Provider candidate.",
   "current_gate": "LOCAL_TEST_PASS: customer knowledge-status adapter/client and AiChat regression coverage passed; full typecheck, 26-file/109-test Vitest run, and production build passed. No READY state is fabricated and no raw material, analysis, model, or technical detail is shown to customers.",
   "status": "ai_control_center_v2_customer_ready_for_cross_service_qa",
   "last_updated": "2026-07-28",
@@ -19,9 +19,9 @@
     "branch": "codex/ai-control-center-v2-customer",
     "base_commit": "8abb67d",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "PENDING_COMMIT_AND_DRAFT_PR_UPDATE",
+    "delivery": "DRAFT_PR_75_STACKED_ON_DATA_INTELLIGENCE_CUSTOMER",
     "clean": true,
-    "task_commit": "PENDING"
+    "task_commit": "1f30a01"
   },
   "owned_paths": [
     "frontend/**",
