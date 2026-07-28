@@ -3,11 +3,11 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "PILOT-HARDENING-B daily customer-service workbench hardening",
-  "current_stage": "Draft PR #49 created: catalog readiness and recovery guidance, cross-store reset boundary, missing-knowledge warning, clipboard recovery and adoption next-step guidance are complete. The complete live success path remains blocked because A/RAG is unavailable.",
-  "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
-  "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
-  "last_updated": "2026-07-27",
+  "current_task": "CONTROL-AI-DATA-INTELLIGENCE-PLATFORM-V1 B customer knowledge-status consumer",
+  "current_stage": "The customer workbench now has an additive, non-blocking compact material-status indicator backed only by the frozen knowledge-quality-loop.v1 response fields. It awaits the C Provider branch for a real integration run.",
+  "current_gate": "LOCAL_TEST_PASS: strict adapter/client tests and AiChat non-blocking regression tests passed; typecheck and production build passed. No READY state is fabricated and no raw material or analysis data is shown.",
+  "status": "data_intelligence_b_consumer_ready_for_stacked_provider_integration",
+  "last_updated": "2026-07-28",
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
     "source_baseline": "origin/develop@32feb610",
@@ -46,7 +46,9 @@
     "frontend/src/api/experienceCaseClient.ts",
     "frontend/src/api/experienceCaseAdapter.ts",
     "frontend/src/api/aiResponseFeedbackClient.ts",
-    "frontend/src/api/aiResponseFeedbackAdapter.ts"
+    "frontend/src/api/aiResponseFeedbackAdapter.ts",
+    "frontend/src/api/customerKnowledgeStatusClient.ts",
+    "frontend/src/api/customerKnowledgeStatusAdapter.ts"
   ],
   "required_interfaces": [
     "GET A /api/health",
@@ -55,7 +57,8 @@
     "POST C /api/v1/customer-experience-cases with frozen feedback_type and top-level case_id/review_status receipt",
     "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI",
     "POST C /api/v1/ai-response-feedback with ai-feedback.v1-draft fields, an Idempotency-Key header, and top-level feedback_id/status=NEW receipt",
-    "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total"
+    "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total",
+    "GET C /api/v1/customer-knowledge-status?store_code=&product_id=&sku_id= with only status, summary and last_checked_at from knowledge-quality-loop.v1"
   ],
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
@@ -77,7 +80,8 @@
     "Experience-case session summaries disappear on refresh until C publishes the GET contract",
     "Pilot-guide dismissal is a local browser boolean, not authentication or training evidence",
     "AI feedback is limited to synthetic or manually de-identified test data; automatic redaction and formal authorization are not implemented",
-    "Feedback history UI is intentionally absent; any future status-query page must consume the frozen GET fields and pagination without inventing fields."
+    "Feedback history UI is intentionally absent; any future status-query page must consume the frozen GET fields and pagination without inventing fields.",
+    "The C knowledge-material Provider is in a stacked branch, so a real customer-status response has not yet been verified against a running C service."
   ],
   "completed_tasks": [
     "B-T01 frontend baseline audit",
@@ -94,7 +98,8 @@
     "B-PRODUCT-V1.1 daily customer workbench experience (local UI and quality verification PASS; full live consultation path BLOCKED by unavailable A/RAG)",
     "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
     "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)",
-    "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added"
+    "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added",
+    "TARGET MODE V2 customer knowledge-status consumer: strict same-origin client, compact Chinese status indicator and non-blocking fallback implemented against knowledge-quality-loop.v1"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
