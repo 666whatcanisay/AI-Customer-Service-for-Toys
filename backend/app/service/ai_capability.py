@@ -296,6 +296,74 @@ def customer_service_detail(application: Any) -> dict[str, Any]:
     }
 
 
+def control_center_overview(application: Any) -> dict[str, Any]:
+    """Project existing A runtime state for the read-only control-center view.
+
+    The projection intentionally selects only the frozen operator-safe fields.  It
+    must not become a shortcut for returning prompts, request content, source
+    text, local paths, or raw evaluation reports.
+    """
+    detail = customer_service_detail(application)
+    knowledge_count = detail["knowledge_count"]
+    evaluation = latest_evaluation(
+        application.state.settings.project_root / "docs" / "rag" / "evaluations"
+    )
+    latest = evaluation["evaluation"]
+
+    return {
+        "module_id": detail["module_id"],
+        "service": {
+            "status": detail["status"],
+            "ready": detail["ready"],
+            "model_configured": detail["model_configured"],
+            "initialization_error": detail["initialization_error"],
+        },
+        "model": {
+            "provider": detail["model_provider"],
+            "name": detail["model_name"],
+            "configured": detail["model_configured"],
+        },
+        "knowledge": {
+            "status": "AVAILABLE" if knowledge_count is not None else "UNAVAILABLE",
+            "queryable_chunk_count": knowledge_count,
+            "scope": "LIVE_QUERYABLE_COLLECTIONS",
+        },
+        "runtime": {
+            key: detail[key]
+            for key in (
+                "metrics_scope",
+                "call_count",
+                "success_count",
+                "error_count",
+                "average_latency_ms",
+                "last_called_at",
+                "last_error_summary",
+            )
+        },
+        "latest_evaluation": {
+            "status": evaluation["status"],
+            "evaluation": (
+                {
+                    key: latest[key]
+                    for key in (
+                        "executed_at",
+                        "dataset_version",
+                        "total_cases",
+                        "passed_cases",
+                        "pass_rate",
+                    )
+                }
+                if latest is not None
+                else None
+            ),
+        },
+        "technical": {
+            "prompt_version": detail["prompt_version"],
+            "prompt_hash": detail["prompt_hash"],
+        },
+    }
+
+
 def latest_evaluation(evaluations_root: Path) -> dict[str, Any]:
     """Read the newest saved real evaluation summary without exposing report paths."""
     candidates: list[tuple[float, Path, dict[str, Any]]] = []
