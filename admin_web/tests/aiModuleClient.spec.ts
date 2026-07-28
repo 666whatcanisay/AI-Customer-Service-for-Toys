@@ -41,6 +41,7 @@ describe('listAiModules', () => {
       name: 'AI Customer Service',
       status: 'RUNNING',
       description: 'Provides controlled customer-service answers.',
+      implemented: false,
       promptMetadata: null,
       recentEvaluations: [],
     }])
@@ -49,12 +50,12 @@ describe('listAiModules', () => {
 
   it('does not reinterpret malformed, legacy, or non-success shapes as modules', async () => {
     aiGet.mockResolvedValue({ data: { success: true, data: { items: [{ module_id: 'wrong-shape' }] } } })
-    await expect(listAiModules()).resolves.toEqual([])
+    await expect(listAiModules()).rejects.toThrow('模块列表')
 
     aiGet.mockResolvedValue({ data: [{ module_id: 'legacy-array' }] })
-    await expect(listAiModules()).resolves.toEqual([])
+    await expect(listAiModules()).rejects.toThrow('未返回成功')
 
     aiGet.mockResolvedValue({ data: { success: false, data: { modules: [{ module_id: 'not-successful' }] } } })
-    await expect(listAiModules()).resolves.toEqual([])
+    await expect(listAiModules()).rejects.toThrow('未返回成功')
   })
 })

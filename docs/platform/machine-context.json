@@ -4,10 +4,10 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "UI-1 unified operations product shell",
-  "current_stage": "The 5174 Admin frontend has an incremental UI-1 product shell with grouped navigation, real environment/platform/A availability labels, default-collapsed technical details and explicit planned/empty states. Existing routes and provider behavior remain unchanged.",
-  "current_gate": "LOCAL_UI_VERIFIED_PENDING_DELIVERY: admin typecheck, 13 Vitest files / 29 tests and production build passed. No platform backend, database, migration, API, shared contract or state-machine behavior changed.",
-  "status": "ui_1_product_shell_ready_for_delivery",
+  "current_task": "CONTROL-UI-FIX-V1 Admin product UI",
+  "current_stage": "The 5174 Admin frontend is being refined as a Chinese AI Operations Center with real A status/knowledge/module/prompt/evaluation read projections, distinct evidence pools, import guidance, and an explicit not-found route. Existing provider behavior remains unchanged.",
+  "current_gate": "LOCAL_UI_VERIFIED_READY_FOR_DRAFT_PR: Admin typecheck, 17 Vitest files / 35 tests, production build, and read-only temporary Vite/proxy HTTP verification passed. No platform backend, database, migration, API, shared contract or state-machine behavior changed.",
+  "status": "ui_fix_v1_ready_for_delivery",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
@@ -35,6 +35,7 @@
     "admin_web/src/views/AiOptimizationPoolView.vue",
     "admin_web/src/views/AiFeedbackOptimizationPoolView.vue",
     "admin_web/src/App.vue",
+    "admin_web/src/views/NotFoundView.vue",
     "admin_web/src/components/ProductEmptyState.vue",
     "platform_backend/app/ai_feedback/models.py",
     "platform_backend/app/api/customer_ai_feedback_routes.py",
@@ -58,6 +59,7 @@
   "required_interfaces": [
     "B submits with Idempotency-Key and consumes only its minimum status projection",
     "A consumes only manually confirmed C feedback snapshots and posts matching revision/hash/type analysis evidence",
+    "Admin UI reads existing A status, knowledge-statistics, module, prompt-metadata and latest-evaluation endpoints without changing their fields or invoking write/test endpoints",
     "No direct A/C database access, A model call, or cross-line automatic action"
   ],
   "cross_line_compatibility": {
@@ -83,7 +85,7 @@
     "customer_message_enabled": false,
     "order_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-27 UI-1: admin vue-tsc PASS; Vitest 13 files / 29 tests PASS; production build PASS. Tests cover grouped product shell navigation, real platform/A status labels, explicit customer not-probed status and default-collapsed technical details. Previous C provider/feedback verification remains unchanged.",
+  "last_test_result": "2026-07-28 CONTROL-UI-FIX-V1: Admin vue-tsc PASS; Vitest 17 files / 35 tests PASS; production build PASS. Temporary Vite on 127.0.0.1:15174 returned 200 for product routes and read-only /ai-api plus /platform-api proxies; the verified temporary Vite listener was stopped and port released. Previous C provider/feedback verification remains unchanged.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
@@ -105,11 +107,11 @@
   ],
   "blockers": [],
   "git": {
-    "branch": "codex/ui-1-product-shell",
-    "base": "origin/develop 3b9f3e63700ba1d5bcc27b54c5be7aabee28e252",
+    "branch": "codex/ui-fix-v1-admin",
+    "base": "origin/develop 2f5f52529d1fc0f649df4a5a7e30e2369c8aabf3",
     "commit": "PENDING_DELIVERY",
     "draft_pr": "PENDING_DELIVERY"
   },
-  "next_recommended_task": "Deliver the UI-1 Draft PR for review. Follow-up UI tasks may refine existing page presentation, but new metrics, logs, roles, Prompt writes, experiments or sensitive views require separate Interface Owner/privacy/authorization approval.",
-  "last_updated": "2026-07-27"
+  "next_recommended_task": "Complete final UI verification and deliver the CONTROL-UI-FIX-V1 Draft PR. Follow-up UI tasks may refine existing page presentation, but new metrics, logs, roles, Prompt writes, experiments or sensitive views require separate Interface Owner/privacy/authorization approval.",
+  "last_updated": "2026-07-28"
 }

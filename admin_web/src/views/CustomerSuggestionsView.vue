@@ -62,7 +62,7 @@ onMounted(load)
 
 <template>
   <main class="page">
-    <div class="page-header"><div><h1>客服建议</h1><p>建议仅支持状态和内部备注处理，不会自动创建开发任务或知识。</p></div></div>
+    <div class="page-header"><div><h1>客服建议审核</h1><p>建议仅支持状态和内部备注处理，不会自动创建开发任务或知识。</p></div></div>
     <form class="filters card" @submit.prevent="filters.page = 1; load()">
       <label>状态<select v-model="filters.status"><option value="">全部</option><option v-for="status in statuses" :key="status" :value="status">{{ displayStatus(status) }}</option></select></label>
       <label>模块<input v-model.trim="filters.module_key" /></label>

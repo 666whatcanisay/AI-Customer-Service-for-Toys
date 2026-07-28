@@ -9,6 +9,7 @@ import {
   type TestPackagePreflight,
   type TestPackageSummary,
 } from '../api/client'
+import { displayStatus } from '../presentation'
 
 const MAX_PACKAGE_BYTES = 32 * 1024 * 1024
 const packages = ref<TestPackageSummary[]>([])
@@ -98,8 +99,9 @@ onMounted(loadPackages)
   <main class="page">
     <div class="page-header">
       <div>
+        <p class="eyebrow">数据与系统 / 测试数据包</p>
         <h1>测试数据包</h1>
-        <p>仅导入 TENANT-PDD-SM-TEST；不可用于生产，禁止自动发送。</p>
+        <p>仅导入经验证的 V0.3.1 原始 ZIP 到测试租户；不可用于生产，禁止自动发送。</p>
       </div>
     </div>
 
@@ -108,6 +110,12 @@ onMounted(loadPackages)
       <p class="notice warning">
         测试专用：test_data_mode=true、production_usable=false、SUGGESTION_ONLY、allow_auto_send=false。
       </p>
+      <section class="package-steps" aria-label="测试数据包导入三步">
+        <article><span>1</span><div><strong>选择原始 ZIP</strong><p>使用已通过 Manifest 验证的原始 V0.3.1 ZIP。</p></div></article>
+        <article><span>2</span><div><strong>先预检</strong><p>确认租户、数量和安全限制被正确识别。</p></div></article>
+        <article><span>3</span><div><strong>确认后导入</strong><p>只在预检通过后导入测试租户。</p></div></article>
+      </section>
+      <p class="template-note"><strong>没有测试包模板下载：</strong>此入口不接受自行拼装的模板或解压目录，只接受原始测试 ZIP。</p>
       <input
         type="file"
         accept=".zip,application/zip"
@@ -138,8 +146,9 @@ onMounted(loadPackages)
       <p v-if="importError" class="notice error" role="alert">{{ importError }}</p>
 
       <div v-if="preflight" class="preflight" role="status">
-        <h3>{{ preflight.can_import ? 'ZIP 预检通过' : 'ZIP 预检未通过' }}</h3>
-        <p>{{ preflight.package_id }} · {{ preflight.version }} · {{ preflight.schema_version }}</p>
+        <h3>{{ preflight.can_import ? '识别结果：ZIP 预检通过' : '识别结果：ZIP 预检未通过' }}</h3>
+        <p>包：{{ preflight.package_id }} · 版本：{{ preflight.version }} · Schema：{{ preflight.schema_version }}</p>
+        <p>租户：{{ preflight.tenant_id }} · 店铺：{{ preflight.store_code }} · 自动发送：{{ preflight.allow_auto_send ? '允许（异常）' : '禁止' }}</p>
         <div class="metrics">
           <span class="metric">商品<strong>{{ preflight.counts.products }}</strong></span>
           <span class="metric">SKU/组合<strong>{{ preflight.counts.skus_and_bundles }}</strong></span>
@@ -153,10 +162,11 @@ onMounted(loadPackages)
             {{ warning.code }}：{{ warning.message }}
           </li>
         </ul>
+        <section v-if="preflight.errors.length" class="issue-list errors"><h4>失败原因</h4><ul><li v-for="issue in preflight.errors" :key="issue.code">{{ issue.code }}：{{ issue.message }}</li></ul></section>
       </div>
 
       <p v-if="imported" class="notice success" role="status">
-        已导入 {{ imported.package_id }}；状态 {{ imported.import_status }}。
+        已导入 {{ imported.package_id }}；状态 {{ displayStatus(imported.import_status) }}。
       </p>
     </section>
 
@@ -171,7 +181,7 @@ onMounted(loadPackages)
           <tbody>
             <tr v-for="item in packages" :key="item.package_id">
               <td>{{ item.package_id }}<br /><small>{{ item.version }}</small></td>
-              <td><span class="badge">{{ item.import_status }}</span></td>
+              <td><span class="badge">{{ displayStatus(item.import_status) }}</span></td>
               <td>{{ item.counts.products }}</td>
               <td>{{ item.counts.skus_and_bundles }}</td>
               <td>{{ item.counts.faqs }}</td>
@@ -193,6 +203,9 @@ onMounted(loadPackages)
   gap: 18px;
   margin-bottom: 24px;
 }
+
+.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.package-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; border-radius: 12px; background: #eef4fb; }.package-steps article { display: flex; gap: 9px; min-width: 0; }.package-steps span { display: grid; width: 24px; height: 24px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #284f8f; color: #fff; font-size: 12px; font-weight: 800; }.package-steps strong { font-size: 13px; }.package-steps p { margin: 3px 0 0; color: #617087; font-size: 12px; line-height: 1.45; }.template-note { padding: 11px 13px; border-left: 3px solid #cf8c24; border-radius: 7px; background: #fff8e7; color: #6d531a; font-size: 13px; line-height: 1.55; }
 
 .actions {
   display: flex;
@@ -218,7 +231,11 @@ onMounted(loadPackages)
   margin: 0;
 }
 
+.issue-list.errors { color: #8c2929; }.issue-list h4 { margin-bottom: 6px; }
+
 small {
   color: #617087;
 }
+
+@media (max-width: 760px) { .package-steps { grid-template-columns: 1fr; } }
 </style>
