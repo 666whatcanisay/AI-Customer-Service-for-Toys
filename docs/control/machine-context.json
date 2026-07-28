@@ -3,14 +3,22 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "productization_v2_code_released_runtime_restart_blocked",
-  "current_task": "AI-CS-PRODUCTIZATION-V2",
-  "current_stage": "PRs #73 (Interface/Data), #76 (C/Admin), #74 (A), and #75 (B) were squash merged to develop@e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3. Unified regression and isolated real integration passed, but the formal host is still serving mixed old-worktree processes and its main worktree contains user-owned uncommitted documentation.",
-  "current_gate": "RUNTIME_RECONCILIATION_REQUIRED: preserve the user-owned main-tree changes, safely reconcile or obtain authorization for old unrecorded listener processes, then restart the released SHA through formal OPS scripts. No automatic RAG publication, Prompt/model change, training, messaging, after-sales, refund, order or ERP action is authorized.",
+  "status": "admin_ui_hotfix_release_candidate",
+  "current_task": "ADMIN-UI-HOTFIX-RELEASE-V1",
+  "current_stage": "Two Admin-only UI hotfixes were cherry-picked from 07eb962 in the authorized release order: source metadata table containment (7787606) followed by overview metric/unit alignment (84366f7). Admin typecheck, 42 Vitest tests, production build, and diff checks passed; the current runtime still requires controlled SHA reconciliation.",
+  "current_gate": "RUNTIME_RELEASE_PENDING: promote the clean Admin UI hotfix candidate, then use formal OPS scripts to replace the trusted 07eb962 runtime with the exact released SHA and verify A/C/B/Admin health plus the 5174 browser pages. No interface, database, AI, automatic action, or network-policy change is authorized.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
+    "admin_ui_hotfix_source_commits": [
+      "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
+      "80097cf73996a4aa0ad424e05fe82e6488312c63"
+    ],
+    "admin_ui_hotfix_candidate_commits": [
+      "7787606",
+      "84366f7"
+    ],
     "base_commit": "6ea5dddc0b1e5b536e3833f353d34a7ac731930d",
     "feature_branch": "codex/mvp-lan-batch-05",
     "mvp_batch_05_squash_commit": "dc48646bcfd20bffc864a6c1ba4d0049cd444870",
