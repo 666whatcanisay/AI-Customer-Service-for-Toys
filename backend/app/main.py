@@ -100,6 +100,12 @@ def create_app(
     @application.get("/", include_in_schema=False)
     def root() -> dict[str, str]:
         return {
+            "title": "AI 能力中心服务接口",
+            "service_type": "AI_SERVICE_API",
+            "usage_note": "这是 AI 服务接口，不是运营后台。",
+            "operations_console": "http://127.0.0.1:5174",
+            "operations_console_note": "运营请前往 5174 的 AI 控制中心。",
+            "product_overview": "/api/admin/ai/control-center/product-overview",
             "message": "RAG AI 客服后端正在运行",
             "docs": "/docs",
             "health": "/api/health",

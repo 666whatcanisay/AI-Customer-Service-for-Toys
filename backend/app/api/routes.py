@@ -16,6 +16,7 @@ from app.models.chat import (
     SearchRequest,
 )
 from app.models.ai_control import AiControlCenterResponse
+from app.models.ai_control_product import AiControlCenterProductResponse
 from app.models.ai_operations import AiOperationsOverviewResponse
 from app.models.quality_baseline import QualityBaselineResponse
 from app.service.experience_evaluation import (
@@ -38,6 +39,7 @@ from app.service.ai_capability import (
     prompt_metadata,
     summarize_feedback_analysis_run,
 )
+from app.service.ai_control_product import product_control_center_snapshot
 from app.service.quality_baseline import latest_quality_baseline
 from app.service.test_knowledge import (
     PlatformIntegrationUnavailable,
@@ -321,6 +323,19 @@ def get_ai_control_center(request: Request) -> dict[str, Any]:
     return envelope(
         control_center_snapshot(request.app).model_dump(),
         message="AI control-center snapshot",
+    )
+
+
+@router.get(
+    "/admin/ai/control-center/product-overview",
+    tags=["ai-admin"],
+    response_model=AiControlCenterProductResponse,
+)
+def get_ai_control_center_product_overview(request: Request) -> dict[str, Any]:
+    """Read the stable Chinese product projection for the 5174 control center."""
+    return envelope(
+        product_control_center_snapshot(request.app).model_dump(),
+        message="AI 控制中心产品数据投影",
     )
 
 

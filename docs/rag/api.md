@@ -5,10 +5,10 @@
 Set `CORS_ALLOWED_ORIGINS` to an English-comma-separated list of explicit Origins, for example:
 
 ```text
-CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://192.168.1.20:5173
+CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174,http://192.168.1.20:5173
 ```
 
-When omitted, only `http://127.0.0.1:5173` and `http://localhost:5173` are allowed. Entries are trimmed, canonicalized, and deduplicated. Every entry must be exactly `http(s)://host[:port]`: paths, queries, fragments, credentials, wildcards, invalid hosts, and invalid ports abort startup. CORS allows GET, POST, PUT, and OPTIONS with Content-Type only; credentials are disabled. An unlisted Origin receives no ACAO header, while a request without Origin remains a normal server-to-server request.
+When omitted, the local UI origins `http://127.0.0.1:5173`, `http://localhost:5173`, `http://127.0.0.1:5174`, and `http://localhost:5174` are allowed. Port 5174 is the AI control-center operations UI; port 8000 remains the API service. Entries are trimmed, canonicalized, and deduplicated. Every entry must be exactly `http(s)://host[:port]`: paths, queries, fragments, credentials, wildcards, invalid hosts, and invalid ports abort startup. CORS allows GET, POST, PUT, and OPTIONS with Content-Type only; credentials are disabled. An unlisted Origin receives no ACAO header, while a request without Origin remains a normal server-to-server request.
 
 ## POST /api/chat
 
@@ -43,6 +43,17 @@ Runtime metrics are thread-safe and reset on process restart. They contain no qu
 Returns the versioned `ai-control-center.v1.1` management snapshot. It is a read-only summary of A process runtime state, safe Prompt metadata, the newest saved `live_c_api` evaluation summary, fixed Badcase empty-state metadata, and a process-memory-only aggregate of successfully completed feedback-analysis runs. Its `response_model` is `AiControlCenterResponse`, so the complete field schema is available in `/openapi.json`.
 
 The route does not probe C, call Ollama, run analysis/evaluation, expose C URLs, or return feedback IDs, content hashes, raw question/answer text, analyses, suggestions, full prompts, environment values, or secrets. Existing module endpoints remain available for V1.0 clients.
+
+### GET /api/admin/ai/control-center/product-overview
+
+Returns the additive `ai-control-center.product.v1` Chinese product-data projection for the AI control center on port 5174. Its OpenAPI response model is `AiControlCenterProductResponse`; the cross-line JSON Schema is `contracts/schemas/ai-control-center-product.schema.json` at shared contract version `0.1.1`.
+
+- One response supplies display-ready service, model, knowledge, A-process answer usage, newest saved real evaluation, safe five-category quality diagnosis, module list, feedback-analysis aggregate, notices, and runtime-identity limits. `NOT_AVAILABLE` means the data has no approved source and must be displayed as an empty state, never as zero or a fixture.
+- Model status is configuration/process readiness only. `availability_probed=false`; the endpoint does not call Qwen. Knowledge `last_sync_at` remains `null` and `last_sync_status=NOT_AVAILABLE` until durable sync evidence is registered. Answer counts reset when A restarts and are not employee or audit metrics.
+- Evaluation data only reads the newest saved `live_c_api` report. Quality categories are direct evaluator evidence, may overlap, and every recommended next step is manual. The endpoint cannot modify Prompt, knowledge, model, rules, vectors, C data, or business data.
+- The response excludes customer content, questions, answers, source excerpts/IDs, feedback IDs, hashes, individual analyses, Prompt text, C URLs, secrets, raw errors and report paths. `raw_content_exposed`, `model_call_performed`, and `business_write_performed` are all fixed to `false`.
+
+This is additive: existing `ai-control-center.v1.1`, `ai-operations.v1`, and `ai-quality-baseline.v1` routes are unchanged. C/Admin may adopt the new endpoint independently. See `docs/rag/ai-control-support-v1.md` for product semantics and compatibility notes.
 
 ### GET /api/admin/ai/operations/overview
 

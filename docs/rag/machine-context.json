@@ -5,13 +5,13 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "draft_delivery_pending_external_validation",
-  "current_task": "A-AI-CONTROL-CENTER-V2-PRODUCT delivery",
-  "next_recommended_task": "Review the V2 Draft PR. Separately, ask the C/knowledge governance owner for an auditable revised governed export/source catalog and explicit remediation authorization before any quality-baseline repair or rerun. Do not modify Prompt, knowledge, rules, vectors, or models automatically.",
-  "current_stage": "AI Control Center V2 is a strict read-only UI consumer of the existing ai-control-center.v1.1, ai-operations.v1, and ai-quality-baseline.v1 snapshots. It shows model/knowledge/quality state, saved evaluation evidence, safe Badcase empty state, diagnoses, notices and readonly Prompt metadata without C access or writes.",
-  "current_gate": "PASS for A-AI-CONTROL-CENTER-V2-PRODUCT: all three real A snapshots returned 200 and the V2 safety/contract checks pass. The independent historical quality remediation gate remains BLOCKED at saved live evaluation 19/28 pending governed C data and separate authorization.",
-  "last_test_result": "2026-07-27 A-AI-CONTROL-CENTER-V2-PRODUCT: full pytest backend 80 passed, 3 skipped, 38 warnings; frontend Vitest 23 files / 91 tests passed; frontend typecheck and production build passed; explicit real scoped qwen3.5:9b smoke 1 passed (1272.7 ms). Actual A GET snapshots returned 200: ai-control-center.v1.1, ai-operations.v1, ai-quality-baseline.v1; saved a-t03-v031-live remains 19/28 with raw_content_exposed=false, model_or_prompt_changed=false, and null Badcase counts.",
+  "current_task": "A-AI-CONTROL-SUPPORT-V1 delivery",
+  "next_recommended_task": "C/Admin may independently adopt the additive ai-control-center.product.v1 endpoint after validating the shared 0.1.1 schema. Separately, ask the C/knowledge governance owner for an auditable revised governed export/source catalog and explicit remediation authorization before any quality-baseline repair or rerun. Do not modify Prompt, knowledge, rules, vectors, or models automatically.",
+  "current_stage": "A provides a strict Chinese product-data projection at GET /api/admin/ai/control-center/product-overview for the 5174 AI control center. It composes safe local A state and the newest saved live_c_api evaluation without C access, model calls, raw content, or writes; port 8000 root explicitly identifies itself as the AI API service rather than the operations console.",
+  "current_gate": "PASS for A-AI-CONTROL-SUPPORT-V1 implementation and verification: product projection, root guidance, CORS, shared additive contract, full pytest and real qwen smoke pass. Commit, push and existing Draft PR update remain as delivery mechanics. The independent historical quality remediation gate remains BLOCKED at saved live evaluation 19/28 pending governed C data and separate authorization.",
+  "last_test_result": "2026-07-28 A-AI-CONTROL-SUPPORT-V1: targeted projection/control-center/operations/CORS tests 29 passed; full pytest backend 86 passed, 3 skipped, 44 warnings; explicit real qwen3.5:9b scoped smoke 1 passed (1428.7 ms). Actual local projection after A readiness returned ai-control-center.product.v1, RUNNING service, READY model, AVAILABLE knowledge, saved evaluation 19/28, and all read-only flags false.",
   "blockers": [
-    "A service at the default UI base URL http://127.0.0.1:8000 is unreachable, so direct browser-to-A control-center smoke remains unverified.",
+    "A service at the default UI base URL http://127.0.0.1:8000 is unreachable, so direct browser-to-A control-center smoke remains unverified; TestClient validates the root direction and product projection only.",
     "An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before the feedback-analysis real read/qwen/writeback/idempotency claim can be made.",
     "No approved versioned aggregate-only C customer-efficiency summary contract is registered in A scope, so efficiency data cannot be read or inferred.",
     "An auditable revised governed C export/source catalog and explicit remediation authorization are required before fixing the 19/28 historical quality baseline or rerunning the 28-case live evaluation."
@@ -39,19 +39,19 @@
   "git": {
     "branch": "agent/ai-control-center-ui-v1",
     "clean": false,
-    "baseline_commit": "db47e31",
+    "baseline_commit": "3015098",
     "commit": "PENDING_DELIVERY",
     "task_commit": "PENDING_DELIVERY",
     "remote_branch": "origin/agent/ai-control-center-ui-v1",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-27T16:07:00+08:00",
+  "checked_at": "2026-07-28T09:11:00+08:00",
   "contracts": [
-    "contracts/version.json 0.1.0 (unchanged)",
     "ai-control-center.v1.1 A-to-necessary-UI read-only OpenAPI projection (no shared contract change)",
     "ai-operations.v1 A read-only OpenAPI projection (no shared contract change; C efficiency consumption intentionally not implemented)",
     "ai-quality-baseline.v1 A read-only OpenAPI projection over saved live evaluation reports (no shared contract change)",
-    "AI Control Center V2 necessary read-only UI consumer with strict schema/safety validation (no contract change)"
+    "AI Control Center V2 necessary read-only UI consumer with strict schema/safety validation (no contract change)",
+    "contracts/version.json 0.1.1 additive ai-control-center.product.v1 A-to-C/Admin read-only product projection; existing 0.1.0 schemas/endpoints unchanged"
   ],
   "entrypoints": [
     "backend/app/service/rag_service.py",
@@ -64,6 +64,8 @@
     "backend/app/models/ai_control.py",
     "backend/app/models/ai_operations.py",
     "backend/app/models/quality_baseline.py",
+    "backend/app/models/ai_control_product.py",
+    "backend/app/service/ai_control_product.py",
     "frontend/src/api/aiControlCenterClient.ts",
     "frontend/src/api/aiControlCenterAdapter.ts",
     "frontend/src/api/aiControlCenterTypes.ts",
@@ -83,7 +85,7 @@
     "extension/**",
     "platform_backend/**",
     "admin_web/**",
-    "contracts/**",
+    "contracts/** except the user-authorized additive ai-control-center.product.v1 schema/version/changelog",
     "backend/vector_db/**"
   ],
   "test_commands": [
@@ -93,6 +95,7 @@
     "cd frontend; npm.cmd run test; npm.cmd run typecheck; npm.cmd run build",
     "RUN_REAL_FEEDBACK_ANALYSIS_E2E=1 with an isolated C service and human-confirmed de-identified feedback python -m pytest backend/tests/test_real_feedback_analysis_e2e.py -q -s",
     "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
+    "source read-only venv python -m pytest backend/tests/test_ai_control_product.py backend/tests/test_ai_control_center.py backend/tests/test_ai_operations.py backend/tests/test_cors.py -q",
     "PLATFORM_API_BASE_URL=http://127.0.0.1:8012 source read-only venv python backend/scripts/evaluate_test_knowledge.py PDD-SM-2026-001-TEST --output-dir docs/rag/evaluations/a-t03-v031-live"
   ],
   "completed_tasks": [
@@ -110,7 +113,8 @@
     "AI-CONTROL-V1.1 read-only technical-lead control center (local and real-qwen verification complete; external A/C validation blocked)",
     "TARGET-PILOT-A AI operations foundation (local and real-qwen verification complete; C feedback/efficiency external validation blocked)",
     "PILOT-HARDENING-A quality baseline diagnosis (19/28 cause evidence and local/real-qwen verification complete; governed remediation blocked)",
-    "A-AI-CONTROL-CENTER-V2-PRODUCT strict read-only product workbench with real A snapshot verification"
+    "A-AI-CONTROL-CENTER-V2-PRODUCT strict read-only product workbench with real A snapshot verification",
+    "A-AI-CONTROL-SUPPORT-V1 additive Chinese read-only product data projection for C/Admin consumption"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -136,7 +140,8 @@
     "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
     "GET /api/admin/ai/control-center ai-control-center.v1.1 read-only management snapshot",
     "GET /api/admin/ai/operations/overview ai-operations.v1 read-only operational metrics snapshot",
-    "GET /api/admin/ai/quality-baseline/latest ai-quality-baseline.v1 read-only saved-evaluation diagnosis"
+    "GET /api/admin/ai/quality-baseline/latest ai-quality-baseline.v1 read-only saved-evaluation diagnosis",
+    "GET /api/admin/ai/control-center/product-overview ai-control-center.product.v1 additive Chinese read-only product projection for the 5174 AI control center"
   ],
-  "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
+  "out_of_scope": ["Other-line business code", "Additional shared contract changes beyond ai-control-center.product.v1", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }
