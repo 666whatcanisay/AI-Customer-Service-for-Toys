@@ -2,27 +2,39 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OperationsOverviewView from '../src/views/OperationsOverviewView.vue'
-import { getAdminOverview, getHealth, listAiModules } from '../src/api/client'
+import {
+  getAdminOverview,
+  getHealth,
+  listAiFeedbackAnalysisResults,
+  listKnowledgeMaterials,
+  listKnowledgeQualityAssessments,
+} from '../src/api/client'
 
 vi.mock('../src/api/client', () => ({
   getAdminOverview: vi.fn(),
   getHealth: vi.fn(),
-  listAiModules: vi.fn(),
-  apiErrorMessage: vi.fn(() => 'Could not load overview'),
+  listKnowledgeMaterials: vi.fn(),
+  listKnowledgeQualityAssessments: vi.fn(),
+  listAiFeedbackAnalysisResults: vi.fn(),
+  apiErrorMessage: vi.fn(() => '运营概览请求失败'),
 }))
 
 const mockedOverview = vi.mocked(getAdminOverview)
 const mockedHealth = vi.mocked(getHealth)
-const mockedModules = vi.mocked(listAiModules)
+const mockedMaterials = vi.mocked(listKnowledgeMaterials)
+const mockedQuality = vi.mocked(listKnowledgeQualityAssessments)
+const mockedFeedback = vi.mocked(listAiFeedbackAnalysisResults)
 
 describe('OperationsOverviewView', () => {
   beforeEach(() => {
     mockedOverview.mockReset()
     mockedHealth.mockReset()
-    mockedModules.mockReset()
+    mockedMaterials.mockReset()
+    mockedQuality.mockReset()
+    mockedFeedback.mockReset()
   })
 
-  it('renders API-backed counts and an unavailable A service without fabricated data', async () => {
+  it('renders API-backed C facts and marks a failed native dataset as unavailable instead of zero', async () => {
     mockedOverview.mockResolvedValue({
       counts: {
         stores: 1, products: 5, skus: 18, faqs: 16, safety_rules: 8, sources: 37,
@@ -34,14 +46,17 @@ describe('OperationsOverviewView', () => {
       production_usable: false,
     })
     mockedHealth.mockResolvedValue({ status: 'ok', service: 'platform-backend', version: '0.1.0', request_id: 'health-1' })
-    mockedModules.mockRejectedValue(new Error('A unavailable'))
+    mockedMaterials.mockResolvedValue({ items: [], total: 4, page: 1, size: 1 })
+    mockedQuality.mockRejectedValue(new Error('quality unavailable'))
+    mockedFeedback.mockResolvedValue({ items: [], total: 3 })
 
-    const wrapper = mount(OperationsOverviewView)
+    const wrapper = mount(OperationsOverviewView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('18')
-    expect(wrapper.text()).toContain('13')
-    expect(wrapper.text()).toContain('A AI')
-    expect(wrapper.find('.service-status').text()).toContain('A AI')
+    expect(wrapper.text()).toContain('4')
+    expect(wrapper.text()).toContain('暂无法读取')
+    expect(wrapper.text()).toContain('AI 控制中心')
+    expect(wrapper.find('.service-status').text()).toContain('C 平台')
   })
 })

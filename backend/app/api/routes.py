@@ -12,6 +12,7 @@ from app.models.chat import (
     ChatRequest,
     ExperienceEvaluationRunRequest,
     FeedbackAnalysisRunRequest,
+    KnowledgeQualityRunRequest,
     ModelConfigUpdate,
     SearchRequest,
 )
@@ -23,10 +24,15 @@ from app.service.feedback_analysis import (
     FeedbackAnalysisError,
     FeedbackAnalysisService,
 )
+from app.service.knowledge_quality import (
+    KnowledgeQualityError,
+    KnowledgeQualityService,
+)
 from app.service.ai_capability import (
     INITIALIZATION_FAILED_CODE,
     MODULE_DEFINITIONS,
     MODULES_BY_ID,
+    control_center_overview,
     customer_service_detail,
     knowledge_collection_counts,
     latest_evaluation,
@@ -84,6 +90,14 @@ def get_feedback_analysis_service(request: Request) -> FeedbackAnalysisService:
     if service is None:
         service = FeedbackAnalysisService(request.app.state.settings)
         request.app.state.feedback_analysis_service = service
+    return service
+
+
+def get_knowledge_quality_service(request: Request) -> KnowledgeQualityService:
+    service = getattr(request.app.state, "knowledge_quality_service", None)
+    if service is None:
+        service = KnowledgeQualityService(request.app.state.settings)
+        request.app.state.knowledge_quality_service = service
     return service
 
 
@@ -179,6 +193,18 @@ def module_not_ready_response(module_id: str) -> JSONResponse:
         content=envelope(
             {"code": "AI_MODULE_NOT_READY", "module_id": module_id},
             message="AI module is not ready for an online test.",
+            success=False,
+        ),
+    )
+
+
+def ai_control_not_ready_response() -> JSONResponse:
+    """Return the frozen safe failure without exposing initialization details."""
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=envelope(
+            {"code": "AI_CONTROL_NOT_READY"},
+            message="AI control center is not ready.",
             success=False,
         ),
     )
@@ -436,6 +462,27 @@ def run_feedback_analysis(
     return envelope(recorded, message="Feedback analysis recorded")
 
 
+@router.post(
+    "/admin/ai/knowledge-quality/run",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_knowledge_quality_analysis(
+    request: Request,
+    analysis_request: KnowledgeQualityRunRequest,
+):
+    """Run a locally initiated analysis for C-approved material snapshots only."""
+    require_loopback_client(request)
+    try:
+        recorded = get_knowledge_quality_service(request).run(analysis_request.maximum)
+    except KnowledgeQualityError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=envelope({"code": exc.code}, message=exc.message, success=False),
+        )
+    return envelope(recorded, message="Knowledge-quality analysis recorded")
+
+
 @router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])
 def get_latest_ai_module_evaluation(
     request: Request, module_id: str
@@ -460,6 +507,14 @@ def get_latest_ai_module_evaluation(
             ),
         }
     )
+
+
+@router.get("/admin/ai/control-center/overview", tags=["ai-admin"])
+def get_ai_control_center_overview(request: Request):
+    """Return the frozen, read-only AI control-center aggregate projection."""
+    if not customer_service_detail(request.app)["ready"]:
+        return ai_control_not_ready_response()
+    return envelope(control_center_overview(request.app))
 
 
 @router.get("/ai/status", tags=["compatibility"])

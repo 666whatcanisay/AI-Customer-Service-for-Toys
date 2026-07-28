@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const apiMocks = vi.hoisted(() => ({
   getAdminOverview: vi.fn(),
   getHealth: vi.fn(),
-  listAiModules: vi.fn()
+  getAiControlCenterOverview: vi.fn()
 }))
 
 vi.mock('./api/client', () => apiMocks)
@@ -15,9 +15,10 @@ import App from './App.vue'
 const createTestRouter = () => createRouter({
   history: createMemoryHistory(),
   routes: [
-    '/overview', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
+    '/overview', '/knowledge-center', '/import-center', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
-    '/ai-capabilities', '/ai-optimization-pool', '/system-status', '/imports', '/test-data-packages'
+    '/ai-capabilities', '/ai-optimization-pool', '/knowledge-materials', '/knowledge-quality-pool',
+    '/system-status', '/imports', '/test-data-packages'
   ].map((path) => ({ path, component: { template: '<div>运营页面内容</div>' } }))
 })
 
@@ -25,7 +26,9 @@ describe('App product shell', () => {
   beforeEach(() => {
     apiMocks.getAdminOverview.mockResolvedValue({ test_data_mode: true, production_usable: false })
     apiMocks.getHealth.mockResolvedValue({ status: 'ok', service: 'platform', version: '0.1.0', request_id: 'request-1' })
-    apiMocks.listAiModules.mockResolvedValue([])
+    apiMocks.getAiControlCenterOverview.mockResolvedValue({
+      service: { status: 'RUNNING', ready: true, modelConfigured: true },
+    })
   })
 
   it('shows grouped navigation and only reveals technical details on demand', async () => {
@@ -37,9 +40,10 @@ describe('App product shell', () => {
 
     expect(wrapper.text()).toContain('AI客服平台')
     expect(wrapper.text()).toContain('客服运营')
-    expect(wrapper.text()).toContain('商品知识')
-    expect(wrapper.text()).toContain('AI 管理')
-    expect(wrapper.text()).toContain('业务扩展')
+    expect(wrapper.text()).toContain('商品知识中心')
+    expect(wrapper.text()).toContain('导入中心')
+    expect(wrapper.text()).toContain('AI 运营')
+    expect(wrapper.text()).toContain('后续能力')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('平台 可用')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('AI 可用')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('客服 未检测')

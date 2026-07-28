@@ -13,12 +13,20 @@ import AiFeedbackOptimizationPoolView from '../views/AiFeedbackOptimizationPoolV
 import OperationsOverviewView from '../views/OperationsOverviewView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ReadonlyListView from '../views/ReadonlyListView.vue'
+import KnowledgeMaterialsView from '../views/KnowledgeMaterialsView.vue'
+import KnowledgeQualityPoolView from '../views/KnowledgeQualityPoolView.vue'
+import KnowledgeCenterView from '../views/KnowledgeCenterView.vue'
+import ImportCenterView from '../views/ImportCenterView.vue'
+import CustomerOperationsView from '../views/CustomerOperationsView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/overview' },
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
+    { path: '/knowledge-center', name: 'knowledge-center', component: KnowledgeCenterView },
+    { path: '/import-center', name: 'import-center', component: ImportCenterView },
+    { path: '/customer-operations', name: 'customer-operations', component: CustomerOperationsView },
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
     {
       path: '/stores', name: 'stores', component: ReadonlyListView,
@@ -67,6 +75,8 @@ export const router = createRouter({
     { path: '/experience-cases', name: 'experience-cases', component: CustomerExperienceCasesView },
     { path: '/ai-optimization-pool', name: 'ai-optimization-pool', component: AiOptimizationPoolView },
     { path: '/ai-feedback-optimization-pool', name: 'ai-feedback-optimization-pool', component: AiFeedbackOptimizationPoolView },
+    { path: '/knowledge-materials', name: 'knowledge-materials', component: KnowledgeMaterialsView },
+    { path: '/knowledge-quality-pool', name: 'knowledge-quality-pool', component: KnowledgeQualityPoolView },
     {
       path: '/system-status',
       name: 'system-status',
