@@ -1,4 +1,8 @@
+import pytest
 from fastapi.testclient import TestClient
+
+
+pytestmark = pytest.mark.usefixtures("customer_identity_catalog")
 
 
 def _payload(**overrides: object) -> dict[str, object]:

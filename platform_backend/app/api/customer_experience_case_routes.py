@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, Query
 
 from app.database import get_db
+from app.customer_identity.service import require_active_bound_user
 from app.experience_cases.models import CustomerExperienceCase
 from app.experience_cases.schemas import (
     CustomerExperienceCaseCreate,
@@ -47,6 +48,7 @@ def create_customer_experience_case(
     payload: CustomerExperienceCaseCreate,
     session: Session = Depends(get_db),
 ) -> CustomerExperienceCaseCreated:
+    require_active_bound_user(session, user_id=payload.created_by, store_code=payload.store_code)
     item = CustomerExperienceCase(
         source_type="CUSTOMER_SERVICE_SUBMITTED",
         store_code=payload.store_code,

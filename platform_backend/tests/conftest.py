@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
+from app.customer_identity.models import CustomerUser, CustomerUserStoreBinding
 from app.ingestion.parsers.product_sku_xlsx import DATA_SHEET, EXPECTED_HEADERS
 from app.main import app
+from app.test_catalog.models import TestKnowledgePackage, TestStore
 
 
 @pytest.fixture
@@ -36,6 +38,66 @@ def client(session: Session) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def customer_identity_catalog(session: Session) -> None:
+    """A minimal catalog and selected trial identities for C API contract tests."""
+    package = TestKnowledgePackage(
+        package_id="identity-test-package",
+        package_name="Identity API synthetic package",
+        version="0.0.0",
+        schema_version="test",
+        tenant_id="identity-test-tenant",
+        platform="test",
+        store_code="STORE-ONE",
+        response_mode="MANUAL",
+        test_data_mode=True,
+        production_usable=False,
+        allow_auto_send=False,
+        import_status="IMPORTED",
+        original_filename="identity-test.zip",
+        zip_sha256="0" * 64,
+        counts_json="{}",
+        imported_by="test",
+    )
+    session.add(package)
+    for code in ("STORE-ONE", "STORE-TWO"):
+        session.add(
+            TestStore(
+                package_id=package.package_id,
+                tenant_id=package.tenant_id,
+                platform="test",
+                store_code=code,
+                store_name=code,
+                trial_enabled=True,
+                knowledge_scope="TEST",
+                response_mode="MANUAL",
+                allow_auto_send=False,
+                test_data_mode=True,
+                production_usable=False,
+                raw_data_json="{}",
+            )
+        )
+    for user_id, stores in {
+        "support-tester": ("STORE-ONE",),
+        "support-other": ("STORE-ONE", "STORE-TWO"),
+        "new-submitter": ("STORE-ONE",),
+        "review-submitter": ("STORE-ONE",),
+        "approved-submitter": ("STORE-ONE",),
+    }.items():
+        user = CustomerUser(
+            user_id=user_id,
+            display_name=f"Test {user_id}",
+            role="CUSTOMER_SERVICE",
+            status="ACTIVE",
+            default_store_code=stores[0],
+        )
+        session.add(user)
+        session.flush()
+        for store_code in stores:
+            session.add(CustomerUserStoreBinding(customer_user_id=user.id, store_code=store_code))
+    session.commit()
 
 
 def valid_row(index: int = 1) -> dict[str, object]:

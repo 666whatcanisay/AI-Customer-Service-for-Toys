@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
   PARSING: '解析中',
   VALIDATED: '已校验',
   READY_FOR_REVIEW: '待审核',
+  PENDING_REVIEW: '待审核',
   FAILED: '处理失败',
   VALID: '校验通过',
   INVALID: '格式错误',
@@ -48,8 +49,15 @@ const STATUS_LABELS: Record<string, string> = {
   COMPONENT: '组合组件',
   RUNNING: '运行中',
   PAUSED: '已暂停',
+  AVAILABLE: '可用',
+  NOT_AVAILABLE: '暂不可用',
   ERROR: '异常',
   UNKNOWN: '状态未知',
+  CUSTOMER_SERVICE: '客服',
+  OPERATIONS: '运营',
+  ADMIN: '管理员',
+  ACTIVE: '启用中',
+  DISABLED: '已停用',
 }
 
 export function displayStatus(value: string | null | undefined, empty = '未设置'): string {

@@ -326,6 +326,37 @@ export interface AdminSuggestion {
   updated_at: string
 }
 
+export type CustomerUserRole = 'CUSTOMER_SERVICE' | 'OPERATIONS' | 'ADMIN'
+export type CustomerUserStatus = 'ACTIVE' | 'DISABLED'
+
+export interface CustomerUserStoreBinding {
+  store_code: string
+  is_default: boolean
+}
+
+export interface CustomerUser {
+  user_id: string
+  display_name: string
+  role: CustomerUserRole
+  status: CustomerUserStatus
+  default_store_code: string
+  store_bindings: CustomerUserStoreBinding[]
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerUserListResponse {
+  items: CustomerUser[]
+  total: number
+}
+
+export interface CustomerUserWrite {
+  display_name: string
+  role: CustomerUserRole
+  store_codes: string[]
+  default_store_code: string
+}
+
 export type AdminResource =
   | 'stores'
   | 'products'
@@ -381,6 +412,47 @@ export async function updateAdminSuggestion(
     update,
   )
   return response.data
+}
+
+export async function listCustomerUsers(status?: CustomerUserStatus): Promise<CustomerUserListResponse> {
+  const response = await apiClient.get<CustomerUserListResponse>('/api/v1/admin/customer-users', {
+    params: status ? { status } : undefined,
+  })
+  return response.data
+}
+
+export async function createCustomerUser(payload: CustomerUserWrite): Promise<CustomerUser> {
+  const response = await apiClient.post<CustomerUser>('/api/v1/admin/customer-users', payload)
+  return response.data
+}
+
+export async function updateCustomerUser(userId: string, payload: CustomerUserWrite): Promise<CustomerUser> {
+  const response = await apiClient.put<CustomerUser>(
+    `/api/v1/admin/customer-users/${encodeURIComponent(userId)}`,
+    payload,
+  )
+  return response.data
+}
+
+export async function updateCustomerUserStatus(
+  userId: string,
+  status: CustomerUserStatus,
+): Promise<CustomerUser> {
+  const response = await apiClient.post<CustomerUser>(
+    `/api/v1/admin/customer-users/${encodeURIComponent(userId)}/status`,
+    { status },
+  )
+  return response.data
+}
+
+export interface CatalogStore {
+  store_code: string
+  store_name: string
+}
+
+export async function listCatalogStores(): Promise<CatalogStore[]> {
+  const response = await apiClient.get<ItemList<CatalogStore>>('/api/v1/test-catalog/stores')
+  return response.data.items
 }
 
 export type ExperienceCaseReviewStatus = 'NEW' | 'REVIEWING' | 'APPROVED' | 'REJECTED'
@@ -521,8 +593,73 @@ export interface AiModule {
   name: string
   status: string
   description: string | null
+  implemented: boolean
   promptMetadata: Record<string, unknown> | null
   recentEvaluations: unknown[]
+}
+
+export interface AiRuntimeStatus {
+  ready: boolean
+  modelConfigured: boolean
+  initializationError: string | null
+}
+
+export interface AiKnowledgeStatistics {
+  documentCount: number
+  chunkCount: number
+  collectionName: string
+  embeddingModel: string
+  vectorDatabase: string
+  modelConfigured: boolean
+}
+
+export interface AiModuleDetail extends AiModule {
+  modelProvider: string | null
+  modelName: string | null
+  ready: boolean | null
+  modelConfigured: boolean | null
+  initializationError: string | null
+  knowledgeCount: number | null
+  promptVersion: string | null
+  promptHash: string | null
+  safePreview: string | null
+  metricsScope: string | null
+  callCount: number | null
+  successCount: number | null
+  errorCount: number | null
+  averageLatencyMs: number | null
+  lastCalledAt: string | null
+  lastErrorSummary: string | null
+  supportedActions: string[]
+  raw: Record<string, unknown>
+}
+
+export interface AiPromptMetadata {
+  moduleId: string
+  status: string | null
+  promptVersion: string | null
+  promptHash: string | null
+  updatedAt: string | null
+  sourceType: string | null
+  safePreview: string | null
+  raw: Record<string, unknown>
+}
+
+export interface AiLatestEvaluation {
+  moduleId: string
+  status: string
+  evaluation: {
+    evaluationId: string | null
+    executedAt: string | null
+    datasetVersion: string | null
+    totalCases: number | null
+    passedCases: number | null
+    passRate: number | null
+    checks: Record<string, number | null>
+    failedCaseIds: string[]
+    reportAvailable: boolean
+  } | null
+  raw: Record<string, unknown>
 }
 
 function normalizeAiModule(value: unknown, index: number): AiModule {
@@ -533,6 +670,7 @@ function normalizeAiModule(value: unknown, index: number): AiModule {
     name: text('display_name', text('name', text('module_key', `Module ${index + 1}`))),
     status: text('status', 'UNKNOWN'),
     description: typeof row.description === 'string' ? row.description : null,
+    implemented: row.implemented === true,
     promptMetadata: typeof row.prompt_metadata === 'object' && row.prompt_metadata !== null
       ? row.prompt_metadata as Record<string, unknown>
       : null,
@@ -540,13 +678,15 @@ function normalizeAiModule(value: unknown, index: number): AiModule {
   }
 }
 
-function modulesFromAiSuccessEnvelope(payload: unknown): unknown[] {
-  if (typeof payload !== 'object' || payload === null) return []
+function aiEnvelopeData<T>(payload: unknown): T {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new Error('AI 服务返回的不是可识别的响应。')
+  }
   const envelope = payload as { success?: unknown; data?: unknown }
-  if (envelope.success !== true || typeof envelope.data !== 'object' || envelope.data === null) return []
-
-  const data = envelope.data as { modules?: unknown }
-  return Array.isArray(data.modules) ? data.modules : []
+  if (envelope.success !== true || envelope.data === undefined || envelope.data === null) {
+    throw new Error('AI 服务未返回成功的数据包。')
+  }
+  return envelope.data as T
 }
 
 /**
@@ -555,7 +695,123 @@ function modulesFromAiSuccessEnvelope(payload: unknown): unknown[] {
  */
 export async function listAiModules(): Promise<AiModule[]> {
   const response = await aiClient.get<unknown>('/api/admin/ai/modules')
-  return modulesFromAiSuccessEnvelope(response.data).map(normalizeAiModule)
+  const data = aiEnvelopeData<{ modules?: unknown }>(response.data)
+  if (!Array.isArray(data.modules)) throw new Error('AI 服务未返回模块列表。')
+  return data.modules.map(normalizeAiModule)
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
+}
+
+function optionalText(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+export async function getAiRuntimeStatus(): Promise<AiRuntimeStatus> {
+  const response = await aiClient.get<unknown>('/api/status')
+  const data = asRecord(aiEnvelopeData<unknown>(response.data))
+  return {
+    ready: data.ready === true,
+    modelConfigured: data.model_configured === true,
+    initializationError: optionalText(data.initialization_error),
+  }
+}
+
+export async function getAiKnowledgeStatistics(): Promise<AiKnowledgeStatistics> {
+  const response = await aiClient.get<unknown>('/api/knowledge/statistics')
+  const data = asRecord(aiEnvelopeData<unknown>(response.data))
+  const documentCount = optionalNumber(data.document_count)
+  const chunkCount = optionalNumber(data.chunk_count)
+  if (documentCount === null || chunkCount === null) {
+    throw new Error('AI 服务未返回可用的知识统计。')
+  }
+  return {
+    documentCount,
+    chunkCount,
+    collectionName: optionalText(data.collection_name) ?? '未提供',
+    embeddingModel: optionalText(data.embedding_model) ?? '未提供',
+    vectorDatabase: optionalText(data.vector_database) ?? '未提供',
+    modelConfigured: data.model_configured === true,
+  }
+}
+
+export async function getAiModuleDetail(moduleId: string): Promise<AiModuleDetail> {
+  const response = await aiClient.get<unknown>(`/api/admin/ai/modules/${encodeURIComponent(moduleId)}`)
+  const raw = asRecord(aiEnvelopeData<unknown>(response.data))
+  const base = normalizeAiModule(raw, 0)
+  const actions = Array.isArray(raw.supported_actions)
+    ? raw.supported_actions.filter((item): item is string => typeof item === 'string')
+    : []
+  return {
+    ...base,
+    modelProvider: optionalText(raw.model_provider),
+    modelName: optionalText(raw.model_name),
+    ready: typeof raw.ready === 'boolean' ? raw.ready : null,
+    modelConfigured: typeof raw.model_configured === 'boolean' ? raw.model_configured : null,
+    initializationError: optionalText(raw.initialization_error),
+    knowledgeCount: optionalNumber(raw.knowledge_count),
+    promptVersion: optionalText(raw.prompt_version),
+    promptHash: optionalText(raw.prompt_hash),
+    safePreview: optionalText(raw.safe_preview),
+    metricsScope: optionalText(raw.metrics_scope),
+    callCount: optionalNumber(raw.call_count),
+    successCount: optionalNumber(raw.success_count),
+    errorCount: optionalNumber(raw.error_count),
+    averageLatencyMs: optionalNumber(raw.average_latency_ms),
+    lastCalledAt: optionalText(raw.last_called_at),
+    lastErrorSummary: optionalText(raw.last_error_summary),
+    supportedActions: actions,
+    raw,
+  }
+}
+
+export async function getAiModulePrompt(moduleId: string): Promise<AiPromptMetadata> {
+  const response = await aiClient.get<unknown>(`/api/admin/ai/modules/${encodeURIComponent(moduleId)}/prompt`)
+  const raw = asRecord(aiEnvelopeData<unknown>(response.data))
+  return {
+    moduleId: optionalText(raw.module_id) ?? moduleId,
+    status: optionalText(raw.status),
+    promptVersion: optionalText(raw.prompt_version),
+    promptHash: optionalText(raw.prompt_hash),
+    updatedAt: optionalText(raw.updated_at),
+    sourceType: optionalText(raw.source_type),
+    safePreview: optionalText(raw.safe_preview),
+    raw,
+  }
+}
+
+export async function getAiModuleLatestEvaluation(moduleId: string): Promise<AiLatestEvaluation> {
+  const response = await aiClient.get<unknown>(`/api/admin/ai/modules/${encodeURIComponent(moduleId)}/evaluations/latest`)
+  const raw = asRecord(aiEnvelopeData<unknown>(response.data))
+  const evaluationValue = asRecord(raw.evaluation)
+  const hasEvaluation = raw.evaluation !== null && Object.keys(evaluationValue).length > 0
+  const checksValue = asRecord(evaluationValue.checks)
+  const checks = Object.fromEntries(
+    Object.entries(checksValue).map(([key, value]) => [key, optionalNumber(value)]),
+  )
+  return {
+    moduleId: optionalText(raw.module_id) ?? moduleId,
+    status: optionalText(raw.status) ?? 'UNKNOWN',
+    evaluation: hasEvaluation ? {
+      evaluationId: optionalText(evaluationValue.evaluation_id),
+      executedAt: optionalText(evaluationValue.executed_at),
+      datasetVersion: optionalText(evaluationValue.dataset_version),
+      totalCases: optionalNumber(evaluationValue.total_cases),
+      passedCases: optionalNumber(evaluationValue.passed_cases),
+      passRate: optionalNumber(evaluationValue.pass_rate),
+      checks,
+      failedCaseIds: Array.isArray(evaluationValue.failed_case_ids)
+        ? evaluationValue.failed_case_ids.filter((item): item is string => typeof item === 'string')
+        : [],
+      reportAvailable: evaluationValue.report_available === true,
+    } : null,
+    raw,
+  }
 }
 
 export async function getHealth(): Promise<HealthResponse> {
