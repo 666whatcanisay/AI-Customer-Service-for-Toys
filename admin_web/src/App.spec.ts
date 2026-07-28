@@ -17,7 +17,8 @@ const createTestRouter = () => createRouter({
   routes: [
     '/overview', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
-    '/ai-capabilities', '/ai-optimization-pool', '/system-status', '/imports', '/test-data-packages'
+    '/ai-capabilities', '/ai-optimization-pool', '/knowledge-materials', '/knowledge-quality-pool',
+    '/system-status', '/imports', '/test-data-packages'
   ].map((path) => ({ path, component: { template: '<div>运营页面内容</div>' } }))
 })
 
