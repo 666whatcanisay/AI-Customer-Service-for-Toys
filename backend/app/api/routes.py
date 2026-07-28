@@ -12,6 +12,7 @@ from app.models.chat import (
     ChatRequest,
     ExperienceEvaluationRunRequest,
     FeedbackAnalysisRunRequest,
+    KnowledgeQualityRunRequest,
     ModelConfigUpdate,
     SearchRequest,
 )
@@ -22,6 +23,10 @@ from app.service.experience_evaluation import (
 from app.service.feedback_analysis import (
     FeedbackAnalysisError,
     FeedbackAnalysisService,
+)
+from app.service.knowledge_quality import (
+    KnowledgeQualityError,
+    KnowledgeQualityService,
 )
 from app.service.ai_capability import (
     INITIALIZATION_FAILED_CODE,
@@ -84,6 +89,14 @@ def get_feedback_analysis_service(request: Request) -> FeedbackAnalysisService:
     if service is None:
         service = FeedbackAnalysisService(request.app.state.settings)
         request.app.state.feedback_analysis_service = service
+    return service
+
+
+def get_knowledge_quality_service(request: Request) -> KnowledgeQualityService:
+    service = getattr(request.app.state, "knowledge_quality_service", None)
+    if service is None:
+        service = KnowledgeQualityService(request.app.state.settings)
+        request.app.state.knowledge_quality_service = service
     return service
 
 
@@ -434,6 +447,27 @@ def run_feedback_analysis(
             content=envelope({"code": exc.code}, message=exc.message, success=False),
         )
     return envelope(recorded, message="Feedback analysis recorded")
+
+
+@router.post(
+    "/admin/ai/knowledge-quality/run",
+    tags=["ai-admin"],
+    response_model=None,
+)
+def run_knowledge_quality_analysis(
+    request: Request,
+    analysis_request: KnowledgeQualityRunRequest,
+):
+    """Run a locally initiated analysis for C-approved material snapshots only."""
+    require_loopback_client(request)
+    try:
+        recorded = get_knowledge_quality_service(request).run(analysis_request.maximum)
+    except KnowledgeQualityError as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=envelope({"code": exc.code}, message=exc.message, success=False),
+        )
+    return envelope(recorded, message="Knowledge-quality analysis recorded")
 
 
 @router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])
