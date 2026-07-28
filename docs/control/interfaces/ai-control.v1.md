@@ -161,6 +161,71 @@ Prompt 路由只返回 `prompt_version`、`prompt_hash`、安全预览和规则�
 
 可处理的稳定 A 错误码：`FEEDBACK_ANALYSIS_EXPORT_UNAVAILABLE` (503)、`FEEDBACK_ANALYSIS_SNAPSHOT_INVALID` (422)、`FEEDBACK_ANALYSIS_MODEL_UNAVAILABLE` (503)、`FEEDBACK_ANALYSIS_OUTPUT_INVALID` (422)、`FEEDBACK_ANALYSIS_WRITEBACK_FAILED` (502)。C 只可展示安全提示和重试建议。
 
+### 4.6 AI 控制中心总览（C → A，只读）
+
+`GET /ai-api/api/admin/ai/control-center/overview`
+
+这是供 5174 的“AI 控制中心”读取的聚合投影；它只汇总 A 已有的真实运行状态、可查询知识数量、进程启动后的调用指标和最近一次已保存评测。它**不**查询或返回客户问题、回答、检索正文、来源文本、完整 Prompt、密钥、异常堆栈或本机路径。
+
+成功结果仍使用 A success envelope，`data` 的冻结形状如下：
+
+```json
+{
+  "module_id": "ai_customer_service",
+  "service": {
+    "status": "RUNNING",
+    "ready": true,
+    "model_configured": true,
+    "initialization_error": null
+  },
+  "model": {
+    "provider": "ollama",
+    "name": "qwen3.5:9b",
+    "configured": true
+  },
+  "knowledge": {
+    "status": "AVAILABLE",
+    "queryable_chunk_count": 47,
+    "scope": "LIVE_QUERYABLE_COLLECTIONS"
+  },
+  "runtime": {
+    "metrics_scope": "since_start",
+    "call_count": 12,
+    "success_count": 11,
+    "error_count": 1,
+    "average_latency_ms": 836.4,
+    "last_called_at": "2026-07-28T00:00:00+00:00",
+    "last_error_summary": "MODEL_UNAVAILABLE"
+  },
+  "latest_evaluation": {
+    "status": "AVAILABLE",
+    "evaluation": {
+      "executed_at": "2026-07-28T00:00:00+00:00",
+      "dataset_version": "...",
+      "total_cases": 28,
+      "passed_cases": 26,
+      "pass_rate": 92.9
+    }
+  },
+  "technical": {
+    "prompt_version": "rag-customer-reply-v1",
+    "prompt_hash": "..."
+  }
+}
+```
+
+字段规则：
+
+* `service.status` 只允许 `RUNNING`、`PAUSED`、`ERROR`；`ready=false` 或 `configured=false` 不能在 C 中显示为“可用”。
+* `knowledge.status` 只允许 `AVAILABLE`、`UNAVAILABLE`；数量为 `null` 时必须显示“暂无法读取”，不得伪造 `0`。
+* `queryable_chunk_count` 是当前 A 实际检索路径可查询的集合数量，不是历史同步次数，也不代表 C 的资料已经自动发布。
+* `runtime.metrics_scope` 只允许 `since_start`、`NOT_AVAILABLE`。它不是客服绩效或历史运营报表；C 不得据此评价个人。
+* `latest_evaluation.status` 只允许 `AVAILABLE`、`NOT_AVAILABLE`。无保存评测时 `evaluation=null`，不是评测失败。
+* `latest_evaluation.evaluation.pass_rate` 是兼容性数值：`0..1` 表示比例（例如 `0.6786` 为 67.86%），大于 `1` 的值表示百分数。Consumer 只能在展示层将比例乘以 100，不得改写 API 原值或据此推断未提供的评测结论。
+* `technical` 只能在 C 的默认折叠“技术详情”中显示；哈希仅用于版本核对，不能作为内容读取入口。
+
+稳定错误码：A 未就绪时返回 `AI_CONTROL_NOT_READY`（503）；C 应显示“AI 服务尚未就绪，请先检查服务状态”，保留 C 自身页面可用，不能回退为虚构统计或 Demo 数据。
+
 ## 5. 状态与幂等
 
 本控制面不拥有业务状态机：
@@ -183,8 +248,8 @@ Prompt 路由只返回 `prompt_version`、`prompt_hash`、安全预览和规则�
 | 线路 | 允许责任 | 禁止事项 |
 | --- | --- | --- |
 | A | 提供真实模块、受限元数据、显式测试和受控 C→A→C 分析 | 不能自动轮询、自动改 Prompt/知识/模型或执行客户业务 |
-| C | 通过同源代理解包 A envelope，展示真实状态和受控操作结果 | 不能伪造模块、扩大代理为任意转发，不能绕过 A loopback 保护 |
-| B | 不消费本控制面 | 不依赖 Admin 技术状态承担客服流程 |
+| C | 通过同源代理解包 A envelope，展示真实状态、资料质量、问题摘要和受控操作结果 | 不能伪造模块、扩大代理为任意转发，不能绕过 A loopback 保护 |
+| B | 继续消费紧凑的客服资料状态，不消费 A 控制面 | 不依赖 Admin 技术状态承担客服流程，也不展示模型/Prompt/诊断信息 |
 | OPS | 保持 A `127.0.0.1:8000` 与 Admin `127.0.0.1:5174` 的本机边界，记录版本和受管 PID | 不能暴露 A/Admin 到 LAN 或关闭防火墙 |
 
 ## 8. 验收与已知限制
@@ -198,3 +263,5 @@ Prompt 路由只返回 `prompt_version`、`prompt_hash`、安全预览和规则�
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
 | v1 | 2026-07-27 | 首次冻结：根据 A 已实现 envelope、模块状态和反馈分析路径定义 C Admin Consumer 边界；记录 `data.modules` 解包要求。 |
+| v1.1 | 2026-07-28 | 新增只读控制中心总览投影。A 只聚合真实且无内容的运行数据；C 展示业务摘要并将技术字段默认折叠；B 不接入该控制面。 |
+| v1.2 | 2026-07-28 | 明确既有 `pass_rate` 的兼容展示语义：比例值由 Consumer 仅在显示层转换为百分数；不改变 Provider 原值或 API 形状。 |

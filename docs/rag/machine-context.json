@@ -5,12 +5,12 @@
   "line": "A",
   "version": "0.3.1-test",
   "status": "source_fixed_runtime_restart_pending",
-  "current_task": "V12.1 A internal-pilot status accuracy and browser-safe initialization errors",
-  "next_recommended_task": "After review/merge, use the formal OPS restart and verify A reports 47 queryable knowledge chunks. Only then, with an isolated C service and one human-confirmed de-identified ANALYZING snapshot, run the explicit C-read/qwen/writeback/idempotency test. Do not auto-merge.",
-  "current_stage": "A preserves the existing control envelope and feedback consumer. Knowledge projections now aggregate primary and frozen test collections; initialization failures expose only a stable safe code.",
-  "current_gate": "A V12.1 source gate is PASS: focused API/parser tests are 27 passed, full pytest backend is 79 passed and 3 opt-in real integration tests are skipped. A synthetic local qwen smoke passed without reading or writing C. The currently running pre-fix instance still projects 0 knowledge chunks; formal restart verification, real C feedback analysis and the historical A-T03 19/28 data-quality gate remain separate.",
-  "last_test_result": "2026-07-27: focused API/parser tests 27 passed; full pytest backend 79 passed, 3 skipped, 32 warnings; local qwen3.5:9b synthetic smoke returned a 776-character JSON object with five assessment keys and one bounded suggestion. A runtime read-only audit found ready=true, model_configured=true, and a pre-fix zero knowledge projection. C badcase export returned zero candidates; raw feedback was not emitted or persisted.",
-  "blockers": ["An isolated reachable C feedback service URL and one human-confirmed, de-identified ANALYZING feedback snapshot with a final_answer are required before this task can make a real cross-service claim."],
+  "current_task": "TARGET MODE V2 A controlled knowledge-material quality analysis",
+  "next_recommended_task": "After the C knowledge-quality provider is available, use an isolated C service with one human-approved de-identified APPROVED_FOR_ANALYSIS material snapshot to run the explicit C-read/qwen/writeback trace. Verify its new revision and analysis evidence in C; do not auto-publish it to RAG or auto-merge.",
+  "current_stage": "A preserves existing RAG and feedback consumers and adds a separate explicit knowledge-material quality consumer. It accepts only frozen C HTTP snapshots, calls the configured local qwen3.5:9b, and returns structured evidence to C without storing source material.",
+  "current_gate": "A controlled knowledge-quality source and isolated cross-service gate are PASS: focused tests and full backend regression pass, and a human-approved de-identified C snapshot completed C → A → local qwen3.5:9b → C with C recording ANALYZED. This does not change the separate historical A-T03 or feedback-analysis gates and does not publish material to RAG.",
+  "last_test_result": "2026-07-28: focused knowledge-quality bridge tests 13 passed; full pytest backend 92 passed, 3 opt-in integration tests skipped, 34 existing warnings. A accepted C's bounded multiline approved summary, ran real qwen3.5:9b, and C recorded the traceable material assessment as overall_status=ANALYZED. No source text, model raw output, or prompt was emitted.",
+  "blockers": [],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
     "Frozen rag-export omits or conflicts with required facts for CASE 007, 011, 019, 020, 023 and 027",
@@ -42,6 +42,7 @@
     "backend/app/service/ai_capability.py",
     "backend/app/service/experience_evaluation.py",
     "backend/app/service/feedback_analysis.py",
+    "backend/app/service/knowledge_quality.py",
     "backend/app/api/routes.py",
     "backend/app/models/chat.py"
   ],
@@ -56,6 +57,7 @@
   ],
   "test_commands": [
     "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
+    "python -m pytest backend/tests/test_knowledge_quality.py -q",
     "source read-only venv python -m pytest backend -q",
     "RUN_REAL_FEEDBACK_ANALYSIS_E2E=1 with an isolated C service and human-confirmed de-identified feedback python -m pytest backend/tests/test_real_feedback_analysis_e2e.py -q -s",
     "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
@@ -74,7 +76,8 @@
     "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
     "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
     "NIGHT-SHIFT A P1 bounded feedback-analysis JSON parsing and synthetic local qwen smoke",
-    "V12.1 A combined knowledge-count projection and browser-safe initialization error normalization"
+    "V12.1 A combined knowledge-count projection and browser-safe initialization error normalization",
+    "TARGET MODE V2 explicit C-approved material quality-analysis consumer (real C provider integration pending)"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -82,7 +85,9 @@
     "GET C /api/v1/admin/ai-optimization/cases/export approved immutable snapshots",
     "POST C /api/v1/admin/ai-optimization/evaluation-results traceable evaluation evidence",
     "GET C /api/v1/admin/ai-quality/badcases frozen manually confirmed feedback snapshots",
-    "POST C /api/v1/admin/ai-quality/analysis-results immutable feedback analysis evidence"
+    "POST C /api/v1/admin/ai-quality/analysis-results immutable feedback analysis evidence",
+    "GET C /api/v1/admin/knowledge-quality/analysis-inputs approved immutable material snapshots",
+    "POST C /api/v1/admin/knowledge-quality/analysis-results traceable material quality evidence"
   ],
   "provided_interfaces": [
     "POST /api/chat with frozen question/context and data response",
@@ -97,7 +102,8 @@
     "POST /api/admin/ai/modules/{module_id}/test",
     "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
     "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
-    "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis"
+    "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
+    "POST /api/admin/ai/knowledge-quality/run explicit loopback-only knowledge-material analysis"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }
