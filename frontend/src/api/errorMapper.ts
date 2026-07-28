@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { CustomerKnowledgeStatusAdapterError } from './customerKnowledgeStatusAdapter'
 import { RagAdapterError } from './ragAdapter'
 import { PlatformAdapterError } from './platformAdapter'
 
@@ -51,6 +52,24 @@ export class AiResponseFeedbackClientError extends Error {
   ) {
     super(message)
     this.name = 'AiResponseFeedbackClientError'
+  }
+}
+
+export type CustomerKnowledgeStatusErrorKind =
+  | 'canceled'
+  | 'timeout'
+  | 'unavailable'
+  | 'contract'
+  | 'unknown'
+
+export class CustomerKnowledgeStatusClientError extends Error {
+  constructor(
+    public readonly kind: CustomerKnowledgeStatusErrorKind,
+    message: string,
+    public readonly status: number | null = null
+  ) {
+    super(message)
+    this.name = 'CustomerKnowledgeStatusClientError'
   }
 }
 
@@ -184,5 +203,54 @@ export const toAiResponseFeedbackClientError = (error: unknown): AiResponseFeedb
   return new AiResponseFeedbackClientError(
     'unknown',
     error instanceof Error ? error.message : 'AI 问题反馈服务发生未知错误'
+  )
+}
+
+// The customer workbench intentionally never exposes a platform error body,
+// raw material details, or contract diagnostics. All status-query failures are
+// mapped to a single actionable, non-blocking message.
+export const toCustomerKnowledgeStatusClientError = (
+  error: unknown
+): CustomerKnowledgeStatusClientError => {
+  if (error instanceof CustomerKnowledgeStatusClientError) return error
+  if (error instanceof CustomerKnowledgeStatusAdapterError) {
+    return new CustomerKnowledgeStatusClientError(
+      'contract',
+      '无法获取资料状态，可继续咨询。'
+    )
+  }
+  if (axios.isCancel(error)) {
+    return new CustomerKnowledgeStatusClientError(
+      'canceled',
+      '无法获取资料状态，可继续咨询。'
+    )
+  }
+
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status ?? null
+    if (error.code === 'ECONNABORTED') {
+      return new CustomerKnowledgeStatusClientError(
+        'timeout',
+        '无法获取资料状态，可继续咨询。',
+        status
+      )
+    }
+    if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
+      return new CustomerKnowledgeStatusClientError(
+        'unavailable',
+        '无法获取资料状态，可继续咨询。',
+        status
+      )
+    }
+    return new CustomerKnowledgeStatusClientError(
+      'unknown',
+      '无法获取资料状态，可继续咨询。',
+      status
+    )
+  }
+
+  return new CustomerKnowledgeStatusClientError(
+    'unknown',
+    '无法获取资料状态，可继续咨询。'
   )
 }
