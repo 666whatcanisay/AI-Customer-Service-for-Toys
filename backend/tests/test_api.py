@@ -421,3 +421,142 @@ def test_ai_admin_returns_not_available_when_no_real_evaluation_is_saved(api_cli
         "status": "NOT_AVAILABLE",
         "evaluation": None,
     }
+
+
+def test_ai_control_center_overview_projects_real_safe_runtime_state(api_client):
+    client, _ = api_client
+
+    response = client.get("/api/admin/ai/control-center/overview")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["module_id"] == "ai_customer_service"
+    assert data["service"] == {
+        "status": "RUNNING",
+        "ready": True,
+        "model_configured": False,
+        "initialization_error": None,
+    }
+    assert data["model"] == {
+        "provider": "bailian",
+        "name": "qwen-turbo",
+        "configured": False,
+    }
+    assert data["knowledge"] == {
+        "status": "AVAILABLE",
+        "queryable_chunk_count": 2,
+        "scope": "LIVE_QUERYABLE_COLLECTIONS",
+    }
+    assert data["runtime"] == {
+        "metrics_scope": "since_start",
+        "call_count": 0,
+        "success_count": 0,
+        "error_count": 0,
+        "average_latency_ms": 0.0,
+        "last_called_at": None,
+        "last_error_summary": None,
+    }
+    assert data["latest_evaluation"] == {
+        "status": "NOT_AVAILABLE",
+        "evaluation": None,
+    }
+    assert set(data["technical"]) == {"prompt_version", "prompt_hash"}
+    assert "PROMPT_SYSTEM_MESSAGE" not in response.text
+    assert "vector_db" not in response.text
+
+
+def test_ai_control_center_overview_marks_knowledge_as_unavailable(api_client):
+    client, _ = api_client
+    rag = client.app.state.rag_service
+    original_stats = rag.vector_store.get_collection_stats
+
+    def unavailable_stats():
+        raise RuntimeError("private collection failure")
+
+    rag.vector_store.get_collection_stats = unavailable_stats
+    try:
+        response = client.get("/api/admin/ai/control-center/overview")
+    finally:
+        rag.vector_store.get_collection_stats = original_stats
+
+    assert response.status_code == 200
+    assert response.json()["data"]["knowledge"] == {
+        "status": "UNAVAILABLE",
+        "queryable_chunk_count": None,
+        "scope": "LIVE_QUERYABLE_COLLECTIONS",
+    }
+    assert "private collection failure" not in response.text
+
+
+def test_ai_control_center_overview_selects_safe_latest_evaluation_fields(
+    api_client,
+):
+    client, vector_path = api_client
+    report_path = (
+        Path(vector_path).parent
+        / "docs"
+        / "rag"
+        / "evaluations"
+        / "real-evaluation"
+        / "a-t03-evaluation.json"
+    )
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(
+        """{
+  "evidence_mode": "live_c_api",
+  "executed_at": "2026-07-28T00:00:00+00:00",
+  "dataset_version": "V0.3.1",
+  "total": 28,
+  "passed": 26,
+  "pass_rate": 92.9,
+  "records": [{"case_id": "CASE-private", "passed": false}]
+}""",
+        encoding="utf-8",
+    )
+
+    response = client.get("/api/admin/ai/control-center/overview")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["latest_evaluation"] == {
+        "status": "AVAILABLE",
+        "evaluation": {
+            "executed_at": "2026-07-28T00:00:00+00:00",
+            "dataset_version": "V0.3.1",
+            "total_cases": 28,
+            "passed_cases": 26,
+            "pass_rate": 92.9,
+        },
+    }
+    assert "CASE-private" not in response.text
+    assert str(Path(vector_path).parent) not in response.text
+
+
+def test_ai_control_center_overview_returns_stable_not_ready_code(tmp_path: Path):
+    settings = replace(
+        Settings.from_env(),
+        backend_root=tmp_path,
+        project_root=tmp_path,
+        knowledge_base_path=tmp_path / "knowledge_base",
+        vector_db_path=tmp_path / "vector_db",
+        log_dir=tmp_path / "logs",
+    )
+    private_failure = r"C:\\private-runtime\\control-center-token"
+
+    def failing_factory(_settings):
+        raise RuntimeError(private_failure)
+
+    app = create_app(settings=settings, rag_factory=failing_factory)
+    with TestClient(app) as client:
+        for _ in range(100):
+            if client.get("/api/status").json()["data"]["initialization_error"]:
+                break
+            time.sleep(0.01)
+        response = client.get("/api/admin/ai/control-center/overview")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "success": False,
+        "message": "AI control center is not ready.",
+        "data": {"code": "AI_CONTROL_NOT_READY"},
+    }
+    assert private_failure not in response.text

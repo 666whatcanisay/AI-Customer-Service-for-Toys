@@ -32,6 +32,7 @@ from app.service.ai_capability import (
     INITIALIZATION_FAILED_CODE,
     MODULE_DEFINITIONS,
     MODULES_BY_ID,
+    control_center_overview,
     customer_service_detail,
     knowledge_collection_counts,
     latest_evaluation,
@@ -192,6 +193,18 @@ def module_not_ready_response(module_id: str) -> JSONResponse:
         content=envelope(
             {"code": "AI_MODULE_NOT_READY", "module_id": module_id},
             message="AI module is not ready for an online test.",
+            success=False,
+        ),
+    )
+
+
+def ai_control_not_ready_response() -> JSONResponse:
+    """Return the frozen safe failure without exposing initialization details."""
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=envelope(
+            {"code": "AI_CONTROL_NOT_READY"},
+            message="AI control center is not ready.",
             success=False,
         ),
     )
@@ -494,6 +507,14 @@ def get_latest_ai_module_evaluation(
             ),
         }
     )
+
+
+@router.get("/admin/ai/control-center/overview", tags=["ai-admin"])
+def get_ai_control_center_overview(request: Request):
+    """Return the frozen, read-only AI control-center aggregate projection."""
+    if not customer_service_detail(request.app)["ready"]:
+        return ai_control_not_ready_response()
+    return envelope(control_center_overview(request.app))
 
 
 @router.get("/ai/status", tags=["compatibility"])
