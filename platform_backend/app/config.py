@@ -63,6 +63,8 @@ class Settings:
     max_test_package_entries: int
     max_test_package_uncompressed_bytes: int
     max_test_package_single_file_bytes: int
+    max_knowledge_material_upload_bytes: int
+    knowledge_material_storage_dir: str
 
 
 @lru_cache
@@ -87,5 +89,11 @@ def get_settings() -> Settings:
         ),
         max_test_package_single_file_bytes=int(
             os.getenv("PLATFORM_MAX_TEST_PACKAGE_SINGLE_FILE_BYTES", str(20 * 1024 * 1024))
+        ),
+        max_knowledge_material_upload_bytes=int(
+            os.getenv("PLATFORM_MAX_KNOWLEDGE_MATERIAL_UPLOAD_BYTES", str(5 * 1024 * 1024))
+        ),
+        knowledge_material_storage_dir=os.getenv(
+            "PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR", "./.runtime/knowledge-materials"
         ),
     )

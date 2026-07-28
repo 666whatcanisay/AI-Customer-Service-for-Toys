@@ -18,6 +18,17 @@ const STATUS_LABELS: Record<string, string> = {
   WRITEBACK_REJECTED: '回写未通过',
   ANALYZING: '分析中',
   ANALYZED: '已完成分析',
+  APPROVED_FOR_ANALYSIS: '已审核，待分析',
+  ANALYSIS_FAILED: '分析未完成',
+  RECOGNIZED: '已识别，待审核',
+  OPEN: '待补充',
+  ACKNOWLEDGED: '已知悉',
+  RESOLVED: '已修复',
+  DISMISSED: '不适用',
+  PRODUCT_SPEC: '商品规格',
+  SAFETY_INSTRUCTION: '安全说明',
+  ASSEMBLY_GUIDE: '拼装说明',
+  FAQ_SOURCE: '问答资料',
   FACT_ERROR: '事实错误',
   MISSING_INFO: '信息缺失',
   STYLE_ISSUE: '表达问题',
@@ -55,4 +66,14 @@ const STATUS_LABELS: Record<string, string> = {
 export function displayStatus(value: string | null | undefined, empty = '未设置'): string {
   if (!value) return empty
   return STATUS_LABELS[value] || value
+}
+
+/**
+ * A providers may serialize a pass rate as a fraction (0..1) or as an
+ * already-percent value. Keep the transport value unchanged and normalize
+ * only its operator-facing label.
+ */
+export function displayPassRate(value: number): string {
+  const percentage = value >= 0 && value <= 1 ? value * 100 : value
+  return `${Number(percentage.toFixed(2))}%`
 }
