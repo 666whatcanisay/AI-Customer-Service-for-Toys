@@ -39,7 +39,7 @@ onMounted(load)
 
     <section class="card">
       <p v-if="loading" class="notice" role="status">正在加载批次…</p>
-      <p v-else-if="error" class="notice error" role="alert">暂时无法读取同步记录。{{ error }}</p>
+      <p v-else-if="error" class="notice error" role="alert"><strong>数据加载失败</strong><br />原因：{{ error }}<br />建议下一步：检查服务状态后重试。</p>
       <p v-else-if="batches.length === 0" class="notice">待启用：尚无数据同步记录。请先同步商品数据。</p>
       <div v-else class="table-wrap">
         <table class="data-table">

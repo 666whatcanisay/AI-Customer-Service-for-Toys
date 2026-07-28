@@ -57,6 +57,17 @@ const dashboardCards = computed(() => {
   ]
 })
 
+const nextSteps = computed(() => {
+  const knowledge = operations.value?.knowledge
+  const queue = operations.value?.work_queue
+  return [
+    { label: '补商品资料', detail: !knowledge ? '知识统计待启用' : knowledge.product_count === 0 ? '样本不足：尚未导入商品' : `当前已记录 ${knowledge.product_count} 个商品`, to: '/imports/new' },
+    { label: '补 FAQ', detail: !knowledge ? '知识统计待启用' : knowledge.faq_count === 0 ? '样本不足：尚未维护 FAQ' : `当前已记录 ${knowledge.faq_count} 条 FAQ`, to: '/faqs' },
+    { label: '审核案例', detail: queue ? (queue.pending_experience_review_count === 0 ? '暂无待审核案例' : `${queue.pending_experience_review_count} 个案例待审核`) : '待读取待办数据', to: '/experience-cases' },
+    { label: '处理 AI 问题', detail: queue ? (queue.pending_ai_analysis_count === 0 ? '暂无待分析问题' : `${queue.pending_ai_analysis_count} 个问题待分析`) : '待读取待办数据', to: '/ai-feedback-optimization-pool' },
+  ]
+})
+
 const windowLabel = computed(() => {
   const today = operations.value?.today
   return today ? `统计窗口（UTC）：${shortTime(today.window_start)} 至 ${shortTime(today.window_end)}` : '统计窗口：待启用'
@@ -104,7 +115,7 @@ onMounted(load)
     </div>
 
     <p class="notice trial-note">当前数据用于测试/试运行观察，不是正式运营报表。{{ windowLabel }}</p>
-    <p v-if="error" class="notice error" role="alert">运营概览待启用：{{ error }}。服务状态仍会独立展示。</p>
+    <p v-if="error" class="notice error" role="alert"><strong>数据加载失败</strong><br />原因：{{ error }}<br />建议下一步：检查服务状态后刷新；已连接的数据仍会独立展示。</p>
 
     <section class="dashboard-grid" aria-label="今日运营状态">
       <RouterLink v-for="card in dashboardCards" :key="card.label" class="status-card" :to="card.to">
@@ -138,6 +149,11 @@ onMounted(load)
       </article>
     </section>
 
+    <section class="card next-step-card">
+      <div class="section-heading"><div><h2>下一步建议</h2><p>根据当前真实数据给出运营入口；没有待办时会明确显示，不伪造任务。</p></div></div>
+      <div class="next-step-grid"><RouterLink v-for="step in nextSteps" :key="step.label" :to="step.to"><strong>{{ step.label }}</strong><span>{{ step.detail }}</span><small>进入处理</small></RouterLink></div>
+    </section>
+
     <section class="card multi-store-card">
       <div class="section-heading"><div><h2>多店铺准备状态</h2><p>试运行店铺遵循创建、目标绑定导入、知识维护、观察的受控流程。</p></div><RouterLink to="/store-center">进入店铺中心</RouterLink></div>
       <p v-if="pilotStoreState === 'unavailable'" class="notice compact">待启用：未读取到试运行店铺状态。</p>
@@ -154,4 +170,10 @@ onMounted(load)
 
 <style scoped>
 .trial-note { margin-bottom: 20px; color: #76580e; background: #fff8df; }.dashboard-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }.status-card { display: grid; min-height: 151px; align-content: start; gap: 9px; padding: 18px; border: 1px solid #dfe7f2; border-radius: 13px; color: #475569; background: #fff; box-shadow: 0 9px 24px rgb(15 23 42 / 4%); text-decoration: none; transition: border-color .15s ease, transform .15s ease; }.status-card:hover { border-color: #86a8d6; transform: translateY(-1px); }.status-card strong { color: #172554; font-size: 21px; }.status-card small { color: #64748b; line-height: 1.45; }.operations-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 18px; }.section-heading { display: flex; justify-content: space-between; gap: 15px; }.section-heading h2, .operating-note h2 { margin: 0 0 4px; color: #172554; font-size: 18px; }.section-heading p, .subtle, .operating-note p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.55; }.section-heading a { color: #285493; font-size: 13px; white-space: nowrap; }.work-list { display: grid; gap: 9px; margin-top: 17px; }.work-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 11px; border-radius: 9px; color: inherit; background: #f6f8fc; text-decoration: none; }.work-list a:hover { background: #eef4ff; }.work-list span { color: #475569; font-size: 13px; }.work-list strong { grid-row: span 2; align-self: center; color: #172554; font-size: 20px; }.work-list small { color: #64748b; font-size: 12px; }.knowledge-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 18px; }.knowledge-metrics div, .store-summary div { padding: 11px; border-radius: 9px; background: #f6f8fc; }.knowledge-metrics span, .store-summary span { display: block; color: #64748b; font-size: 12px; }.knowledge-metrics strong, .store-summary strong { display: block; margin-top: 4px; color: #172554; font-size: 20px; }.subtle { margin-top: 13px; }.compact { margin: 18px 0 0; }.multi-store-card, .operating-note { margin-top: 18px; }.store-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 18px; }.operating-note p { max-width: 900px; }@media (max-width: 1100px) { .dashboard-grid { grid-template-columns: repeat(3, 1fr); }.knowledge-metrics { grid-template-columns: repeat(3, 1fr); } }@media (max-width: 760px) { .dashboard-grid, .operations-grid { grid-template-columns: 1fr; }.knowledge-metrics, .store-summary { grid-template-columns: repeat(2, 1fr); } }
+.next-step-card { margin-top: 18px; }
+.next-step-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.next-step-grid a { display: grid; gap: 7px; padding: 13px; border-radius: 9px; color: inherit; background: #f6f8fc; text-decoration: none; }
+.next-step-grid a:hover { background: #eef4ff; }.next-step-grid strong { color: #172554; }.next-step-grid span { color: #64748b; font-size: 13px; line-height: 1.45; }.next-step-grid small { color: #285493; font-size: 12px; }
+@media (max-width: 1100px) { .next-step-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .next-step-grid { grid-template-columns: 1fr; } }
 </style>

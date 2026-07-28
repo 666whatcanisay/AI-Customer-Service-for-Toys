@@ -10,6 +10,8 @@ import CustomerSuggestionsView from '../views/CustomerSuggestionsView.vue'
 import CustomerExperienceCasesView from '../views/CustomerExperienceCasesView.vue'
 import AiOptimizationPoolView from '../views/AiOptimizationPoolView.vue'
 import AiFeedbackOptimizationPoolView from '../views/AiFeedbackOptimizationPoolView.vue'
+import AiImprovementSuggestionsView from '../views/AiImprovementSuggestionsView.vue'
+import AiControlCenterView from '../views/AiControlCenterView.vue'
 import CustomerEfficiencyDashboardView from '../views/CustomerEfficiencyDashboardView.vue'
 import PilotStoreCenterView from '../views/PilotStoreCenterView.vue'
 import TrialGovernanceView from '../views/TrialGovernanceView.vue'
@@ -22,6 +24,7 @@ export const router = createRouter({
   routes: [
     { path: '/', redirect: '/overview' },
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
+    { path: '/ai-control-center', name: 'ai-control-center', component: AiControlCenterView },
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
     { path: '/store-center', name: 'store-center', component: PilotStoreCenterView },
     { path: '/trial-governance', name: 'trial-governance', component: TrialGovernanceView },
@@ -79,6 +82,7 @@ export const router = createRouter({
     { path: '/experience-cases', name: 'experience-cases', component: CustomerExperienceCasesView },
     { path: '/ai-optimization-pool', name: 'ai-optimization-pool', component: AiOptimizationPoolView },
     { path: '/ai-feedback-optimization-pool', name: 'ai-feedback-optimization-pool', component: AiFeedbackOptimizationPoolView },
+    { path: '/ai-improvement-suggestions', name: 'ai-improvement-suggestions', component: AiImprovementSuggestionsView },
     { path: '/customer-efficiency', name: 'customer-efficiency', component: CustomerEfficiencyDashboardView },
     {
       path: '/system-status',

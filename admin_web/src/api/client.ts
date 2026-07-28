@@ -70,6 +70,10 @@ export interface ProductSkuPreflight {
   file_size_bytes: number
   worksheets: string[]
   data_row_count: number
+  recognized_product_count: number
+  recognized_sku_count: number
+  rows_needing_manual_completion: number
+  missing_field_counts: Record<string, number>
   valid_rows: number
   invalid_rows: number
   duplicate_rows: number
