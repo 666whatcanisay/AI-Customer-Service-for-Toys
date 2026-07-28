@@ -80,12 +80,19 @@ onMounted(load)
     <p v-if="loading" class="notice" role="status">正在加载…</p>
     <p v-else-if="error" class="notice error" role="alert">暂时无法读取{{ title }}。{{ error }}</p>
     <p v-else-if="rows.length === 0" class="notice">暂无符合当前筛选条件的{{ title }}。请调整筛选条件，或先完成数据导入与审核。</p>
-    <div v-else class="card table-wrap">
-      <table class="data-table">
+    <div v-else class="card table-wrap readonly-table-wrap">
+      <table class="data-table readonly-list-table" :class="{ 'source-table': resource === 'sources' }">
         <thead><tr><th v-for="column in columns" :key="column.key">{{ column.label }}</th></tr></thead>
         <tbody>
           <tr v-for="row in rows" :key="value(row, columns[0]?.key || 'id')">
-            <td v-for="column in columns" :key="column.key">
+            <td
+              v-for="column in columns"
+              :key="column.key"
+              :class="{
+                'source-file-cell': resource === 'sources' && column.key === 'file_name',
+                'source-hash-cell': resource === 'sources' && column.key === 'file_sha256',
+              }"
+            >
               <RouterLink v-if="resource === 'products' && column.key === 'product_id'" :to="`/products/${encodeURIComponent(value(row, column.key))}`">{{ value(row, column.key) }}</RouterLink>
               <span v-else>{{ value(row, column.key) }}</span>
             </td>
@@ -105,5 +112,14 @@ onMounted(load)
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 20px; padding: 16px; }
 label { display: grid; gap: 5px; color: #526279; font-size: 13px; }
 input { min-height: 38px; min-width: 130px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 7px; font: inherit; }
+.readonly-table-wrap { max-width: 100%; overflow-x: auto; }
+.source-table { table-layout: fixed; }
+.source-table th:nth-child(1) { width: 15%; }
+.source-table th:nth-child(2) { width: 24%; }
+.source-table th:nth-child(3) { width: 34%; }
+.source-table th:nth-child(4) { width: 17%; }
+.source-table th:nth-child(5) { width: 10%; }
+.source-file-cell, .source-hash-cell { overflow-wrap: anywhere; word-break: break-word; }
+.source-hash-cell { color: #33445c; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 20px; }
 </style>

@@ -38,4 +38,39 @@ describe('ReadonlyListView', () => {
 
     expect(wrapper.find('p.notice').exists()).toBe(true)
   })
+
+  it('keeps source filenames and checksums in controlled table cells', async () => {
+    mockedList.mockResolvedValue({
+      items: [{
+        source_type: 'PRODUCT_IMAGE',
+        file_name: '汕明_812580876528_商品参数_G1005.png',
+        file_sha256: '66850eb1a594e3f408566711382f7139daa474abb696112b483b80d8796387',
+        product_id: 'PDD-SM-P0001',
+        sku_id: null,
+      }],
+      page: 1,
+      size: 20,
+      total: 1,
+    })
+    const wrapper = mount(ReadonlyListView, {
+      props: {
+        resource: 'sources',
+        title: '知识来源',
+        description: '只读来源元数据。',
+        columns: [
+          { key: 'source_type', label: '类型' },
+          { key: 'file_name', label: '文件' },
+          { key: 'file_sha256', label: '校验值' },
+          { key: 'product_id', label: '商品' },
+          { key: 'sku_id', label: 'SKU' },
+        ],
+      },
+      global: { stubs: { RouterLink: routerLink } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('table').classes()).toContain('source-table')
+    expect(wrapper.find('.source-file-cell').text()).toContain('汕明_812580876528_商品参数_G1005.png')
+    expect(wrapper.find('.source-hash-cell').text()).toContain('66850eb1a594e3f408566711382f7139daa474abb696112b483b80d8796387')
+  })
 })
