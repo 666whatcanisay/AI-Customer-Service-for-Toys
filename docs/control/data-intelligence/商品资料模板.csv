@@ -1,0 +1,2 @@
+store_code,product_id,sku_id,material_type,display_name,适用年龄,安全提示,包装清单,拼装说明,常见问答,资料来源,维护人,检查备注
+PDD-SM,PRODUCT-EXAMPLE-001,SKU-EXAMPLE-001,PRODUCT_SPEC,示例积木产品资料,6-12岁,含小颗粒，不适合3岁以下儿童；建议成人陪同,积木颗粒；说明书；贴纸,请按说明书步骤拼装；先分类零件,问：适合几岁？答：建议6-12岁并由成人陪同,商品包装与已审核说明书,运营示例,示例行，上传前请替换全部示例内容

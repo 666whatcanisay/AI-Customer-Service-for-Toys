@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "pilot_candidate_ready",
-  "current_task": "CONTROL-INTERNAL-PILOT-READY-NIGHT V12.1",
-  "current_stage": "Current deployed isolation baseline is origin/develop f5fccfd. A #61, C/Data #59 and OPS #60 are independently tested Draft candidates; B verified without a source change. Browser and UTF-8 proxy smoke prove the existing customer workflow, but candidate fixes are not deployed until reviewed and merged.",
-  "current_gate": "PILOT_CANDIDATE_READY: merge and formally restart #61/#59/#60, then verify live (not historical) A knowledge statistics. INTERNAL_PILOT_READY additionally requires an administrator-authorized current-subnet Private TCP 5173 rule and a second controlled customer-computer TCP/browser acceptance. Do not expose 8000, 8011 or 5174.",
+  "status": "target_mode_v2_candidate_ready",
+  "current_task": "CONTROL-AI-DATA-INTELLIGENCE-PLATFORM-V1",
+  "current_stage": "knowledge-quality-loop.v1 candidate delivery is complete and isolated C→A(qwen3.5:9b)→C→B integration has been recorded. C owns controlled material intake/revisions/review/results; A consumes only approved immutable snapshots through a manual operator trigger; B consumes only a compact customer-safe status projection. Candidate PRs remain unmerged and undeployed.",
+  "current_gate": "TARGET_MODE_READY_CANDIDATE: implementation and isolated integration are complete within the frozen v1 state machine. Merge/deployment and a separate RAG publication lifecycle require explicit authorization. No automatic RAG publication, Prompt/model change, training, messaging, after-sales, refund, order or ERP action is authorized.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
@@ -139,5 +139,5 @@
     "Customer-efficiency.v1 is interface-blocked: C PR #37 uses DIRECT_ADOPTION/EDITED_ADOPTION/NOT_ADOPTED and a reduced payload, while frozen B fields are AI_DIRECT_ADOPT/AI_EDIT_ADOPT/AI_REJECT with required correlation and privacy fields. PRs #37/#38/#39 and C descendants #43/#44/#47/#50 remain unmerged.",
     "PR #32 is stale, PR #33 is DIRTY, and PR #42 conflicts with the cumulative B/UI chain and crosses A/B ownership. They require separate review rather than forced baseline inclusion."
   ],
-  "last_updated": "2026-07-27"
+  "last_updated": "2026-07-28"
 }
