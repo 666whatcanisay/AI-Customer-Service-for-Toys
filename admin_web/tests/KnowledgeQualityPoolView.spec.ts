@@ -2,17 +2,23 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import KnowledgeQualityPoolView from '../src/views/KnowledgeQualityPoolView.vue'
-import { listKnowledgeQualityAssessments } from '../src/api/client'
+import { listKnowledgeMaterials, listKnowledgeQualityAssessments } from '../src/api/client'
 
 vi.mock('../src/api/client', () => ({
   apiErrorMessage: vi.fn(() => '资料质量服务暂时不可用'),
   listKnowledgeQualityAssessments: vi.fn(),
+  listKnowledgeMaterials: vi.fn(),
 }))
 
 const mockedList = vi.mocked(listKnowledgeQualityAssessments)
+const mockedMaterials = vi.mocked(listKnowledgeMaterials)
 
 describe('KnowledgeQualityPoolView', () => {
-  beforeEach(() => mockedList.mockReset())
+  beforeEach(() => {
+    mockedList.mockReset()
+    mockedMaterials.mockReset()
+    mockedMaterials.mockResolvedValue({ items: [], total: 0, page: 1, size: 100 })
+  })
 
   it('shows an operator-facing repair recommendation and retains technical details below it', async () => {
     mockedList.mockResolvedValue({
@@ -26,7 +32,7 @@ describe('KnowledgeQualityPoolView', () => {
     })
     const wrapper = mount(KnowledgeQualityPoolView)
     await flushPromises()
-    expect(wrapper.text()).toContain('资料质量与补充')
+    expect(wrapper.text()).toContain('知识质量中心')
     expect(wrapper.text()).toContain('包装来源还需要运营核对。')
     await wrapper.get('.link-button').trigger('click')
     expect(wrapper.text()).toContain('核对后上传修正版本。')

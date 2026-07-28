@@ -33,11 +33,11 @@ describe('KnowledgeMaterialsView', () => {
   })
 
   it('shows the Chinese controlled upload workflow and never advertises automatic publication', async () => {
-    const wrapper = mount(KnowledgeMaterialsView)
+    const wrapper = mount(KnowledgeMaterialsView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('商品资料上传与审核')
-    expect(wrapper.text()).toContain('下载填写模板')
+    expect(wrapper.text()).toContain('下载资料模板')
     expect(wrapper.text()).toContain('不会自动发布')
     expect(wrapper.text()).toContain('积木规格说明')
     expect(wrapper.text()).toContain('已识别，待审核')

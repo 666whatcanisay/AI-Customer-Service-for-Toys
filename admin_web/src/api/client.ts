@@ -698,6 +698,147 @@ export async function listAiModules(): Promise<AiModule[]> {
   return modulesFromAiSuccessEnvelope(response.data).map(normalizeAiModule)
 }
 
+/**
+ * Read-only A-line control-centre projection frozen by ai-control.v1.1.
+ *
+ * Every nullable field deliberately means "the provider did not make this
+ * fact available".  The Admin UI must never turn it into a fabricated zero,
+ * a demo number, or a successful service state.
+ */
+export interface AiControlCenterOverview {
+  moduleId: string
+  service: {
+    status: string | null
+    ready: boolean | null
+    modelConfigured: boolean | null
+    initializationError: string | null
+  }
+  model: {
+    provider: string | null
+    name: string | null
+    configured: boolean | null
+  }
+  knowledge: {
+    status: string | null
+    queryableChunkCount: number | null
+    scope: string | null
+  }
+  runtime: {
+    metricsScope: string | null
+    callCount: number | null
+    successCount: number | null
+    errorCount: number | null
+    averageLatencyMs: number | null
+    lastCalledAt: string | null
+    lastErrorSummary: string | null
+  }
+  latestEvaluation: {
+    status: string | null
+    evaluation: {
+      executedAt: string | null
+      datasetVersion: string | null
+      totalCases: number | null
+      passedCases: number | null
+      passRate: number | null
+    } | null
+  }
+  technical: {
+    promptVersion: string | null
+    promptHash: string | null
+  }
+}
+
+type UnknownRecord = Record<string, unknown>
+
+function recordOrEmpty(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function nullableBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/** Extract only the `data` object promised by A's success envelope. */
+export function aiControlOverviewFromSuccessEnvelope(payload: unknown): AiControlCenterOverview {
+  const envelope = recordOrEmpty(payload)
+  if (envelope.success !== true) {
+    throw new Error('AI 控制中心未返回成功结果。')
+  }
+
+  const data = recordOrEmpty(envelope.data)
+  const moduleId = nullableString(data.module_id)
+  if (!moduleId) {
+    throw new Error('AI 控制中心返回的数据不符合已冻结接口。')
+  }
+
+  const service = recordOrEmpty(data.service)
+  const model = recordOrEmpty(data.model)
+  const knowledge = recordOrEmpty(data.knowledge)
+  const runtime = recordOrEmpty(data.runtime)
+  const latestEvaluation = recordOrEmpty(data.latest_evaluation)
+  const evaluation = recordOrEmpty(latestEvaluation.evaluation)
+  const technical = recordOrEmpty(data.technical)
+
+  return {
+    moduleId,
+    service: {
+      status: nullableString(service.status),
+      ready: nullableBoolean(service.ready),
+      modelConfigured: nullableBoolean(service.model_configured),
+      initializationError: nullableString(service.initialization_error),
+    },
+    model: {
+      provider: nullableString(model.provider),
+      name: nullableString(model.name),
+      configured: nullableBoolean(model.configured),
+    },
+    knowledge: {
+      status: nullableString(knowledge.status),
+      queryableChunkCount: nullableNumber(knowledge.queryable_chunk_count),
+      scope: nullableString(knowledge.scope),
+    },
+    runtime: {
+      metricsScope: nullableString(runtime.metrics_scope),
+      callCount: nullableNumber(runtime.call_count),
+      successCount: nullableNumber(runtime.success_count),
+      errorCount: nullableNumber(runtime.error_count),
+      averageLatencyMs: nullableNumber(runtime.average_latency_ms),
+      lastCalledAt: nullableString(runtime.last_called_at),
+      lastErrorSummary: nullableString(runtime.last_error_summary),
+    },
+    latestEvaluation: {
+      status: nullableString(latestEvaluation.status),
+      evaluation: Object.keys(evaluation).length === 0 ? null : {
+        executedAt: nullableString(evaluation.executed_at),
+        datasetVersion: nullableString(evaluation.dataset_version),
+        totalCases: nullableNumber(evaluation.total_cases),
+        passedCases: nullableNumber(evaluation.passed_cases),
+        passRate: nullableNumber(evaluation.pass_rate),
+      },
+    },
+    technical: {
+      promptVersion: nullableString(technical.prompt_version),
+      promptHash: nullableString(technical.prompt_hash),
+    },
+  }
+}
+
+/** The only AI-control overview request used by the operator-facing screen. */
+export async function getAiControlCenterOverview(): Promise<AiControlCenterOverview> {
+  const response = await aiClient.get<unknown>('/api/admin/ai/control-center/overview')
+  return aiControlOverviewFromSuccessEnvelope(response.data)
+}
+
 export async function getHealth(): Promise<HealthResponse> {
   const response = await apiClient.get<HealthResponse>('/health')
   return response.data

@@ -135,7 +135,7 @@ onMounted(load)
         <h1>商品资料上传与审核</h1>
         <p>把已核实的商品资料交给系统识别，再由运营人工审核。上传或分析成功都不等于已发布到 AI 知识库。</p>
       </div>
-      <a class="button secondary" href="/商品资料上传模板.csv" download>下载填写模板</a>
+      <RouterLink class="button secondary" to="/import-center">下载资料模板</RouterLink>
     </div>
 
     <section class="card guide">

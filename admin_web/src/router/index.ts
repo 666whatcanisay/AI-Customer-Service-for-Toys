@@ -15,12 +15,18 @@ import ProductDetailView from '../views/ProductDetailView.vue'
 import ReadonlyListView from '../views/ReadonlyListView.vue'
 import KnowledgeMaterialsView from '../views/KnowledgeMaterialsView.vue'
 import KnowledgeQualityPoolView from '../views/KnowledgeQualityPoolView.vue'
+import KnowledgeCenterView from '../views/KnowledgeCenterView.vue'
+import ImportCenterView from '../views/ImportCenterView.vue'
+import CustomerOperationsView from '../views/CustomerOperationsView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/overview' },
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
+    { path: '/knowledge-center', name: 'knowledge-center', component: KnowledgeCenterView },
+    { path: '/import-center', name: 'import-center', component: ImportCenterView },
+    { path: '/customer-operations', name: 'customer-operations', component: CustomerOperationsView },
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
     {
       path: '/stores', name: 'stores', component: ReadonlyListView,
