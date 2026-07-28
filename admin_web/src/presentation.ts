@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
   PARSING: '解析中',
   VALIDATED: '已校验',
   READY_FOR_REVIEW: '待审核',
+  PENDING_REVIEW: '待审核',
   FAILED: '处理失败',
   VALID: '校验通过',
   INVALID: '格式错误',
@@ -48,6 +49,8 @@ const STATUS_LABELS: Record<string, string> = {
   COMPONENT: '组合组件',
   RUNNING: '运行中',
   PAUSED: '已暂停',
+  AVAILABLE: '可用',
+  NOT_AVAILABLE: '暂不可用',
   ERROR: '异常',
   UNKNOWN: '状态未知',
 }

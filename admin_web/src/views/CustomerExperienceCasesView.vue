@@ -67,7 +67,7 @@ onMounted(load)
   <main class="page">
     <div class="page-header">
       <div>
-        <h1>客服案例</h1>
+        <h1>客服经验库</h1>
         <p>沉淀客服提交的真实案例。只有人工审核通过后才会形成受控评测快照；不会自动发布知识或修改提示词。</p>
       </div>
       <button class="button secondary" type="button" @click="load">刷新数据</button>

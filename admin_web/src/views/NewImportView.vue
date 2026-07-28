@@ -9,6 +9,7 @@ import {
   type ImportBatch,
   type ProductSkuPreflight,
 } from '../api/client'
+import { displayStatus } from '../presentation'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const selectedFile = ref<File | null>(null)
@@ -85,13 +86,19 @@ async function submit(): Promise<void> {
   <main class="page">
     <div class="page-header">
       <div>
-        <h1>新建商品与 SKU 导入</h1>
-        <p>请使用固定模板；上传后只进入 PENDING_REVIEW。</p>
+        <p class="eyebrow">商品资料 / 导入</p>
+        <h1>商品资料导入</h1>
+        <p>使用平台提供的 Excel 模板导入商品与 SKU 事实资料。只有通过预检的文件才能进入待审核区，不会自动发布给 AI。</p>
       </div>
       <RouterLink class="button secondary" to="/imports">返回批次</RouterLink>
     </div>
 
     <section class="card import-form">
+      <section class="import-steps" aria-label="商品资料导入三步">
+        <article><span>1</span><div><strong>下载模板</strong><p>仅使用平台提供的 .xlsx 模板。</p></div></article>
+        <article><span>2</span><div><strong>填写可核对事实</strong><p>保留工作表和列名，不确定内容留空。</p></div></article>
+        <article><span>3</span><div><strong>预检后导入</strong><p>先处理识别出的错误，再正式导入。</p></div></article>
+      </section>
       <section class="knowledge-guide" aria-labelledby="knowledge-preparation-title">
         <h2 id="knowledge-preparation-title">资料准备清单</h2>
         <p>本页只导入商品与 SKU 的可核对事实，导入后进入待审核区；不会自动发布给 AI，也不会替换已审核知识。</p>
@@ -146,7 +153,7 @@ async function submit(): Promise<void> {
         :class="preflightResult.can_import ? 'passed' : 'blocked'"
         role="status"
       >
-        <h2>{{ preflightResult.can_import ? '预检通过' : '预检未通过' }}</h2>
+        <h2>{{ preflightResult.can_import ? '识别结果：预检通过' : '识别结果：预检未通过' }}</h2>
         <p>
           {{ preflightResult.original_filename }} · {{ preflightResult.file_size_bytes }} bytes ·
           SHA-256 {{ preflightResult.file_sha256 }}
@@ -170,7 +177,7 @@ async function submit(): Promise<void> {
           </div>
         </dl>
         <div v-if="preflightResult.error_summary.length" class="issue-list errors">
-          <h3>错误</h3>
+          <h3>失败原因</h3>
           <ul>
             <li v-for="issue in preflightResult.error_summary" :key="issue.code">
               <strong>{{ issue.code }} × {{ issue.count }}</strong>：{{ issue.message }}
@@ -190,7 +197,7 @@ async function submit(): Promise<void> {
       <p v-if="uploadError" class="notice error" role="alert">{{ uploadError }}</p>
 
       <div v-if="result" class="notice success" role="status">
-        <strong>导入完成：{{ result.status }}</strong>
+        <strong>导入完成：{{ displayStatus(result.status) }}</strong>
         <div class="metrics">
           <span class="metric">总行数<strong>{{ result.total_rows }}</strong></span>
           <span class="metric">待审核有效行<strong>{{ result.valid_rows }}</strong></span>
@@ -208,6 +215,11 @@ async function submit(): Promise<void> {
   display: grid;
   gap: 20px;
 }
+
+.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+
+.import-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; border-radius: 12px; background: #eef4fb; }
+.import-steps article { display: flex; gap: 9px; min-width: 0; }.import-steps span { display: grid; width: 24px; height: 24px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #284f8f; color: #fff; font-size: 12px; font-weight: 800; }.import-steps strong { font-size: 13px; }.import-steps p { margin: 3px 0 0; color: #617087; font-size: 12px; line-height: 1.45; }
 
 .knowledge-guide {
   padding: 18px;
@@ -294,4 +306,6 @@ small {
 .issue-list.warnings {
   color: #76551b;
 }
+
+@media (max-width: 760px) { .import-steps { grid-template-columns: 1fr; } }
 </style>
