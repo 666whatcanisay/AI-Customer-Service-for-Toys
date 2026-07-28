@@ -153,6 +153,18 @@ submitted_by=CSU-001
 
 C 必须验证 revision、hash、资料状态及 `analysis_run_id` 幂等性。A 只在实际模型输出通过结构验证后回写；模型不可用或输出不合格时不创建伪造结果。
 
+### 4.2.1 与既有 AI 反馈回写的共享路径
+
+`/api/v1/admin/ai-quality/analysis-results` 已被既有 `ai-feedback.v1` 的反馈分析结果回写使用。两个 V1 协议保留该既有路径，C 必须通过请求体中的唯一业务主键做严格分派：
+
+| 请求体主键 | 协议 | C 行为 |
+| --- | --- | --- |
+| 仅 `material_id` | 本协议的资料质量分析 | 按本节验证 `revision`、`content_hash`、`analysis_run_id` 并返回资料 assessment。 |
+| 仅 `feedback_id` | `ai-feedback.v1` | 保持既有反馈分析校验、幂等和响应。 |
+| 同时包含或均不包含 | 无效 | 422；不得猜测协议、忽略字段或写入任一结果。 |
+
+这只是对已冻结 URL 的路由兼容澄清：不增加 URL、字段、枚举或自动动作。两类请求各自维持原有响应形状与幂等语义。
+
 ### 4.3 客服紧凑状态（B ← C）
 
 `GET /api/v1/customer-knowledge-status?store_code=&product_id=&sku_id=`
