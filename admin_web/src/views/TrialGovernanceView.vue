@@ -64,7 +64,7 @@ onMounted(load)
 
     <section class="card context-card"><div><h2>试运行上下文</h2><p>服务端将固定身份映射为角色；浏览器选择用于验证边界，不能作为正式身份凭据。</p></div><form @submit.prevent="applyContext"><label>身份<select v-model="actor"><option value="trial-admin">管理员</option><option value="trial-operator">运营</option><option value="trial-support">客服（只读）</option></select></label><label>操作目的<select v-model="reason"><option value="DAILY_OPERATIONS">日常运营</option><option value="CASE_REVIEW">案例审核</option><option value="KNOWLEDGE_MAINTENANCE">知识维护</option><option value="GOVERNANCE_REVIEW">治理检查</option></select></label><button class="button" type="submit">应用试运行上下文</button></form></section>
 
-    <p v-if="loading" class="notice" role="status">正在读取试运行治理状态…</p><p v-else-if="error" class="notice error" role="alert">暂时无法读取试运行治理状态。{{ error }}</p>
+    <p v-if="loading" class="notice" role="status">正在读取试运行治理状态…</p><p v-else-if="error" class="notice error" role="alert"><strong>数据加载失败</strong><br />原因：{{ error }}<br />建议下一步：检查服务状态后重试。</p>
     <template v-else-if="governance">
       <section class="summary-grid"><article><span>当前角色</span><strong>{{ roleLabel }}</strong><small>{{ governance.actor_id }}</small></article><article><span>审计基础</span><strong>{{ governance.audit_foundation_enabled ? '已启用' : '待启用' }}</strong><small>仅记录受控元数据</small></article><article><span>自动脱敏</span><strong>{{ governance.automatic_redaction_enabled ? '已启用' : '未启用' }}</strong><small>当前仅有提交前提醒</small></article><article><span>留存策略</span><strong>{{ governance.retention_policy_configured ? '已配置' : '未配置' }}</strong><small>正式策略待实施</small></article></section>
 

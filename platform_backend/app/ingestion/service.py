@@ -149,12 +149,38 @@ class IngestionService:
             "Blank rows will be ignored during import",
         )
 
+        # These are recognition counts, not import-success counts.  They let the
+        # operations UI explain what was found before an operator decides
+        # whether to fix the rows and submit the staged import.
+        product_identifiers = {
+            str(row.normalized_data.get("product_code") or row.normalized_data.get("platform_product_id"))
+            for row in processed
+            if row.normalized_data.get("product_code") or row.normalized_data.get("platform_product_id")
+        }
+        sku_identifiers = {
+            str(row.normalized_data.get("sku_code") or row.normalized_data.get("platform_sku_id"))
+            for row in processed
+            if row.normalized_data.get("sku_code") or row.normalized_data.get("platform_sku_id")
+        }
+        missing_field_counts: Counter[str] = Counter(
+            issue.field
+            for row in processed
+            for issue in row.errors
+            if issue.error_code == ErrorCode.REQUIRED_FIELD_MISSING and issue.field
+        )
+
         return ProductSkuPreflightResponse(
             original_filename=safe_filename,
             file_sha256=sha256_bytes(content),
             file_size_bytes=len(content),
             worksheets=inspection.worksheet_names,
             data_row_count=inspection.data_row_count,
+            recognized_product_count=len(product_identifiers),
+            recognized_sku_count=len(sku_identifiers),
+            rows_needing_manual_completion=sum(
+                row.validation_status != RowStatus.VALID for row in processed
+            ),
+            missing_field_counts=dict(sorted(missing_field_counts.items())),
             valid_rows=sum(row.validation_status == RowStatus.VALID for row in processed),
             invalid_rows=sum(row.validation_status == RowStatus.INVALID for row in processed),
             duplicate_rows=sum(

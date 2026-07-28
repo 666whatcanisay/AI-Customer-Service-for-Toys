@@ -85,6 +85,10 @@ class ProductSkuPreflightResponse(BaseModel):
     file_size_bytes: int
     worksheets: list[str]
     data_row_count: int
+    recognized_product_count: int
+    recognized_sku_count: int
+    rows_needing_manual_completion: int
+    missing_field_counts: dict[str, int] = Field(default_factory=dict)
     valid_rows: int
     invalid_rows: int
     duplicate_rows: int

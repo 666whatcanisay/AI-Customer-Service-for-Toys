@@ -4,10 +4,10 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "C-OPERATION-CENTER-V2-PRODUCTIZATION",
-  "current_stage": "Chinese C-internal AI customer-service operations center with source-backed home metrics, business navigation, Chinese state/error presentation, and a test-only SKU inventory",
-  "current_gate": "C-OPERATION-CENTER-V2-PRODUCTIZATION verification PASS; code branch pushed, Draft PR blocked by GitHub API TLS handshake timeout",
-  "status": "external_delivery_blocked",
+  "current_task": "C-ADMIN-UI-PRODUCTIZATION-V1",
+  "current_stage": "Chinese AI customer-service operations productization: left business navigation, source-backed AI control center, folded technical evidence, template-led test packages, and novice product/SKU import",
+  "current_gate": "C-ADMIN-UI-PRODUCTIZATION-V1 verification PASS; commit/push/Draft PR delivery pending",
+  "status": "verification_passed",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
@@ -50,7 +50,16 @@
     "admin_web/src/views/OperationsOverviewView.vue",
     "admin_web/src/views/CustomerEfficiencyDashboardView.vue",
     "admin_web/src/presentation.ts",
+    "admin_web/src/aiPresentation.ts",
+    "admin_web/src/templateCatalog.ts",
+    "admin_web/src/views/AiControlCenterView.vue",
+    "admin_web/src/views/AiImprovementSuggestionsView.vue",
+    "admin_web/src/views/TestDataPackagesView.vue",
+    "admin_web/src/views/NewImportView.vue",
+    "platform_backend/app/ingestion/service.py",
+    "platform_backend/app/ingestion/schemas.py",
     "docs/platform/17_AI客服运营中心V2说明.md",
+    "docs/platform/18_Admin中文产品化说明.md",
     "docs/platform/14_客服效率接口说明.md"
   ],
   "provided_interfaces": [
@@ -78,6 +87,7 @@
     "C-OPERATION-V1.1 adds no cross-line interface, shared schema, error-code, or contract-version change",
     "PILOT-HARDENING-C changes only C-internal Admin/test-only paths and does not revise B/A frozen interfaces or contracts/**",
     "C-OPERATION-CENTER-V2-PRODUCTIZATION adds only C-internal Admin presentation and the test-only SKU read projection; B/A frozen paths and contracts/** remain unchanged",
+    "C-ADMIN-UI-PRODUCTIZATION-V1 adds only C-internal Admin presentation and zero-write product/SKU preflight counts; B/A frozen paths and contracts/** remain unchanged",
     "B writes content-free efficiency event types; A consumes aggregate-only customer-efficiency summaries"
   ],
   "cross_line_compatibility": {
@@ -103,6 +113,8 @@
     "retention_policy_configured": false,
     "operations_center_uses_real_source_states": true,
     "operations_center_fabricated_trends_enabled": false,
+    "admin_productization_uses_source_backed_states": true,
+    "admin_productization_exposes_untranslated_evidence_by_default": false,
     "automatic_training_enabled": false,
     "prompt_change_enabled": false,
     "knowledge_publication_enabled": false,
@@ -112,7 +124,7 @@
     "customer_efficiency_employee_identity_stored": false,
     "customer_efficiency_ranking_enabled": false
   },
-  "last_test_result": "2026-07-27 C-OPERATION-CENTER-V2-PRODUCTIZATION: current-worktree browser verification at localhost:5174 passed for Chinese business navigation, primary direct routes, refresh, support-role access denial, and 1366x768 layout with no console errors. The C-internal /api/v1/admin/skus route returned a real empty test-only inventory. Full platform backend pytest passed (77); Admin typecheck, Vitest (40), and production build passed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
+  "last_test_result": "2026-07-28 C-ADMIN-UI-PRODUCTIZATION-V1: full platform backend pytest passed; Admin typecheck, Vitest (33), and production build passed; git diff --check passed. Current-worktree browser verification at localhost:5175 passed for left Chinese navigation, AI control center, test-data templates, product/SKU import guide, AI-problem summary default, and 1366x768 layout with no console errors. Port 5174 belonged to another worktree and was not changed. Existing TestClient deprecation and read-only pytest-cache warnings remain.",
   "test_commands": [
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
@@ -120,7 +132,7 @@
     "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0006_mvp_plus_02_ai_feedback_idempotency; upgrade head",
     "cd admin_web; npm.cmd run typecheck; npm.cmd test; npm.cmd run build",
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_admin_operations_api.py tests/test_admin_api.py",
-    "current-worktree local runtime: platform_backend on 8011 and admin_web Vite on 5174; verify primary direct routes, refresh, support boundary, and 1366x768 layout"
+    "current-worktree local runtime: verify productized direct routes, refresh, default-folded technical evidence, and 1366x768 layout; do not stop a port owned by another worktree"
   ],
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, production authorization, retention, deletion, recovery, or production security certification. The fixed trial-actor header and content-free audit table are a test-only governance foundation, not identity proof or formal access control.",
@@ -132,7 +144,8 @@
     "CORS is not authentication or authorization.",
     "UI-3 preserves the existing internal-test Admin boundary; it does not add formal authentication, authorization, audit, retention, or sensitive-data controls.",
     "C-OPERATION-V1.1 returns aggregate-only daily metrics but does not add formal Admin access control, audit logging, retention, or production-report certification.",
-    "C-OPERATION-CENTER-V2-PRODUCTIZATION maps endpoint reachability to a Chinese UI state but does not establish AI answer quality, business impact, or production readiness."
+    "C-OPERATION-CENTER-V2-PRODUCTIZATION maps endpoint reachability to a Chinese UI state but does not establish AI answer quality, business impact, or production readiness.",
+    "C-ADMIN-UI-PRODUCTIZATION-V1 keeps untranslated analysis evidence in folded technical details; it does not claim automatic translation or reinterpretation of A evidence."
   ],
   "out_of_scope": [
     "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, and A model invocation",
@@ -145,11 +158,11 @@
   ],
   "blockers": [],
   "git": {
-    "branch": "agent/platform-operation-center-v2",
-    "base": "agent/platform-pilot-hardening-c d5dcc38 (trial governance foundation)",
-    "commit": "feat(platform): productize Chinese operations center",
-    "draft_pr": "ENV_BLOCKED_CREATE_PR: GitHub API TLS handshake timeout after two create attempts"
+    "branch": "agent/platform-admin-ui-productization-v1",
+    "base": "agent/platform-operation-center-v2 fd17498 (Chinese operations center)",
+    "commit": "feat(platform): productize Chinese operations admin",
+    "draft_pr": "pending delivery"
   },
-  "next_recommended_task": "Review the dependent trial-governance and multi-store pilot PRs before this child PR. Do not promote source reachability, trial headers, or content-free audit metadata into AI-quality, formal authentication, production authorization, retention, or automatic-redaction claims without separately approved work.",
-  "last_updated": "2026-07-27"
+  "next_recommended_task": "Review the dependent trial-governance and multi-store pilot work before merge. Do not promote source reachability, trial headers, preflight recognition counts, or content-free audit metadata into AI-quality, formal authentication, production authorization, retention, automatic translation, or automatic-redaction claims without separately approved work.",
+  "last_updated": "2026-07-28"
 }

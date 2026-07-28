@@ -49,6 +49,10 @@ def test_valid_file_preflight_reports_metadata_and_writes_nothing(
     assert body["file_size_bytes"] == len(content)
     assert body["worksheets"] == ["商品SKU资料"]
     assert body["data_row_count"] == 10
+    assert body["recognized_product_count"] == 10
+    assert body["recognized_sku_count"] == 10
+    assert body["rows_needing_manual_completion"] == 0
+    assert body["missing_field_counts"] == {}
     assert body["valid_rows"] == 10
     assert body["missing_columns"] == []
     assert body["unknown_columns"] == []
@@ -66,8 +70,24 @@ def test_preflight_reports_missing_column(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["missing_columns"] == ["product_name"]
+    assert body["recognized_product_count"] == 0
+    assert body["recognized_sku_count"] == 0
     assert body["can_import"] is False
     assert "INVALID_TEMPLATE" in codes(body, "error_summary")
+
+
+def test_preflight_reports_recognized_items_and_manual_completion_fields(client: TestClient) -> None:
+    row = valid_row()
+    row["product_name"] = None
+
+    response = preflight(client, workbook_bytes([row]))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recognized_product_count"] == 1
+    assert body["recognized_sku_count"] == 1
+    assert body["rows_needing_manual_completion"] == 1
+    assert body["missing_field_counts"] == {"product_name": 1}
 
 
 def test_preflight_reports_unknown_column(client: TestClient) -> None:

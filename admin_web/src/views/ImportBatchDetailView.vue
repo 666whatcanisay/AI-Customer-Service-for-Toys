@@ -50,7 +50,7 @@ onMounted(load)
     </div>
 
     <p v-if="loading" class="notice" role="status">正在加载批次详情…</p>
-    <p v-else-if="error" class="notice error" role="alert">暂时无法读取同步详情。{{ error }}</p>
+    <p v-else-if="error" class="notice error" role="alert"><strong>数据加载失败</strong><br />原因：{{ error }}<br />建议下一步：返回导入记录后重新打开，或检查服务状态。</p>
     <template v-else-if="batch">
       <section class="card">
         <div class="summary-row">

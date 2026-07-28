@@ -16,7 +16,7 @@ describe('AiCapabilityCenterView', () => {
     const wrapper = mount(AiCapabilityCenterView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Answer module')
+    expect(wrapper.text()).toContain('AI 模块')
     expect(wrapper.find('button[disabled]').exists()).toBe(false)
   })
 })
