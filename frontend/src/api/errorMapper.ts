@@ -28,7 +28,8 @@ export class PlatformClientError extends Error {
   constructor(
     public readonly kind: PlatformErrorKind,
     message: string,
-    public readonly status: number | null = null
+    public readonly status: number | null = null,
+    public readonly code: string | null = null
   ) {
     super(message)
     this.name = 'PlatformClientError'
@@ -47,7 +48,8 @@ export class AiResponseFeedbackClientError extends Error {
   constructor(
     public readonly kind: AiResponseFeedbackErrorKind,
     message: string,
-    public readonly status: number | null = null
+    public readonly status: number | null = null,
+    public readonly code: string | null = null
   ) {
     super(message)
     this.name = 'AiResponseFeedbackClientError'
@@ -120,21 +122,24 @@ export const toPlatformClientError = (error: unknown): PlatformClientError => {
 
   if (axios.isAxiosError(error)) {
     const status = error.response?.status ?? null
+    const code = responseCode(error.response?.data)
     const detail = responseMessage(error.response?.data)
     if (error.code === 'ECONNABORTED') {
-      return new PlatformClientError('timeout', 'C 目录服务请求超时，请稍后重试', status)
+      return new PlatformClientError('timeout', 'C 目录服务请求超时，请稍后重试', status, code)
     }
     if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
       return new PlatformClientError(
         'unavailable',
         detail ?? 'C 目录服务当前不可用，请联系中台维护人员',
-        status
+        status,
+        code
       )
     }
     return new PlatformClientError(
       'unknown',
       detail ?? error.message ?? 'C 目录服务请求失败',
-      status
+      status,
+      code
     )
   }
 
@@ -158,26 +163,29 @@ export const toAiResponseFeedbackClientError = (error: unknown): AiResponseFeedb
     const code = responseCode(error.response?.data)
     const detail = responseMessage(error.response?.data)
     if (error.code === 'ECONNABORTED') {
-      return new AiResponseFeedbackClientError('timeout', 'AI 问题反馈请求超时，请稍后重试', status)
+      return new AiResponseFeedbackClientError('timeout', 'AI 问题反馈请求超时，请稍后重试', status, code)
     }
     if (code === 'AI_RESPONSE_FEEDBACK_VALIDATION_FAILED' || status === 422) {
       return new AiResponseFeedbackClientError(
         'validation',
         detail ?? 'AI 问题反馈不符合冻结接口要求',
-        status
+        status,
+        code
       )
     }
     if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
       return new AiResponseFeedbackClientError(
         'unavailable',
         detail ?? 'AI 问题反馈服务当前不可用，请稍后重试',
-        status
+        status,
+        code
       )
     }
     return new AiResponseFeedbackClientError(
       'unknown',
       detail ?? error.message ?? 'AI 问题反馈请求失败',
-      status
+      status,
+      code
     )
   }
 

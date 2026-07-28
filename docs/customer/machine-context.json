@@ -3,11 +3,11 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "PILOT-HARDENING-B daily customer-service workbench hardening",
-  "current_stage": "Draft PR #49 created: catalog readiness and recovery guidance, cross-store reset boundary, missing-knowledge warning, clipboard recovery and adoption next-step guidance are complete. The complete live success path remains blocked because A/RAG is unavailable.",
-  "current_gate": "CONDITIONAL_PASS: typecheck, 24 Vitest files / 99 tests and production build passed. Browser verified the real test store/catalog, catalog guidance, cross-store warning and no-product guard. No answer/copy/case/feedback success result was fabricated.",
-  "status": "pilot_hardening_b_draft_pr_49_with_rag_blocker",
-  "last_updated": "2026-07-27",
+  "current_task": "PILOT-USER-IDENTITY-V1 customer identity selection and provenance binding",
+  "current_stage": "B implementation complete: C-owned active identity selection gates the customer workbench; stale selections clear; default/bound-store handling, case/feedback provenance and privacy-bounded efficiency events are implemented. Delivery depends on interface PR #66 and C API PR #67.",
+  "current_gate": "LOCAL_PASS: typecheck, 28 Vitest files / 104 tests and production build passed. No local TESTER identity remains in the runtime. Full browser E2E requires the C identity/efficiency APIs on the integrated baseline.",
+  "status": "pilot_user_identity_b_ready_for_stacked_draft_pr",
+  "last_updated": "2026-07-28",
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
     "source_baseline": "origin/develop@32feb610",
@@ -16,10 +16,10 @@
     "owner": "OPS for safe current-baseline restart; B added route regression coverage only."
   },
   "git": {
-    "branch": "codex/customer-pilot-hardening-b-v4",
-    "base_commit": "348c875",
+    "branch": "codex/customer-identity-v1-customer",
+    "base_commit": "ae99161",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "DRAFT_PR_49",
+    "delivery": "PENDING_STACKED_DRAFT_PR",
     "clean": false,
     "task_commit": "89f9ead"
   },
@@ -55,25 +55,29 @@
     "POST C /api/v1/customer-experience-cases with frozen feedback_type and top-level case_id/review_status receipt",
     "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI",
     "POST C /api/v1/ai-response-feedback with ai-feedback.v1-draft fields, an Idempotency-Key header, and top-level feedback_id/status=NEW receipt",
-    "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total"
+    "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total",
+    "GET C /api/v1/customer-identities and GET C /api/v1/customer-identities/{user_id}",
+    "POST C /api/v1/customer-efficiency/events with customer-efficiency.v1, Idempotency-Key and no message content"
   ],
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "experience-case.v1-draft task-local frozen adapter agreement",
     "ai-feedback.v1-draft task-local frozen adapter agreement"
+    ,"customer-identity.v1 frozen by Control Interface Owner",
+    "customer-efficiency.v1 frozen by Control Interface Owner"
   ],
   "test_commands": [
     "npm run typecheck",
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 PILOT-HARDENING-B: vue-tsc --noEmit PASS; Vitest 24 files / 99 tests PASS; vite build PASS. Browser verified the real test store/catalog, catalog readiness guidance, cross-store reset warning and no-product submission guard. A/RAG was unavailable, so no answer/copy/case/feedback success was fabricated. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "last_test_result": "2026-07-28 PILOT-USER-IDENTITY-V1: vue-tsc --noEmit PASS; Vitest 28 files / 104 tests PASS; vite build PASS. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
   "blockers": [
-    "A/RAG service was unavailable during browser validation and the actual de-identified consultation request failed, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
+    "Full browser E2E must run only after C identity and efficiency APIs from PR #67 are on the same integrated baseline as this B branch."
   ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
-    "Tester identity is local browser state and is not authentication or authorization",
+    "Pilot identity selection is not password authentication, SSO or formal RBAC; it is a C-owned internal-pilot provenance control",
     "Experience-case session summaries disappear on refresh until C publishes the GET contract",
     "Pilot-guide dismissal is a local browser boolean, not authentication or training evidence",
     "AI feedback is limited to synthetic or manually de-identified test data; automatic redaction and formal authorization are not implemented",
@@ -95,6 +99,7 @@
     "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
     "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)",
     "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added"
+    ,"PILOT-USER-IDENTITY-V1: C-owned identity selection, bound-store restriction and provenance binding implemented; stacked delivery pending"
   ],
   "out_of_scope": [
     "Automatic customer message sending",

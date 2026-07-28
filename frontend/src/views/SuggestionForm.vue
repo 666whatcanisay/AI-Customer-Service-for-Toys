@@ -3,7 +3,7 @@
     <header>
       <p class="eyebrow">意见与建议</p>
       <h1>告诉我们哪里需要改进</h1>
-      <p>建议会关联当前测试客服，提交后可在“我的建议”中查看。</p>
+      <p>建议会关联当前客服身份，提交后可在“我的建议”中查看。</p>
     </header>
 
     <el-alert
@@ -16,8 +16,8 @@
 
     <section class="form-card">
       <div class="identity-row">
-        <span>提交人：{{ identity.reporterName || '请先在右上角设置测试姓名' }}</span>
-        <span>默认店铺：{{ identity.defaultStoreCode || '未设置' }}</span>
+        <span>提交人：{{ identity?.displayName || '请先选择客服身份' }}</span>
+        <span>默认店铺：{{ identity?.defaultStoreCode || '未设置' }}</span>
       </div>
 
       <div class="form-grid">
@@ -86,10 +86,10 @@ import {
   URGENCY_LABELS,
   suggestionStatusLabel
 } from '@/workspace/suggestionPresentation'
-import { useTesterIdentity } from '@/workspace/testerIdentity'
+import { useCustomerIdentity } from '@/workspace/customerIdentity'
 
 const route = useRoute()
-const { identity } = useTesterIdentity()
+const { identity } = useCustomerIdentity()
 const submitting = ref(false)
 const validationError = ref('')
 const requestError = ref('')
@@ -110,7 +110,7 @@ onMounted(() => {
 })
 
 const validate = (): string => {
-  if (!identity.value.reporterName) return '请先在右上角设置测试客服姓名。'
+  if (!identity.value) return '请先选择客服身份。'
   if (!findWorkbenchModule(form.moduleKey)) return '请选择相关模块。'
   if (!form.title.trim()) return '请填写建议标题。'
   if (form.title.trim().length < 4) return '标题至少需要 4 个字。'
@@ -125,13 +125,18 @@ const submit = async () => {
   requestError.value = ''
   receipt.value = null
   if (validationError.value) return
+  const currentIdentity = identity.value
+  if (!currentIdentity) {
+    validationError.value = '请先选择客服身份。'
+    return
+  }
 
   submitting.value = true
   try {
     const request = suggestionClient.submit({
-        reporterId: identity.value.reporterId,
-        reporterName: identity.value.reporterName,
-        storeCode: identity.value.defaultStoreCode || null,
+        reporterId: currentIdentity.userId,
+        reporterName: currentIdentity.displayName,
+        storeCode: currentIdentity.defaultStoreCode || null,
         moduleKey: form.moduleKey,
         category: form.category,
         title: form.title.trim(),

@@ -36,9 +36,9 @@ import { suggestionClient } from '@/api/suggestionClient'
 import type { SuggestionSummary } from '@/api/suggestionTypes'
 import { findWorkbenchModule } from '@/workspace/modules'
 import { CATEGORY_LABELS, FREQUENCY_LABELS, URGENCY_LABELS, suggestionStatusLabel } from '@/workspace/suggestionPresentation'
-import { useTesterIdentity } from '@/workspace/testerIdentity'
+import { useCustomerIdentity } from '@/workspace/customerIdentity'
 
-const { identity } = useTesterIdentity()
+const { identity } = useCustomerIdentity()
 const loading = ref(false)
 const errorMessage = ref('')
 const items = ref<SuggestionSummary[]>([])
@@ -50,7 +50,11 @@ const load = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const request = suggestionClient.listMine(identity.value.reporterId)
+    if (!identity.value) {
+      errorMessage.value = '请先选择客服身份。'
+      return
+    }
+    const request = suggestionClient.listMine(identity.value.userId)
     const outcome = await request.then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error })

@@ -56,10 +56,10 @@
 import { RouterLink } from 'vue-router'
 import { EXPERIENCE_CASE_STATUS_LABELS, EXPERIENCE_FEEDBACK_LABELS } from '@/workspace/experienceCasePresentation'
 import { useExperienceCaseSubmissions } from '@/workspace/experienceCaseSession'
-import { useTesterIdentity } from '@/workspace/testerIdentity'
+import { useCustomerIdentity } from '@/workspace/customerIdentity'
 
-const { identity } = useTesterIdentity()
-const { submissions } = useExperienceCaseSubmissions(identity.value.reporterId)
+const { identity } = useCustomerIdentity()
+const { submissions } = useExperienceCaseSubmissions(identity.value?.userId ?? '')
 </script>
 
 <style scoped>

@@ -2,7 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TESTER_IDENTITY_STORAGE_KEY } from '@/workspace/testerIdentity'
+import { ref } from 'vue'
+import { CustomerIdentityKey } from '@/workspace/customerIdentity'
 import CustomerWorkbenchLayout from './CustomerWorkbenchLayout.vue'
 
 const healthMocks = vi.hoisted(() => ({ rag: vi.fn(), platform: vi.fn() }))
@@ -18,7 +19,21 @@ const mountLayout = async () => {
   })
   await router.push('/')
   await router.isReady()
-  return mount(CustomerWorkbenchLayout, { attachTo: document.body, global: { plugins: [router, ElementPlus] } })
+  return mount(CustomerWorkbenchLayout, {
+    attachTo: document.body,
+    global: {
+      plugins: [router, ElementPlus],
+      provide: {
+        [CustomerIdentityKey as symbol]: {
+          identity: ref({
+            userId: 'CSU-ONE', displayName: '小木', role: 'CUSTOMER_SERVICE', status: 'ACTIVE',
+            defaultStoreCode: 'PDD-SM', storeBindings: [{ storeCode: 'PDD-SM', isDefault: true }]
+          }),
+          clear: vi.fn()
+        }
+      }
+    }
+  })
 }
 
 describe('CustomerWorkbenchLayout', () => {
@@ -30,7 +45,6 @@ describe('CustomerWorkbenchLayout', () => {
   })
 
   it('shows the unified product navigation, honest status labels and safety banner', async () => {
-    localStorage.setItem(TESTER_IDENTITY_STORAGE_KEY, JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }))
     const wrapper = await mountLayout()
     await flushPromises()
     expect(wrapper.get('nav').text()).toContain('首页')
@@ -48,19 +62,15 @@ describe('CustomerWorkbenchLayout', () => {
     wrapper.unmount()
   })
 
-  it('asks a first-time tester for a display name without claiming authentication', async () => {
+  it('shows the selected customer identity instead of a browser-created tester identity', async () => {
     const wrapper = await mountLayout()
     await flushPromises()
-    expect(document.body.textContent).toContain('设置测试客服身份')
-    expect(document.body.textContent).toContain('不是登录或权限认证')
+    expect(wrapper.get('[data-testid="customer-identity-summary"]').text()).toContain('小木')
+    expect(wrapper.get('[data-testid="customer-identity-summary"]').text()).toContain('PDD-SM')
     wrapper.unmount()
   })
 
   it('shows the test guide once for a known tester and records dismissal', async () => {
-    localStorage.setItem(
-      TESTER_IDENTITY_STORAGE_KEY,
-      JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' })
-    )
     const wrapper = await mountLayout()
     await flushPromises()
 

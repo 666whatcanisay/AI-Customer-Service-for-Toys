@@ -9,7 +9,7 @@ import {
   useCustomerSessionActivity
 } from '@/workspace/customerSessionActivity'
 import { clearExperienceCaseSubmissions } from '@/workspace/experienceCaseSession'
-import { TesterIdentityKey } from '@/workspace/testerIdentity'
+import { CustomerIdentityKey } from '@/workspace/customerIdentity'
 import AiChat from './AiChat.vue'
 
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
@@ -23,7 +23,10 @@ const apiMocks = vi.hoisted(() => ({
   listSkus: vi.fn(),
   submitExperienceCase: vi.fn(),
   submitAiFeedback: vi.fn(),
-  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key')
+  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key'),
+  submitEfficiencyEvent: vi.fn(),
+  createEfficiencyIdempotencyKey: vi.fn(() => 'customer-efficiency-test-key'),
+  createInteractionId: vi.fn(() => 'interaction-test-1')
 }))
 
 vi.mock('@/api/ragClient', () => ({
@@ -49,6 +52,13 @@ vi.mock('@/api/experienceCaseClient', () => ({
 vi.mock('@/api/aiResponseFeedbackClient', () => ({
   aiResponseFeedbackClient: { submit: apiMocks.submitAiFeedback },
   createAiResponseFeedbackIdempotencyKey: apiMocks.createAiFeedbackIdempotencyKey
+}))
+
+vi.mock('@/api/customerEfficiencyClient', () => ({
+  customerEfficiencyClient: { submit: apiMocks.submitEfficiencyEvent },
+  createCustomerEfficiencyIdempotencyKey: apiMocks.createEfficiencyIdempotencyKey,
+  createCustomerInteractionId: apiMocks.createInteractionId,
+  CustomerEfficiencyClientError: class CustomerEfficiencyClientError extends Error {}
 }))
 
 const store = {
@@ -137,9 +147,15 @@ const mountPage = () => {
     global: {
       plugins: [ElementPlus],
       provide: {
-        [TesterIdentityKey as symbol]: {
-          identity: ref({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }),
-          save: vi.fn(), reload: vi.fn()
+        [CustomerIdentityKey as symbol]: {
+          identity: ref({
+            userId: 'CSU-ONE', displayName: '小木', role: 'CUSTOMER_SERVICE', status: 'ACTIVE',
+            defaultStoreCode: 'PDD-SM', storeBindings: [
+              { storeCode: 'PDD-SM', isDefault: true },
+              { storeCode: 'PDD-SM-2', isDefault: false }
+            ]
+          }),
+          clear: vi.fn()
         }
       }
     }
@@ -209,6 +225,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     apiMocks.submitAiFeedback.mockResolvedValue({
       feedbackId: 'ARF-001', status: 'NEW'
     })
+    apiMocks.submitEfficiencyEvent.mockResolvedValue({ eventId: 'CEE-001', eventType: 'AI_REQUEST', accepted: true, createdAt: '2026-07-28T00:00:00Z' })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) }
@@ -520,11 +537,20 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.submitAiFeedback).toHaveBeenCalledWith({
       storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
       aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', feedbackType: 'RISK_ISSUE',
-      feedbackNote: null, finalAnswer: null, createdBy: 'TESTER-ONE'
+      feedbackNote: null, finalAnswer: null, createdBy: 'CSU-ONE'
     }, expect.stringMatching(/^ai-feedback-/))
     expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
     expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
     expect(useCustomerSessionActivity().feedbackSubmissions.value).toBe(1)
+    expect(apiMocks.submitEfficiencyEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'AI_REQUEST', operatorId: 'CSU-ONE', storeCode: 'PDD-SM', interactionId: 'interaction-test-1'
+    }), 'customer-efficiency-test-key')
+    expect(apiMocks.submitEfficiencyEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'AI_REJECT', operatorId: 'CSU-ONE', interactionId: 'interaction-test-1'
+    }), 'customer-efficiency-test-key')
+    expect(apiMocks.submitEfficiencyEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: 'AI_FEEDBACK_SUBMIT', operatorId: 'CSU-ONE', feedbackId: 'ARF-001'
+    }), 'customer-efficiency-test-key')
   })
 
   it('reuses an in-flight feedback Idempotency-Key and displays C replay as the recorded result', async () => {
@@ -596,7 +622,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.submitExperienceCase).toHaveBeenCalledWith({
       storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
       aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', finalAnswer: '客服审核后的测试回复',
-      feedbackType: 'EDITED_ADOPTED', createdBy: 'TESTER-ONE'
+      feedbackType: 'EDITED_ADOPTED', createdBy: 'CSU-ONE'
     })
     expect(wrapper.get('[data-testid="experience-case-success"]').text()).toContain('新建')
   })
