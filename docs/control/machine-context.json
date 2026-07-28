@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "target_mode_v5_productization_v2_interface_frozen",
+  "status": "target_mode_v5_productization_v2_candidate_ready",
   "current_task": "AI-CS-PRODUCTIZATION-V2",
-  "current_stage": "ai-control.v1.1 is frozen. A will expose a real, content-safe, read-only supervision overview; C will productize the 5174 operational surface with that projection plus C-owned product knowledge, quality and AI-feedback data; B will retain compact customer knowledge status while improving store context and flow guidance; Data will provide reviewed-material preparation templates.",
-  "current_gate": "INTERFACE_FROZEN: implementation may proceed only within ai-control.v1.1 and the existing C-owned quality/feedback APIs. No automatic RAG publication, Prompt/model change, training, messaging, after-sales, refund, order or ERP action is authorized; metrics are since-start system signals, not employee performance data; templates do not authorize automatic import or publication.",
+  "current_stage": "ai-control.v1.2 is frozen. Candidate Draft PRs #73 (Interface/Data), #74 (A), #75 (B), and #76 (C/Admin) passed isolated real integration: original test ZIP catalog, reviewed material, real qwen3.5:9b knowledge analysis and writeback, Chinese Admin control-center projection, and customer product/SKU answer flow.",
+  "current_gate": "CANDIDATE_READY_PENDING_MERGE_AUTHORIZATION: no automatic RAG publication, Prompt/model change, training, messaging, after-sales, refund, order or ERP action is authorized. Candidate-only verification does not replace formal develop restart, Private firewall configuration, or second controlled customer-computer acceptance.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",

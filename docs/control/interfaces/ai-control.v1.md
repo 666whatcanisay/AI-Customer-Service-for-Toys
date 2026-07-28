@@ -221,6 +221,7 @@ Prompt 路由只返回 `prompt_version`、`prompt_hash`、安全预览和规则�
 * `queryable_chunk_count` 是当前 A 实际检索路径可查询的集合数量，不是历史同步次数，也不代表 C 的资料已经自动发布。
 * `runtime.metrics_scope` 只允许 `since_start`、`NOT_AVAILABLE`。它不是客服绩效或历史运营报表；C 不得据此评价个人。
 * `latest_evaluation.status` 只允许 `AVAILABLE`、`NOT_AVAILABLE`。无保存评测时 `evaluation=null`，不是评测失败。
+* `latest_evaluation.evaluation.pass_rate` 是兼容性数值：`0..1` 表示比例（例如 `0.6786` 为 67.86%），大于 `1` 的值表示百分数。Consumer 只能在展示层将比例乘以 100，不得改写 API 原值或据此推断未提供的评测结论。
 * `technical` 只能在 C 的默认折叠“技术详情”中显示；哈希仅用于版本核对，不能作为内容读取入口。
 
 稳定错误码：A 未就绪时返回 `AI_CONTROL_NOT_READY`（503）；C 应显示“AI 服务尚未就绪，请先检查服务状态”，保留 C 自身页面可用，不能回退为虚构统计或 Demo 数据。
@@ -263,3 +264,4 @@ Prompt 路由只返回 `prompt_version`、`prompt_hash`、安全预览和规则�
 | --- | --- | --- |
 | v1 | 2026-07-27 | 首次冻结：根据 A 已实现 envelope、模块状态和反馈分析路径定义 C Admin Consumer 边界；记录 `data.modules` 解包要求。 |
 | v1.1 | 2026-07-28 | 新增只读控制中心总览投影。A 只聚合真实且无内容的运行数据；C 展示业务摘要并将技术字段默认折叠；B 不接入该控制面。 |
+| v1.2 | 2026-07-28 | 明确既有 `pass_rate` 的兼容展示语义：比例值由 Consumer 仅在显示层转换为百分数；不改变 Provider 原值或 API 形状。 |

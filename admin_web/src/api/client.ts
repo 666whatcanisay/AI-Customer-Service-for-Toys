@@ -467,6 +467,89 @@ export interface AiFeedbackAnalysisResultList {
   total: number
 }
 
+export type KnowledgeMaterialType = 'PRODUCT_SPEC' | 'SAFETY_INSTRUCTION' | 'ASSEMBLY_GUIDE' | 'FAQ_SOURCE' | 'OTHER'
+export type KnowledgeMaterialStatus = 'RECEIVED' | 'RECOGNIZED' | 'REVIEWING' | 'APPROVED_FOR_ANALYSIS' | 'ANALYZING' | 'ANALYZED' | 'ANALYSIS_FAILED' | 'REJECTED'
+export type KnowledgeQualityOverallStatus = 'ANALYZED' | 'FAILED'
+export type KnowledgeQualityGapSeverity = 'LOW' | 'MEDIUM' | 'HIGH'
+export type KnowledgeQualityGapStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'DISMISSED'
+
+export interface RecognitionSummary {
+  readable: boolean
+  file_extension: string
+  detected_fields: string[]
+  missing_expected_fields: string[]
+  privacy_reminder: string
+}
+
+export interface KnowledgeMaterial {
+  material_id: string
+  revision: number
+  store_code: string
+  product_id: string
+  sku_id: string | null
+  material_type: KnowledgeMaterialType
+  display_name: string
+  original_filename: string
+  content_hash: string
+  redaction_version: string
+  recognition_summary: RecognitionSummary
+  material_status: KnowledgeMaterialStatus
+  submitted_by: string
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface KnowledgeMaterialDetail extends KnowledgeMaterial {
+  analysis_text_preview: string
+}
+
+export interface KnowledgeMaterialReceipt {
+  material_id: string
+  revision: number
+  content_hash: string
+  material_status: KnowledgeMaterialStatus
+  recognition_summary: RecognitionSummary
+}
+
+export interface KnowledgeMaterialList {
+  items: KnowledgeMaterial[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface KnowledgeQualityGap {
+  gap_id: string
+  gap_code: string
+  severity: KnowledgeQualityGapSeverity
+  title: string
+  description: string
+  recommended_action: string
+  status: KnowledgeQualityGapStatus
+}
+
+export interface KnowledgeQualityAssessment {
+  assessment_id: string
+  material_id: string
+  revision: number
+  content_hash: string
+  analysis_run_id: string
+  model_version: string
+  prompt_version: string
+  overall_status: KnowledgeQualityOverallStatus
+  summary: string
+  gaps: KnowledgeQualityGap[]
+  created_at: string
+}
+
+export interface KnowledgeQualityAssessmentList {
+  items: KnowledgeQualityAssessment[]
+  total: number
+}
+
 export async function listAdminExperienceCases(
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<AdminExperienceCase>> {
@@ -516,6 +599,63 @@ export async function listAiFeedbackAnalysisResults(): Promise<AiFeedbackAnalysi
   return response.data
 }
 
+export async function listKnowledgeMaterials(
+  params?: { store_code?: string; product_id?: string; material_status?: KnowledgeMaterialStatus | ''; page?: number; size?: number },
+): Promise<KnowledgeMaterialList> {
+  const response = await apiClient.get<KnowledgeMaterialList>('/api/v1/admin/knowledge-materials', {
+    params: omitBlankQueryParams(params),
+  })
+  return response.data
+}
+
+export async function getKnowledgeMaterial(materialId: string): Promise<KnowledgeMaterialDetail> {
+  const response = await apiClient.get<KnowledgeMaterialDetail>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}`,
+  )
+  return response.data
+}
+
+export async function uploadKnowledgeMaterial(
+  file: File,
+  fields: {
+    store_code: string
+    product_id: string
+    sku_id?: string
+    material_type: KnowledgeMaterialType
+    display_name: string
+    submitted_by: string
+    material_id?: string
+  },
+): Promise<KnowledgeMaterialReceipt> {
+  const form = new FormData()
+  form.append('file', file)
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value) form.append(key, value)
+  })
+  const idempotencyKey = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `knowledge-material-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const response = await apiClient.post<KnowledgeMaterialReceipt>('/api/v1/admin/knowledge-materials', form, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+  return response.data
+}
+
+export async function reviewKnowledgeMaterial(
+  materialId: string,
+  payload: { revision: number; decision: 'APPROVE_FOR_ANALYSIS' | 'REJECT'; reviewed_by: string; review_note: string },
+): Promise<KnowledgeMaterial> {
+  const response = await apiClient.post<KnowledgeMaterial>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}/review`, payload,
+  )
+  return response.data
+}
+
+export async function listKnowledgeQualityAssessments(): Promise<KnowledgeQualityAssessmentList> {
+  const response = await apiClient.get<KnowledgeQualityAssessmentList>('/api/v1/admin/knowledge-quality/assessments')
+  return response.data
+}
+
 export interface AiModule {
   id: string
   name: string
@@ -556,6 +696,147 @@ function modulesFromAiSuccessEnvelope(payload: unknown): unknown[] {
 export async function listAiModules(): Promise<AiModule[]> {
   const response = await aiClient.get<unknown>('/api/admin/ai/modules')
   return modulesFromAiSuccessEnvelope(response.data).map(normalizeAiModule)
+}
+
+/**
+ * Read-only A-line control-centre projection frozen by ai-control.v1.1.
+ *
+ * Every nullable field deliberately means "the provider did not make this
+ * fact available".  The Admin UI must never turn it into a fabricated zero,
+ * a demo number, or a successful service state.
+ */
+export interface AiControlCenterOverview {
+  moduleId: string
+  service: {
+    status: string | null
+    ready: boolean | null
+    modelConfigured: boolean | null
+    initializationError: string | null
+  }
+  model: {
+    provider: string | null
+    name: string | null
+    configured: boolean | null
+  }
+  knowledge: {
+    status: string | null
+    queryableChunkCount: number | null
+    scope: string | null
+  }
+  runtime: {
+    metricsScope: string | null
+    callCount: number | null
+    successCount: number | null
+    errorCount: number | null
+    averageLatencyMs: number | null
+    lastCalledAt: string | null
+    lastErrorSummary: string | null
+  }
+  latestEvaluation: {
+    status: string | null
+    evaluation: {
+      executedAt: string | null
+      datasetVersion: string | null
+      totalCases: number | null
+      passedCases: number | null
+      passRate: number | null
+    } | null
+  }
+  technical: {
+    promptVersion: string | null
+    promptHash: string | null
+  }
+}
+
+type UnknownRecord = Record<string, unknown>
+
+function recordOrEmpty(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function nullableBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/** Extract only the `data` object promised by A's success envelope. */
+export function aiControlOverviewFromSuccessEnvelope(payload: unknown): AiControlCenterOverview {
+  const envelope = recordOrEmpty(payload)
+  if (envelope.success !== true) {
+    throw new Error('AI 控制中心未返回成功结果。')
+  }
+
+  const data = recordOrEmpty(envelope.data)
+  const moduleId = nullableString(data.module_id)
+  if (!moduleId) {
+    throw new Error('AI 控制中心返回的数据不符合已冻结接口。')
+  }
+
+  const service = recordOrEmpty(data.service)
+  const model = recordOrEmpty(data.model)
+  const knowledge = recordOrEmpty(data.knowledge)
+  const runtime = recordOrEmpty(data.runtime)
+  const latestEvaluation = recordOrEmpty(data.latest_evaluation)
+  const evaluation = recordOrEmpty(latestEvaluation.evaluation)
+  const technical = recordOrEmpty(data.technical)
+
+  return {
+    moduleId,
+    service: {
+      status: nullableString(service.status),
+      ready: nullableBoolean(service.ready),
+      modelConfigured: nullableBoolean(service.model_configured),
+      initializationError: nullableString(service.initialization_error),
+    },
+    model: {
+      provider: nullableString(model.provider),
+      name: nullableString(model.name),
+      configured: nullableBoolean(model.configured),
+    },
+    knowledge: {
+      status: nullableString(knowledge.status),
+      queryableChunkCount: nullableNumber(knowledge.queryable_chunk_count),
+      scope: nullableString(knowledge.scope),
+    },
+    runtime: {
+      metricsScope: nullableString(runtime.metrics_scope),
+      callCount: nullableNumber(runtime.call_count),
+      successCount: nullableNumber(runtime.success_count),
+      errorCount: nullableNumber(runtime.error_count),
+      averageLatencyMs: nullableNumber(runtime.average_latency_ms),
+      lastCalledAt: nullableString(runtime.last_called_at),
+      lastErrorSummary: nullableString(runtime.last_error_summary),
+    },
+    latestEvaluation: {
+      status: nullableString(latestEvaluation.status),
+      evaluation: Object.keys(evaluation).length === 0 ? null : {
+        executedAt: nullableString(evaluation.executed_at),
+        datasetVersion: nullableString(evaluation.dataset_version),
+        totalCases: nullableNumber(evaluation.total_cases),
+        passedCases: nullableNumber(evaluation.passed_cases),
+        passRate: nullableNumber(evaluation.pass_rate),
+      },
+    },
+    technical: {
+      promptVersion: nullableString(technical.prompt_version),
+      promptHash: nullableString(technical.prompt_hash),
+    },
+  }
+}
+
+/** The only AI-control overview request used by the operator-facing screen. */
+export async function getAiControlCenterOverview(): Promise<AiControlCenterOverview> {
+  const response = await aiClient.get<unknown>('/api/admin/ai/control-center/overview')
+  return aiControlOverviewFromSuccessEnvelope(response.data)
 }
 
 export async function getHealth(): Promise<HealthResponse> {

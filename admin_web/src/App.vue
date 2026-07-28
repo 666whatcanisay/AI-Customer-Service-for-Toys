@@ -3,8 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import {
   getAdminOverview,
+  getAiControlCenterOverview,
   getHealth,
-  listAiModules,
   type HealthResponse
 } from './api/client'
 
@@ -21,51 +21,31 @@ const showTechnicalDetails = ref(false)
 const refreshing = ref(false)
 
 const navGroups: Array<{ label: string; items: Array<{ label: string; to?: string; planned?: boolean }> }> = [
-  { label: '首页', items: [{ label: '运营概览', to: '/overview' }] },
+  {
+    label: '开始工作',
+    items: [
+      { label: '运营概览', to: '/overview' },
+      { label: '商品知识中心', to: '/knowledge-center' },
+      { label: '导入中心', to: '/import-center' },
+    ],
+  },
   {
     label: '客服运营',
     items: [
-      { label: '客服经验库', to: '/experience-cases' },
-      { label: 'AI 问题', to: '/ai-feedback-optimization-pool' },
-      { label: '效率分析', planned: true },
-      { label: '改进建议', to: '/suggestions' }
-    ]
+      { label: '客服运营工作台', to: '/customer-operations' },
+    ],
   },
   {
-    label: '商品知识',
+    label: 'AI 运营',
     items: [
-      { label: '店铺', to: '/stores' },
-      { label: '商品与 SKU', to: '/products' },
-      { label: 'FAQ', to: '/faqs' },
-      { label: '安全规则', to: '/safety-rules' },
-      { label: '来源与冲突', to: '/sources' },
-      { label: '数据冲突', to: '/conflicts' }
-    ]
-  },
-  {
-    label: 'AI 管理',
-    items: [
-      { label: 'AI 能力中心', to: '/ai-capabilities' },
-      { label: '评测', to: '/ai-optimization-pool' },
-      { label: '优化建议', to: '/ai-feedback-optimization-pool' }
-    ]
-  },
-  {
-    label: '业务扩展',
-    items: [
-      { label: 'ERP 同步', planned: true },
-      { label: '售后助手', planned: true },
-      { label: '退款风险', planned: true }
-    ]
+      { label: 'AI 控制中心', to: '/ai-capabilities' },
+    ],
   },
   {
     label: '系统',
     items: [
       { label: '服务状态', to: '/system-status' },
-      { label: '数据导入', to: '/imports' },
-      { label: '测试数据包', to: '/test-data-packages' },
-      { label: '日志', planned: true }
-    ]
+    ],
   }
 ]
 
@@ -89,7 +69,7 @@ async function refreshStatus(): Promise<void> {
   const [overviewResult, platformResult, aiResult] = await Promise.allSettled([
     getAdminOverview(),
     getHealth(),
-    listAiModules()
+    getAiControlCenterOverview(),
   ])
 
   if (overviewResult.status === 'fulfilled') {
@@ -106,7 +86,12 @@ async function refreshStatus(): Promise<void> {
     platformState.value = 'unavailable'
   }
 
-  aiState.value = aiResult.status === 'fulfilled' ? 'available' : 'unavailable'
+  aiState.value = aiResult.status === 'fulfilled'
+    && aiResult.value.service.status === 'RUNNING'
+    && aiResult.value.service.ready === true
+    && aiResult.value.service.modelConfigured === true
+    ? 'available'
+    : 'unavailable'
   checkedAt.value = new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
   }).format(new Date())
@@ -141,6 +126,11 @@ onMounted(() => { void refreshStatus() })
           </span>
         </section>
       </nav>
+
+      <section class="planned-capabilities" aria-label="规划中的业务能力">
+        <strong>后续能力</strong>
+        <p>ERP 镜像、售后助手和退款风险辅助仍在规划中，当前没有自动业务动作。</p>
+      </section>
 
       <div class="sidebar-boundary">
         <strong>内部测试管理</strong>
@@ -202,13 +192,16 @@ a { color: #285493; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 17px; }
 .brand small { margin-top: 3px; color: #9fb2d1; font-size: 12px; }
-.product-nav { display: grid; gap: 14px; }
+.product-nav { display: grid; gap: 12px; }
 .nav-group { display: grid; gap: 4px; }
 .nav-group h2 { margin: 0; padding: 0 9px 4px; color: #91a7ca; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
 .nav-link { display: flex; min-height: 34px; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 9px; color: #c1d0e7; font-size: 13px; text-decoration: none; }
 .nav-link:hover, .nav-link.router-link-active { color: #fff; background: rgb(103 153 245 / 21%); }
 .nav-link.planned { color: #8498b8; cursor: default; }
 .nav-link.planned small { color: #8297b6; font-size: 10px; }
+.planned-capabilities { margin-top: 16px; padding: 11px 12px; border-left: 2px solid rgb(160 183 220 / 35%); color: #9fb2d1; }
+.planned-capabilities strong { color: #b9c8df; font-size: 12px; }
+.planned-capabilities p { margin: 5px 0 0; font-size: 11px; line-height: 1.55; }
 .sidebar-boundary { margin-top: auto; padding: 13px; border: 1px solid rgb(160 183 220 / 22%); border-radius: 12px; background: rgb(255 255 255 / 6%); }
 .sidebar-boundary strong { font-size: 13px; }
 .sidebar-boundary p { margin: 6px 0 0; color: #9fb2d1; font-size: 11px; line-height: 1.55; }
