@@ -6,8 +6,8 @@
   "version": "0.1.0",
   "current_task": "TARGET MODE V5 AI control center and 5174 operations productization",
   "current_stage": "C Admin provides concise Chinese workspaces for operations, knowledge, imports, customer operations, and a typed read-only AI control center. The AI screen consumes only frozen ai-control.v1.1 A overview data; C-native knowledge-quality and feedback views remain separate. This UI is stacked on C Provider #70; browser integration awaits the Interface/A candidates in an isolated combined baseline.",
-  "current_gate": "C_UI_VERIFIED_PENDING_STACKED_INTEGRATION: Admin typecheck, 19-file/39-test Vitest suite, production build and diff check pass. The A Provider endpoint must be present in the same isolated candidate baseline before browser smoke can be claimed.",
-  "status": "target_mode_v5_c_ui_verified_pending_stacked_integration",
+  "current_gate": "C_UI_VERIFIED_ENV_BLOCKED_CREATE_PR: Admin typecheck, 19-file/39-test Vitest suite, production build and diff check pass. Branch cf1f070 is pushed; two Draft PR attempts failed only on GitHub API TLS handshake. The A Provider endpoint must be present in the same isolated candidate baseline before browser smoke can be claimed.",
+  "status": "target_mode_v5_c_ui_verified_env_blocked_create_pr",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen TARGET MODE V2 interface: docs/control/interfaces/knowledge-quality-loop.v1.md (not modified)",
@@ -101,8 +101,8 @@
   "git": {
     "branch": "codex/ai-control-center-v2-platform",
     "base": "codex/data-intelligence-platform-v1 (C Provider Draft PR #70)",
-    "commit": "PENDING_DELIVERY",
-    "draft_pr": "PENDING_DELIVERY"
+    "commit": "cf1f070ef1cc8879c50b99091c9ddbe4ec42c55e",
+    "draft_pr": "ENV_BLOCKED_CREATE_PR: two gh pr create attempts hit GitHub API TLS handshake timeout; branch is pushed and ready for Draft PR creation."
   },
   "next_recommended_task": "Run isolated browser validation after the planned candidate order Interface #73 → C Provider #70 → A #74 → C V5 UI → B #75. Do not add publication, training, Prompt writes or customer/ERP actions.",
   "last_updated": "2026-07-28"
