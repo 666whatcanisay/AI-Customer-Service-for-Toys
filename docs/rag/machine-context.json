@@ -4,12 +4,12 @@
   "project_name": "A: RAG Core and safe-answer services",
   "line": "A",
   "version": "0.3.1-test",
-  "status": "source_fixed_runtime_restart_pending",
-  "current_task": "TARGET MODE V2 A controlled knowledge-material quality analysis",
-  "next_recommended_task": "After the C knowledge-quality provider is available, use an isolated C service with one human-approved de-identified APPROVED_FOR_ANALYSIS material snapshot to run the explicit C-read/qwen/writeback trace. Verify its new revision and analysis evidence in C; do not auto-publish it to RAG or auto-merge.",
-  "current_stage": "A preserves existing RAG and feedback consumers and adds a separate explicit knowledge-material quality consumer. It accepts only frozen C HTTP snapshots, calls the configured local qwen3.5:9b, and returns structured evidence to C without storing source material.",
-  "current_gate": "A controlled knowledge-quality source and isolated cross-service gate are PASS: focused tests and full backend regression pass, and a human-approved de-identified C snapshot completed C → A → local qwen3.5:9b → C with C recording ANALYZED. This does not change the separate historical A-T03 or feedback-analysis gates and does not publish material to RAG.",
-  "last_test_result": "2026-07-28: focused knowledge-quality bridge tests 13 passed; full pytest backend 92 passed, 3 opt-in integration tests skipped, 34 existing warnings. A accepted C's bounded multiline approved summary, ran real qwen3.5:9b, and C recorded the traceable material assessment as overall_status=ANALYZED. No source text, model raw output, or prompt was emitted.",
+  "status": "ai_control_center_provider_ready",
+  "current_task": "TARGET MODE V5 A AI control-center overview provider",
+  "next_recommended_task": "C Admin should consume the frozen overview through its existing /ai-api loopback proxy and verify Chinese business-summary rendering plus safe not-ready state. Do not expose A directly to LAN, add writes, or auto-change models, prompts, or knowledge.",
+  "current_stage": "A provides the frozen read-only AI control-center overview from existing module state, model configuration, queryable knowledge count, process-local metrics, and a safe persisted-evaluation summary. It remains separate from controlled C→A→C analysis consumers.",
+  "current_gate": "A provider gate is PASS: the frozen overview is read-only, uses only real in-process state, returns a stable 503 AI_CONTROL_NOT_READY when A is unavailable, and hides customer content, source text, full prompts, keys, paths, tracebacks, and raw evaluation records. C browser integration remains a separate consumer gate.",
+  "last_test_result": "2026-07-28: overview API tests 25 passed; full pytest backend 96 passed, 3 opt-in integration tests skipped, 38 existing warnings. Coverage verifies live projection, unavailable knowledge, safe latest-evaluation field selection, and stable not-ready error without private failure content.",
   "blockers": [],
   "historical_blockers": [
     "Live C evaluation remains 19/28 rather than the required 28/28",
@@ -27,7 +27,7 @@
     "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
   ],
   "git": {
-    "branch": "codex/rag-v12-1-ai",
+    "branch": "codex/ai-control-center-v2-rag",
     "clean": true,
     "baseline_commit": "f5fccfd9685440f0e43ee5be35207ab4372f6a2d",
     "commit": "PENDING_DELIVERY",
@@ -35,7 +35,7 @@
     "remote_branch": "origin/codex/rag-v12-1-ai",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
   },
-  "checked_at": "2026-07-27",
+  "checked_at": "2026-07-28",
   "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
   "entrypoints": [
     "backend/app/service/rag_service.py",
@@ -77,7 +77,8 @@
     "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
     "NIGHT-SHIFT A P1 bounded feedback-analysis JSON parsing and synthetic local qwen smoke",
     "V12.1 A combined knowledge-count projection and browser-safe initialization error normalization",
-    "TARGET MODE V2 explicit C-approved material quality-analysis consumer (real C provider integration pending)"
+    "TARGET MODE V2 explicit C-approved material quality-analysis consumer (real C provider integration pending)",
+    "TARGET MODE V5 frozen read-only AI control-center overview provider"
   ],
   "required_interfaces": [
     "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
@@ -103,7 +104,8 @@
     "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
     "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
     "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
-    "POST /api/admin/ai/knowledge-quality/run explicit loopback-only knowledge-material analysis"
+    "POST /api/admin/ai/knowledge-quality/run explicit loopback-only knowledge-material analysis",
+    "GET /api/admin/ai/control-center/overview frozen read-only operator-safe overview"
   ],
   "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
 }
