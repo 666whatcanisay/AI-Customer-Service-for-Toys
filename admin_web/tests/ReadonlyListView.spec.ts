@@ -42,7 +42,7 @@ describe('ReadonlyListView', () => {
   it('keeps source filenames and checksums in controlled table cells', async () => {
     mockedList.mockResolvedValue({
       items: [{
-        source_type: 'PRODUCT_IMAGE',
+        source_type: 'PRODUCT_DETAIL_SCREENSHOT',
         file_name: '汕明_812580876528_商品参数_G1005.png',
         file_sha256: '66850eb1a594e3f408566711382f7139daa474abb696112b483b80d8796387',
         product_id: 'PDD-SM-P0001',
@@ -70,6 +70,7 @@ describe('ReadonlyListView', () => {
     await flushPromises()
 
     expect(wrapper.find('table').classes()).toContain('source-table')
+    expect(wrapper.find('.source-type-cell').text()).toBe('PRODUCT_DETAIL_SCREENSHOT')
     expect(wrapper.find('.source-file-cell').text()).toContain('汕明_812580876528_商品参数_G1005.png')
     expect(wrapper.find('.source-hash-cell').text()).toContain('66850eb1a594e3f408566711382f7139daa474abb696112b483b80d8796387')
   })

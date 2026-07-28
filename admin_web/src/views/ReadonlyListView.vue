@@ -89,6 +89,7 @@ onMounted(load)
               v-for="column in columns"
               :key="column.key"
               :class="{
+                'source-type-cell': resource === 'sources' && column.key === 'source_type',
                 'source-file-cell': resource === 'sources' && column.key === 'file_name',
                 'source-hash-cell': resource === 'sources' && column.key === 'file_sha256',
               }"
@@ -114,12 +115,12 @@ label { display: grid; gap: 5px; color: #526279; font-size: 13px; }
 input { min-height: 38px; min-width: 130px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 7px; font: inherit; }
 .readonly-table-wrap { max-width: 100%; overflow-x: auto; }
 .source-table { table-layout: fixed; }
-.source-table th:nth-child(1) { width: 15%; }
-.source-table th:nth-child(2) { width: 24%; }
+.source-table th:nth-child(1) { width: 18%; }
+.source-table th:nth-child(2) { width: 21%; }
 .source-table th:nth-child(3) { width: 34%; }
 .source-table th:nth-child(4) { width: 17%; }
 .source-table th:nth-child(5) { width: 10%; }
-.source-file-cell, .source-hash-cell { overflow-wrap: anywhere; word-break: break-word; }
+.source-type-cell, .source-file-cell, .source-hash-cell { overflow-wrap: anywhere; word-break: break-word; }
 .source-hash-cell { color: #33445c; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 20px; }
 </style>
