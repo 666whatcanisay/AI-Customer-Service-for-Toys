@@ -3,13 +3,14 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "target_mode_v5_productization_v2_candidate_ready",
+  "status": "productization_v2_code_released_runtime_restart_blocked",
   "current_task": "AI-CS-PRODUCTIZATION-V2",
-  "current_stage": "ai-control.v1.2 is frozen. Candidate Draft PRs #73 (Interface/Data), #74 (A), #75 (B), and #76 (C/Admin) passed isolated real integration: original test ZIP catalog, reviewed material, real qwen3.5:9b knowledge analysis and writeback, Chinese Admin control-center projection, and customer product/SKU answer flow.",
-  "current_gate": "CANDIDATE_READY_PENDING_MERGE_AUTHORIZATION: no automatic RAG publication, Prompt/model change, training, messaging, after-sales, refund, order or ERP action is authorized. Candidate-only verification does not replace formal develop restart, Private firewall configuration, or second controlled customer-computer acceptance.",
+  "current_stage": "PRs #73 (Interface/Data), #76 (C/Admin), #74 (A), and #75 (B) were squash merged to develop@e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3. Unified regression and isolated real integration passed, but the formal host is still serving mixed old-worktree processes and its main worktree contains user-owned uncommitted documentation.",
+  "current_gate": "RUNTIME_RECONCILIATION_REQUIRED: preserve the user-owned main-tree changes, safely reconcile or obtain authorization for old unrecorded listener processes, then restart the released SHA through formal OPS scripts. No automatic RAG publication, Prompt/model change, training, messaging, after-sales, refund, order or ERP action is authorized.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
+    "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "base_commit": "6ea5dddc0b1e5b536e3833f353d34a7ac731930d",
     "feature_branch": "codex/mvp-lan-batch-05",
     "mvp_batch_05_squash_commit": "dc48646bcfd20bffc864a6c1ba4d0049cd444870",
@@ -134,10 +135,11 @@
   },
   "t02_executed": false,
   "blockers": [
+    "Formal Productization V2 runtime restart is blocked: the formal develop worktree has user-owned uncommitted documents and 8000/8011/5173/5174 are occupied by mixed old-worktree processes without a complete current trusted record set. The official stop script correctly refused an unrecorded 8011 listener rather than killing by port.",
     "A second controlled customer computer must run browser and TCP 5173 acceptance. If company Wi-Fi and wired clients cannot route after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure.",
     "The required AI Customer Service LAN 5173 (Private) rule is not configured. The current session has no administrator rights, so no UAC bypass or firewall change was attempted.",
     "Customer-efficiency.v1 is interface-blocked: C PR #37 uses DIRECT_ADOPTION/EDITED_ADOPTION/NOT_ADOPTED and a reduced payload, while frozen B fields are AI_DIRECT_ADOPT/AI_EDIT_ADOPT/AI_REJECT with required correlation and privacy fields. PRs #37/#38/#39 and C descendants #43/#44/#47/#50 remain unmerged.",
     "PR #32 is stale, PR #33 is DIRTY, and PR #42 conflicts with the cumulative B/UI chain and crosses A/B ownership. They require separate review rather than forced baseline inclusion."
   ],
-  "last_updated": "2026-07-27"
+  "last_updated": "2026-07-28"
 }
