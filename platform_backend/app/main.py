@@ -19,6 +19,11 @@ from app.api.admin_ai_feedback_routes import (
     admin_router as admin_ai_feedback_router,
     ai_quality_router,
 )
+from app.api.knowledge_material_routes import (
+    admin_router as knowledge_material_admin_router,
+    ai_quality_router as knowledge_quality_router,
+    customer_router as customer_knowledge_status_router,
+)
 from app.api.import_routes import router as import_router
 from app.api.test_catalog_routes import router as test_catalog_router
 from app.errors import (
@@ -54,6 +59,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.add_exception_handler(AppError, app_exception_handler)
+
     application.include_router(import_router)
     application.include_router(test_catalog_router)
     application.include_router(customer_suggestion_router)
@@ -64,6 +70,9 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(ai_optimization_router)
     application.include_router(admin_ai_feedback_router)
     application.include_router(ai_quality_router)
+    application.include_router(knowledge_material_admin_router)
+    application.include_router(knowledge_quality_router)
+    application.include_router(customer_knowledge_status_router)
     application.include_router(admin_router)
 
     @application.get("/health")

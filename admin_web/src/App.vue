@@ -38,6 +38,7 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to?: strin
       { label: '商品与 SKU', to: '/products' },
       { label: 'FAQ', to: '/faqs' },
       { label: '安全规则', to: '/safety-rules' },
+      { label: '资料上传与审核', to: '/knowledge-materials' },
       { label: '来源与冲突', to: '/sources' },
       { label: '数据冲突', to: '/conflicts' }
     ]
@@ -47,6 +48,7 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to?: strin
     items: [
       { label: 'AI 能力中心', to: '/ai-capabilities' },
       { label: '评测', to: '/ai-optimization-pool' },
+      { label: '资料质量与补充', to: '/knowledge-quality-pool' },
       { label: '优化建议', to: '/ai-feedback-optimization-pool' }
     ]
   },

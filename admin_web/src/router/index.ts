@@ -13,6 +13,8 @@ import AiFeedbackOptimizationPoolView from '../views/AiFeedbackOptimizationPoolV
 import OperationsOverviewView from '../views/OperationsOverviewView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ReadonlyListView from '../views/ReadonlyListView.vue'
+import KnowledgeMaterialsView from '../views/KnowledgeMaterialsView.vue'
+import KnowledgeQualityPoolView from '../views/KnowledgeQualityPoolView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -67,6 +69,8 @@ export const router = createRouter({
     { path: '/experience-cases', name: 'experience-cases', component: CustomerExperienceCasesView },
     { path: '/ai-optimization-pool', name: 'ai-optimization-pool', component: AiOptimizationPoolView },
     { path: '/ai-feedback-optimization-pool', name: 'ai-feedback-optimization-pool', component: AiFeedbackOptimizationPoolView },
+    { path: '/knowledge-materials', name: 'knowledge-materials', component: KnowledgeMaterialsView },
+    { path: '/knowledge-quality-pool', name: 'knowledge-quality-pool', component: KnowledgeQualityPoolView },
     {
       path: '/system-status',
       name: 'system-status',
