@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TesterIdentityKey } from '@/workspace/testerIdentity'
+import { CustomerIdentityKey } from '@/workspace/customerIdentity'
 import SuggestionForm from './SuggestionForm.vue'
 
 const apiMocks = vi.hoisted(() => ({ submit: vi.fn() }))
@@ -18,9 +18,8 @@ const mountPage = async () => {
       plugins: [ElementPlus],
       stubs: { RouterLink: { template: '<a><slot /></a>' } },
       provide: {
-        [TesterIdentityKey as symbol]: {
-          identity: ref({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }),
-          save: vi.fn(), reload: vi.fn()
+        [CustomerIdentityKey as symbol]: {
+          identity: ref({ userId: 'CSU-ONE', displayName: '小木', role: 'CUSTOMER_SERVICE', status: 'ACTIVE', defaultStoreCode: 'PDD-SM', storeBindings: [{ storeCode: 'PDD-SM', isDefault: true }] })
         }
       }
     }
@@ -47,7 +46,7 @@ describe('SuggestionForm', () => {
     await button.trigger('click')
     await button.trigger('click')
     expect(apiMocks.submit).toHaveBeenCalledTimes(1)
-    expect(apiMocks.submit.mock.calls[0][0]).toMatchObject({ reporterId: 'TESTER-ONE', storeCode: 'PDD-SM' })
+    expect(apiMocks.submit.mock.calls[0][0]).toMatchObject({ reporterId: 'CSU-ONE', storeCode: 'PDD-SM' })
     resolveRequest({ suggestionId: 'SUG-001', status: 'SUBMITTED' })
     await flushPromises()
     expect(wrapper.get('[data-testid="suggestion-success"]').text()).toContain('SUG-001')

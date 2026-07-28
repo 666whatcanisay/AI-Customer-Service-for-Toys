@@ -11,7 +11,7 @@ import {
   recordExperienceCaseSubmission
 } from '@/workspace/experienceCaseSession'
 import { SystemStatusKey } from '@/workspace/systemStatus'
-import { TesterIdentityKey } from '@/workspace/testerIdentity'
+import { CustomerIdentityKey } from '@/workspace/customerIdentity'
 import WorkspaceHome from './WorkspaceHome.vue'
 
 describe('WorkspaceHome', () => {
@@ -30,16 +30,15 @@ describe('WorkspaceHome', () => {
       skuId: 'SKU-RED',
       caseId: 'CEC-001',
       feedbackType: 'ADOPTED',
-      createdBy: 'TESTER-ONE',
+      createdBy: 'CSU-ONE',
       reviewStatus: 'NEW',
       submittedAt: '2026-07-27 12:00:00'
     })
     const wrapper = mount(WorkspaceHome, {
       global: {
         provide: {
-          [TesterIdentityKey as symbol]: {
-            identity: ref({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }),
-            save: vi.fn(), reload: vi.fn()
+          [CustomerIdentityKey as symbol]: {
+            identity: ref({ userId: 'CSU-ONE', displayName: '小木', role: 'CUSTOMER_SERVICE', status: 'ACTIVE', defaultStoreCode: 'PDD-SM', storeBindings: [{ storeCode: 'PDD-SM', isDefault: true }] })
           },
           [SystemStatusKey as symbol]: {
             aiReady: ref(true), dataReady: ref(false), loading: ref(false),

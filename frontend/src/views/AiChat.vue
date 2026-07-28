@@ -506,6 +506,9 @@
           <p v-if="adoptionMessage" class="feedback-result" data-testid="adoption-result">
             {{ adoptionMessage }}
           </p>
+          <p v-if="efficiencyStatus" class="feedback-result efficiency-warning" data-testid="efficiency-event-warning">
+            {{ efficiencyStatus }}
+          </p>
         </div>
       </details>
 
@@ -682,10 +685,18 @@ import {
   createAiResponseFeedbackIdempotencyKey
 } from '@/api/aiResponseFeedbackClient'
 import {
+  AiResponseFeedbackClientError,
   PlatformClientError,
   toPlatformClientError,
   toRagClientError
 } from '@/api/errorMapper'
+import {
+  CustomerEfficiencyClientError,
+  createCustomerEfficiencyIdempotencyKey,
+  createCustomerInteractionId,
+  customerEfficiencyClient
+} from '@/api/customerEfficiencyClient'
+import type { CustomerEfficiencyEventType } from '@/api/customerEfficiencyTypes'
 import type {
   CatalogProduct,
   CatalogSku,
@@ -716,7 +727,7 @@ import {
 } from '@/workspace/customerSessionActivity'
 import { recordExperienceCaseSubmission } from '@/workspace/experienceCaseSession'
 import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresentation'
-import { useTesterIdentity } from '@/workspace/testerIdentity'
+import { useCustomerIdentity } from '@/workspace/customerIdentity'
 
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
 
@@ -868,11 +879,14 @@ const aiFeedbackType = ref<NotAdoptedReason | ''>('')
 const aiFeedbackNote = ref('')
 const aiFeedbackFinalAnswer = ref('')
 const aiFeedbackIdempotencyKey = ref('')
+const efficiencyStatus = ref('')
+const interactionId = ref('')
 const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
 let activeCatalogController: AbortController | null = null
-const { identity } = useTesterIdentity()
+let efficiencyEventChain: Promise<void> = Promise.resolve()
+const { identity, clear: clearIdentity } = useCustomerIdentity()
 
 const runtimeDetails = {
   frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'development',
@@ -896,6 +910,71 @@ const selectedSku = computed(() =>
 )
 
 const canSubmit = computed(() => Boolean(customerQuestion.value.trim() && !loading.value))
+
+const invalidIdentityCodes = new Set([
+  'CUSTOMER_USER_NOT_FOUND',
+  'CUSTOMER_USER_DISABLED',
+  'CUSTOMER_USER_STORE_FORBIDDEN'
+])
+
+const clearInvalidIdentity = (error: unknown): boolean => {
+  const code = error instanceof PlatformClientError ||
+    error instanceof AiResponseFeedbackClientError ||
+    error instanceof CustomerEfficiencyClientError
+    ? error.code
+    : null
+  if (!code || !invalidIdentityCodes.has(code)) return false
+  clearIdentity()
+  return true
+}
+
+const sendEfficiencyEvent = async (
+  eventType: CustomerEfficiencyEventType,
+  feedbackId: string | null,
+  snapshot: {
+    userId: string
+    storeCode: string
+    productId: string | null
+    skuId: string | null
+    interactionId: string | null
+  }
+): Promise<void> => {
+  try {
+    await customerEfficiencyClient.submit({
+      eventType,
+      operatorId: snapshot.userId,
+      storeCode: snapshot.storeCode,
+      productId: snapshot.productId,
+      skuId: snapshot.skuId,
+      conversationId: null,
+      interactionId: snapshot.interactionId,
+      feedbackId
+    }, createCustomerEfficiencyIdempotencyKey())
+    efficiencyStatus.value = ''
+  } catch (error) {
+    if (clearInvalidIdentity(error)) return
+    efficiencyStatus.value = '本次使用记录暂未写入，不影响当前 AI 建议和人工确认。'
+  }
+}
+
+const queueEfficiencyEvent = (
+  eventType: CustomerEfficiencyEventType,
+  feedbackId: string | null = null
+): Promise<void> => {
+  const currentIdentity = identity.value
+  const currentResult = result.value
+  if (!currentIdentity || !currentResult) return Promise.resolve()
+  const snapshot = {
+    userId: currentIdentity.userId,
+    storeCode: currentResult.context.store_code,
+    productId: currentResult.context.product_id,
+    skuId: currentResult.context.sku_id,
+    interactionId: interactionId.value || null
+  }
+  const queued = efficiencyEventChain.then(() => sendEfficiencyEvent(eventType, feedbackId, snapshot))
+  efficiencyEventChain = queued.catch(() => undefined)
+  return queued
+}
 
 const systemReady = computed(() =>
   ragHealth.value?.ready === true &&
@@ -1084,6 +1163,8 @@ const clearAnswer = () => {
   aiFeedbackFinalAnswer.value = ''
   aiFeedbackError.value = ''
   aiFeedbackStatus.value = ''
+  efficiencyStatus.value = ''
+  interactionId.value = ''
   copyStatus.value = 'idle'
   copyError.value = ''
   requestError.value = ''
@@ -1169,17 +1250,22 @@ const loadStores = async () => {
         `店铺 ${unsafeStore.storeCode} 不符合测试数据、仅供建议、禁止自动发送的安全边界`
       )
     }
-    stores.value = nextStores
+    const boundStoreCodes = new Set(identity.value?.storeBindings.map((binding) => binding.storeCode) ?? [])
+    const boundStores = nextStores.filter((store) => boundStoreCodes.has(store.storeCode))
+    if (!boundStores.length) {
+      throw new PlatformClientError('contract', '当前客服身份没有可用的已绑定店铺，请联系运营在用户管理中检查店铺绑定。')
+    }
+    stores.value = boundStores
     const currentStoreKey = selectedStoreKey.value
     const rememberedStoreKey = readRememberedStore()
-    const defaultStoreKey = nextStores.find(
-      (store) => store.storeCode === identity.value.defaultStoreCode
+    const defaultStoreKey = boundStores.find(
+      (store) => store.storeCode === identity.value?.defaultStoreCode
     )
     storeKeyToLoad = [
+      defaultStoreKey ? storeKey(defaultStoreKey) : '',
       currentStoreKey,
-      rememberedStoreKey,
-      defaultStoreKey ? storeKey(defaultStoreKey) : ''
-    ].find((value) => nextStores.some((store) => storeKey(store) === value)) ?? ''
+      rememberedStoreKey
+    ].find((value) => boundStores.some((store) => storeKey(store) === value)) ?? ''
   } catch (error) {
     if (!controller.signal.aborted) {
       stores.value = []
@@ -1328,7 +1414,9 @@ const submitQuestion = async () => {
     result.value = response
     replyDraft.value = response.answer
     lastAnsweredQuestion.value = message
+    interactionId.value = createCustomerInteractionId()
     recordAiAssist()
+    void queueEfficiencyEvent('AI_REQUEST')
   } catch (error) {
     const clientError = toRagClientError(error)
     if (controller.signal.aborted || clientError.kind === 'canceled') {
@@ -1396,6 +1484,12 @@ const recordAdoption = (type: AdoptionType) => {
   aiFeedbackFinalAnswer.value = ''
   aiFeedbackError.value = ''
   aiFeedbackStatus.value = ''
+  const efficiencyEvent: CustomerEfficiencyEventType = type === 'DIRECT_ACCEPT'
+    ? 'AI_DIRECT_ADOPT'
+    : type === 'EDITED_ACCEPT'
+      ? 'AI_EDIT_ADOPT'
+      : 'AI_REJECT'
+  void queueEfficiencyEvent(efficiencyEvent)
   ElMessage.success('已记录本页反馈')
 }
 
@@ -1427,6 +1521,12 @@ const openAiFeedbackCapture = () => {
 
 const submitAiFeedback = async () => {
   if (!result.value || adoption.value?.type !== 'REJECTED' || aiFeedbackSubmitting.value) return
+  const currentIdentity = identity.value
+  if (!currentIdentity) {
+    aiFeedbackError.value = '当前客服身份已失效，请重新选择身份后再提交。'
+    clearIdentity()
+    return
+  }
 
   const question = customerQuestion.value.trim()
   const aiAnswer = result.value.answer.trim()
@@ -1450,7 +1550,7 @@ const submitAiFeedback = async () => {
     aiFeedbackIdempotencyKey.value || createAiResponseFeedbackIdempotencyKey()
   aiFeedbackIdempotencyKey.value = idempotencyKey
   try {
-    await aiResponseFeedbackClient.submit({
+    const receipt = await aiResponseFeedbackClient.submit({
       storeCode: result.value.context.store_code,
       productId: result.value.context.product_id,
       skuId: result.value.context.sku_id,
@@ -1459,11 +1559,13 @@ const submitAiFeedback = async () => {
       feedbackType: aiFeedbackType.value,
       feedbackNote: aiFeedbackType.value === 'OTHER' ? aiFeedbackNote.value.trim() : null,
       finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
-      createdBy: identity.value.reporterId
+      createdBy: currentIdentity.userId
     }, idempotencyKey)
     recordAiFeedbackSubmission()
+    void queueEfficiencyEvent('AI_FEEDBACK_SUBMIT', receipt.feedbackId)
     aiFeedbackStatus.value = '反馈已记录。'
   } catch (error) {
+    if (clearInvalidIdentity(error)) return
     aiFeedbackError.value = error instanceof Error ? error.message : 'AI 问题反馈服务当前不可用。'
   } finally {
     aiFeedbackSubmitting.value = false
@@ -1472,6 +1574,12 @@ const submitAiFeedback = async () => {
 
 const submitExperienceCase = async () => {
   if (!result.value || !adoption.value || experienceCaseSubmitting.value) return
+  const currentIdentity = identity.value
+  if (!currentIdentity) {
+    experienceCaseError.value = '当前客服身份已失效，请重新选择身份后再提交。'
+    clearIdentity()
+    return
+  }
 
   const question = customerQuestion.value.trim()
   const aiAnswer = result.value.answer.trim()
@@ -1496,7 +1604,7 @@ const submitExperienceCase = async () => {
       aiAnswer,
       finalAnswer: experienceCaseFinalAnswer.value.trim(),
       feedbackType: experienceCaseFeedbackType.value,
-      createdBy: identity.value.reporterId
+      createdBy: currentIdentity.userId
     })
     recordExperienceCaseSubmission({
       storeCode: result.value.context.store_code,
@@ -1504,12 +1612,14 @@ const submitExperienceCase = async () => {
       skuId: result.value.context.sku_id,
       caseId: receipt.caseId,
       feedbackType: experienceCaseFeedbackType.value,
-      createdBy: identity.value.reporterId,
+      createdBy: currentIdentity.userId,
       reviewStatus: receipt.reviewStatus,
       submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
     })
+    void queueEfficiencyEvent('EXPERIENCE_CASE_SAVE')
     experienceCaseStatus.value = `案例已提交，当前状态：${EXPERIENCE_CASE_STATUS_LABELS[receipt.reviewStatus]}。`
   } catch (error) {
+    if (clearInvalidIdentity(error)) return
     experienceCaseError.value = error instanceof Error ? error.message : '案例服务当前不可用。'
   } finally {
     experienceCaseSubmitting.value = false
@@ -1768,6 +1878,7 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .feedback-section summary { cursor: pointer; color: #284a73; font-size: 14px; font-weight: 800; }
 .feedback-section > .el-button { vertical-align: top; margin-top: 16px; }
 .feedback-result { margin-top: 12px; color: #246b3f !important; font-weight: 700; }
+.efficiency-warning { color: #8a5d00 !important; }
 .experience-case-entry-hint { margin-top: -2px !important; color: #47705d !important; }
 .adoption-next-step { color: #495a78 !important; }
 .ai-feedback-entry-hint { margin-top: 8px !important; color: #315fbd !important; }

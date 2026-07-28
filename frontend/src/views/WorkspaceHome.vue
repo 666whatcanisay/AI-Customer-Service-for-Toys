@@ -3,7 +3,7 @@
     <section class="welcome-panel">
       <div>
         <p class="eyebrow">AI客服平台 · 客服工作台</p>
-        <h1>{{ identity.reporterName ? `${identity.reporterName}，从一条咨询开始` : '从一条咨询开始' }}</h1>
+        <h1>{{ identity?.displayName ? `${identity.displayName}，从一条咨询开始` : '从一条咨询开始' }}</h1>
         <p>选择商品和 SKU，获取 AI 建议，再由你核对、编辑和复制。系统不会自动向客户发送消息。</p>
         <div class="hero-actions">
           <RouterLink to="/ai-chat" class="primary-link" data-testid="enter-ai-chat">开始 AI 客服</RouterLink>
@@ -117,13 +117,13 @@ import { RouterLink } from 'vue-router'
 import ProductEmptyState from '@/components/ProductEmptyState.vue'
 import { useCustomerSessionActivity } from '@/workspace/customerSessionActivity'
 import { useExperienceCaseSubmissions } from '@/workspace/experienceCaseSession'
-import { useTesterIdentity } from '@/workspace/testerIdentity'
+import { useCustomerIdentity } from '@/workspace/customerIdentity'
 import { useSystemStatus } from '@/workspace/systemStatus'
 
-const { identity } = useTesterIdentity()
+const { identity } = useCustomerIdentity()
 const systemStatus = useSystemStatus()
 const activity = useCustomerSessionActivity()
-const { submissions } = useExperienceCaseSubmissions(identity.value.reporterId)
+const { submissions } = useExperienceCaseSubmissions(identity.value?.userId ?? '')
 </script>
 
 <style scoped>

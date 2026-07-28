@@ -1,5 +1,20 @@
+<script setup lang="ts">
+import { computed, onMounted, provide } from 'vue'
+
+import CustomerIdentitySelection from '@/views/CustomerIdentitySelection.vue'
+import { CustomerIdentityKey, createCustomerIdentityStore } from '@/workspace/customerIdentity'
+
+const identityStore = createCustomerIdentityStore()
+const canEnterWorkbench = computed(() => identityStore.identity.value !== null)
+
+provide(CustomerIdentityKey, identityStore)
+
+onMounted(() => { void identityStore.restore() })
+</script>
+
 <template>
-  <router-view />
+  <CustomerIdentitySelection v-if="!canEnterWorkbench" />
+  <router-view v-else />
 </template>
 
 <style>
