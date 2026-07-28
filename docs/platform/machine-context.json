@@ -1,18 +1,17 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-platform-center",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-data-intel-platform",
   "project_id": "mumu-C",
-  "project_name": "C-line knowledge governance and administration platform",
+  "project_name": "C-line knowledge governance and operations platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "UI-1 unified operations product shell",
-  "current_stage": "The 5174 Admin frontend has an incremental UI-1 product shell with grouped navigation, real environment/platform/A availability labels, default-collapsed technical details and explicit planned/empty states. Existing routes and provider behavior remain unchanged.",
-  "current_gate": "LOCAL_UI_VERIFIED_PENDING_DELIVERY: admin typecheck, 13 Vitest files / 29 tests and production build passed. No platform backend, database, migration, API, shared contract or state-machine behavior changed.",
-  "status": "ui_1_product_shell_ready_for_delivery",
+  "current_task": "TARGET MODE V2 controlled product-material and knowledge-quality loop",
+  "current_stage": "C provides controlled material intake, recognition summary, human review, immutable revision/hash snapshots, AI-quality evidence storage, a compact customer status, and Chinese 5174 operational pages. A and B consumer integration remains separate work.",
+  "current_gate": "C_PROVIDER_VERIFIED_PENDING_DELIVERY: dedicated and full platform tests, isolated Alembic round trip, Admin typecheck, 18-file/36-test Vitest suite and production build pass.",
+  "status": "target_mode_v2_c_provider_verified_pending_delivery",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
-    "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
-    "Frozen feedback supplement: docs/control/interfaces/ai-feedback.v1-draft.md (not modified in this worktree)",
-    "C implementation note: docs/platform/13_AI反馈接口说明.md; frozen B/C/A Provider paths with affected-line review required before any shared-contract promotion."
+    "Frozen TARGET MODE V2 interface: docs/control/interfaces/knowledge-quality-loop.v1.md (not modified)",
+    "Existing experience-case and ai-feedback frozen interface documents remain unchanged."
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -27,53 +26,42 @@
   ],
   "entrypoints": [
     "platform_backend/app/main.py:app",
-    "platform_backend/app/api/customer_experience_case_routes.py",
-    "platform_backend/app/api/admin_experience_case_routes.py",
-    "platform_backend/app/experience_cases/models.py",
-    "platform_backend/migrations/versions/0004_mvp_plus_01_experience_cases.py",
-    "admin_web/src/views/CustomerExperienceCasesView.vue",
-    "admin_web/src/views/AiOptimizationPoolView.vue",
-    "admin_web/src/views/AiFeedbackOptimizationPoolView.vue",
-    "admin_web/src/App.vue",
-    "admin_web/src/components/ProductEmptyState.vue",
-    "platform_backend/app/ai_feedback/models.py",
-    "platform_backend/app/api/customer_ai_feedback_routes.py",
-    "platform_backend/app/api/admin_ai_feedback_routes.py",
-    "platform_backend/migrations/versions/0005_mvp_plus_02_ai_response_feedback.py",
-    "platform_backend/migrations/versions/0006_mvp_plus_02_ai_feedback_idempotency.py",
-    "docs/platform/13_AI反馈接口说明.md"
+    "platform_backend/app/knowledge_materials/models.py",
+    "platform_backend/app/knowledge_materials/service.py",
+    "platform_backend/app/api/knowledge_material_routes.py",
+    "platform_backend/migrations/versions/0007_target_mode_v2_knowledge_quality_loop.py",
+    "admin_web/src/views/KnowledgeMaterialsView.vue",
+    "admin_web/src/views/KnowledgeQualityPoolView.vue",
+    "docs/platform/15_商品资料与知识质量闭环.md"
   ],
   "provided_interfaces": [
-    "POST/GET /api/v1/customer-experience-cases",
-    "GET /api/v1/admin/ai-optimization/cases/export",
-    "POST /api/v1/admin/ai-optimization/evaluation-results",
-    "C-owned internal Admin review/list/detail and AI optimization pool endpoints",
-    "POST/GET /api/v1/ai-response-feedback",
-    "GET /api/v1/admin/ai-quality/badcases",
-    "POST /api/v1/admin/ai-quality/analysis-results",
-    "C-owned internal GET /api/v1/admin/ai-quality/analysis-results for completed evidence only",
-    "C-owned internal POST /api/v1/admin/ai-response-feedback/{feedback_id}/confirm",
-    "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
+    "POST/GET /api/v1/admin/knowledge-materials",
+    "POST /api/v1/admin/knowledge-materials/{material_id}/review",
+    "GET /api/v1/admin/knowledge-quality/analysis-inputs",
+    "POST /api/v1/admin/knowledge-quality/analysis-results",
+    "GET /api/v1/admin/knowledge-quality/assessments",
+    "GET /api/v1/customer-knowledge-status",
+    "Existing customer experience, AI feedback, catalog, import and health interfaces (unchanged)"
   ],
   "required_interfaces": [
-    "B submits with Idempotency-Key and consumes only its minimum status projection",
-    "A consumes only manually confirmed C feedback snapshots and posts matching revision/hash/type analysis evidence",
-    "No direct A/C database access, A model call, or cross-line automatic action"
+    "A reads only APPROVED_FOR_ANALYSIS material snapshots and posts matching material_id/revision/content_hash evidence.",
+    "B reads only the compact customer knowledge-status summary and never material binary, raw path or analysis text.",
+    "No direct A/C database access or cross-line automatic action."
   ],
   "cross_line_compatibility": {
     "affected_lines": ["A", "B"],
-    "change": "MVP-PLUS-02 Provider convergence implements frozen B create/history and A badcases/writeback paths; the final C internal Admin read-only projection exposes completed evidence without changing B/A paths, fields, or non-feedback interfaces.",
+    "change": "C implements the separately frozen knowledge-quality-loop Provider without modifying contracts or existing feedback paths.",
     "shared_contract_version": "0.1.0 unchanged",
     "database_change": true,
-    "verified": "C real TestClient B create/history, A badcases/snapshot, and analysis idempotency tests; B/A integration remains consumer-owned follow-up."
+    "verified": "C TestClient material intake/review/export/writeback/revision/privacy tests and existing feedback API regression pass. A real model consumption and B UI consumption remain consumer-owned integration follow-up."
   },
   "data_boundaries": {
     "source": "Synthetic local test values only",
     "production_data_imported": false,
-    "attachment_binary_stored": false,
+    "attachment_binary_stored": true,
+    "knowledge_material_raw_storage": "Local controlled runtime directory only; Git ignored; not returned by B-facing APIs or logs.",
     "case_content_logged": false,
     "automatic_redaction_enabled": false,
-    "raw_rtf_returned": false,
     "published_to_a_line": false,
     "a_b_live_integration_claimed": false,
     "formal_permissions_enabled": false,
@@ -83,33 +71,30 @@
     "customer_message_enabled": false,
     "order_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-27 UI-1: admin vue-tsc PASS; Vitest 13 files / 29 tests PASS; production build PASS. Tests cover grouped product shell navigation, real platform/A status labels, explicit customer not-probed status and default-collapsed technical details. Previous C provider/feedback verification remains unchanged.",
+  "last_test_result": "2026-07-28 TARGET MODE V2: dedicated material lifecycle plus AI feedback API regression passed (5 tests); full platform pytest passed (73 tests); isolated SQLite Alembic upgrade-to-head, downgrade-to-0006 and re-upgrade passed; Admin typecheck, 18-file/36-test Vitest suite and production build passed. Existing TestClient deprecation warning only.",
   "test_commands": [
-    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_ai_response_feedback_api.py",
-    "DATABASE_URL=isolated SQLite; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0005_mvp_plus_02_ai_response_feedback; upgrade head",
+    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_knowledge_material_api.py tests/test_ai_response_feedback_api.py",
+    "cd platform_backend; isolated DATABASE_URL; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0006_mvp_plus_02_ai_feedback_idempotency; upgrade head",
     "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
     "cd admin_web; pnpm typecheck; pnpm test; pnpm build"
   ],
   "known_risks": [
-    "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
-    "AI feedback text is not logged by the new modules, but v1-reminder-only is a reminder and not automatic redaction.",
-    "Idempotency-Key and created_by scope B replay/history but do not verify an identity or grant authorization.",
-    "A analysis evidence is stored only after C confirmation and matching revision/hash/type; C does not verify an A identity in this baseline.",
-    "The Admin analysis-results route is a C internal namespace boundary only; formal authentication, authorization, sensitive-view audit, retention, and automatic redaction are not enabled.",
+    "The internal-test administration APIs have no formal authentication, authorization, persistent audit, retention or production security certification.",
+    "Knowledge material binary is retained only in a local runtime path. Operators must manually deidentify before upload; phone/identity-number checks are limited safeguards, not automatic redaction.",
     "CORS is not authentication or authorization."
   ],
   "out_of_scope": [
-    "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, and A model invocation",
-    "Formal login, roles, retention, access audit, and production data",
-    "A/B business code and shared contract changes"
+    "Automatic training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, refunds and after-sales actions.",
+    "Formal login, roles, retention, access audit, and production data.",
+    "A/B business code and shared contract changes."
   ],
   "blockers": [],
   "git": {
-    "branch": "codex/ui-1-product-shell",
-    "base": "origin/develop 3b9f3e63700ba1d5bcc27b54c5be7aabee28e252",
+    "branch": "codex/data-intelligence-platform-v1",
+    "base": "codex/ai-data-intelligence-v1-interface (stacked Draft PR)",
     "commit": "PENDING_DELIVERY",
     "draft_pr": "PENDING_DELIVERY"
   },
-  "next_recommended_task": "Deliver the UI-1 Draft PR for review. Follow-up UI tasks may refine existing page presentation, but new metrics, logs, roles, Prompt writes, experiments or sensitive views require separate Interface Owner/privacy/authorization approval.",
-  "last_updated": "2026-07-27"
+  "next_recommended_task": "Complete A/B consumer integration against the frozen knowledge-quality loop, then perform a real isolated B-to-C-to-A-to-C validation. Do not add publication, training, Prompt writes or customer/ERP actions.",
+  "last_updated": "2026-07-28"
 }

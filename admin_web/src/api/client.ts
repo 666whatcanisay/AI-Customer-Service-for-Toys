@@ -467,6 +467,89 @@ export interface AiFeedbackAnalysisResultList {
   total: number
 }
 
+export type KnowledgeMaterialType = 'PRODUCT_SPEC' | 'SAFETY_INSTRUCTION' | 'ASSEMBLY_GUIDE' | 'FAQ_SOURCE' | 'OTHER'
+export type KnowledgeMaterialStatus = 'RECEIVED' | 'RECOGNIZED' | 'REVIEWING' | 'APPROVED_FOR_ANALYSIS' | 'ANALYZING' | 'ANALYZED' | 'ANALYSIS_FAILED' | 'REJECTED'
+export type KnowledgeQualityOverallStatus = 'ANALYZED' | 'FAILED'
+export type KnowledgeQualityGapSeverity = 'LOW' | 'MEDIUM' | 'HIGH'
+export type KnowledgeQualityGapStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'DISMISSED'
+
+export interface RecognitionSummary {
+  readable: boolean
+  file_extension: string
+  detected_fields: string[]
+  missing_expected_fields: string[]
+  privacy_reminder: string
+}
+
+export interface KnowledgeMaterial {
+  material_id: string
+  revision: number
+  store_code: string
+  product_id: string
+  sku_id: string | null
+  material_type: KnowledgeMaterialType
+  display_name: string
+  original_filename: string
+  content_hash: string
+  redaction_version: string
+  recognition_summary: RecognitionSummary
+  material_status: KnowledgeMaterialStatus
+  submitted_by: string
+  reviewed_by: string | null
+  reviewed_at: string | null
+  review_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface KnowledgeMaterialDetail extends KnowledgeMaterial {
+  analysis_text_preview: string
+}
+
+export interface KnowledgeMaterialReceipt {
+  material_id: string
+  revision: number
+  content_hash: string
+  material_status: KnowledgeMaterialStatus
+  recognition_summary: RecognitionSummary
+}
+
+export interface KnowledgeMaterialList {
+  items: KnowledgeMaterial[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface KnowledgeQualityGap {
+  gap_id: string
+  gap_code: string
+  severity: KnowledgeQualityGapSeverity
+  title: string
+  description: string
+  recommended_action: string
+  status: KnowledgeQualityGapStatus
+}
+
+export interface KnowledgeQualityAssessment {
+  assessment_id: string
+  material_id: string
+  revision: number
+  content_hash: string
+  analysis_run_id: string
+  model_version: string
+  prompt_version: string
+  overall_status: KnowledgeQualityOverallStatus
+  summary: string
+  gaps: KnowledgeQualityGap[]
+  created_at: string
+}
+
+export interface KnowledgeQualityAssessmentList {
+  items: KnowledgeQualityAssessment[]
+  total: number
+}
+
 export async function listAdminExperienceCases(
   params?: Record<string, string | number | undefined>,
 ): Promise<AdminPage<AdminExperienceCase>> {
@@ -513,6 +596,63 @@ export async function listAiFeedbackAnalysisResults(): Promise<AiFeedbackAnalysi
   const response = await apiClient.get<AiFeedbackAnalysisResultList>(
     '/api/v1/admin/ai-quality/analysis-results',
   )
+  return response.data
+}
+
+export async function listKnowledgeMaterials(
+  params?: { store_code?: string; product_id?: string; material_status?: KnowledgeMaterialStatus | ''; page?: number; size?: number },
+): Promise<KnowledgeMaterialList> {
+  const response = await apiClient.get<KnowledgeMaterialList>('/api/v1/admin/knowledge-materials', {
+    params: omitBlankQueryParams(params),
+  })
+  return response.data
+}
+
+export async function getKnowledgeMaterial(materialId: string): Promise<KnowledgeMaterialDetail> {
+  const response = await apiClient.get<KnowledgeMaterialDetail>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}`,
+  )
+  return response.data
+}
+
+export async function uploadKnowledgeMaterial(
+  file: File,
+  fields: {
+    store_code: string
+    product_id: string
+    sku_id?: string
+    material_type: KnowledgeMaterialType
+    display_name: string
+    submitted_by: string
+    material_id?: string
+  },
+): Promise<KnowledgeMaterialReceipt> {
+  const form = new FormData()
+  form.append('file', file)
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value) form.append(key, value)
+  })
+  const idempotencyKey = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `knowledge-material-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const response = await apiClient.post<KnowledgeMaterialReceipt>('/api/v1/admin/knowledge-materials', form, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+  return response.data
+}
+
+export async function reviewKnowledgeMaterial(
+  materialId: string,
+  payload: { revision: number; decision: 'APPROVE_FOR_ANALYSIS' | 'REJECT'; reviewed_by: string; review_note: string },
+): Promise<KnowledgeMaterial> {
+  const response = await apiClient.post<KnowledgeMaterial>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}/review`, payload,
+  )
+  return response.data
+}
+
+export async function listKnowledgeQualityAssessments(): Promise<KnowledgeQualityAssessmentList> {
+  const response = await apiClient.get<KnowledgeQualityAssessmentList>('/api/v1/admin/knowledge-quality/assessments')
   return response.data
 }
 

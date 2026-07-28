@@ -71,6 +71,13 @@ async def validation_exception_handler(
             "/api/v1/admin/ai-quality",
         )
     )
+    knowledge_material_path = request.url.path.startswith(
+        (
+            "/api/v1/admin/knowledge-materials",
+            "/api/v1/customer-knowledge-status",
+        )
+    )
+    knowledge_quality_path = request.url.path.startswith("/api/v1/admin/knowledge-quality")
     analysis_output_invalid = (
         request.url.path == "/api/v1/admin/ai-quality/analysis-results"
         and any(
@@ -79,15 +86,27 @@ async def validation_exception_handler(
             for error in exc.errors()
         )
     )
+    knowledge_quality_output_invalid = (
+        request.url.path == "/api/v1/admin/knowledge-quality/analysis-results"
+        and any(
+            len(error.get("loc", ())) > 1
+            and error["loc"][1] in {"summary", "gaps", "material_id", "revision", "content_hash"}
+            for error in exc.errors()
+        )
+    )
     return JSONResponse(
         status_code=422,
         content=_error_payload(
             request,
             code=(
-                "AI_RESPONSE_FEEDBACK_ANALYSIS_OUTPUT_INVALID"
+                "KNOWLEDGE_QUALITY_OUTPUT_INVALID"
+                if knowledge_quality_output_invalid
+                else "AI_RESPONSE_FEEDBACK_ANALYSIS_OUTPUT_INVALID"
                 if analysis_output_invalid
                 else "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
                 if ai_feedback_path
+                else "KNOWLEDGE_MATERIAL_VALIDATION_FAILED"
+                if knowledge_material_path or knowledge_quality_path
                 else "EXPERIENCE_CASE_VALIDATION_FAILED"
                 if experience_case_path
                 else "VALIDATION_ERROR"
