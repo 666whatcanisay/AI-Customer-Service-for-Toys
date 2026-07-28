@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -71,6 +72,10 @@ async def validation_exception_handler(
             "/api/v1/admin/ai-quality",
         )
     )
+    customer_identity_path = request.url.path.startswith(
+        ("/api/v1/customer-identities", "/api/v1/admin/customer-users")
+    )
+    customer_efficiency_path = request.url.path.startswith("/api/v1/customer-efficiency")
     analysis_output_invalid = (
         request.url.path == "/api/v1/admin/ai-quality/analysis-results"
         and any(
@@ -86,6 +91,10 @@ async def validation_exception_handler(
             code=(
                 "AI_RESPONSE_FEEDBACK_ANALYSIS_OUTPUT_INVALID"
                 if analysis_output_invalid
+                else "CUSTOMER_EFFICIENCY_EVENT_VALIDATION_FAILED"
+                if customer_efficiency_path
+                else "CUSTOMER_USER_VALIDATION_FAILED"
+                if customer_identity_path
                 else "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
                 if ai_feedback_path
                 else "EXPERIENCE_CASE_VALIDATION_FAILED"
@@ -93,7 +102,9 @@ async def validation_exception_handler(
                 else "VALIDATION_ERROR"
             ),
             message="The request is invalid." if ai_feedback_path else "Request validation failed",
-            details=exc.errors(),
+            # Pydantic can retain a ValueError instance in `ctx.error`; make
+            # the standard error envelope JSON-safe for all validation paths.
+            details=jsonable_encoder(exc.errors()),
         ),
     )
 

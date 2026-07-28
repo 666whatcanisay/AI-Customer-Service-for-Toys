@@ -326,6 +326,37 @@ export interface AdminSuggestion {
   updated_at: string
 }
 
+export type CustomerUserRole = 'CUSTOMER_SERVICE' | 'OPERATIONS' | 'ADMIN'
+export type CustomerUserStatus = 'ACTIVE' | 'DISABLED'
+
+export interface CustomerUserStoreBinding {
+  store_code: string
+  is_default: boolean
+}
+
+export interface CustomerUser {
+  user_id: string
+  display_name: string
+  role: CustomerUserRole
+  status: CustomerUserStatus
+  default_store_code: string
+  store_bindings: CustomerUserStoreBinding[]
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerUserListResponse {
+  items: CustomerUser[]
+  total: number
+}
+
+export interface CustomerUserWrite {
+  display_name: string
+  role: CustomerUserRole
+  store_codes: string[]
+  default_store_code: string
+}
+
 export type AdminResource =
   | 'stores'
   | 'products'
@@ -381,6 +412,47 @@ export async function updateAdminSuggestion(
     update,
   )
   return response.data
+}
+
+export async function listCustomerUsers(status?: CustomerUserStatus): Promise<CustomerUserListResponse> {
+  const response = await apiClient.get<CustomerUserListResponse>('/api/v1/admin/customer-users', {
+    params: status ? { status } : undefined,
+  })
+  return response.data
+}
+
+export async function createCustomerUser(payload: CustomerUserWrite): Promise<CustomerUser> {
+  const response = await apiClient.post<CustomerUser>('/api/v1/admin/customer-users', payload)
+  return response.data
+}
+
+export async function updateCustomerUser(userId: string, payload: CustomerUserWrite): Promise<CustomerUser> {
+  const response = await apiClient.put<CustomerUser>(
+    `/api/v1/admin/customer-users/${encodeURIComponent(userId)}`,
+    payload,
+  )
+  return response.data
+}
+
+export async function updateCustomerUserStatus(
+  userId: string,
+  status: CustomerUserStatus,
+): Promise<CustomerUser> {
+  const response = await apiClient.post<CustomerUser>(
+    `/api/v1/admin/customer-users/${encodeURIComponent(userId)}/status`,
+    { status },
+  )
+  return response.data
+}
+
+export interface CatalogStore {
+  store_code: string
+  store_name: string
+}
+
+export async function listCatalogStores(): Promise<CatalogStore[]> {
+  const response = await apiClient.get<ItemList<CatalogStore>>('/api/v1/test-catalog/stores')
+  return response.data.items
 }
 
 export type ExperienceCaseReviewStatus = 'NEW' | 'REVIEWING' | 'APPROVED' | 'REJECTED'

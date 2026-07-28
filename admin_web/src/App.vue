@@ -24,6 +24,7 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to: string
     label: '客服运营',
     items: [
       { label: '客服经验库', to: '/experience-cases' },
+      { label: '客服用户', to: '/customer-users' },
       { label: 'AI 问题与分析', to: '/ai-feedback-optimization-pool' },
       { label: '客服建议审核', to: '/suggestions' },
     ],

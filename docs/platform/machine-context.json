@@ -4,10 +4,10 @@
   "project_name": "C-line knowledge governance and administration platform",
   "line": "C",
   "version": "0.1.0",
-  "current_task": "CONTROL-UI-FIX-V1 Admin product UI",
-  "current_stage": "The 5174 Admin frontend is being refined as a Chinese AI Operations Center with real A status/knowledge/module/prompt/evaluation read projections, distinct evidence pools, import guidance, and an explicit not-found route. Existing provider behavior remains unchanged.",
-  "current_gate": "LOCAL_UI_VERIFIED_READY_FOR_DRAFT_PR: Admin typecheck, 17 Vitest files / 35 tests, production build, and read-only temporary Vite/proxy HTTP verification passed. No platform backend, database, migration, API, shared contract or state-machine behavior changed.",
-  "status": "ui_fix_v1_ready_for_delivery",
+  "current_task": "PILOT-USER-IDENTITY-V1 C customer identity, source binding, and Admin management",
+  "current_stage": "C provides internal-pilot customer identity selection, customer-user/store management, identity-bound experience cases/AI feedback, and privacy-bounded efficiency-event persistence. B login selection and final B/C browser integration remain consumer-owned follow-up work.",
+  "current_gate": "C_IMPLEMENTATION_VERIFIED_WAITING_FOR_B_INTEGRATION: platform pytest, user/identity/efficiency unit tests, migration upgrade/downgrade, Admin typecheck, CustomerUsersView Vitest, and production build passed. This is not a production authentication or authorization claim.",
+  "status": "c_identity_ready_for_draft_pr",
   "contracts": [
     "contracts/version.json 0.1.0 (unchanged)",
     "Frozen MVP-PLUS-01 interface: docs/control/interfaces/experience-case.v1-draft.md (not modified)",
@@ -39,9 +39,16 @@
     "admin_web/src/components/ProductEmptyState.vue",
     "platform_backend/app/ai_feedback/models.py",
     "platform_backend/app/api/customer_ai_feedback_routes.py",
+    "platform_backend/app/api/customer_identity_routes.py",
+    "platform_backend/app/api/customer_efficiency_routes.py",
+    "platform_backend/app/customer_identity/models.py",
+    "platform_backend/app/customer_efficiency/models.py",
     "platform_backend/app/api/admin_ai_feedback_routes.py",
     "platform_backend/migrations/versions/0005_mvp_plus_02_ai_response_feedback.py",
     "platform_backend/migrations/versions/0006_mvp_plus_02_ai_feedback_idempotency.py",
+    "platform_backend/migrations/versions/0007_pilot_user_identity.py",
+    "admin_web/src/views/CustomerUsersView.vue",
+    "docs/platform/20_PILOT-USER-IDENTITY-V1_C端实现说明.md",
     "docs/platform/13_AI反馈接口说明.md"
   ],
   "provided_interfaces": [
@@ -54,9 +61,13 @@
     "POST /api/v1/admin/ai-quality/analysis-results",
     "C-owned internal GET /api/v1/admin/ai-quality/analysis-results for completed evidence only",
     "C-owned internal POST /api/v1/admin/ai-response-feedback/{feedback_id}/confirm",
+    "GET /api/v1/customer-identities and GET /api/v1/customer-identities/{user_id} for active internal-pilot identity selection",
+    "C-owned GET/POST/PUT/status /api/v1/admin/customer-users with validated store bindings",
+    "POST /api/v1/customer-efficiency/events with event sequence, source-binding, and Idempotency-Key validation",
     "Existing C-T05 suggestion, catalog, import, health, and test-package interfaces (unchanged)"
   ],
   "required_interfaces": [
+    "B must select an active C-owned customer identity and submit that opaque user_id as created_by/operator_id; browser-local identities are not accepted",
     "B submits with Idempotency-Key and consumes only its minimum status projection",
     "A consumes only manually confirmed C feedback snapshots and posts matching revision/hash/type analysis evidence",
     "Admin UI reads existing A status, knowledge-statistics, module, prompt-metadata and latest-evaluation endpoints without changing their fields or invoking write/test endpoints",
@@ -64,10 +75,10 @@
   ],
   "cross_line_compatibility": {
     "affected_lines": ["A", "B"],
-    "change": "MVP-PLUS-02 Provider convergence implements frozen B create/history and A badcases/writeback paths; the final C internal Admin read-only projection exposes completed evidence without changing B/A paths, fields, or non-feedback interfaces.",
+    "change": "PILOT-USER-IDENTITY-V1 adds C-owned internal identity selection and requires existing B case/feedback created_by values to be active, store-bound C user IDs. It also implements the frozen C-owned customer-efficiency event endpoint. B login/event adapters require matching consumer delivery before claiming end-to-end readiness.",
     "shared_contract_version": "0.1.0 unchanged",
     "database_change": true,
-    "verified": "C real TestClient B create/history, A badcases/snapshot, and analysis idempotency tests; B/A integration remains consumer-owned follow-up."
+    "verified": "C complete pytest, identity/store validation, case/feedback source rejection, efficiency sequence/idempotency tests, and isolated migration upgrade/downgrade passed. B/A browser integration remains consumer-owned follow-up."
   },
   "data_boundaries": {
     "source": "Synthetic local test values only",
@@ -95,23 +106,23 @@
   "known_risks": [
     "SQLite and the internal-test administration APIs have no formal authentication, authorization, persistent audit, retention, or production security certification.",
     "AI feedback text is not logged by the new modules, but v1-reminder-only is a reminder and not automatic redaction.",
-    "Idempotency-Key and created_by scope B replay/history but do not verify an identity or grant authorization.",
+    "Internal customer identity is a local pilot selection mechanism, not a password, SSO, session-security, authorization, audit, retention, or production security system.",
     "A analysis evidence is stored only after C confirmation and matching revision/hash/type; C does not verify an A identity in this baseline.",
     "The Admin analysis-results route is a C internal namespace boundary only; formal authentication, authorization, sensitive-view audit, retention, and automatic redaction are not enabled.",
     "CORS is not authentication or authorization."
   ],
   "out_of_scope": [
     "Automatic redaction, model training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, and A model invocation",
-    "Formal login, roles, retention, access audit, and production data",
+    "Password login, SSO, complex RBAC, formal authorization, retention, access audit, and production data",
     "A/B business code and shared contract changes"
   ],
   "blockers": [],
   "git": {
-    "branch": "codex/ui-fix-v1-admin",
-    "base": "origin/develop 2f5f52529d1fc0f649df4a5a7e30e2369c8aabf3",
+    "branch": "codex/customer-identity-v1-platform",
+    "base": "codex/ui-fix-v1-admin de687fa90aa0bb2dd7601998747c0b95fa66038c (requires UI PR #64 and interface PR #66)",
     "commit": "PENDING_DELIVERY",
     "draft_pr": "PENDING_DELIVERY"
   },
-  "next_recommended_task": "Complete final UI verification and deliver the CONTROL-UI-FIX-V1 Draft PR. Follow-up UI tasks may refine existing page presentation, but new metrics, logs, roles, Prompt writes, experiments or sensitive views require separate Interface Owner/privacy/authorization approval.",
+  "next_recommended_task": "Deliver the C identity Draft PR, then implement B identity selection/login, default-store display, source field binding, and frozen efficiency-event adapter. Final end-to-end work must validate an active identity, disabled/stale identity recovery, B → C case/feedback/events, and no anonymous access.",
   "last_updated": "2026-07-28"
 }

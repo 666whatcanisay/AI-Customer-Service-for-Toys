@@ -14,6 +14,7 @@ import OperationsOverviewView from '../views/OperationsOverviewView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ReadonlyListView from '../views/ReadonlyListView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import CustomerUsersView from '../views/CustomerUsersView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -66,6 +67,7 @@ export const router = createRouter({
     },
     { path: '/suggestions', name: 'suggestions', component: CustomerSuggestionsView },
     { path: '/experience-cases', name: 'experience-cases', component: CustomerExperienceCasesView },
+    { path: '/customer-users', name: 'customer-users', component: CustomerUsersView },
     { path: '/ai-optimization-pool', name: 'ai-optimization-pool', component: AiOptimizationPoolView },
     { path: '/ai-feedback-optimization-pool', name: 'ai-feedback-optimization-pool', component: AiFeedbackOptimizationPoolView },
     {

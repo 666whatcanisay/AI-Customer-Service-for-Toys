@@ -53,6 +53,11 @@ const STATUS_LABELS: Record<string, string> = {
   NOT_AVAILABLE: '暂不可用',
   ERROR: '异常',
   UNKNOWN: '状态未知',
+  CUSTOMER_SERVICE: '客服',
+  OPERATIONS: '运营',
+  ADMIN: '管理员',
+  ACTIVE: '启用中',
+  DISABLED: '已停用',
 }
 
 export function displayStatus(value: string | null | undefined, empty = '未设置'): string {

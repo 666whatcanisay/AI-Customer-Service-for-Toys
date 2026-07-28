@@ -21,6 +21,7 @@ from app.ai_feedback.schemas import (
     AIResponseFeedbackType,
 )
 from app.database import get_db
+from app.customer_identity.service import require_active_bound_user
 from app.errors import AppError
 
 
@@ -106,6 +107,8 @@ def create_ai_response_feedback(
     receipt = _idempotency_record(session, created_by=payload.created_by, idempotency_key=key)
     if receipt is not None:
         return _replay_or_conflict(session, receipt, fingerprint)
+
+    require_active_bound_user(session, user_id=payload.created_by, store_code=payload.store_code)
 
     item = AIResponseFeedback(
         store_code=payload.store_code,

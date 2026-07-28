@@ -11,6 +11,11 @@ from app.api.admin_suggestion_routes import router as admin_suggestion_router
 from app.api.customer_suggestion_routes import router as customer_suggestion_router
 from app.api.customer_experience_case_routes import router as customer_experience_case_router
 from app.api.customer_ai_feedback_routes import router as customer_ai_feedback_router
+from app.api.customer_efficiency_routes import router as customer_efficiency_router
+from app.api.customer_identity_routes import (
+    admin_router as admin_customer_user_router,
+    customer_router as customer_identity_router,
+)
 from app.api.admin_experience_case_routes import (
     admin_router as admin_experience_case_router,
     ai_optimization_router,
@@ -43,7 +48,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=list(settings.cors_allowed_origins),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH"],
+        allow_methods=["GET", "POST", "PATCH", "PUT"],
         # B submits the frozen feedback v1 Idempotency-Key header from the
         # browser. Keep the CORS policy explicit; do not widen it to a
         # wildcard just to accommodate this preflight.
@@ -60,10 +65,13 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(admin_suggestion_router)
     application.include_router(customer_experience_case_router)
     application.include_router(customer_ai_feedback_router)
+    application.include_router(customer_efficiency_router)
+    application.include_router(customer_identity_router)
     application.include_router(admin_experience_case_router)
     application.include_router(ai_optimization_router)
     application.include_router(admin_ai_feedback_router)
     application.include_router(ai_quality_router)
+    application.include_router(admin_customer_user_router)
     application.include_router(admin_router)
 
     @application.get("/health")

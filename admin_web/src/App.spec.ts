@@ -15,7 +15,7 @@ import App from './App.vue'
 const createTestRouter = () => createRouter({
   history: createMemoryHistory(),
   routes: [
-    '/overview', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
+    '/overview', '/experience-cases', '/customer-users', '/ai-feedback-optimization-pool', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
     '/ai-capabilities', '/ai-optimization-pool', '/system-status', '/imports', '/test-data-packages'
   ].map((path) => ({ path, component: { template: '<div>运营页面内容</div>' } }))
