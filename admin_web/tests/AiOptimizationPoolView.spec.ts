@@ -34,7 +34,8 @@ describe('AiOptimizationPoolView', () => {
 
     expect(wrapper.text()).toContain('CEC-TEST-2')
     await wrapper.get('.link-button').trigger('click')
-    expect(wrapper.text()).toContain('NEEDS_REVIEW')
+    expect(wrapper.text()).toContain('需要人工复核')
+    expect(wrapper.text()).not.toContain('"outcome"')
     expect(wrapper.find('.detail button').exists()).toBe(false)
   })
 })
