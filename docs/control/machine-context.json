@@ -3,14 +3,16 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "admin_ui_hotfix_release_candidate",
-  "current_task": "ADMIN-UI-HOTFIX-RELEASE-V1",
-  "current_stage": "Two Admin-only UI hotfixes were cherry-picked from 07eb962 in the authorized release order: source metadata table containment (7787606) followed by overview metric/unit alignment (84366f7). Admin typecheck, 42 Vitest tests, production build, and diff checks passed; the current runtime still requires controlled SHA reconciliation.",
-  "current_gate": "RUNTIME_RELEASE_PENDING: promote the clean Admin UI hotfix candidate, then use formal OPS scripts to replace the trusted 07eb962 runtime with the exact released SHA and verify A/C/B/Admin health plus the 5174 browser pages. No interface, database, AI, automatic action, or network-policy change is authorized.",
+  "status": "knowledge_foundation_v1_ready",
+  "current_task": "AI-CS-KNOWLEDGE-FOUNDATION-V1",
+  "current_stage": "A documentation-only knowledge foundation was created from origin/develop@671c9a293f1e5e0f462522ad2c7e114c7919c388. It adds product, architecture, operation, data, AI, development and agent assets, and synchronizes the control status board, changelog and handoff. No business code, interface, database, configuration, process or runtime service was changed.",
+  "current_gate": "DOCUMENTATION_READY: validate Markdown links, JSON/YAML syntax and documentation-only diff scope. Any claim about the active runtime still requires a separate Runtime Gate for worktree, SHA, managed/listener PIDs, health and browser entry.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "develop",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
+    "knowledge_foundation_v1_base": "671c9a293f1e5e0f462522ad2c7e114c7919c388",
+    "knowledge_foundation_v1_branch": "codex/knowledge-foundation-v1",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
       "80097cf73996a4aa0ad424e05fe82e6488312c63"
