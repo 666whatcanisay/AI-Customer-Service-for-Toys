@@ -138,6 +138,14 @@ class FeedbackAnalysisRunRequest(BaseModel):
     maximum: int = Field(default=1, ge=1, le=100)
 
 
+class KnowledgeQualityRunRequest(BaseModel):
+    """An explicit, bounded local run over C-approved material snapshots."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    maximum: int = Field(default=1, ge=1, le=20)
+
+
 class ModelConfigUpdate(BaseModel):
     provider: str = Field(default="ollama", min_length=1, max_length=40)
     model: str = Field(default="qwen3.5:9b", min_length=1, max_length=100)
