@@ -101,6 +101,20 @@
       </div>
     </nav>
 
+    <section class="consultation-journey" data-testid="consultation-journey" aria-label="客服处理路径">
+      <div>
+        <small>客服处理路径</small>
+        <strong>AI 只提供建议，回复由你确认后再人工复制。</strong>
+      </div>
+      <ol>
+        <li :class="{ done: Boolean(selectedStore && selectedProduct) }"><b>1</b><span>确认店铺、商品和款式</span></li>
+        <li :class="{ done: Boolean(customerQuestion.trim()) }"><b>2</b><span>保留客户原话并提问</span></li>
+        <li :class="{ done: Boolean(result) }"><b>3</b><span>核对建议和回答依据</span></li>
+        <li :class="{ done: copyStatus === 'copied' }"><b>4</b><span>修改后人工复制</span></li>
+        <li class="optional"><b>可选</b><span>收藏优秀案例或反馈问题</span></li>
+      </ol>
+    </section>
+
     <section class="workbench-grid" aria-label="客服建议工作区">
       <div class="composer-pane">
     <section class="step-card context-card">
@@ -206,18 +220,24 @@
 
       <div v-if="selectedStore && selectedProduct" class="selection-confirmed" data-testid="context-summary">
         <span class="check-mark">✓</span>
-        <div class="context-summary-grid">
-          <div>
-            <small>当前店铺</small>
-            <strong>{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
+        <div class="context-summary-content">
+          <div class="context-summary-heading">
+            <strong>本次咨询对象</strong>
+            <small>AI 会按以下商品范围生成建议</small>
           </div>
-          <div>
-            <small>商品上下文</small>
-            <strong>{{ selectedProduct.displayName }}</strong>
-          </div>
-          <div>
-            <small>SKU 上下文</small>
-            <strong>{{ selectedSku?.displayName ?? '待确认（可留空）' }}</strong>
+          <div class="context-summary-grid">
+            <div>
+              <small>当前店铺</small>
+              <strong>{{ platformName(selectedStore.platform) }} · {{ selectedStore.name }}</strong>
+            </div>
+            <div>
+              <small>当前商品</small>
+              <strong>{{ selectedProduct.displayName }}</strong>
+            </div>
+            <div>
+              <small>具体款式（SKU）</small>
+              <strong>{{ selectedSku?.displayName ?? '待确认（可留空）' }}</strong>
+            </div>
           </div>
         </div>
         <el-button link @click="showTechnicalDetails = !showTechnicalDetails">
@@ -229,11 +249,15 @@
         class="knowledge-status-card"
         :class="`is-${customerKnowledgeTone}`"
         data-testid="customer-knowledge-status"
+        aria-live="polite"
       >
         <div>
-          <small>商品资料状态</small>
+          <small>AI 参考准备度</small>
           <strong>{{ customerKnowledgeTitle }}</strong>
           <p>{{ customerKnowledgeDescription }}</p>
+          <p class="knowledge-action" data-testid="customer-knowledge-action">
+            <b>本次操作：</b>{{ customerKnowledgeAction }}
+          </p>
           <time v-if="customerKnowledgeStatus" :datetime="customerKnowledgeStatus.lastCheckedAt">
             最近检查：{{ customerKnowledgeCheckedAt }}
           </time>
@@ -953,6 +977,26 @@ const customerKnowledgeDescription = computed(() => {
   if (customerKnowledgeError.value) return '无法获取资料状态，可继续咨询；生成回复前请人工核对商品信息。'
   if (customerKnowledgeStatus.value) return customerKnowledgeStatus.value.summary
   return '选择商品后会显示资料是否已完成审核；该提示不会阻断 AI 咨询。'
+})
+
+const customerKnowledgeAction = computed(() => {
+  if (customerKnowledgeLoading.value) return '请稍候，资料状态不会阻断当前咨询。'
+  if (customerKnowledgeError.value) {
+    return '资料状态接口暂时无法连接；可继续生成建议，但发送前请按人工客服流程核对商品信息。'
+  }
+
+  switch (customerKnowledgeStatus.value?.status) {
+    case 'READY':
+      return '可继续提问；生成后仍须核对商品、款式和至少一条回答依据。'
+    case 'NEEDS_REVIEW':
+      return '可继续提问；发送前请核对当前商品信息和回答依据，不作超出资料范围的承诺。'
+    case 'NO_APPROVED_MATERIAL':
+      return '可继续提问；资料不足时不要直接采用，必要时转人工处理。'
+    case 'UNAVAILABLE':
+      return '可继续提问；请先按人工客服流程核对商品信息，避免作出承诺。'
+    default:
+      return '选择商品后会显示资料准备情况；该提示不会阻断 AI 咨询。'
+  }
 })
 
 const customerKnowledgeTone = computed(() => {
@@ -1739,6 +1783,37 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 }
 .workflow-progress i { width: 70px; height: 2px; background: #dce3f0; }
 
+.consultation-journey {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #cbd9ee;
+  border-radius: 12px;
+  background: #f7faff;
+}
+.consultation-journey > div { display: grid; gap: 3px; flex: 0 1 270px; }
+.consultation-journey small { color: #3157c8; font-size: 11px; font-weight: 800; }
+.consultation-journey strong { color: #294c85; font-size: 12px; line-height: 1.45; }
+.consultation-journey ol {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.consultation-journey li { display: inline-flex; align-items: center; gap: 5px; color: #60718b; font-size: 11px; line-height: 1.35; }
+.consultation-journey li b { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 50%; background: #e8effb; color: #3157c8; font-size: 10px; }
+.consultation-journey li.done { color: #19633f; }
+.consultation-journey li.done b { background: #dff5e8; color: #19633f; }
+.consultation-journey li.optional { color: #6b7280; }
+.consultation-journey li.optional b { border-radius: 999px; background: #f2f4f7; color: #64748b; }
+
 .step-card, .empty-card, .loading-card {
   margin-top: 18px;
   border: 1px solid #dce3f0;
@@ -1802,7 +1877,11 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   background: #ecf8f2;
   color: #19633f;
 }
-.context-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1; gap: 10px; }
+.context-summary-content { display: grid; flex: 1; gap: 8px; min-width: 0; }
+.context-summary-heading { display: grid; gap: 1px; }
+.context-summary-heading > strong { color: #19633f; font-size: 13px; }
+.context-summary-heading > small { color: #4e8669; font-size: 11px; }
+.context-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .context-summary-grid > div { display: grid; gap: 2px; min-width: 0; }
 .context-summary-grid small { color: #4e8669; font-size: 11px; font-weight: 800; }
 .context-summary-grid strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -1826,6 +1905,8 @@ h2 { margin-bottom: 7px; font-size: 21px; }
 .knowledge-status-card small { display: block; color: #5b6f8c; font-size: 11px; font-weight: 800; }
 .knowledge-status-card strong { display: block; margin-top: 2px; color: #294c85; font-size: 13px; }
 .knowledge-status-card p { margin: 4px 0 0; color: #52657e; font-size: 12px; line-height: 1.5; }
+.knowledge-status-card .knowledge-action { color: #294c85; font-weight: 600; }
+.knowledge-status-card .knowledge-action b { margin-right: 4px; }
 .knowledge-status-card time { display: block; margin-top: 4px; color: #6d7d92; font-size: 11px; }
 .knowledge-status-card.is-ready { border-color: #b7dfc8; background: #f1fbf5; }
 .knowledge-status-card.is-ready strong { color: #19633f; }
@@ -1950,6 +2031,8 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   }
   .system-summary, .question-actions .el-button, .reply-actions .el-button { width: 100%; }
   .catalog-guidance { align-items: flex-start; flex-direction: column; }
+  .consultation-journey { align-items: flex-start; flex-direction: column; }
+  .consultation-journey ol { justify-content: flex-start; }
   .reply-actions { width: 100%; }
   .context-summary-grid { grid-template-columns: 1fr; gap: 6px; }
   .connection-card { grid-template-columns: 1fr; }

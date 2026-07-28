@@ -3,10 +3,10 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "CONTROL-AI-DATA-INTELLIGENCE-PLATFORM-V1 B customer knowledge-status consumer",
-  "current_stage": "The customer workbench now has an additive, non-blocking compact material-status indicator backed only by the frozen knowledge-quality-loop.v1 response fields. It awaits the C Provider branch for a real integration run.",
-  "current_gate": "LOCAL_TEST_PASS: strict adapter/client tests and AiChat non-blocking regression tests passed; typecheck and production build passed. No READY state is fabricated and no raw material or analysis data is shown.",
-  "status": "data_intelligence_b_consumer_ready_for_stacked_provider_integration",
+  "current_task": "LONG RUN TARGET MODE V5 / AI-CS PRODUCTIZATION V2 B customer usability",
+  "current_stage": "The customer workbench adds a visible consultation scope, non-blocking AI reference readiness guidance, and a human review-to-copy path using only the frozen customer knowledge-status response. It awaits cross-service browser QA against the matching C Provider candidate.",
+  "current_gate": "LOCAL_TEST_PASS: customer knowledge-status adapter/client and AiChat regression coverage passed; full typecheck, 26-file/109-test Vitest run, and production build passed. No READY state is fabricated and no raw material, analysis, model, or technical detail is shown to customers.",
+  "status": "ai_control_center_v2_customer_ready_for_cross_service_qa",
   "last_updated": "2026-07-28",
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
@@ -16,12 +16,12 @@
     "owner": "OPS for safe current-baseline restart; B added route regression coverage only."
   },
   "git": {
-    "branch": "codex/customer-pilot-hardening-b-v4",
-    "base_commit": "348c875",
+    "branch": "codex/ai-control-center-v2-customer",
+    "base_commit": "8abb67d",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "delivery": "DRAFT_PR_49",
-    "clean": false,
-    "task_commit": "89f9ead"
+    "delivery": "PENDING_COMMIT_AND_DRAFT_PR_UPDATE",
+    "clean": true,
+    "task_commit": "PENDING"
   },
   "owned_paths": [
     "frontend/**",
@@ -70,9 +70,9 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-27 PILOT-HARDENING-B: vue-tsc --noEmit PASS; Vitest 24 files / 99 tests PASS; vite build PASS. Browser verified the real test store/catalog, catalog readiness guidance, cross-store reset warning and no-product submission guard. A/RAG was unavailable, so no answer/copy/case/feedback success was fabricated. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain.",
+  "last_test_result": "2026-07-28 TARGET MODE V5: focused customer knowledge-status/AiChat tests 3 files / 40 tests PASS; vue-tsc --noEmit PASS; full Vitest 26 files / 109 tests PASS; vite build PASS. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain. Cross-service browser QA is owned by the QA thread and has not been claimed here.",
   "blockers": [
-    "A/RAG service was unavailable during browser validation and the actual de-identified consultation request failed, so a real answer could not be generated and the copy, experience-case submit and AI-feedback submit success path could not be executed."
+    "Cross-service browser verification of this additive V5 presentation against the matching C Provider candidate is pending QA; this is not substituted by a frontend Mock."
   ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
@@ -81,7 +81,7 @@
     "Pilot-guide dismissal is a local browser boolean, not authentication or training evidence",
     "AI feedback is limited to synthetic or manually de-identified test data; automatic redaction and formal authorization are not implemented",
     "Feedback history UI is intentionally absent; any future status-query page must consume the frozen GET fields and pagination without inventing fields.",
-    "The C knowledge-material Provider is in a stacked branch, so a real customer-status response has not yet been verified against a running C service."
+    "The V5 presentation still needs browser regression against the matching C Provider candidate before it can be presented as an integrated deployment."
   ],
   "completed_tasks": [
     "B-T01 frontend baseline audit",
@@ -99,7 +99,8 @@
     "TARGET-PILOT-B independent daily customer consultation (local UI and quality verification PASS; full live success path BLOCKED by unavailable A/RAG)",
     "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)",
     "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added",
-    "TARGET MODE V2 customer knowledge-status consumer: strict same-origin client, compact Chinese status indicator and non-blocking fallback implemented against knowledge-quality-loop.v1"
+    "TARGET MODE V2 customer knowledge-status consumer: strict same-origin client, compact Chinese status indicator and non-blocking fallback implemented against knowledge-quality-loop.v1",
+    "TARGET MODE V5 customer usability: visible consultation scope, AI reference readiness actions, and human review-to-copy path implemented without adding API consumption"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
