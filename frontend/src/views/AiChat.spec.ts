@@ -21,6 +21,7 @@ const apiMocks = vi.hoisted(() => ({
   listStores: vi.fn(),
   listProducts: vi.fn(),
   listSkus: vi.fn(),
+  getCustomerKnowledgeStatus: vi.fn(),
   submitExperienceCase: vi.fn(),
   submitAiFeedback: vi.fn(),
   createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key')
@@ -39,6 +40,12 @@ vi.mock('@/api/platformClient', () => ({
     listStores: apiMocks.listStores,
     listProducts: apiMocks.listProducts,
     listSkus: apiMocks.listSkus
+  }
+}))
+
+vi.mock('@/api/customerKnowledgeStatusClient', () => ({
+  customerKnowledgeStatusClient: {
+    getStatus: apiMocks.getCustomerKnowledgeStatus
   }
 }))
 
@@ -204,6 +211,11 @@ describe('AiChat B-T04 three-step workbench', () => {
         : [product, secondProduct])
     )
     apiMocks.listSkus.mockResolvedValue([sku])
+    apiMocks.getCustomerKnowledgeStatus.mockResolvedValue({
+      status: 'NEEDS_REVIEW',
+      summary: '该商品资料仍有待补全项，回复前请人工核对。',
+      lastCheckedAt: '2026-07-28T10:00:00Z'
+    })
     apiMocks.chat.mockResolvedValue(resultFor())
     apiMocks.submitExperienceCase.mockResolvedValue({ caseId: 'CEC-001', reviewStatus: 'NEW' })
     apiMocks.submitAiFeedback.mockResolvedValue({
@@ -235,6 +247,86 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
     await selectAt(wrapper, 1, 'PROD-001')
     expect(apiMocks.listSkus).toHaveBeenCalledWith(store, product, expect.any(AbortSignal))
+  })
+
+  it('shows only the compact frozen knowledge status for the selected product scope', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await selectContext(wrapper)
+
+    expect(apiMocks.getCustomerKnowledgeStatus).toHaveBeenLastCalledWith({
+      storeCode: 'PDD-SM',
+      productId: 'PROD-001',
+      skuId: 'SKU-RED'
+    }, expect.any(AbortSignal))
+    const status = wrapper.get('[data-testid="customer-knowledge-status"]')
+    expect(status.text()).toContain('回复前需要人工核对')
+    expect(status.text()).toContain('该商品资料仍有待补全项')
+    expect(status.text()).not.toContain('analysis_text')
+    expect(status.text()).not.toContain('content_hash')
+  })
+
+  it('keeps the selected consultation scope and the human review-to-copy path visible', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await selectContext(wrapper, false)
+
+    const context = wrapper.get('[data-testid="context-summary"]')
+    expect(context.text()).toContain('本次咨询对象')
+    expect(context.text()).toContain('当前店铺')
+    expect(context.text()).toContain('当前商品')
+    expect(context.text()).toContain('具体款式（SKU）')
+    expect(context.text()).toContain('待确认（可留空）')
+
+    const journey = wrapper.get('[data-testid="consultation-journey"]')
+    expect(journey.text()).toContain('确认店铺、商品和款式')
+    expect(journey.text()).toContain('保留客户原话并提问')
+    expect(journey.text()).toContain('核对建议和回答依据')
+    expect(journey.text()).toContain('修改后人工复制')
+    expect(journey.text()).toContain('收藏优秀案例或反馈问题')
+  })
+
+  it('distinguishes no approved material from a status-service failure without blocking consultation', async () => {
+    apiMocks.getCustomerKnowledgeStatus.mockResolvedValue({
+      status: 'NO_APPROVED_MATERIAL',
+      summary: '该商品暂无已审核资料，请人工核对。',
+      lastCheckedAt: '2026-07-28T10:00:00Z'
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    await selectContext(wrapper)
+
+    const noMaterialStatus = wrapper.get('[data-testid="customer-knowledge-status"]')
+    expect(noMaterialStatus.text()).toContain('暂无已审核资料')
+    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('资料不足时不要直接采用')
+
+    apiMocks.getCustomerKnowledgeStatus.mockRejectedValueOnce(new Error('platform request failed'))
+    await wrapper.get('[data-testid="customer-knowledge-refresh"]').trigger('click')
+    await flushPromises()
+
+    const unavailableStatus = wrapper.get('[data-testid="customer-knowledge-status"]')
+    expect(unavailableStatus.text()).toContain('资料状态暂时无法获取')
+    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('资料状态接口暂时无法连接')
+    await wrapper.get('[data-testid="question-input"]').setValue('这个款式适合几岁儿童？')
+    expect(wrapper.get('[data-testid="submit-button"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps AI consultation available when the compact knowledge status cannot be retrieved', async () => {
+    apiMocks.getCustomerKnowledgeStatus.mockRejectedValue(new Error('platform request failed'))
+    const wrapper = mountPage()
+    await flushPromises()
+    await selectContext(wrapper)
+
+    const status = wrapper.get('[data-testid="customer-knowledge-status"]')
+    expect(status.text()).toContain('无法获取资料状态，可继续咨询')
+    expect(status.text()).not.toContain('暂无数据')
+    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('资料状态接口暂时无法连接')
+
+    await wrapper.get('[data-testid="question-input"]').setValue('这个款式适合几岁儿童？')
+    expect(wrapper.get('[data-testid="submit-button"]').attributes('disabled')).toBeUndefined()
+    await wrapper.get('[data-testid="submit-button"]').trigger('click')
+    await flushPromises()
+    expect(apiMocks.chat).toHaveBeenCalledTimes(1)
   })
 
   it('keeps version and runtime routing information folded into technical details', async () => {
@@ -332,8 +424,8 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="sources-details"]').attributes('open')).toBeUndefined()
     expect(wrapper.get('[data-testid="citation-item"]').text()).toContain('toy-guide.pdf')
     expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('当前店铺')
-    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('商品上下文')
-    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('SKU 上下文')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('当前商品')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('具体款式（SKU）')
     expect(wrapper.get('[data-testid="answer-trust-note"]').text()).toContain('资料匹配，可参考')
     expect(wrapper.get('[data-testid="feedback-section"]').attributes('open')).toBeDefined()
     expect(useCustomerSessionActivity().aiAssists.value).toBe(1)
@@ -427,7 +519,7 @@ describe('AiChat B-T04 three-step workbench', () => {
 
     expect(wrapper.find('[data-testid="answer-card"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="next-question-notice"]').text()).toContain('已清空上一条建议')
-    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('商品上下文')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('当前商品')
   })
 
   it('starts the next consultation without discarding the selected store, product, or SKU', async () => {
@@ -440,7 +532,7 @@ describe('AiChat B-T04 three-step workbench', () => {
 
     expect(wrapper.find('[data-testid="answer-card"]').exists()).toBe(false)
     expect((wrapper.get('[data-testid="question-input"]').element as HTMLTextAreaElement).value).toBe('')
-    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('SKU 上下文')
+    expect(wrapper.get('[data-testid="context-summary"]').text()).toContain('具体款式（SKU）')
   })
 
   it('enables experience capture or problem feedback only after the matching adoption decision', async () => {
