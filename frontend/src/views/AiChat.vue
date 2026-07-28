@@ -167,7 +167,7 @@
             :disabled="!selectedProduct || loading"
             clearable
             filterable
-            @change="clearAnswer"
+            @change="handleSkuChange"
           >
             <el-option
               v-for="sku in skus"
@@ -224,6 +224,29 @@
           {{ showTechnicalDetails ? '隐藏技术信息' : '查看技术信息' }}
         </el-button>
       </div>
+      <section
+        v-if="selectedStore && selectedProduct"
+        class="knowledge-status-card"
+        :class="`is-${customerKnowledgeTone}`"
+        data-testid="customer-knowledge-status"
+      >
+        <div>
+          <small>商品资料状态</small>
+          <strong>{{ customerKnowledgeTitle }}</strong>
+          <p>{{ customerKnowledgeDescription }}</p>
+          <time v-if="customerKnowledgeStatus" :datetime="customerKnowledgeStatus.lastCheckedAt">
+            最近检查：{{ customerKnowledgeCheckedAt }}
+          </time>
+        </div>
+        <el-button
+          link
+          :loading="customerKnowledgeLoading"
+          data-testid="customer-knowledge-refresh"
+          @click="loadCustomerKnowledgeStatus"
+        >
+          刷新资料状态
+        </el-button>
+      </section>
       <div v-if="showTechnicalDetails && selectedStore && selectedProduct" class="technical-box" data-testid="context-technical-details">
         <code>tenant_id={{ selectedStore.tenantId }}</code>
         <code>platform={{ selectedStore.platform }}</code>
@@ -676,6 +699,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ragClient } from '@/api/ragClient'
 import { platformClient } from '@/api/platformClient'
+import { customerKnowledgeStatusClient } from '@/api/customerKnowledgeStatusClient'
 import { experienceCaseClient } from '@/api/experienceCaseClient'
 import {
   aiResponseFeedbackClient,
@@ -692,6 +716,10 @@ import type {
   CatalogStore,
   PlatformHealth
 } from '@/api/platformTypes'
+import type {
+  CustomerKnowledgeStatus,
+  CustomerKnowledgeStatusValue
+} from '@/api/customerKnowledgeStatusTypes'
 import type {
   AdoptionRecord,
   AdoptionType,
@@ -765,6 +793,20 @@ const platformLabels: Record<string, string> = {
   jd: '京东',
   offline: '线下',
   other: '其他'
+}
+
+const customerKnowledgeLabels: Record<CustomerKnowledgeStatusValue, string> = {
+  READY: '资料可供人工参考',
+  NEEDS_REVIEW: '回复前需要人工核对',
+  NO_APPROVED_MATERIAL: '暂无已审核资料',
+  UNAVAILABLE: '资料状态暂不可用'
+}
+
+const customerKnowledgeTones: Record<CustomerKnowledgeStatusValue, string> = {
+  READY: 'ready',
+  NEEDS_REVIEW: 'warning',
+  NO_APPROVED_MATERIAL: 'warning',
+  UNAVAILABLE: 'error'
 }
 
 const requiredFieldLabels: Record<string, string> = {
@@ -841,10 +883,13 @@ const productsLoading = ref(false)
 const skusLoading = ref(false)
 const ragHealthLoading = ref(false)
 const platformHealthLoading = ref(false)
+const customerKnowledgeLoading = ref(false)
 const ragHealth = ref<RagHealth | null>(null)
 const platformHealth = ref<PlatformHealth | null>(null)
+const customerKnowledgeStatus = ref<CustomerKnowledgeStatus | null>(null)
 const ragHealthError = ref('')
 const platformError = ref('')
+const customerKnowledgeError = ref('')
 const requestError = ref('')
 const result = ref<RagChatResult | null>(null)
 const replyDraft = ref('')
@@ -872,6 +917,7 @@ const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
 let activeCatalogController: AbortController | null = null
+let activeCustomerKnowledgeController: AbortController | null = null
 const { identity } = useTesterIdentity()
 
 const runtimeDetails = {
@@ -894,6 +940,36 @@ const selectedProduct = computed(() =>
 const selectedSku = computed(() =>
   skus.value.find((sku) => sku.skuId === selectedSkuId.value) ?? null
 )
+
+const customerKnowledgeTitle = computed(() => {
+  if (customerKnowledgeLoading.value) return '正在检查资料状态'
+  if (customerKnowledgeError.value) return '资料状态暂时无法获取'
+  if (customerKnowledgeStatus.value) return customerKnowledgeLabels[customerKnowledgeStatus.value.status]
+  return '等待选择商品后检查'
+})
+
+const customerKnowledgeDescription = computed(() => {
+  if (customerKnowledgeLoading.value) return '正在读取与当前商品范围匹配的资料状态。'
+  if (customerKnowledgeError.value) return '无法获取资料状态，可继续咨询；生成回复前请人工核对商品信息。'
+  if (customerKnowledgeStatus.value) return customerKnowledgeStatus.value.summary
+  return '选择商品后会显示资料是否已完成审核；该提示不会阻断 AI 咨询。'
+})
+
+const customerKnowledgeTone = computed(() => {
+  if (customerKnowledgeLoading.value) return 'loading'
+  if (customerKnowledgeError.value) return 'error'
+  if (customerKnowledgeStatus.value) return customerKnowledgeTones[customerKnowledgeStatus.value.status]
+  return 'neutral'
+})
+
+const customerKnowledgeCheckedAt = computed(() => {
+  if (!customerKnowledgeStatus.value) return ''
+  return new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    hour12: false
+  }).format(new Date(customerKnowledgeStatus.value.lastCheckedAt))
+})
 
 const canSubmit = computed(() => Boolean(customerQuestion.value.trim() && !loading.value))
 
@@ -1147,6 +1223,46 @@ const refreshRagHealth = async () => {
   }
 }
 
+const clearCustomerKnowledgeStatus = () => {
+  activeCustomerKnowledgeController?.abort()
+  activeCustomerKnowledgeController = null
+  customerKnowledgeStatus.value = null
+  customerKnowledgeError.value = ''
+  customerKnowledgeLoading.value = false
+}
+
+const loadCustomerKnowledgeStatus = async () => {
+  const store = selectedStore.value
+  const product = selectedProduct.value
+  if (!store || !product) {
+    clearCustomerKnowledgeStatus()
+    return
+  }
+
+  activeCustomerKnowledgeController?.abort()
+  const controller = new AbortController()
+  activeCustomerKnowledgeController = controller
+  customerKnowledgeLoading.value = true
+  customerKnowledgeError.value = ''
+  try {
+    customerKnowledgeStatus.value = await customerKnowledgeStatusClient.getStatus({
+      storeCode: store.storeCode,
+      productId: product.productId,
+      skuId: selectedSku.value?.skuId ?? null
+    }, controller.signal)
+  } catch {
+    if (!controller.signal.aborted) {
+      customerKnowledgeStatus.value = null
+      customerKnowledgeError.value = '无法获取资料状态，可继续咨询。'
+    }
+  } finally {
+    if (activeCustomerKnowledgeController === controller) {
+      activeCustomerKnowledgeController = null
+      customerKnowledgeLoading.value = false
+    }
+  }
+}
+
 const loadStores = async () => {
   activeCatalogController?.abort()
   const controller = new AbortController()
@@ -1219,6 +1335,7 @@ const handleStoreChange = async () => {
   skus.value = []
   selectedProductId.value = ''
   selectedSkuId.value = ''
+  clearCustomerKnowledgeStatus()
   clearAnswer()
   if (!selectedStore.value) {
     rememberStore('')
@@ -1254,6 +1371,7 @@ const handleProductChange = async () => {
   activeCatalogController?.abort()
   skus.value = []
   selectedSkuId.value = ''
+  clearCustomerKnowledgeStatus()
   clearAnswer()
   if (!selectedStore.value || !selectedProduct.value) return
 
@@ -1281,6 +1399,13 @@ const handleProductChange = async () => {
     if (activeCatalogController === controller) activeCatalogController = null
     skusLoading.value = false
   }
+
+  if (!controller.signal.aborted) void loadCustomerKnowledgeStatus()
+}
+
+const handleSkuChange = () => {
+  clearAnswer()
+  void loadCustomerKnowledgeStatus()
 }
 
 const submitQuestion = async () => {
@@ -1524,6 +1649,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   activeRagController?.abort()
   activeCatalogController?.abort()
+  activeCustomerKnowledgeController?.abort()
 })
 </script>
 
@@ -1685,6 +1811,28 @@ h2 { margin-bottom: 7px; font-size: 21px; }
   display: grid; place-items: center; width: 32px; height: 32px;
   border-radius: 50%; background: #22a06b; color: #fff; font-weight: 900;
 }
+.knowledge-status-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 11px 13px;
+  border: 1px solid #cbd9ee;
+  border-radius: 12px;
+  background: #f7faff;
+}
+.knowledge-status-card > div { min-width: 0; }
+.knowledge-status-card small { display: block; color: #5b6f8c; font-size: 11px; font-weight: 800; }
+.knowledge-status-card strong { display: block; margin-top: 2px; color: #294c85; font-size: 13px; }
+.knowledge-status-card p { margin: 4px 0 0; color: #52657e; font-size: 12px; line-height: 1.5; }
+.knowledge-status-card time { display: block; margin-top: 4px; color: #6d7d92; font-size: 11px; }
+.knowledge-status-card.is-ready { border-color: #b7dfc8; background: #f1fbf5; }
+.knowledge-status-card.is-ready strong { color: #19633f; }
+.knowledge-status-card.is-warning { border-color: #efd49a; background: #fffaf0; }
+.knowledge-status-card.is-warning strong { color: #8a5a00; }
+.knowledge-status-card.is-error { border-color: #efc5c2; background: #fff7f6; }
+.knowledge-status-card.is-error strong { color: #ad3730; }
 
 .technical-box {
   display: flex;
