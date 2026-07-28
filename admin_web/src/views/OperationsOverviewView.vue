@@ -97,20 +97,24 @@ onMounted(() => { void load() })
 
       <section class="next-grid" aria-label="运营待办">
         <RouterLink class="next-card primary" to="/knowledge-center">
-          <span>商品知识</span><strong>{{ displayedTotal(materialTotal, materialUnavailable) }}</strong>
-          <small>{{ materialUnavailable ? '资料记录接口暂时不可用，请稍后刷新。' : '份受控资料记录，进入知识中心继续审核。' }}</small>
+          <span>商品知识</span>
+          <span class="next-card__metric"><strong>{{ displayedTotal(materialTotal, materialUnavailable) }}</strong><span v-if="!materialUnavailable" class="next-card__unit">份</span></span>
+          <small>{{ materialUnavailable ? '资料记录接口暂时不可用，请稍后刷新。' : '受控资料记录，进入知识中心继续审核。' }}</small>
         </RouterLink>
         <RouterLink class="next-card" to="/knowledge-quality-pool">
-          <span>知识质量</span><strong>{{ displayedTotal(qualityTotal, qualityUnavailable) }}</strong>
-          <small>{{ qualityUnavailable ? '质量分析接口暂时不可用，请稍后刷新。' : '条已完成分析，查看待补充项和修正建议。' }}</small>
+          <span>知识质量</span>
+          <span class="next-card__metric"><strong>{{ displayedTotal(qualityTotal, qualityUnavailable) }}</strong><span v-if="!qualityUnavailable" class="next-card__unit">条</span></span>
+          <small>{{ qualityUnavailable ? '质量分析接口暂时不可用，请稍后刷新。' : '已完成分析，查看待补充项和修正建议。' }}</small>
         </RouterLink>
         <RouterLink class="next-card" to="/ai-feedback-optimization-pool">
-          <span>AI 问题</span><strong>{{ displayedTotal(feedbackTotal, feedbackUnavailable) }}</strong>
-          <small>{{ feedbackUnavailable ? 'AI 问题接口暂时不可用，请稍后刷新。' : '条已分析反馈，查看原因与建议。' }}</small>
+          <span>AI 问题</span>
+          <span class="next-card__metric"><strong>{{ displayedTotal(feedbackTotal, feedbackUnavailable) }}</strong><span v-if="!feedbackUnavailable" class="next-card__unit">条</span></span>
+          <small>{{ feedbackUnavailable ? 'AI 问题接口暂时不可用，请稍后刷新。' : '已分析反馈，查看原因与建议。' }}</small>
         </RouterLink>
         <RouterLink class="next-card" to="/customer-operations">
-          <span>客服运营</span><strong>{{ overview.counts.suggestions.submitted }}</strong>
-          <small>条已提交运营建议；查看客服案例、问题和建议。</small>
+          <span>客服运营</span>
+          <span class="next-card__metric"><strong>{{ overview.counts.suggestions.submitted }}</strong><span class="next-card__unit">条</span></span>
+          <small>已提交运营建议；查看客服案例、问题和建议。</small>
         </RouterLink>
       </section>
 
@@ -140,7 +144,9 @@ onMounted(() => { void load() })
 .next-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .next-card { display: grid; gap: 7px; min-height: 150px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 13px; color: #25466f; background: #fff; text-decoration: none; }
 .next-card.primary { border-color: #92b5e8; background: linear-gradient(145deg, #f5f9ff, #fff); }
+.next-card__metric { display: inline-flex; align-items: baseline; gap: 5px; min-height: 34px; }
 .next-card strong { color: #172554; font-size: 28px; }
+.next-card__unit { color: #475569; font-size: 14px; font-weight: 700; }
 .next-card small { color: #617087; line-height: 1.55; }
 .workbench-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
 .workbench-link { display: grid; gap: 8px; min-height: 116px; padding: 17px; border: 1px solid #dbe4ef; border-radius: 12px; color: #25466f; background: #fff; text-decoration: none; }
