@@ -24,7 +24,10 @@ const apiMocks = vi.hoisted(() => ({
   getCustomerKnowledgeStatus: vi.fn(),
   submitExperienceCase: vi.fn(),
   submitAiFeedback: vi.fn(),
-  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key')
+  createAiFeedbackIdempotencyKey: vi.fn(() => 'ai-feedback-test-key'),
+  submitInteractionEvent: vi.fn(),
+  createInteractionEventIdempotencyKey: vi.fn(() => 'ai-interaction-test-key'),
+  createLocalInteractionId: vi.fn(() => 'interaction-local-test')
 }))
 
 vi.mock('@/api/ragClient', () => ({
@@ -56,6 +59,12 @@ vi.mock('@/api/experienceCaseClient', () => ({
 vi.mock('@/api/aiResponseFeedbackClient', () => ({
   aiResponseFeedbackClient: { submit: apiMocks.submitAiFeedback },
   createAiResponseFeedbackIdempotencyKey: apiMocks.createAiFeedbackIdempotencyKey
+}))
+
+vi.mock('@/api/aiInteractionEventClient', () => ({
+  aiInteractionEventClient: { submit: apiMocks.submitInteractionEvent },
+  createAiInteractionEventIdempotencyKey: apiMocks.createInteractionEventIdempotencyKey,
+  createLocalInteractionId: apiMocks.createLocalInteractionId
 }))
 
 const store = {
@@ -220,6 +229,12 @@ describe('AiChat B-T04 three-step workbench', () => {
     apiMocks.submitExperienceCase.mockResolvedValue({ caseId: 'CEC-001', reviewStatus: 'NEW' })
     apiMocks.submitAiFeedback.mockResolvedValue({
       feedbackId: 'ARF-001', status: 'NEW'
+    })
+    apiMocks.submitInteractionEvent.mockResolvedValue({
+      eventId: 'AIE-001',
+      interactionId: 'req-ui-1',
+      status: 'RECORDED',
+      occurredAt: '2026-07-29T08:00:00Z'
     })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -547,17 +562,19 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(feedback.attributes('disabled')).toBeDefined()
 
     await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    await flushPromises()
     expect(collect.attributes('disabled')).toBeUndefined()
     expect(feedback.attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="adoption-next-step"]').text()).toContain('收藏为优秀案例')
 
     await wrapper.get('[data-testid="reject"]').trigger('click')
+    await flushPromises()
     expect(collect.attributes('disabled')).toBeDefined()
     expect(feedback.attributes('disabled')).toBeUndefined()
     expect(wrapper.get('[data-testid="adoption-next-step"]').text()).toContain('AI 问题反馈')
   })
 
-  it('copies the customer-service edit and records all three page-local outcomes', async () => {
+  it('copies the customer-service edit and persists all three adoption events', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await submit(wrapper)
@@ -568,11 +585,43 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('客服修改后的测试回复')
 
     await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    await flushPromises()
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('直接采用')
     await wrapper.get('[data-testid="edited-accept"]').trigger('click')
+    await flushPromises()
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('修改后采用')
     await wrapper.get('[data-testid="reject"]').trigger('click')
+    await flushPromises()
     expect(wrapper.get('[data-testid="adoption-result"]').text()).toContain('未采用')
+    expect(apiMocks.submitInteractionEvent).toHaveBeenCalledTimes(3)
+    expect(apiMocks.submitInteractionEvent).toHaveBeenLastCalledWith({
+      interactionId: 'req-ui-1',
+      storeCode: 'PDD-SM',
+      storeName: '汕明',
+      productId: 'PROD-001',
+      productName: '测试积木套装',
+      skuId: 'SKU-RED',
+      skuName: '红色款（测试）',
+      actionType: 'REJECTED',
+      questionSummary: '这个款式适合几岁？',
+      aiAnswerSummary: '建议回复：适用年龄请以商品包装标识为准。',
+      finalAnswerSummary: null,
+      createdBy: 'TESTER-ONE'
+    }, 'ai-interaction-test-key')
+  })
+
+  it('shows no local adoption success when the event cannot be saved', async () => {
+    apiMocks.submitInteractionEvent.mockRejectedValue(new Error('行为事件服务不可用'))
+    const wrapper = mountPage()
+    await flushPromises()
+    await submit(wrapper)
+
+    await wrapper.get('[data-testid="reject"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="adoption-event-error"]').text()).toContain('行为事件服务不可用')
+    expect(wrapper.find('[data-testid="adoption-result"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="open-ai-feedback"]').exists()).toBe(false)
   })
 
   it('keeps the edited reply available when browser clipboard access fails', async () => {
@@ -601,6 +650,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     await submit(wrapper)
 
     await wrapper.get('[data-testid="reject"]').trigger('click')
+    await flushPromises()
     expect(wrapper.get('[data-testid="open-ai-feedback"]').text()).toContain('AI 问题反馈')
     expect(wrapper.get('[data-testid="save-experience-case"]').attributes('disabled')).toBeDefined()
     await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
@@ -612,7 +662,8 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(apiMocks.submitAiFeedback).toHaveBeenCalledWith({
       storeCode: 'PDD-SM', productId: 'PROD-001', skuId: 'SKU-RED', question: '这个款式适合几岁？',
       aiAnswer: '建议回复：适用年龄请以商品包装标识为准。', feedbackType: 'RISK_ISSUE',
-      feedbackNote: null, finalAnswer: null, createdBy: 'TESTER-ONE'
+      feedbackNote: null, finalAnswer: null, createdBy: 'TESTER-ONE',
+      interactionId: 'req-ui-1'
     }, expect.stringMatching(/^ai-feedback-/))
     expect(wrapper.get('[data-testid="ai-feedback-success"]').text()).toContain('反馈已记录。')
     expect(apiMocks.submitExperienceCase).not.toHaveBeenCalled()
@@ -628,6 +679,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     await submit(wrapper)
 
     await wrapper.get('[data-testid="reject"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
     await selectAiFeedbackType(wrapper, 'FACT_ERROR')
     await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
@@ -649,6 +701,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     await submit(wrapper)
 
     await wrapper.get('[data-testid="reject"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="open-ai-feedback"]').trigger('click')
     await selectAiFeedbackType(wrapper, 'OTHER')
     await wrapper.get('[data-testid="ai-feedback-submit"]').trigger('click')
@@ -672,6 +725,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(wrapper.get('[data-testid="save-experience-case"]').text()).toContain('收藏为优秀案例')
     expect(wrapper.text()).toContain('帮助系统持续优化')
     await wrapper.get('[data-testid="edited-accept"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
     await flushPromises()
     await wrapper.get('[data-testid="experience-case-final-answer"]').setValue('客服审核后的测试回复')
@@ -699,6 +753,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     await flushPromises()
     await submit(wrapper)
     await wrapper.get('[data-testid="direct-accept"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="save-experience-case"]').trigger('click')
     await flushPromises()
     await selectExperienceCaseFeedbackType(wrapper, 'ADOPTED')
