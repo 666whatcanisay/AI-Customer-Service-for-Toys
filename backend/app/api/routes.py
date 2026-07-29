@@ -16,6 +16,7 @@ from app.models.chat import (
     ModelConfigUpdate,
     SearchRequest,
 )
+from app.models.ai_control_product import AiControlCenterProductResponse
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
@@ -41,6 +42,7 @@ from app.service.ai_capability import (
     prompt_metadata,
     safe_initialization_error,
 )
+from app.service.ai_control_product import product_control_center_snapshot
 from app.service.test_knowledge import (
     PlatformIntegrationUnavailable,
     TestKnowledgeValidationError,
@@ -515,6 +517,19 @@ def get_ai_control_center_overview(request: Request):
     if not customer_service_detail(request.app)["ready"]:
         return ai_control_not_ready_response()
     return envelope(control_center_overview(request.app))
+
+
+@router.get(
+    "/admin/ai/control-center/product-overview",
+    tags=["ai-admin"],
+    response_model=AiControlCenterProductResponse,
+)
+def get_ai_control_center_product_overview(request: Request) -> dict[str, Any]:
+    """Return the stable read-only product projection for the 5174 console."""
+    return envelope(
+        product_control_center_snapshot(request.app).model_dump(),
+        message="AI 控制中心产品数据投影",
+    )
 
 
 @router.get("/ai/status", tags=["compatibility"])
