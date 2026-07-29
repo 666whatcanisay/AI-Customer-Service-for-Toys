@@ -1,0 +1,43 @@
+{
+  "schema_version": "ai-cs-pilot-baseline.v1",
+  "updated_at": "2026-07-29",
+  "requirement_id": "R004",
+  "status": "CONTROLLED_PILOT_BASELINE_READY",
+  "repository_root": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-pilot-baseline-recovery-v1",
+  "branch": "control/pilot-baseline-recovery-v1",
+  "base_sha": "671c9a293f1e5e0f462522ad2c7e114c7919c388",
+  "executable_capability_sha": "acfaa8b574d445cea6039ffa388d54661775b31f",
+  "final_ref": "refs/tags/ai-cs-pilot-baseline-v1",
+  "contracts_version": "0.2.0",
+  "a_test_knowledge_schema": "0.3.1-test",
+  "runtime": {
+    "source_state": "CLEAN",
+    "services": {
+      "B": {"port": 5173, "path": "frontend", "health_path": "/"},
+      "C_ADMIN": {"port": 5174, "path": "admin_web", "health_path": "/"},
+      "A": {"port": 8000, "path": "backend", "health_path": "/api/health"},
+      "C_API": {"port": 8011, "path": "platform_backend", "health_path": "/health"}
+    },
+    "bind_scope": "127.0.0.1 only",
+    "isolated_runtime_data": true,
+    "knowledge_sync": "47/47 MATCH"
+  },
+  "tests": {
+    "a_backend": "101 passed, 3 skipped",
+    "c_backend": "95 passed",
+    "b_frontend": "115 passed; typecheck and build passed",
+    "c_admin": "54 passed; typecheck and build passed",
+    "contracts": "7 schemas valid; A provider response valid"
+  },
+  "excluded": [
+    "Business Data Activation",
+    "Master Data",
+    "ERP",
+    "PostgreSQL",
+    "RBAC",
+    "Answer Trace",
+    "A model changes",
+    "Prompt changes"
+  ],
+  "next_entry": "R006 Interface Freeze only; implementation remains prohibited until approval"
+}
