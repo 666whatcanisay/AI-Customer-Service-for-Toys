@@ -129,6 +129,9 @@ def test_controlled_material_lifecycle_export_writeback_and_customer_projection(
         assert exports.json()["total"] == 1
         snapshot = exports.json()["items"][0]
         assert snapshot["material_id"] == created["material_id"]
+        assert set(snapshot["recognition_summary"]) == {
+            "readable", "file_extension", "detected_fields", "missing_expected_fields", "privacy_reminder"
+        }
         assert "适用年龄" in snapshot["analysis_text"]
 
         recorded = client.post(

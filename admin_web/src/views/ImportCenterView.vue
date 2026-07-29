@@ -1,99 +1,77 @@
 <script setup lang="ts">
 const templates = [
-  {
-    title: '商品资料模板',
-    description: '整理名称、适用年龄、安全提示、包装和使用说明等已核实事实。',
-    href: '/templates/product-material-template.csv',
-    nextStep: '可在“资料上传与审核”中作为受控资料上传，再由运营人工审核。',
-  },
-  {
-    title: 'SKU 资料模板',
-    description: '整理颜色、款式、规格、组合关系和上架状态等 SKU 事实。',
-    href: '/templates/sku-material-template.csv',
-    nextStep: '可在“资料上传与审核”中作为受控资料上传，再由运营人工审核。',
-  },
-  {
-    title: 'FAQ 模板',
-    description: '整理客户常见问题、已核实回复要点和人工确认要求。',
-    href: '/templates/faq-material-template.csv',
-    nextStep: '用于问答资料准备，不是商品批量导入文件；请提交资料审核。',
-  },
-  {
-    title: '安全规则模板',
-    description: '整理必须提醒、禁止承诺和人工复核说明。',
-    href: '/templates/safety-rule-template.csv',
-    nextStep: '用于安全资料准备，不是商品批量导入文件；请提交资料审核。',
-  },
+  { title: '商品知识采集模板', description: '商品简介、卖点、年龄、材质、包装和使用说明。', href: '/templates/商品知识采集模板V1.xlsx' },
+  { title: 'SKU差异知识采集模板', description: '只记录颜色、规格、包装、数量、尺寸和玩法差异。', href: '/templates/SKU差异知识采集模板V1.xlsx' },
+  { title: '客服FAQ知识采集模板', description: '把真实高频问题整理为有事实依据的标准回答。', href: '/templates/客服FAQ知识采集模板V1.xlsx' },
+  { title: '商品安全规则采集模板', description: '维护安全提醒、禁止承诺和必须转人工情况。', href: '/templates/商品安全规则采集模板V1.xlsx' },
+  { title: '客服AI问题反馈模板', description: '记录去除敏感信息后的AI回答问题和客服处理结果。', href: '/templates/客服AI问题反馈模板V1.xlsx' },
+  { title: 'AI知识缺口管理模板', description: '整理缺失主题、出现次数、影响程度和处理优先级。', href: '/templates/AI知识缺口管理模板V1.xlsx' },
 ]
+
 </script>
 
 <template>
   <main class="page">
     <div class="page-header">
       <div>
-        <p class="eyebrow">资料准备与导入</p>
-        <h1>导入中心</h1>
-        <p>先准备可核对的事实，再选择正确入口提交。下载模板或上传资料都不会自动发布到 AI。</p>
+        <p class="eyebrow">商品知识资料准备</p>
+        <h1>中文资料模板</h1>
+        <p>六类中文模板分别覆盖商品、SKU、FAQ、安全、AI反馈和知识缺口。模板不要求填写内部标识，也不会在下载或上传后自动发布知识。</p>
       </div>
-      <RouterLink class="button" to="/imports/new">商品与 SKU 批量导入</RouterLink>
+      <RouterLink class="button" to="/knowledge-materials">进入资料上传与审核</RouterLink>
     </div>
 
     <section class="steps card">
-      <h2>三步完成资料准备</h2>
+      <h2>使用顺序</h2>
       <ol>
-        <li>下载下方对应模板，保留第一行标题；一行只填写一个已核实事实。</li>
-        <li>在“事实来源说明”写明可复核来源，不要填写客户姓名、电话、地址、订单号或支付信息。</li>
-        <li>商品与 SKU 批量导入请先预检；其他资料请提交“资料上传与审核”，再由运营人工确认。</li>
+        <li>下载 Excel，先阅读“填写说明”和“字段说明”。</li>
+        <li>在“数据填写”中录入真实资料；“示例数据”仅用于理解格式，不能直接当作正式知识。</li>
+        <li>进入“资料上传与审核”，用中文名称选择店铺、商品和 SKU，再上传并完成人工审核。</li>
       </ol>
     </section>
 
-    <section class="template-grid" aria-label="资料模板下载">
-      <article v-for="template in templates" :key="template.href" class="template-card">
-        <h2>{{ template.title }}</h2>
-        <p>{{ template.description }}</p>
-        <a class="button secondary" :href="template.href" download>下载 CSV 模板</a>
-        <small>{{ template.nextStep }}</small>
+    <section class="template-grid">
+      <article v-for="template in templates" :key="template.title" class="template-card">
+        <div><p class="eyebrow">中文运营模板 · XLSX</p><h2>{{ template.title }}</h2><p>{{ template.description }}</p></div>
+        <a class="button secondary" :href="template.href" download>下载模板</a>
       </article>
     </section>
 
+    <section class="card template-note">
+      <h2>统一填写边界</h2>
+      <ul><li>A级知识优先核实年龄、安全、包装和FAQ。</li><li>资料不足允许保存，但AI不能编造，必须提示人工确认。</li><li>不收集价格、库存、财务、采购和平台技术标识。</li></ul>
+    </section>
+
     <section class="entry-grid">
-      <RouterLink class="entry-card primary" to="/imports/new">
-        <strong>商品与 SKU 批量导入</strong>
-        <span>只接受该入口公布的专用 Excel 格式。系统会先预检；通过后仍进入人工审核区。</span>
-      </RouterLink>
-      <RouterLink class="entry-card" to="/knowledge-materials">
+      <RouterLink class="entry-card primary" to="/knowledge-materials">
         <strong>资料上传与审核</strong>
-        <span>用于商品资料、SKU 资料、FAQ 和安全规则等受控资料准备，需人工审核后才可供 AI 做质量分析。</span>
+        <span>日常商品知识补充的主入口。选择业务名称、核对识别结果并由运营人工审核。</span>
       </RouterLink>
-      <RouterLink class="entry-card" to="/test-data-packages">
-        <strong>测试数据包</strong>
-        <span>仅用于已验证的测试 ZIP；不适用于日常商品资料填写或生产数据导入。</span>
+      <RouterLink class="entry-card" to="/knowledge-editor"><strong>中文知识维护</strong><span>不使用Excel时，可按店铺、商品和SKU直接补充结构化知识。</span></RouterLink>
+      <RouterLink class="entry-card" to="/knowledge-center">
+        <strong>查看商品知识缺口</strong>
+        <span>按店铺、商品和 SKU 查看 AI 能回答什么、不能回答什么以及下一步补什么。</span>
       </RouterLink>
     </section>
 
+    <details class="card legacy-entry">
+      <summary>旧版试点数据入口（兼容保留）</summary>
+      <p>下列入口继续用于既有试点数据验证，不是日常商品知识维护流程，也不会自动迁移历史测试数据。</p>
+      <div class="legacy-links">
+        <RouterLink class="button secondary" to="/imports/new">旧版商品与 SKU 批量导入</RouterLink>
+        <RouterLink class="button secondary" to="/test-data-packages">测试数据包</RouterLink>
+      </div>
+    </details>
+
     <section class="card boundary">
-      <h2>导入后会发生什么？</h2>
-      <p>系统只进行格式检查、受控保存、识别和人工审核。不会自动修改知识、训练模型、修改 Prompt、发送客户消息、退款、订单或 ERP 数据。</p>
+      <h2>处理边界</h2>
+      <p>资料上传后只进行受控保存、识别和人工审核。系统不会自动补写缺失事实、发布到 RAG、训练模型、修改 Prompt 或触发任何客户与业务动作。</p>
     </section>
   </main>
 </template>
 
 <style scoped>
-.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.steps { margin-bottom: 20px; background: #f8fbff; }
-.steps h2, .template-card h2, .boundary h2 { margin-top: 0; color: #172554; }
-.steps ol { display: grid; gap: 9px; margin-bottom: 0; padding-left: 22px; color: #526279; line-height: 1.65; }
-.template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.template-card { display: grid; gap: 12px; min-height: 218px; padding: 19px; border: 1px solid #dbe4ef; border-radius: 13px; background: #fff; }
-.template-card h2 { margin-bottom: 0; font-size: 18px; }
-.template-card p { margin: 0; color: #526279; line-height: 1.6; }
-.template-card small { margin-top: auto; color: #617087; line-height: 1.5; }
-.entry-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
-.entry-card { display: grid; gap: 9px; min-height: 132px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 13px; color: #25466f; background: #fff; text-decoration: none; }
-.entry-card.primary { border-color: #92b5e8; background: linear-gradient(145deg, #f5f9ff, #fff); }
-.entry-card span { color: #617087; font-size: 13px; line-height: 1.55; }
-.boundary { margin-top: 20px; border-left: 4px solid #d59b2c; }
-.boundary p { margin-bottom: 0; color: #526279; line-height: 1.65; }
-@media (max-width: 860px) { .entry-grid { grid-template-columns: 1fr; } }
-@media (max-width: 620px) { .template-grid { grid-template-columns: 1fr; } }
+.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }.steps { margin-bottom: 20px; background: #f8fbff; }.steps h2, .template-card h2, .boundary h2, .template-note h2 { margin-top: 0; color: #172554; }.steps ol { display: grid; gap: 9px; margin-bottom: 0; padding-left: 22px; color: #526279; line-height: 1.65; }.template-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }.template-card { display: grid; align-content: space-between; gap: 18px; min-height: 210px; padding: 20px; border: 1px solid #b9cde9; border-radius: 13px; background: linear-gradient(145deg, #f4f8ff, #fff); }.template-card h2 { margin-bottom: 8px; font-size: 18px; }.template-card p { color: #526279; line-height: 1.6; }.template-card > .button { justify-self: start; }.template-note { margin-top: 16px; }.template-note ul { margin-bottom: 0; color: #526279; line-height: 1.7; }.entry-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }.entry-card { display: grid; gap: 9px; min-height: 118px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 13px; color: #25466f; background: #fff; text-decoration: none; }.entry-card.primary { border-color: #92b5e8; }.entry-card span { color: #617087; font-size: 13px; line-height: 1.55; }.legacy-entry { margin-top: 20px; color: #526279; }.legacy-entry summary { color: #334965; font-weight: 700; cursor: pointer; }.legacy-entry p { line-height: 1.6; }.legacy-links { display: flex; flex-wrap: wrap; gap: 10px; }.boundary { margin-top: 20px; border-left: 4px solid #d59b2c; }.boundary p { margin-bottom: 0; color: #526279; line-height: 1.65; }
+@media (max-width: 900px) { .template-grid, .entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .template-grid, .entry-grid { grid-template-columns: 1fr; } }
 </style>

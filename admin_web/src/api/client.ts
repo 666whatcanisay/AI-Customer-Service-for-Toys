@@ -468,6 +468,7 @@ export interface AiFeedbackAnalysisResultList {
 }
 
 export type KnowledgeMaterialType = 'PRODUCT_SPEC' | 'SAFETY_INSTRUCTION' | 'ASSEMBLY_GUIDE' | 'FAQ_SOURCE' | 'OTHER'
+export type KnowledgeTemplateType = 'PRODUCT_KNOWLEDGE' | 'SKU_DIFFERENCE' | 'FAQ' | 'SAFETY_RULE' | 'AI_FEEDBACK' | 'KNOWLEDGE_GAP'
 export type KnowledgeMaterialStatus = 'RECEIVED' | 'RECOGNIZED' | 'REVIEWING' | 'APPROVED_FOR_ANALYSIS' | 'ANALYZING' | 'ANALYZED' | 'ANALYSIS_FAILED' | 'REJECTED'
 export type KnowledgeQualityOverallStatus = 'ANALYZED' | 'FAILED'
 export type KnowledgeQualityGapSeverity = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -479,6 +480,11 @@ export interface RecognitionSummary {
   detected_fields: string[]
   missing_expected_fields: string[]
   privacy_reminder: string
+  template_type: KnowledgeTemplateType | null
+  template_name: string | null
+  record_count: number
+  warnings: string[]
+  high_risk_source_confirmed: boolean | null
 }
 
 export interface KnowledgeMaterial {
@@ -548,6 +554,194 @@ export interface KnowledgeQualityAssessment {
 export interface KnowledgeQualityAssessmentList {
   items: KnowledgeQualityAssessment[]
   total: number
+}
+
+export type KnowledgeTopicStatus = 'SUPPORTED' | 'PARTIAL' | 'MISSING'
+export type ProductKnowledgeState = 'WELL_COVERED' | 'BASIC_AVAILABLE' | 'NEEDS_COMPLETION'
+export type KnowledgeDataStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED'
+export type KnowledgeAiStatus = 'EFFECTIVE' | 'PARTIALLY_AVAILABLE' | 'MISSING_KNOWLEDGE' | 'UNCONFIRMED'
+export type KnowledgeGapWorkflowStatus = 'PENDING' | 'IN_PROGRESS' | 'PENDING_VERIFICATION' | 'RESOLVED'
+
+export interface ProductKnowledgeTechnicalDetails {
+  store_code: string | null
+  platform: string | null
+  product_id: string | null
+  product_code: string | null
+  sku_id: string | null
+  sku_code: string | null
+  source_id: string | null
+  material_id: string | null
+  revision: number | null
+  content_hash: string | null
+}
+
+export interface StoreKnowledgeSummary {
+  store_name: string
+  platform_name: string
+  remarks?: string
+  product_count: number
+  ai_usable_product_count: number
+  gap_count: number
+  pending_review_count: number
+  technical_details: ProductKnowledgeTechnicalDetails
+}
+
+export interface ProductKnowledgeOverview {
+  generated_at: string
+  has_data: boolean
+  stats: {
+    store_count: number | null
+    product_count: number | null
+    ai_usable_product_count: number | null
+    gap_count: number | null
+    pending_review_count: number | null
+  }
+  stores: StoreKnowledgeSummary[]
+  boundary_note: string
+}
+
+export interface ProductKnowledgeListItem {
+  store_name: string
+  product_name: string
+  product_summary: string | null
+  core_selling_points: string[]
+  applicable_age: string | null
+  material_safety: string | null
+  package_contents: string | null
+  faq_count: number
+  sku_names: string[]
+  coverage_percent: number
+  ai_usable: boolean
+  knowledge_state: ProductKnowledgeState
+  data_status: KnowledgeDataStatus
+  ai_status: KnowledgeAiStatus
+  answerable_topics: string[]
+  missing_topics: string[]
+  gap_count: number
+  technical_details: ProductKnowledgeTechnicalDetails
+}
+
+export interface TopicCoverage {
+  key: string
+  name: string
+  level: 'A' | 'B'
+  status: KnowledgeTopicStatus
+  evidence_summary: string | null
+}
+
+export interface ProductKnowledgeGap {
+  key: string
+  title: string
+  severity: string
+  description: string
+  recommended_action: string
+  safe_fallback: string
+  source: string
+}
+
+export interface ProductKnowledgeDetail {
+  store: StoreKnowledgeSummary
+  product: {
+    product_name: string
+    product_summary: string | null
+    core_selling_points: string[]
+    applicable_age: string | null
+    material: string | null
+    package_contents: string | null
+    usage_instructions: string | null
+    technical_details: ProductKnowledgeTechnicalDetails
+  }
+  skus: Array<{
+    sku_name: string
+    color_style: string | null
+    specification_difference: string | null
+    package_difference: string | null
+    faq_count: number
+    difference_confirmed: boolean
+    attributes: string[]
+    technical_details: ProductKnowledgeTechnicalDetails
+  }>
+  faqs: Array<{
+    question: string
+    recommended_reply: string
+    answer_strategy: string
+    risk_level: string
+    sku_name: string | null
+  }>
+  safety_information: Array<{
+    title: string
+    content: string
+    risk_level: string | null
+    forbidden_claim: string | null
+    handoff_condition: string | null
+  }>
+  sources: Array<{
+    source_name: string
+    source_type: string
+    review_status: string | null
+    technical_details: ProductKnowledgeTechnicalDetails
+  }>
+  coverage_percent: number
+  ai_usable: boolean
+  knowledge_state: ProductKnowledgeState
+  data_status: KnowledgeDataStatus
+  ai_status: KnowledgeAiStatus
+  topic_coverage: TopicCoverage[]
+  answerable_topics: string[]
+  missing_topics: string[]
+  gaps: ProductKnowledgeGap[]
+  next_actions: string[]
+  boundary_note: string
+}
+
+export interface ProductKnowledgeGapListItem {
+  store_name: string
+  product_name: string
+  sku_name: string
+  missing_topic: string
+  occurrence_count: number
+  impact_level: string
+  priority: 'P0' | 'P1' | 'P2' | 'P3'
+  workflow_status: KnowledgeGapWorkflowStatus
+  description: string
+  recommended_action: string
+  safe_fallback: string
+}
+
+export async function getProductKnowledgeOverview(): Promise<ProductKnowledgeOverview> {
+  const response = await apiClient.get<ProductKnowledgeOverview>(
+    '/api/v1/admin/product-knowledge/overview',
+  )
+  return response.data
+}
+
+export async function listProductKnowledgeProducts(
+  storeCode?: string,
+): Promise<ItemList<ProductKnowledgeListItem>> {
+  const response = await apiClient.get<ItemList<ProductKnowledgeListItem>>(
+    '/api/v1/admin/product-knowledge/products',
+    { params: omitBlankQueryParams({ store_code: storeCode }) },
+  )
+  return response.data
+}
+
+export async function getProductKnowledgeProduct(productId: string): Promise<ProductKnowledgeDetail> {
+  const response = await apiClient.get<ProductKnowledgeDetail>(
+    `/api/v1/admin/product-knowledge/products/${encodeURIComponent(productId)}`,
+  )
+  return response.data
+}
+
+export async function listProductKnowledgeGaps(params?: {
+  store_code?: string
+  priority?: '' | 'P0' | 'P1' | 'P2' | 'P3'
+  workflow_status?: '' | KnowledgeGapWorkflowStatus
+}): Promise<ItemList<ProductKnowledgeGapListItem>> {
+  const response = await apiClient.get<ItemList<ProductKnowledgeGapListItem>>(
+    '/api/v1/admin/product-knowledge/gaps',
+    { params: omitBlankQueryParams(params) },
+  )
+  return response.data
 }
 
 export async function listAdminExperienceCases(
@@ -622,6 +816,7 @@ export async function uploadKnowledgeMaterial(
     product_id: string
     sku_id?: string
     material_type: KnowledgeMaterialType
+    template_type?: KnowledgeTemplateType
     display_name: string
     submitted_by: string
     material_id?: string
