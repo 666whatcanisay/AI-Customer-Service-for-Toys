@@ -20,6 +20,7 @@ import ImportCenterView from '../views/ImportCenterView.vue'
 import CustomerOperationsView from '../views/CustomerOperationsView.vue'
 import KnowledgeEditorView from '../views/KnowledgeEditorView.vue'
 import KnowledgeGapCenterView from '../views/KnowledgeGapCenterView.vue'
+import StoreManagementView from '../views/StoreManagementView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -30,20 +31,21 @@ export const router = createRouter({
     { path: '/knowledge-editor', name: 'knowledge-editor', component: KnowledgeEditorView },
     { path: '/knowledge-gaps', name: 'knowledge-gaps', component: KnowledgeGapCenterView },
     { path: '/import-center', name: 'import-center', component: ImportCenterView },
+    { path: '/store-management', name: 'store-management', component: StoreManagementView },
     { path: '/customer-operations', name: 'customer-operations', component: CustomerOperationsView },
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
     {
       path: '/stores', name: 'stores', component: ReadonlyListView,
-      props: { resource: 'stores', title: '店铺', description: '查看平台、店铺编码、测试标记与已导入商品数量。', columns: [
-        { key: 'platform', label: '平台' }, { key: 'store_code', label: '店铺编码' },
+      props: { resource: 'stores', title: '店铺', description: '查看店铺业务名称、平台、测试标记与已导入商品数量。', columns: [
+        { key: 'platform', label: '平台' },
         { key: 'store_name', label: '店铺名称' }, { key: 'test_data_mode', label: '测试数据' }, { key: 'product_count', label: '商品数' },
       ] },
     },
     {
       path: '/products', name: 'products', component: ReadonlyListView,
-      props: { resource: 'products', title: '商品与 SKU', description: '查询已导入商品，并打开只读 SKU 明细核对事实。', columns: [
-        { key: 'product_id', label: '商品 ID' }, { key: 'product_name_display', label: '商品名称' },
-        { key: 'store_code', label: '店铺' }, { key: 'sales_status', label: '销售状态' }, { key: 'review_status', label: '审核状态' },
+      props: { resource: 'products', title: '商品与 SKU', description: '按商品业务名称查询已导入资料，并打开 SKU 明细核对事实。', columns: [
+        { key: 'product_name_display', label: '商品名称' },
+        { key: 'sales_status', label: '销售状态' }, { key: 'review_status', label: '审核状态' },
       ] },
     },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailView, props: true },
@@ -52,21 +54,20 @@ export const router = createRouter({
       path: '/faqs', name: 'faqs', component: ReadonlyListView,
       props: { resource: 'faqs', title: '常见问题', description: '查看已导入问题、回答动作、风险、适用范围与来源。', columns: [
         { key: 'question', label: '问题' }, { key: 'answer_action', label: '回答动作' },
-        { key: 'risk_level', label: '风险' }, { key: 'product_id', label: '商品' }, { key: 'source_ids', label: '来源' },
+        { key: 'risk_level', label: '风险' },
       ] },
     },
     {
       path: '/safety-rules', name: 'safety-rules', component: ReadonlyListView,
       props: { resource: 'safety-rules', title: '安全规则', description: '查看风险场景、允许动作、禁止表述与来源。', columns: [
         { key: 'scenario', label: '场景' }, { key: 'risk_level', label: '风险' },
-        { key: 'action', label: '允许动作' }, { key: 'forbidden_claim', label: '禁止表述' }, { key: 'source_ids', label: '来源' },
+        { key: 'action', label: '允许动作' }, { key: 'forbidden_claim', label: '禁止表述' },
       ] },
     },
     {
       path: '/sources', name: 'sources', component: ReadonlyListView,
-      props: { resource: 'sources', title: '知识来源', description: '仅展示来源元数据与安全相对定位，不提供预览、下载或发布。', columns: [
+      props: { resource: 'sources', title: '知识来源', description: '仅展示来源类型和业务文件名称，不提供原文预览、下载或发布。', columns: [
         { key: 'source_type', label: '类型' }, { key: 'file_name', label: '文件' },
-        { key: 'file_sha256', label: '校验值' }, { key: 'product_id', label: '商品' }, { key: 'sku_id', label: 'SKU' },
       ] },
     },
     {

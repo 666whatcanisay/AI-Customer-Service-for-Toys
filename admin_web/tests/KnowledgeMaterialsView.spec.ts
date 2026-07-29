@@ -6,6 +6,7 @@ import {
   getKnowledgeMaterial,
   getProductKnowledgeOverview,
   listKnowledgeMaterials,
+  listOperationStores,
   listProductKnowledgeProducts,
 } from '../src/api/client'
 
@@ -17,6 +18,7 @@ vi.mock('../src/api/client', () => ({
   getProductKnowledgeOverview: vi.fn(),
   getProductKnowledgeProduct: vi.fn(),
   listKnowledgeMaterials: vi.fn(),
+  listOperationStores: vi.fn(),
   listProductKnowledgeProducts: vi.fn(),
   reviewKnowledgeMaterial: vi.fn(),
   uploadKnowledgeMaterial: vi.fn(),
@@ -26,6 +28,7 @@ const mockedList = vi.mocked(listKnowledgeMaterials)
 const mockedDetail = vi.mocked(getKnowledgeMaterial)
 const mockedOverview = vi.mocked(getProductKnowledgeOverview)
 const mockedProducts = vi.mocked(listProductKnowledgeProducts)
+const mockedOperationStores = vi.mocked(listOperationStores)
 
 const material = {
   material_id: 'KMT-TEST-1', revision: 1, store_code: 'STORE-ONE', product_id: 'PRODUCT-ONE', sku_id: null,
@@ -42,6 +45,7 @@ describe('KnowledgeMaterialsView', () => {
     mockedDetail.mockReset()
     mockedOverview.mockReset()
     mockedProducts.mockReset()
+    mockedOperationStores.mockReset()
     mockedOverview.mockResolvedValue({
       generated_at: '2026-07-28T00:00:00Z', has_data: true,
       stats: { store_count: 1, product_count: 1, ai_usable_product_count: 1, gap_count: 2, pending_review_count: 1 },
@@ -62,6 +66,7 @@ describe('KnowledgeMaterialsView', () => {
         technical_details: { store_code: 'STORE-ONE', platform: 'pinduoduo', product_id: 'PRODUCT-ONE', product_code: null, sku_id: null, sku_code: null, source_id: null, material_id: null, revision: null, content_hash: null },
       }], total: 1,
     })
+    mockedOperationStores.mockResolvedValue({ items: [], total: 0 })
     mockedList.mockResolvedValue({ items: [material], total: 1, page: 1, size: 20 })
     mockedDetail.mockResolvedValue({ ...material, analysis_text_preview: '适用年龄：6-12岁。' })
   })

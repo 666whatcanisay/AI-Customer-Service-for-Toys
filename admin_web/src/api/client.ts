@@ -732,6 +732,104 @@ export async function getProductKnowledgeProduct(productId: string): Promise<Pro
   return response.data
 }
 
+export type StoreOperationStatus = 'ACTIVE' | 'INACTIVE'
+
+export interface StoreOperationItem {
+  store_ref: number
+  store_name: string
+  platform_name: string
+  status: StoreOperationStatus
+  status_name: string
+  product_count: number
+  created_at: string
+  remarks: string
+}
+
+export interface StoreOperationInput {
+  store_name: string
+  platform: 'pinduoduo' | 'taobao' | 'tmall' | 'jd' | 'douyin' | 'offline' | 'other'
+  remarks: string
+}
+
+export interface ProductOperationInput {
+  product_name: string
+  product_summary: string
+}
+
+export interface ProductOperationItem {
+  product_ref: string
+  store_ref: number
+  store_name: string
+  product_name: string
+  product_summary: string
+  data_status: 'PENDING_REVIEW'
+  data_status_name: string
+  sku_count: number
+  created_at: string
+}
+
+export async function listOperationStores(): Promise<ItemList<StoreOperationItem>> {
+  const response = await apiClient.get<ItemList<StoreOperationItem>>(
+    '/api/v1/admin/operations/stores',
+  )
+  return response.data
+}
+
+export async function createOperationStore(
+  input: StoreOperationInput,
+): Promise<StoreOperationItem> {
+  const response = await apiClient.post<StoreOperationItem>(
+    '/api/v1/admin/operations/stores',
+    input,
+  )
+  return response.data
+}
+
+export async function getOperationStore(storeRef: number): Promise<StoreOperationItem> {
+  const response = await apiClient.get<StoreOperationItem>(
+    `/api/v1/admin/operations/stores/${storeRef}`,
+  )
+  return response.data
+}
+
+export async function updateOperationStore(
+  storeRef: number,
+  input: StoreOperationInput & { status: StoreOperationStatus },
+): Promise<StoreOperationItem> {
+  const response = await apiClient.patch<StoreOperationItem>(
+    `/api/v1/admin/operations/stores/${storeRef}`,
+    input,
+  )
+  return response.data
+}
+
+export async function createOperationProduct(
+  storeRef: number,
+  input: ProductOperationInput,
+): Promise<ProductOperationItem> {
+  const response = await apiClient.post<ProductOperationItem>(
+    `/api/v1/admin/operations/stores/${storeRef}/products`,
+    input,
+  )
+  return response.data
+}
+
+export async function updateProductBasicInfo(
+  productId: string,
+  input: {
+    product_display_name: string
+    product_summary: string
+    store_display_name: string
+    store_remarks: string
+  },
+): Promise<ProductKnowledgeDetail> {
+  const response = await apiClient.patch<ProductKnowledgeDetail>(
+    `/api/v1/admin/operations/products/${encodeURIComponent(productId)}/basic-info`,
+    input,
+  )
+  return response.data
+}
+
 export async function listProductKnowledgeGaps(params?: {
   store_code?: string
   priority?: '' | 'P0' | 'P1' | 'P2' | 'P3'
