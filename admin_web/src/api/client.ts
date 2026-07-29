@@ -467,6 +467,60 @@ export interface AiFeedbackAnalysisResultList {
   total: number
 }
 
+export type AiProblemType =
+  | 'UNCLASSIFIED'
+  | 'KNOWLEDGE_MISSING'
+  | 'PRODUCT_INFO_ERROR'
+  | 'SKU_ERROR'
+  | 'INCOMPLETE_ANSWER'
+  | 'RISK_ISSUE'
+  | 'EXPRESSION_ISSUE'
+export type AiProblemStatus = 'NEW' | 'CONFIRMED' | 'PROCESSING' | 'SOLVED' | 'VERIFIED'
+export type KnowledgeOptimizationTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED'
+export type KnowledgeVerificationResult = 'IMPROVED' | 'NOT_IMPROVED'
+
+export interface KnowledgeOptimizationTask {
+  task_id: string
+  source_problem_id: string
+  store_code: string
+  product_id: string
+  sku_id: string | null
+  missing_topic: string
+  status: KnowledgeOptimizationTaskStatus
+  status_note: string | null
+  verification_result: KnowledgeVerificationResult | null
+  verification_note: string | null
+  verified_by: string | null
+  verified_at: string | null
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AiProblem {
+  problem_id: string
+  store_code: string
+  store_name: string
+  product_id: string
+  product_name: string
+  sku_id: string | null
+  sku_name: string | null
+  question_summary: string
+  ai_answer_summary: string
+  issue_type: AiProblemType
+  occurrence_count: number
+  status: AiProblemStatus
+  first_seen_at: string
+  last_seen_at: string
+  knowledge_task: KnowledgeOptimizationTask | null
+}
+
+export interface AiProblemList {
+  items: AiProblem[]
+  total: number
+}
+
 export type KnowledgeMaterialType = 'PRODUCT_SPEC' | 'SAFETY_INSTRUCTION' | 'ASSEMBLY_GUIDE' | 'FAQ_SOURCE' | 'OTHER'
 export type KnowledgeTemplateType = 'PRODUCT_KNOWLEDGE' | 'SKU_DIFFERENCE' | 'FAQ' | 'SAFETY_RULE' | 'AI_FEEDBACK' | 'KNOWLEDGE_GAP'
 export type KnowledgeMaterialStatus = 'RECEIVED' | 'RECOGNIZED' | 'REVIEWING' | 'APPROVED_FOR_ANALYSIS' | 'ANALYZING' | 'ANALYZED' | 'ANALYSIS_FAILED' | 'REJECTED'
@@ -887,6 +941,76 @@ export async function listAiOptimizationCases(
 export async function listAiFeedbackAnalysisResults(): Promise<AiFeedbackAnalysisResultList> {
   const response = await apiClient.get<AiFeedbackAnalysisResultList>(
     '/api/v1/admin/ai-quality/analysis-results',
+  )
+  return response.data
+}
+
+export async function listAiProblems(params?: {
+  status?: AiProblemStatus | ''
+  issue_type?: AiProblemType | ''
+  store_code?: string
+  product_id?: string
+}): Promise<AiProblemList> {
+  const response = await apiClient.get<AiProblemList>(
+    '/api/v1/admin/ai-feedback-loop/issues',
+    { params: omitBlankQueryParams(params) },
+  )
+  return response.data
+}
+
+export async function updateAiProblemStatus(
+  problemId: string,
+  update: {
+    status: AiProblemStatus
+    operator: string
+    note?: string | null
+    issue_type?: AiProblemType
+  },
+): Promise<AiProblem> {
+  const response = await apiClient.patch<AiProblem>(
+    `/api/v1/admin/ai-feedback-loop/issues/${encodeURIComponent(problemId)}/status`,
+    update,
+  )
+  return response.data
+}
+
+export async function createKnowledgeOptimizationTask(
+  problemId: string,
+  input: { missing_topic: string; operator: string; note?: string | null },
+): Promise<KnowledgeOptimizationTask> {
+  const response = await apiClient.post<KnowledgeOptimizationTask>(
+    `/api/v1/admin/ai-feedback-loop/issues/${encodeURIComponent(problemId)}/knowledge-tasks`,
+    input,
+  )
+  return response.data
+}
+
+export async function updateKnowledgeOptimizationTaskStatus(
+  taskId: string,
+  update: {
+    status: KnowledgeOptimizationTaskStatus
+    operator: string
+    note?: string | null
+  },
+): Promise<KnowledgeOptimizationTask> {
+  const response = await apiClient.patch<KnowledgeOptimizationTask>(
+    `/api/v1/admin/ai-feedback-loop/knowledge-tasks/${encodeURIComponent(taskId)}/status`,
+    update,
+  )
+  return response.data
+}
+
+export async function verifyKnowledgeOptimizationTask(
+  taskId: string,
+  input: {
+    result: KnowledgeVerificationResult
+    operator: string
+    note: string
+  },
+): Promise<KnowledgeOptimizationTask> {
+  const response = await apiClient.post<KnowledgeOptimizationTask>(
+    `/api/v1/admin/ai-feedback-loop/knowledge-tasks/${encodeURIComponent(taskId)}/verifications`,
+    input,
   )
   return response.data
 }

@@ -50,7 +50,7 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to?: strin
   {
     label: 'AI 运营',
     items: [
-      { label: 'AI 控制中心', to: '/ai-capabilities' },
+      { label: 'AI问题中心', to: '/ai-issues' },
     ],
   },
   {
