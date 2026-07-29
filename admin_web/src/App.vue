@@ -24,8 +24,19 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to?: strin
   {
     label: '开始工作',
     items: [
-      { label: '运营概览', to: '/overview' },
+      { label: '首页', to: '/overview' },
+      { label: 'AI运营概览', to: '/ai-capabilities' },
+    ],
+  },
+  {
+    label: '商品知识',
+    items: [
       { label: '商品知识中心', to: '/knowledge-center' },
+      { label: '商品知识维护', to: '/knowledge-editor' },
+      { label: '知识缺口', to: '/knowledge-gaps' },
+      { label: '知识资料', to: '/knowledge-materials' },
+      { label: 'FAQ管理', to: '/faqs' },
+      { label: '安全规则', to: '/safety-rules' },
       { label: '导入中心', to: '/import-center' },
     ],
   },

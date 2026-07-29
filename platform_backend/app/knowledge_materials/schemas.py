@@ -19,6 +19,15 @@ class KnowledgeMaterialType(StrEnum):
     OTHER = "OTHER"
 
 
+class KnowledgeTemplateType(StrEnum):
+    PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE"
+    SKU_DIFFERENCE = "SKU_DIFFERENCE"
+    FAQ = "FAQ"
+    SAFETY_RULE = "SAFETY_RULE"
+    AI_FEEDBACK = "AI_FEEDBACK"
+    KNOWLEDGE_GAP = "KNOWLEDGE_GAP"
+
+
 class KnowledgeMaterialStatus(StrEnum):
     RECEIVED = "RECEIVED"
     RECOGNIZED = "RECOGNIZED"
@@ -63,12 +72,22 @@ class RecognitionSummary(BaseModel):
     privacy_reminder: str
 
 
+class KnowledgeTemplateRecognitionSummary(RecognitionSummary):
+    """C Admin-only template metadata; never added to the frozen A input."""
+
+    template_type: KnowledgeTemplateType | None = None
+    template_name: str | None = None
+    record_count: int = Field(default=0, ge=0)
+    warnings: list[str] = Field(default_factory=list)
+    high_risk_source_confirmed: bool | None = None
+
+
 class KnowledgeMaterialReceipt(BaseModel):
     material_id: str
     revision: int
     content_hash: str
     material_status: KnowledgeMaterialStatus
-    recognition_summary: RecognitionSummary
+    recognition_summary: KnowledgeTemplateRecognitionSummary
 
 
 class KnowledgeMaterialSummary(BaseModel):
@@ -82,7 +101,7 @@ class KnowledgeMaterialSummary(BaseModel):
     original_filename: str
     content_hash: str
     redaction_version: str
-    recognition_summary: RecognitionSummary
+    recognition_summary: KnowledgeTemplateRecognitionSummary
     material_status: KnowledgeMaterialStatus
     submitted_by: str
     reviewed_by: str | None

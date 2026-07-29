@@ -18,6 +18,8 @@ import KnowledgeQualityPoolView from '../views/KnowledgeQualityPoolView.vue'
 import KnowledgeCenterView from '../views/KnowledgeCenterView.vue'
 import ImportCenterView from '../views/ImportCenterView.vue'
 import CustomerOperationsView from '../views/CustomerOperationsView.vue'
+import KnowledgeEditorView from '../views/KnowledgeEditorView.vue'
+import KnowledgeGapCenterView from '../views/KnowledgeGapCenterView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +27,8 @@ export const router = createRouter({
     { path: '/', redirect: '/overview' },
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
     { path: '/knowledge-center', name: 'knowledge-center', component: KnowledgeCenterView },
+    { path: '/knowledge-editor', name: 'knowledge-editor', component: KnowledgeEditorView },
+    { path: '/knowledge-gaps', name: 'knowledge-gaps', component: KnowledgeGapCenterView },
     { path: '/import-center', name: 'import-center', component: ImportCenterView },
     { path: '/customer-operations', name: 'customer-operations', component: CustomerOperationsView },
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
@@ -43,6 +47,7 @@ export const router = createRouter({
       ] },
     },
     { path: '/products/:productId', name: 'product-detail', component: ProductDetailView, props: true },
+    { path: '/knowledge-center/products/:productId', name: 'product-knowledge-detail', component: ProductDetailView, props: true },
     {
       path: '/faqs', name: 'faqs', component: ReadonlyListView,
       props: { resource: 'faqs', title: '常见问题', description: '查看已导入问题、回答动作、风险、适用范围与来源。', columns: [

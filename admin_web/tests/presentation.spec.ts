@@ -14,6 +14,8 @@ describe('displayStatus', () => {
     expect(displayStatus('ANALYZED')).toBe('已完成分析')
     expect(displayStatus('ANALYSIS_FAILED')).toBe('分析未完成')
     expect(displayStatus('REJECTED')).toBe('已拒绝')
+    expect(displayStatus('PRODUCT_DETAIL_SCREENSHOT')).toBe('商品详情截图')
+    expect(displayStatus('TEST_VERIFIED')).toBe('测试已核验')
     expect(displayStatus('UNKNOWN_API_VALUE')).toBe('UNKNOWN_API_VALUE')
     expect(displayStatus(null)).toBe('未设置')
   })

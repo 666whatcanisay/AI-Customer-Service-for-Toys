@@ -30,7 +30,7 @@ function value(row: Record<string, unknown>, key: string): string {
   if (raw === null || raw === undefined || raw === '') return '—'
   if (typeof raw === 'boolean') return raw ? '是' : '否'
   if (typeof raw === 'string' && [
-    'sales_status', 'review_status', 'risk_level', 'answer_action', 'status', 'relation_type',
+    'sales_status', 'review_status', 'risk_level', 'answer_action', 'status', 'relation_type', 'source_type',
   ].includes(key)) return displayStatus(raw)
   return String(raw)
 }
@@ -72,8 +72,6 @@ onMounted(load)
     </div>
     <form class="filters card" @submit.prevent="search">
       <label>关键词<input v-model.trim="filters.keyword" type="search" placeholder="搜索" /></label>
-      <label>店铺编码<input v-model.trim="filters.store_code" type="search" placeholder="可选" /></label>
-      <label>商品 ID<input v-model.trim="filters.product_id" type="search" placeholder="可选" /></label>
       <label>状态 / 风险<input v-model.trim="filters.status" type="search" placeholder="可选" /></label>
       <button class="button" type="submit">筛选</button>
     </form>

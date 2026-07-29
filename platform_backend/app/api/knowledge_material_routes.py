@@ -36,6 +36,8 @@ from app.knowledge_materials.schemas import (
     KnowledgeMaterialStatus,
     KnowledgeMaterialSummary,
     KnowledgeMaterialType,
+    KnowledgeTemplateRecognitionSummary,
+    KnowledgeTemplateType,
     KnowledgeQualityAnalysisInput,
     KnowledgeQualityAnalysisInputListResponse,
     KnowledgeQualityAnalysisResultCreate,
@@ -54,6 +56,7 @@ from app.knowledge_materials.service import (
     safe_filename,
     write_controlled_upload,
 )
+from app.test_catalog.models import TestProduct, TestSku, TestStore
 
 
 admin_router = APIRouter(prefix="/api/v1/admin/knowledge-materials", tags=["knowledge-materials"])
@@ -63,6 +66,18 @@ customer_router = APIRouter(tags=["customer-knowledge-status"])
 _UPLOAD_METHOD = "POST"
 _UPLOAD_PATH = "/api/v1/admin/knowledge-materials"
 _PREVIEW_LIMIT = 4_000
+_TEMPLATE_MATERIAL_TYPE = {
+    KnowledgeTemplateType.PRODUCT_KNOWLEDGE: KnowledgeMaterialType.PRODUCT_SPEC,
+    KnowledgeTemplateType.SKU_DIFFERENCE: KnowledgeMaterialType.PRODUCT_SPEC,
+    KnowledgeTemplateType.FAQ: KnowledgeMaterialType.FAQ_SOURCE,
+    KnowledgeTemplateType.SAFETY_RULE: KnowledgeMaterialType.SAFETY_INSTRUCTION,
+    KnowledgeTemplateType.AI_FEEDBACK: KnowledgeMaterialType.OTHER,
+    KnowledgeTemplateType.KNOWLEDGE_GAP: KnowledgeMaterialType.OTHER,
+}
+_NON_AI_KNOWLEDGE_TEMPLATES = {
+    KnowledgeTemplateType.AI_FEEDBACK.value,
+    KnowledgeTemplateType.KNOWLEDGE_GAP.value,
+}
 
 
 def _summary(item: KnowledgeMaterial) -> KnowledgeMaterialSummary:
@@ -77,7 +92,7 @@ def _summary(item: KnowledgeMaterial) -> KnowledgeMaterialSummary:
         original_filename=item.original_filename,
         content_hash=item.content_hash,
         redaction_version=item.redaction_version,
-        recognition_summary=RecognitionSummary.model_validate(item.recognition_summary),
+        recognition_summary=KnowledgeTemplateRecognitionSummary.model_validate(item.recognition_summary),
         material_status=item.material_status,
         submitted_by=item.submitted_by,
         reviewed_by=item.reviewed_by,
@@ -94,7 +109,7 @@ def _receipt(item: KnowledgeMaterial) -> KnowledgeMaterialReceipt:
         revision=item.revision,
         content_hash=item.content_hash,
         material_status=item.material_status,
-        recognition_summary=RecognitionSummary.model_validate(item.recognition_summary),
+        recognition_summary=KnowledgeTemplateRecognitionSummary.model_validate(item.recognition_summary),
     )
 
 
@@ -130,12 +145,56 @@ def _material_or_404(session: Session, material_id: str) -> KnowledgeMaterial:
 
 
 def _same_upload_scope(item: KnowledgeMaterial, values: dict[str, str | None]) -> bool:
-    return (
+    base_matches = (
         item.material_id == values["material_id"] if values["material_id"] else True
     ) and all(
         getattr(item, key) == values[key]
         for key in ("store_code", "product_id", "sku_id", "material_type", "display_name", "submitted_by")
     )
+    return base_matches and (item.recognition_summary or {}).get("template_type") == values.get(
+        "template_type"
+    )
+
+
+def _template_scope(
+    session: Session,
+    *,
+    store_code: str,
+    product_id: str,
+    sku_id: str | None,
+) -> dict[str, str | None]:
+    product = session.get(TestProduct, product_id)
+    if product is None or product.store_code != store_code:
+        raise AppError(
+            "KNOWLEDGE_TEMPLATE_SCOPE_INVALID",
+            "页面所选商品不属于当前店铺，请重新选择。",
+            status_code=422,
+        )
+    store = session.scalar(
+        select(TestStore).where(
+            TestStore.package_id == product.package_id,
+            TestStore.store_code == product.store_code,
+        )
+    )
+    if store is None:
+        raise AppError(
+            "KNOWLEDGE_TEMPLATE_SCOPE_INVALID", "无法确认所选店铺范围。", status_code=422
+        )
+    sku_name: str | None = None
+    if sku_id:
+        sku = session.get(TestSku, sku_id)
+        if sku is None or sku.product_id != product.product_id:
+            raise AppError(
+                "KNOWLEDGE_TEMPLATE_SCOPE_INVALID",
+                "页面所选SKU不属于当前商品，请重新选择。",
+                status_code=422,
+            )
+        sku_name = sku.sku_name_display or sku.sku_name_official
+    return {
+        "store_name": store.store_name,
+        "product_name": product.product_name_display or product.product_name_official,
+        "sku_name": sku_name,
+    }
 
 
 def _same_analysis_payload(
@@ -165,6 +224,7 @@ async def upload_knowledge_material(
     product_id: str = Form(..., min_length=1, max_length=128),
     sku_id: str | None = Form(default=None, max_length=128),
     material_type: KnowledgeMaterialType = Form(...),
+    template_type: KnowledgeTemplateType | None = Form(default=None),
     display_name: str = Form(..., min_length=1, max_length=256),
     submitted_by: str = Form(..., min_length=1, max_length=128),
     material_id: str | None = Form(default=None, max_length=64),
@@ -188,12 +248,27 @@ async def upload_knowledge_material(
         "product_id": product_id.strip(),
         "sku_id": sku_id.strip() if sku_id and sku_id.strip() else None,
         "material_type": material_type.value,
+        "template_type": template_type.value if template_type else None,
         "display_name": display_name.strip(),
         "submitted_by": submitted_by.strip(),
     }
     if not values["store_code"] or not values["product_id"] or not values["display_name"] or not values["submitted_by"]:
         raise AppError(
             "KNOWLEDGE_MATERIAL_VALIDATION_FAILED", "店铺、商品、资料名称和提交人不能为空。", status_code=422
+        )
+    expected_scope: dict[str, str | None] | None = None
+    if template_type is not None:
+        if _TEMPLATE_MATERIAL_TYPE[template_type] is not material_type:
+            raise AppError(
+                "KNOWLEDGE_TEMPLATE_TYPE_MISMATCH",
+                "所选模板类型与资料类型不一致，请重新选择。",
+                status_code=422,
+            )
+        expected_scope = _template_scope(
+            session,
+            store_code=str(values["store_code"]),
+            product_id=str(values["product_id"]),
+            sku_id=values["sku_id"],
         )
     fingerprint = fingerprint_upload(values, content)
     existing_receipt = session.scalar(
@@ -225,6 +300,8 @@ async def upload_knowledge_material(
         content=content,
         material_type=material_type,
         max_bytes=settings.max_knowledge_material_upload_bytes,
+        template_type=template_type,
+        expected_scope=expected_scope,
     )
     previous = _current_revision(session, values["material_id"]) if values["material_id"] else None
     if values["material_id"] and previous is None:
@@ -360,12 +437,19 @@ def export_approved_knowledge_quality_inputs(
     statement = select(KnowledgeMaterial).where(
         KnowledgeMaterial.material_status == KnowledgeMaterialStatus.APPROVED_FOR_ANALYSIS
     )
-    total = session.scalar(select(func.count()).select_from(statement.subquery())) or 0
-    rows = session.scalars(
-        statement.order_by(KnowledgeMaterial.created_at, KnowledgeMaterial.material_id)
-        .offset((page - 1) * size)
-        .limit(size)
-    ).all()
+    approved_rows = list(
+        session.scalars(
+            statement.order_by(KnowledgeMaterial.created_at, KnowledgeMaterial.material_id)
+        ).all()
+    )
+    eligible_rows = [
+        item
+        for item in approved_rows
+        if (item.recognition_summary or {}).get("template_type")
+        not in _NON_AI_KNOWLEDGE_TEMPLATES
+    ]
+    total = len(eligible_rows)
+    rows = eligible_rows[(page - 1) * size: page * size]
     return KnowledgeQualityAnalysisInputListResponse(
         items=[
             KnowledgeQualityAnalysisInput(
@@ -377,7 +461,15 @@ def export_approved_knowledge_quality_inputs(
                 sku_id=item.sku_id,
                 material_type=item.material_type,
                 analysis_text=item.analysis_text,
-                recognition_summary=RecognitionSummary.model_validate(item.recognition_summary),
+                recognition_summary=RecognitionSummary(
+                    readable=bool(item.recognition_summary.get("readable")),
+                    file_extension=str(item.recognition_summary.get("file_extension") or ""),
+                    detected_fields=list(item.recognition_summary.get("detected_fields") or []),
+                    missing_expected_fields=list(
+                        item.recognition_summary.get("missing_expected_fields") or []
+                    ),
+                    privacy_reminder=str(item.recognition_summary.get("privacy_reminder") or ""),
+                ),
             )
             for item in rows
         ],
