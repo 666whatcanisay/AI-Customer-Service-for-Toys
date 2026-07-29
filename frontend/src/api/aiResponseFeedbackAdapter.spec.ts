@@ -40,6 +40,12 @@ describe('aiResponseFeedbackAdapter', () => {
       .toMatchObject({ feedback_type: 'OTHER', feedback_note: '无法归类的测试问题' })
   })
 
+  it('adds the saved interaction link only when the new client provides it', () => {
+    expect(toAiResponseFeedbackPayload({ ...draft, interactionId: ' req-001 ' }))
+      .toMatchObject({ interaction_id: 'req-001' })
+    expect(toAiResponseFeedbackPayload(draft)).not.toHaveProperty('interaction_id')
+  })
+
   it('accepts only the frozen creation receipt', () => {
     expect(adaptAiResponseFeedbackReceipt({
       feedback_id: 'ARF-001', status: 'NEW'

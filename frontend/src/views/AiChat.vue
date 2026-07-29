@@ -505,6 +505,7 @@
       </div>
       <div v-if="showTechnicalDetails" class="technical-box" data-testid="answer-technical-details">
         <code>request_id={{ result.requestId ?? '未提供' }}</code>
+        <code v-if="adoptionEventId">event_id={{ adoptionEventId }}</code>
         <code>model={{ result.model ?? '未提供' }}</code>
         <code>latency={{ result.latencyMs === null ? '未提供' : `${Math.round(result.latencyMs)} ms` }}</code>
         <code>action={{ result.action ?? '未分类' }}</code>
@@ -514,15 +515,15 @@
       <details open class="feedback-section" data-testid="feedback-section">
         <summary>选择采用结果，再继续收藏案例或反馈问题</summary>
         <div class="feedback-body">
-          <p>当前采用反馈只记录在本页。保存经验案例时必须在表单中明确选择冻结的经验类型。</p>
+          <p>采用结果会以去标识化摘要保存到反馈闭环；保存经验案例时仍须明确选择经验类型。</p>
           <div class="feedback-actions">
-            <el-button data-testid="direct-accept" type="success" plain @click="recordAdoption('DIRECT_ACCEPT')">
+            <el-button data-testid="direct-accept" type="success" plain :disabled="adoptionEventSubmitting" @click="recordAdoption('DIRECT_ACCEPT')">
               直接采用
             </el-button>
-            <el-button data-testid="edited-accept" type="warning" plain @click="recordAdoption('EDITED_ACCEPT')">
+            <el-button data-testid="edited-accept" type="warning" plain :disabled="adoptionEventSubmitting" @click="recordAdoption('EDITED_ACCEPT')">
               修改后采用
             </el-button>
-            <el-button data-testid="reject" type="danger" plain @click="recordAdoption('REJECTED')">
+            <el-button data-testid="reject" type="danger" plain :disabled="adoptionEventSubmitting" @click="recordAdoption('REJECTED')">
               未采用
             </el-button>
             <el-button
@@ -543,6 +544,12 @@
               ⭐ 收藏为优秀案例
             </el-button>
           </div>
+          <p v-if="adoptionEventSubmitting" class="adoption-next-step" data-testid="adoption-event-saving">
+            正在保存采用事件…
+          </p>
+          <p v-if="adoptionEventError" class="ai-feedback-error" data-testid="adoption-event-error">
+            {{ adoptionEventError }} 未产生本地成功记录，请重试。
+          </p>
           <p class="experience-case-entry-hint">优秀回复用于经验沉淀，帮助系统持续优化。</p>
           <p class="adoption-next-step" data-testid="adoption-next-step">
             {{ adoptionNextStep }}
@@ -729,6 +736,11 @@ import {
   aiResponseFeedbackClient,
   createAiResponseFeedbackIdempotencyKey
 } from '@/api/aiResponseFeedbackClient'
+import {
+  aiInteractionEventClient,
+  createAiInteractionEventIdempotencyKey,
+  createLocalInteractionId
+} from '@/api/aiInteractionEventClient'
 import {
   PlatformClientError,
   toPlatformClientError,
@@ -923,6 +935,12 @@ const replyEditor = ref<{ focus: () => void } | null>(null)
 const copyStatus = ref<'idle' | 'copied'>('idle')
 const copyError = ref('')
 const adoption = ref<AdoptionRecord | null>(null)
+const interactionId = ref('')
+const adoptionEventId = ref('')
+const adoptionEventSubmitting = ref(false)
+const adoptionEventError = ref('')
+const adoptionEventPendingKey = ref('')
+const adoptionEventPendingFingerprint = ref('')
 const experienceCaseDialogOpen = ref(false)
 const experienceCaseSubmitting = ref(false)
 const experienceCaseError = ref('')
@@ -1181,9 +1199,9 @@ const adoptionMessage = computed(() =>
     ? ''
     : adoption.value.type === 'REJECTED'
       ? aiFeedbackStatus.value
-        ? '已在本页记录：未采用。AI 问题反馈已独立提交。'
-        : '已在本页记录：未采用。可通过“AI 问题反馈”单独提交原因。'
-      : `已在本页记录：${adoptionLabels[adoption.value.type]}。未发送到远端反馈服务。`
+        ? '未采用事件已保存，AI 问题原因也已关联提交。'
+        : '未采用事件已保存并进入 AI 问题中心；可继续补充问题原因。'
+      : `${adoptionLabels[adoption.value.type]}事件已保存到反馈闭环。`
 )
 
 const adoptionNextStep = computed(() => {
@@ -1198,6 +1216,12 @@ const clearAnswer = () => {
   lastAnsweredQuestion.value = ''
   nextQuestionNotice.value = ''
   adoption.value = null
+  interactionId.value = ''
+  adoptionEventId.value = ''
+  adoptionEventSubmitting.value = false
+  adoptionEventError.value = ''
+  adoptionEventPendingKey.value = ''
+  adoptionEventPendingFingerprint.value = ''
   aiFeedbackDialogOpen.value = false
   aiFeedbackType.value = ''
   aiFeedbackNote.value = ''
@@ -1495,6 +1519,7 @@ const submitQuestion = async () => {
       return
     }
     result.value = response
+    interactionId.value = response.requestId?.trim() || createLocalInteractionId()
     replyDraft.value = response.answer
     lastAnsweredQuestion.value = message
     recordAiAssist()
@@ -1539,8 +1564,8 @@ const editReply = () => {
   replyEditor.value?.focus()
 }
 
-const recordAdoption = (type: AdoptionType) => {
-  if (!result.value) return
+const recordAdoption = async (type: AdoptionType) => {
+  if (!result.value || adoptionEventSubmitting.value) return
   const originalAnswer = result.value.answer
   const finalAnswer = type === 'REJECTED'
     ? ''
@@ -1553,19 +1578,63 @@ const recordAdoption = (type: AdoptionType) => {
     return
   }
 
-  adoption.value = {
-    requestId: result.value.requestId,
-    type,
-    originalAnswer,
-    finalAnswer
+  const store = selectedStore.value
+  const product = selectedProduct.value
+  if (!store || !product || !interactionId.value) {
+    adoptionEventError.value = '缺少本次咨询的店铺、商品或 interaction_id，未保存采用事件。'
+    return
   }
-  aiFeedbackDialogOpen.value = false
-  aiFeedbackType.value = ''
-  aiFeedbackNote.value = ''
-  aiFeedbackFinalAnswer.value = ''
-  aiFeedbackError.value = ''
-  aiFeedbackStatus.value = ''
-  ElMessage.success('已记录本页反馈')
+
+  const fingerprint = JSON.stringify({
+    interactionId: interactionId.value,
+    type,
+    finalAnswer
+  })
+  if (adoptionEventPendingFingerprint.value !== fingerprint) {
+    adoptionEventPendingFingerprint.value = fingerprint
+    adoptionEventPendingKey.value = createAiInteractionEventIdempotencyKey()
+  }
+
+  adoptionEventSubmitting.value = true
+  adoptionEventError.value = ''
+  try {
+    const receipt = await aiInteractionEventClient.submit({
+      interactionId: interactionId.value,
+      storeCode: store.storeCode,
+      storeName: store.name,
+      productId: product.productId,
+      productName: product.displayName,
+      skuId: selectedSku.value?.skuId ?? null,
+      skuName: selectedSku.value?.displayName ?? null,
+      actionType: type,
+      questionSummary: lastAnsweredQuestion.value || customerQuestion.value,
+      aiAnswerSummary: originalAnswer,
+      finalAnswerSummary: type === 'REJECTED' ? null : finalAnswer,
+      createdBy: identity.value.reporterId
+    }, adoptionEventPendingKey.value)
+    adoption.value = {
+      requestId: result.value.requestId,
+      type,
+      originalAnswer,
+      finalAnswer
+    }
+    adoptionEventId.value = receipt.eventId
+    adoptionEventPendingKey.value = ''
+    adoptionEventPendingFingerprint.value = ''
+    aiFeedbackDialogOpen.value = false
+    aiFeedbackType.value = ''
+    aiFeedbackNote.value = ''
+    aiFeedbackFinalAnswer.value = ''
+    aiFeedbackError.value = ''
+    aiFeedbackStatus.value = ''
+    ElMessage.success('采用结果已保存到反馈闭环')
+  } catch (error) {
+    adoptionEventError.value = error instanceof Error
+      ? error.message
+      : 'AI 行为事件服务当前不可用。'
+  } finally {
+    adoptionEventSubmitting.value = false
+  }
 }
 
 const openExperienceCaseCapture = () => {
@@ -1628,7 +1697,8 @@ const submitAiFeedback = async () => {
       feedbackType: aiFeedbackType.value,
       feedbackNote: aiFeedbackType.value === 'OTHER' ? aiFeedbackNote.value.trim() : null,
       finalAnswer: aiFeedbackFinalAnswer.value.trim() || null,
-      createdBy: identity.value.reporterId
+      createdBy: identity.value.reporterId,
+      interactionId: interactionId.value
     }, idempotencyKey)
     recordAiFeedbackSubmission()
     aiFeedbackStatus.value = '反馈已记录。'

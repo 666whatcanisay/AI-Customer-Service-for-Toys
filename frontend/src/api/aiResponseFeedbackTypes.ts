@@ -21,6 +21,7 @@ export interface AiResponseFeedbackDraft {
   feedbackNote: string | null
   finalAnswer: string | null
   createdBy: string
+  interactionId?: string | null
 }
 
 export interface AiResponseFeedbackReceipt {

@@ -59,6 +59,7 @@ export const toAiResponseFeedbackPayload = (
   const skuId = optionalText(draft.skuId)
   const feedbackType = requiredFeedbackType(draft.feedbackType)
   const feedbackNote = optionalText(draft.feedbackNote)
+  const interactionId = optionalText(draft.interactionId ?? null)
 
   if (feedbackType === 'OTHER' && !feedbackNote) {
     throw new PlatformAdapterError('选择“其他”时必须填写 feedback_note')
@@ -74,6 +75,7 @@ export const toAiResponseFeedbackPayload = (
     feedback_note: feedbackNote,
     final_answer: optionalText(draft.finalAnswer),
     created_by: requiredText(draft.createdBy, 'created_by'),
+    ...(interactionId ? { interaction_id: interactionId } : {}),
     context: {
       store_code: storeCode,
       product_id: productId,
