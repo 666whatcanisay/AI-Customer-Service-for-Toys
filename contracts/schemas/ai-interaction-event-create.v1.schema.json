@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-interaction-event-create.v1.schema.json",
+  "title": "AI Interaction Event Create V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "interaction_id",
+    "store_code",
+    "store_name",
+    "product_id",
+    "product_name",
+    "action_type",
+    "question_summary",
+    "ai_answer_summary",
+    "created_by"
+  ],
+  "properties": {
+    "interaction_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "store_code": {"type": "string", "minLength": 1, "maxLength": 96},
+    "store_name": {"type": "string", "minLength": 1, "maxLength": 256},
+    "product_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "product_name": {"type": "string", "minLength": 1, "maxLength": 256},
+    "sku_id": {"type": ["string", "null"], "maxLength": 128},
+    "sku_name": {"type": ["string", "null"], "maxLength": 256},
+    "action_type": {
+      "type": "string",
+      "enum": ["DIRECT_ACCEPT", "EDITED_ACCEPT", "REJECTED"]
+    },
+    "question_summary": {"type": "string", "minLength": 1, "maxLength": 1200},
+    "ai_answer_summary": {"type": "string", "minLength": 1, "maxLength": 1200},
+    "final_answer_summary": {"type": ["string", "null"], "maxLength": 1200},
+    "created_by": {"type": "string", "minLength": 1, "maxLength": 128}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"action_type": {"const": "EDITED_ACCEPT"}},
+        "required": ["action_type"]
+      },
+      "then": {
+        "required": ["final_answer_summary"],
+        "properties": {
+          "final_answer_summary": {"type": "string", "minLength": 1, "maxLength": 1200}
+        }
+      }
+    }
+  ]
+}
