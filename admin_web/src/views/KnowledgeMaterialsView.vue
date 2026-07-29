@@ -8,6 +8,7 @@ import {
   getProductKnowledgeOverview,
   getProductKnowledgeProduct,
   listKnowledgeMaterials,
+  listOperationStores,
   listProductKnowledgeProducts,
   reviewKnowledgeMaterial,
   uploadKnowledgeMaterial,
@@ -81,15 +82,22 @@ function materialStatusLabel(item: KnowledgeMaterial): string {
 async function loadCatalog(): Promise<void> {
   catalogLoading.value = true
   try {
-    const [overview, productPage] = await Promise.all([
+    const [overview, productPage, operationStores] = await Promise.all([
       getProductKnowledgeOverview(),
       listProductKnowledgeProducts(),
+      listOperationStores(),
     ])
     stores.value = overview.stores
     products.value = productPage.items
     const requestedStore = typeof route.query.store === 'string' ? route.query.store : ''
+    const requestedStoreRef = typeof route.query.store_ref === 'string' ? route.query.store_ref : ''
     const requestedProduct = typeof route.query.product === 'string' ? route.query.product : ''
-    const selectedStoreCode = requestedStore
+    const operationStore = operationStores.items.find((item) => String(item.store_ref) === requestedStoreRef)
+    const selectedStoreCode = requestedStore || stores.value.find(
+      (item) => operationStore
+        && item.store_name === operationStore.store_name
+        && item.platform_name === operationStore.platform_name,
+    )?.technical_details.store_code || ''
     if (selectedStoreCode && stores.value.some((item) => item.technical_details.store_code === selectedStoreCode)) {
       form.store_code = selectedStoreCode
       filters.store_code = selectedStoreCode

@@ -2,11 +2,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
 import ProductDetailView from '../src/views/ProductDetailView.vue'
-import { getProductKnowledgeProduct, type ProductKnowledgeDetail } from '../src/api/client'
+import { getProductKnowledgeProduct, updateProductBasicInfo, type ProductKnowledgeDetail } from '../src/api/client'
 
 vi.mock('../src/api/client', () => ({
   apiErrorMessage: vi.fn(() => '暂时不可用'),
   getProductKnowledgeProduct: vi.fn(),
+  updateProductBasicInfo: vi.fn(),
 }))
 
 vi.mock('../src/presentation', () => ({ displayStatus: (value: string) => value }))
@@ -45,5 +46,36 @@ describe('ProductDetailView', () => {
     expect(wrapper.text()).toContain('含灯光组件')
     expect(wrapper.text()).toContain('当前资料未提供年龄信息，建议人工确认。')
     expect(wrapper.text()).toContain('不代表知识已发布到 RAG')
+
+    const editButton = wrapper.findAll('button').find((item) => item.text() === '编辑基础信息')
+    await editButton!.trigger('click')
+    expect(wrapper.text()).toContain('商品展示名称')
+    expect(wrapper.text()).toContain('店铺展示名称')
+    expect(wrapper.text()).toContain('商品和 SKU 的内部身份不会改变')
+
+    const updatedDetail: ProductKnowledgeDetail = {
+      ...productDetail,
+      store: { ...productDetail.store, store_name: '木木小栈玩具旗舰店', remarks: '展示备注' },
+      product: { ...productDetail.product, product_name: 'Q66消防局机械积木', product_summary: '更新后的商品简介。' },
+      data_status: 'PENDING_REVIEW',
+    }
+    vi.mocked(updateProductBasicInfo).mockResolvedValue(updatedDetail)
+    const inputs = wrapper.findAll('.basic-info-form input')
+    const textareas = wrapper.findAll('.basic-info-form textarea')
+    await inputs[0].setValue('Q66消防局机械积木')
+    await inputs[1].setValue('木木小栈玩具旗舰店')
+    await textareas[0].setValue('更新后的商品简介。')
+    await textareas[1].setValue('展示备注')
+    await wrapper.get('.basic-info-form').trigger('submit')
+    await flushPromises()
+
+    expect(updateProductBasicInfo).toHaveBeenCalledWith('PRODUCT-Q66', {
+      product_display_name: 'Q66消防局机械积木',
+      product_summary: '更新后的商品简介。',
+      store_display_name: '木木小栈玩具旗舰店',
+      store_remarks: '展示备注',
+    })
+    expect(wrapper.text()).toContain('基础信息已保存并同步显示')
+    expect(wrapper.text()).toContain('Q66消防局机械积木')
   })
 })

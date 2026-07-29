@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import {
   apiErrorMessage,
   getProductKnowledgeProduct,
+  updateProductBasicInfo,
   type ProductKnowledgeDetail,
   type TopicCoverage,
 } from '../api/client'
@@ -13,6 +14,16 @@ const props = defineProps<{ productId: string }>()
 const detail = ref<ProductKnowledgeDetail | null>(null)
 const error = ref('')
 const loading = ref(true)
+const editingBasicInfo = ref(false)
+const savingBasicInfo = ref(false)
+const saveError = ref('')
+const saveReceipt = ref('')
+const basicInfo = reactive({
+  product_display_name: '',
+  product_summary: '',
+  store_display_name: '',
+  store_remarks: '',
+})
 
 const aTopics = computed(() => detail.value?.topic_coverage.filter((item) => item.level === 'A') ?? [])
 const bTopics = computed(() => detail.value?.topic_coverage.filter((item) => item.level === 'B') ?? [])
@@ -30,11 +41,52 @@ async function load(): Promise<void> {
   error.value = ''
   try {
     detail.value = await getProductKnowledgeProduct(props.productId)
+    resetBasicInfoForm()
   } catch (reason: unknown) {
     detail.value = null
     error.value = apiErrorMessage(reason)
   } finally {
     loading.value = false
+  }
+}
+
+function resetBasicInfoForm(): void {
+  if (!detail.value) return
+  Object.assign(basicInfo, {
+    product_display_name: detail.value.product.product_name,
+    product_summary: detail.value.product.product_summary || '',
+    store_display_name: detail.value.store.store_name,
+    store_remarks: detail.value.store.remarks || '',
+  })
+}
+
+function beginBasicInfoEdit(): void {
+  resetBasicInfoForm()
+  saveError.value = ''
+  saveReceipt.value = ''
+  editingBasicInfo.value = true
+}
+
+function cancelBasicInfoEdit(): void {
+  editingBasicInfo.value = false
+  saveError.value = ''
+  resetBasicInfoForm()
+}
+
+async function saveBasicInfo(): Promise<void> {
+  if (savingBasicInfo.value) return
+  savingBasicInfo.value = true
+  saveError.value = ''
+  saveReceipt.value = ''
+  try {
+    detail.value = await updateProductBasicInfo(props.productId, basicInfo)
+    resetBasicInfoForm()
+    editingBasicInfo.value = false
+    saveReceipt.value = '基础信息已保存并同步显示；商品知识发生变化时会进入待审核，不会自动发布到 AI 或 RAG。'
+  } catch (reason: unknown) {
+    saveError.value = apiErrorMessage(reason)
+  } finally {
+    savingBasicInfo.value = false
   }
 }
 
@@ -93,8 +145,23 @@ onMounted(load)
               <span class="status-pill ai">AI：{{ displayStatus(detail.ai_status) }}</span>
             </div>
           </div>
-          <div class="coverage-score"><strong>{{ detail.coverage_percent }}%</strong><span>AI 核心知识覆盖度</span></div>
+          <div class="overview-actions">
+            <button v-if="!editingBasicInfo" class="button secondary" type="button" @click="beginBasicInfoEdit">编辑基础信息</button>
+            <div class="coverage-score"><strong>{{ detail.coverage_percent }}%</strong><span>AI 核心知识覆盖度</span></div>
+          </div>
         </div>
+        <form v-if="editingBasicInfo" class="basic-info-form" @submit.prevent="saveBasicInfo">
+          <div class="form-grid">
+            <label>商品展示名称<input v-model.trim="basicInfo.product_display_name" required minlength="2" maxlength="255"></label>
+            <label>店铺展示名称<input v-model.trim="basicInfo.store_display_name" required minlength="2" maxlength="255"></label>
+            <label class="wide">商品简介<textarea v-model.trim="basicInfo.product_summary" maxlength="4000" placeholder="资料未提供时可以留空"></textarea></label>
+            <label class="wide">店铺展示备注<textarea v-model.trim="basicInfo.store_remarks" maxlength="1000" placeholder="可填写该店铺在知识运营中的展示说明"></textarea></label>
+          </div>
+          <p class="notice boundary">只维护中文业务展示信息。商品和 SKU 的内部身份不会改变；保存后进入人工审核，不会自动发布。</p>
+          <p v-if="saveError" class="notice error" role="alert">{{ saveError }}</p>
+          <div class="form-actions"><button class="button" type="submit" :disabled="savingBasicInfo">{{ savingBasicInfo ? '正在保存…' : '保存基础信息' }}</button><button class="button secondary" type="button" :disabled="savingBasicInfo" @click="cancelBasicInfoEdit">取消</button></div>
+        </form>
+        <p v-if="saveReceipt" class="notice success" role="status">{{ saveReceipt }}</p>
         <p class="summary">{{ detail.product.product_summary || '当前资料未提供商品简介。' }}</p>
         <dl class="business-facts">
           <div><dt>核心卖点</dt><dd>{{ detail.product.core_selling_points.join('；') || '当前资料未提供' }}</dd></div>
@@ -192,7 +259,8 @@ onMounted(load)
 <style scoped>
 .eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }.answer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }.answer-card { display: grid; align-content: start; gap: 10px; min-height: 180px; padding: 19px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }.answer-card > span { color: #526279; font-size: 13px; }.answer-card > strong { color: #172554; font-size: 26px; }.answer-card.supported { border-top: 4px solid #3d9b6b; }.answer-card.missing { border-top: 4px solid #d69735; }.answer-card.action { border-top: 4px solid #3973c4; }.answer-card ul { margin: 0; padding-left: 18px; color: #526279; line-height: 1.55; }
 .topic-chips { display: flex; flex-wrap: wrap; gap: 6px; }.topic-chips span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: start; }.section-heading h2, .section-card h2 { margin: 0; color: #172554; }.coverage-score { display: grid; justify-items: end; }.coverage-score strong { color: #2e6db0; font-size: 30px; }.coverage-score span { color: #617087; font-size: 12px; }.status-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }.status-pill { padding: 5px 9px; border-radius: 999px; color: #365174; background: #edf2f8; font-size: 12px; }.status-pill.ai { color: #285493; background: #eaf2ff; }.summary { color: #526279; line-height: 1.65; }.business-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }.business-facts div { padding: 13px; border-radius: 9px; background: #f7f9fc; }.business-facts dt { color: #617087; font-size: 12px; }.business-facts dd { margin: 5px 0 0; color: #2f4259; line-height: 1.5; }
+.overview-actions { display: grid; justify-items: end; gap: 12px; }.basic-info-form { display: grid; gap: 14px; margin: 18px 0; padding: 18px; border: 1px solid #b9cde9; border-radius: 11px; background: #f8fbff; }.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }.form-grid label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.form-grid input, .form-grid textarea { min-height: 41px; padding: 9px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.form-grid textarea { min-height: 92px; resize: vertical; }.form-grid .wide { grid-column: 1 / -1; }.form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .section-card { margin-top: 20px; }.section-card > .eyebrow + h2 { margin-bottom: 16px; }.sku-grid, .source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }.sku-card, .source-grid article { padding: 15px; border: 1px solid #e0e7f0; border-radius: 10px; }.sku-card h3 { margin: 0; color: #25466f; }.sku-card p { color: #526279; line-height: 1.55; }.sku-card .confirmed { color: #217447; font-weight: 700; }.coverage-layout, .lower-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }.coverage-list { display: grid; gap: 8px; margin-top: 16px; }.coverage-item { display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: #edf7f1; color: #276a49; }.coverage-item.partial { background: #eef4ff; color: #315f9d; }.coverage-item.missing { background: #fff5e7; color: #9a641c; }.coverage-item strong { font-size: 12px; }
 .gap-list { display: grid; gap: 10px; margin-top: 16px; }.gap-card { padding: 15px; border-left: 4px solid #d69735; border-radius: 8px; background: #fffaf2; }.gap-card > div { display: flex; justify-content: space-between; gap: 12px; color: #704911; }.gap-card p { margin: 8px 0; color: #526279; line-height: 1.55; }.gap-card blockquote { margin: 10px 0 0; padding: 10px 12px; border-radius: 7px; background: #fff; color: #75570a; }.faq-item { padding: 11px 0; border-bottom: 1px solid #e5ebf2; }.faq-item summary { color: #25466f; cursor: pointer; }.faq-item p, .safety-item p { color: #526279; line-height: 1.55; }.faq-item small, .safety-item small { color: #617087; }.safety-item { padding: 12px 0; border-bottom: 1px solid #e5ebf2; }.source-grid article { display: grid; gap: 6px; }.source-grid article > span { color: #617087; font-size: 12px; }.boundary { margin-top: 20px; color: #75570a; background: #fff8df; line-height: 1.6; }
-@media (max-width: 900px) { .answer-grid, .coverage-layout, .lower-grid { grid-template-columns: 1fr; }.business-facts, .sku-grid, .source-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .answer-grid, .coverage-layout, .lower-grid { grid-template-columns: 1fr; }.business-facts, .sku-grid, .source-grid, .form-grid { grid-template-columns: 1fr; }.form-grid .wide { grid-column: span 1; } }
 </style>

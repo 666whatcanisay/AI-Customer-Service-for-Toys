@@ -15,7 +15,7 @@ import App from './App.vue'
 const createTestRouter = () => createRouter({
   history: createMemoryHistory(),
   routes: [
-    '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-gaps', '/import-center', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
+    '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-gaps', '/import-center', '/store-management', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
     '/ai-capabilities', '/ai-optimization-pool', '/knowledge-materials', '/knowledge-quality-pool',
     '/system-status', '/imports', '/test-data-packages'
@@ -43,6 +43,7 @@ describe('App product shell', () => {
     expect(wrapper.text()).toContain('AI运营概览')
     expect(wrapper.text()).toContain('客服运营')
     expect(wrapper.text()).toContain('商品知识中心')
+    expect(wrapper.text()).toContain('店铺管理')
     expect(wrapper.text()).toContain('商品知识维护')
     expect(wrapper.text()).toContain('知识缺口')
     expect(wrapper.text()).toContain('知识资料')
