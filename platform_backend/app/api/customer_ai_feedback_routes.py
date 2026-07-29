@@ -21,6 +21,7 @@ from app.ai_feedback.schemas import (
     AIResponseFeedbackType,
 )
 from app.database import get_db
+from app.customer_feedback_loop.service import link_feedback_classification, minimize_summary
 from app.errors import AppError
 
 
@@ -107,22 +108,51 @@ def create_ai_response_feedback(
     if receipt is not None:
         return _replay_or_conflict(session, receipt, fingerprint)
 
+    linked_to_minimized_event = payload.interaction_id is not None
     item = AIResponseFeedback(
         store_code=payload.store_code,
         product_id=payload.product_id,
         sku_id=payload.sku_id,
-        question=payload.question,
-        ai_answer=payload.ai_answer,
-        final_answer=payload.final_answer,
+        question=(
+            minimize_summary(payload.question)
+            if linked_to_minimized_event
+            else payload.question
+        ),
+        ai_answer=(
+            minimize_summary(payload.ai_answer)
+            if linked_to_minimized_event
+            else payload.ai_answer
+        ),
+        final_answer=(
+            minimize_summary(payload.final_answer)
+            if linked_to_minimized_event and payload.final_answer
+            else payload.final_answer
+        ),
         feedback_type=payload.feedback_type,
-        feedback_note=payload.feedback_note,
+        feedback_note=(
+            minimize_summary(payload.feedback_note)
+            if linked_to_minimized_event and payload.feedback_note
+            else payload.feedback_note
+        ),
         created_by=payload.created_by,
         status=AIResponseFeedbackStatus.NEW,
         analysis_status=AIResponseFeedbackStatus.NEW,
-        redaction_version="v1-reminder-only",
+        redaction_version=(
+            "feedback-summary-v1"
+            if linked_to_minimized_event
+            else "v1-reminder-only"
+        ),
     )
     session.add(item)
     session.flush()
+    if payload.interaction_id:
+        link_feedback_classification(
+            session,
+            interaction_id=payload.interaction_id,
+            created_by=payload.created_by,
+            feedback_id=item.feedback_id,
+            feedback_type=payload.feedback_type,
+        )
     session.add(
         AIResponseFeedbackIdempotency(
             request_method=_REQUEST_METHOD,

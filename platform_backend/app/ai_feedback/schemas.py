@@ -45,6 +45,7 @@ class AIResponseFeedbackCreate(BaseModel):
     feedback_note: str | None = Field(default=None, max_length=4000)
     final_answer: str | None = Field(default=None, max_length=12000)
     created_by: str = Field(min_length=1, max_length=128)
+    interaction_id: str | None = Field(default=None, min_length=1, max_length=160)
     context: FeedbackContext
 
     @model_validator(mode="after")

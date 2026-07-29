@@ -71,6 +71,12 @@ async def validation_exception_handler(
             "/api/v1/admin/ai-quality",
         )
     )
+    feedback_loop_path = request.url.path.startswith(
+        (
+            "/api/v1/ai-interaction-events",
+            "/api/v1/admin/ai-feedback-loop",
+        )
+    )
     knowledge_material_path = request.url.path.startswith(
         (
             "/api/v1/admin/knowledge-materials",
@@ -105,6 +111,8 @@ async def validation_exception_handler(
                 if analysis_output_invalid
                 else "AI_RESPONSE_FEEDBACK_VALIDATION_FAILED"
                 if ai_feedback_path
+                else "AI_INTERACTION_EVENT_VALIDATION_FAILED"
+                if feedback_loop_path
                 else "KNOWLEDGE_MATERIAL_VALIDATION_FAILED"
                 if knowledge_material_path or knowledge_quality_path
                 else "EXPERIENCE_CASE_VALIDATION_FAILED"

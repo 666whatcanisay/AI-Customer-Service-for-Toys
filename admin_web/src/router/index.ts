@@ -21,6 +21,7 @@ import CustomerOperationsView from '../views/CustomerOperationsView.vue'
 import KnowledgeEditorView from '../views/KnowledgeEditorView.vue'
 import KnowledgeGapCenterView from '../views/KnowledgeGapCenterView.vue'
 import StoreManagementView from '../views/StoreManagementView.vue'
+import AiIssueCenterView from '../views/AiIssueCenterView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -81,6 +82,7 @@ export const router = createRouter({
     { path: '/experience-cases', name: 'experience-cases', component: CustomerExperienceCasesView },
     { path: '/ai-optimization-pool', name: 'ai-optimization-pool', component: AiOptimizationPoolView },
     { path: '/ai-feedback-optimization-pool', name: 'ai-feedback-optimization-pool', component: AiFeedbackOptimizationPoolView },
+    { path: '/ai-issues', name: 'ai-issues', component: AiIssueCenterView },
     { path: '/knowledge-materials', name: 'knowledge-materials', component: KnowledgeMaterialsView },
     { path: '/knowledge-quality-pool', name: 'knowledge-quality-pool', component: KnowledgeQualityPoolView },
     {

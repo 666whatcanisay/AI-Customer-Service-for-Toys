@@ -15,7 +15,7 @@ import App from './App.vue'
 const createTestRouter = () => createRouter({
   history: createMemoryHistory(),
   routes: [
-    '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-gaps', '/import-center', '/store-management', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/suggestions',
+    '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-gaps', '/import-center', '/store-management', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/ai-issues', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
     '/ai-capabilities', '/ai-optimization-pool', '/knowledge-materials', '/knowledge-quality-pool',
     '/system-status', '/imports', '/test-data-packages'
@@ -50,8 +50,12 @@ describe('App product shell', () => {
     expect(wrapper.text()).toContain('FAQ管理')
     expect(wrapper.text()).toContain('安全规则')
     expect(wrapper.text()).toContain('导入中心')
-    expect(wrapper.text()).toContain('AI 运营')
+    expect(wrapper.text()).toContain('AI问题中心')
     expect(wrapper.text()).toContain('后续能力')
+    expect(wrapper.text()).not.toContain('Stores')
+    expect(wrapper.text()).not.toContain('Products and SKUs')
+    expect(wrapper.text()).not.toContain('Source evidence')
+    expect(wrapper.text()).not.toContain('SHA')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('平台 可用')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('AI 可用')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('客服 未检测')
