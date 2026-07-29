@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-customer-service-for-toys.local/contracts/ai-control-center-product.schema.json",
+  "title": "AI Control Center Product Overview v1",
+  "description": "Stable, aggregate-only, read-only presentation projection consumed by the 5174 AI control center. It never contains customer content, raw errors, prompt text, secrets, platform URLs, or individual feedback/evaluation records.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["success", "message", "data"],
+  "properties": {
+    "success": {"type": "boolean"},
+    "message": {"type": "string"},
+    "data": {"$ref": "#/$defs/snapshot"}
+  },
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "generated_at", "service", "model", "knowledge", "answer_usage", "latest_evaluation", "latest_quality_analysis", "modules", "feedback_analysis", "notices", "runtime", "raw_content_exposed", "model_call_performed", "business_write_performed"],
+      "properties": {
+        "schema_version": {"const": "ai-control-center.product.v1"},
+        "generated_at": {"type": "string"},
+        "service": {"$ref": "#/$defs/service"},
+        "model": {"$ref": "#/$defs/model"},
+        "knowledge": {"$ref": "#/$defs/knowledge"},
+        "answer_usage": {"$ref": "#/$defs/answerUsage"},
+        "latest_evaluation": {"$ref": "#/$defs/evaluation"},
+        "latest_quality_analysis": {"$ref": "#/$defs/qualityAnalysis"},
+        "modules": {"type": "array", "items": {"$ref": "#/$defs/module"}},
+        "feedback_analysis": {"$ref": "#/$defs/feedbackAnalysis"},
+        "notices": {"type": "array", "items": {"$ref": "#/$defs/notice"}},
+        "runtime": {"$ref": "#/$defs/runtime"},
+        "raw_content_exposed": {"const": false},
+        "model_call_performed": {"const": false},
+        "business_write_performed": {"const": false}
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "display_status", "summary", "last_initialization_status", "last_initialized_at", "initialization_error_exposed"],
+      "properties": {
+        "status": {"enum": ["RUNNING", "INITIALIZING", "ERROR"]},
+        "display_status": {"type": "string"},
+        "summary": {"type": "string"},
+        "last_initialization_status": {"enum": ["READY", "INITIALIZING", "FAILED"]},
+        "last_initialized_at": {"type": "null"},
+        "initialization_error_exposed": {"const": false}
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "display_status", "provider", "model_name", "availability_probed", "last_initialization_status", "last_initialized_at", "summary"],
+      "properties": {
+        "status": {"enum": ["READY", "INITIALIZING", "ERROR", "NOT_CONFIGURED"]},
+        "display_status": {"type": "string"},
+        "provider": {"type": ["string", "null"]},
+        "model_name": {"type": ["string", "null"]},
+        "availability_probed": {"const": false},
+        "last_initialization_status": {"enum": ["READY", "INITIALIZING", "FAILED", "NOT_CONFIGURED"]},
+        "last_initialized_at": {"type": "null"},
+        "summary": {"type": "string"}
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "indexed_chunk_count", "last_sync_at", "last_sync_status", "display_status", "summary"],
+      "properties": {
+        "status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "indexed_chunk_count": {"type": ["integer", "null"], "minimum": 0},
+        "last_sync_at": {"type": "null"},
+        "last_sync_status": {"const": "NOT_AVAILABLE"},
+        "display_status": {"type": "string"},
+        "summary": {"type": "string"}
+      }
+    },
+    "answerUsage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "metrics_scope", "processed_request_count", "direct_answer_count", "controlled_answer_count", "transfer_human_count", "other_outcome_count", "reset_on_restart", "summary"],
+      "properties": {
+        "status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "metrics_scope": {"enum": ["A_PROCESS_SINCE_START", "NOT_AVAILABLE"]},
+        "processed_request_count": {"type": ["integer", "null"], "minimum": 0},
+        "direct_answer_count": {"type": ["integer", "null"], "minimum": 0},
+        "controlled_answer_count": {"type": ["integer", "null"], "minimum": 0},
+        "transfer_human_count": {"type": ["integer", "null"], "minimum": 0},
+        "other_outcome_count": {"type": ["integer", "null"], "minimum": 0},
+        "reset_on_restart": {"const": true},
+        "summary": {"type": "string"}
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "source", "evaluation_id", "recorded_at", "recorded_at_status", "dataset_version", "dataset_version_status", "total_case_count", "passed_case_count", "failed_case_count", "pass_rate_percent", "summary"],
+      "properties": {
+        "status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "source": {"enum": ["SAVED_LIVE_C_API", "NOT_AVAILABLE"]},
+        "evaluation_id": {"type": ["string", "null"]},
+        "recorded_at": {"type": ["string", "null"]},
+        "recorded_at_status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "dataset_version": {"type": ["string", "null"]},
+        "dataset_version_status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "total_case_count": {"type": ["integer", "null"], "minimum": 0},
+        "passed_case_count": {"type": ["integer", "null"], "minimum": 0},
+        "failed_case_count": {"type": ["integer", "null"], "minimum": 0},
+        "pass_rate_percent": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+        "summary": {"type": "string"}
+      }
+    },
+    "qualityAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "source_evaluation_id", "source_recorded_at", "source_recorded_at_status", "failed_case_count", "summary", "findings", "automatic_change_allowed"],
+      "properties": {
+        "status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "source_evaluation_id": {"type": ["string", "null"]},
+        "source_recorded_at": {"type": ["string", "null"]},
+        "source_recorded_at_status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "failed_case_count": {"type": ["integer", "null"], "minimum": 0},
+        "summary": {"type": "string"},
+        "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "automatic_change_allowed": {"const": false}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "display_name", "evidence", "affected_case_count", "summary", "manual_next_step", "automatic_change_allowed"],
+      "properties": {
+        "category": {"enum": ["KNOWLEDGE_PROBLEM", "RETRIEVAL_PROBLEM", "PROMPT_OR_MODEL_PROBLEM", "DATA_PROBLEM", "RULE_DECISION_PROBLEM"]},
+        "display_name": {"type": "string"},
+        "evidence": {"enum": ["DIRECT_EVALUATOR_SIGNAL", "NO_SIGNAL_IN_CURRENT_REPORT"]},
+        "affected_case_count": {"type": "integer", "minimum": 0},
+        "summary": {"type": "string"},
+        "manual_next_step": {"type": "string"},
+        "automatic_change_allowed": {"const": false}
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_id", "name", "status", "data_status", "operator_mode", "display_status", "summary"],
+      "properties": {
+        "module_id": {"type": "string"},
+        "name": {"type": "string"},
+        "status": {"enum": ["RUNNING", "PAUSED", "ERROR", "PLANNED", "CONFIGURED", "NOT_CONFIGURED", "AVAILABLE", "NOT_AVAILABLE", "MANUAL_ONLY"]},
+        "data_status": {"enum": ["AVAILABLE", "NOT_AVAILABLE"]},
+        "operator_mode": {"enum": ["READ_ONLY", "EXPLICIT_MANUAL"]},
+        "display_status": {"type": "string"},
+        "summary": {"type": "string"}
+      }
+    },
+    "feedbackAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "latest_completed_at", "completed_analysis_count", "summary", "raw_content_exposed"],
+      "properties": {
+        "status": {"enum": ["MANUAL_ONLY", "NOT_CONFIGURED"]},
+        "latest_completed_at": {"type": ["string", "null"]},
+        "completed_analysis_count": {"type": ["integer", "null"], "minimum": 0},
+        "summary": {"type": "string"},
+        "raw_content_exposed": {"const": false}
+      }
+    },
+    "notice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "title", "summary", "manual_next_step", "automatic_action_taken"],
+      "properties": {
+        "code": {"type": "string"},
+        "severity": {"enum": ["INFO", "WARNING", "ERROR"]},
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "manual_next_step": {"type": "string"},
+        "automatic_action_taken": {"const": false}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service_version", "runtime_commit_sha", "runtime_commit_sha_status", "metrics_scope", "metrics_reset_on_restart"],
+      "properties": {
+        "service_version": {"type": "string"},
+        "runtime_commit_sha": {"type": "null"},
+        "runtime_commit_sha_status": {"const": "NOT_AVAILABLE"},
+        "metrics_scope": {"const": "A_PROCESS_SINCE_START"},
+        "metrics_reset_on_restart": {"const": true}
+      }
+    }
+  }
+}

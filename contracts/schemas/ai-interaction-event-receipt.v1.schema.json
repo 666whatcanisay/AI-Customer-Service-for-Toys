@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-interaction-event-receipt.v1.schema.json",
+  "title": "AI Interaction Event Receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "interaction_id", "status", "occurred_at"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "interaction_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "status": {"const": "RECORDED"},
+    "occurred_at": {"type": "string", "format": "date-time"}
+  }
+}
