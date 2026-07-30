@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "runtime_migration_complete",
-  "current_task": "R008 Phase E2 Standard Port Cutover Execution",
-  "current_stage": "Phase E2 passed. The standard runtime now runs from AI-CS@26f8cde on 5173/5174/8000/8011 with verified managed records, clean source identity, C revision 0008, A ready/model configured with 47 chunks, B catalog plus synthetic AI-answer smoke, and Admin runtime routing to 8000/8011. Shadow services are stopped. Recovery cbc77ed is stopped but its repository, final SQLite online backup, RAG assets and original configuration remain preserved as the rollback anchor. Phase F worktree or old-directory handling is not authorized.",
-  "current_gate": "RUNTIME_MIGRATION_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_STOPPED_PRESERVED / PHASE_F_NOT_AUTHORIZED",
+  "status": "runtime_handover_ready",
+  "current_task": "R008 AI-CS Runtime Handover V1",
+  "current_stage": "Runtime Handover V1 is complete. AI-CS is the sole daily development and runtime root; the handover freezes the exact green-standard start environment, managed stop/status commands, four service responsibilities, local B/Admin entries, Target SQLite/RAG paths and Recovery rollback prerequisites. A read-only gate confirmed the existing Target services still run from clean 26f8cde with C revision 0008 and A ready/model configured with 47 chunks. No service, Target source or runtime data was changed. Recovery remains stopped and rollback-only; Phase F is not authorized.",
+  "current_gate": "RUNTIME_HANDOVER_READY / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED",
   "phase_e_plan": {
     "report": "docs/control/AI-CS-Phase-E-Runtime-Migration-Plan-V1.md",
     "recovery": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
@@ -104,6 +104,45 @@
       "repository_and_data_preserved": true,
       "rollback_triggered": false
     },
+    "phase_f_authorized": false
+  },
+  "runtime_handover": {
+    "report": "docs/control/AI-CS-Runtime-Handover-Report-V1.md",
+    "result": "RUNTIME_HANDOVER_READY",
+    "verified_utc": "2026-07-30T05:56:44.2605665Z",
+    "canonical_project_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "branch": "control/r008-physical-migration-v1",
+    "sha": "26f8cde1e8f7373315baa1ac68d02f7823b4de82",
+    "contracts": "0.2.0",
+    "source_state": "CLEAN",
+    "standard_config": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/config/green-standard.local.ps1",
+    "managed_runtime_directory": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/green-standard",
+    "services": {
+      "C_API": {"port": 8011, "managed_pid": 21372, "listener_pid": 20424},
+      "A": {"port": 8000, "managed_pid": 27616, "listener_pid": 25528},
+      "B": {"port": 5173, "managed_pid": 13412, "listener_pid": 13412},
+      "C_ADMIN": {"port": 5174, "managed_pid": 42400, "listener_pid": 6188}
+    },
+    "experience_entries": {
+      "B": "http://127.0.0.1:5173/ai-chat",
+      "C_ADMIN": "http://127.0.0.1:5174/overview",
+      "AI_CONTROL": "http://127.0.0.1:5174/ai-capabilities"
+    },
+    "data": {
+      "platform_database": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/data/standard-platform.sqlite3",
+      "knowledge_base": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/standard-rag/knowledge-base",
+      "vector_db": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/standard-rag/vector-db",
+      "knowledge_materials": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/standard-knowledge-materials",
+      "git_ignored": true
+    },
+    "recovery": {
+      "root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1",
+      "sha": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+      "state": "STOPPED_PRESERVED_ROLLBACK_ANCHOR",
+      "daily_use": false,
+      "rollback_requires_authorization_and_write_reconciliation": true
+    },
+    "runtime_changed_by_handover_task": false,
     "phase_f_authorized": false
   },
   "git": {
@@ -387,6 +426,7 @@
     "B": "Node v24.14.0, npm 10.9.2; typecheck exit 0; production build exit 0; no test script",
     "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
     "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
+    "R008_RUNTIME_HANDOVER": "Read-only verification confirmed AI-CS@26f8cde is clean and remains the active standard runtime on 5173/5174/8000/8011 with verified managed and listener PIDs, C revision 0008, A ready/model configured and 47 chunks. The handover documents the exact green-standard config plus Target-isolated knowledge, vector, material and Admin API environment required for restart; managed stop/status commands; local B/Admin entries; active SQLite; and Recovery rollback-only rules. No Target code, runtime environment, service or data changed.",
     "R008_PHASE_E2_STANDARD_PORT_CUTOVER": "The authorized quiet window had no sustained standard-port client sessions and stable Recovery SQLite metadata. Target shadow services were stopped through managed records and all four shadow ports released. Recovery final runtime records, SQLite online backup and RAG manifests were preserved; Recovery then stopped in Admin/B/A/C order. Target 26f8cde started C/A/B/Admin on 8011/8000/5173/5174 with verified paths, PIDs, clean source identity, C revision 0008, A ready/model configured with 47 chunks, B synthetic AI-answer smoke and Admin runtime routing to 8000/8011. Recovery remains stopped and preserved; rollback was not triggered.",
     "R008_PHASE_E1_SHADOW_RUNTIME": "Target 26f8cde started C/A/B/Admin in the frozen order on 18011/18000/15173/15174 from isolated .runtime/phase-e data. Official status verified all runtime identities clean, C revision 0008, A ready with 47 chunks, and one successful model call. Browser checks passed for B chat and Admin control center. The served Admin runtime module contained AI 18000, Platform 18011 and Target short SHA with no standard-port fallback; both Admin-origin read-only endpoints returned HTTP 200 and correct CORS. Recovery cbc77ed services, standard listener PIDs, SQLite metadata and RAG source hashes remained unchanged.",
     "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified.",
@@ -454,11 +494,12 @@
     "R008 Phase D Target Validation Retry passed the complete A/C/B/Admin/contracts matrix without runtime changes",
     "R008 Phase E Runtime Migration Preparation completed the read-only preflight and blue-green execution plan without runtime changes",
     "R008 Phase E1 Green Shadow Runtime passed with isolated data, verified Admin routing and unchanged Recovery",
-    "R008 Phase E2 Standard Port Cutover completed with Target standard runtime active and Recovery stopped but preserved"
+    "R008 Phase E2 Standard Port Cutover completed with Target standard runtime active and Recovery stopped but preserved",
+    "R008 AI-CS Runtime Handover V1 documented the canonical daily runtime and rollback operations without changing the runtime"
   ],
   "next_tasks": {
-    "CONTROL": "Keep R008 IN_PROGRESS until Phase F is separately authorized and closed. Treat AI-CS@26f8cde as the active standard runtime and Recovery cbc77ed as a stopped rollback anchor; do not repeat Phase E2 or delete Recovery.",
-    "OPS": "Operate 5173/5174/8000/8011 only through Target green-standard managed records. Preserve Recovery repository, final backup, RAG assets and config. If a core failure occurs before real writes, perform managed Target stop and Recovery restart; after real writes, take a backup and govern data reconciliation first.",
+    "CONTROL": "Use docs/control/AI-CS-Runtime-Handover-Report-V1.md as the current runtime handover and keep R008 IN_PROGRESS until Phase F is separately authorized and closed. Do not repeat Phase E2 or delete Recovery.",
+    "OPS": "Operate 5173/5174/8000/8011 only through the handover's Target green-standard config, explicit isolated data environment and managed records. Preserve Recovery; if Target has accepted writes, backup and govern data reconciliation before any rollback.",
     "A_B_C": "Keep code, UI, contracts, requirements and lockfiles frozen until a new registered task is authorized. Runtime migration does not authorize R006, model/prompt/RAG changes, UI redesign or business-data activation.",
     "CONTRACTS": "Remain unchanged at 0.2.0; all seven schemas pass. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
     "QA": "For any later restart or Phase F entry, re-verify Target PID/path/SHA, SQLite revision/integrity/count invariants, 47-chunk RAG state, B/C pages and Admin 8000/8011 routing. Do not infer R006 or Pilot business acceptance from the runtime migration."
