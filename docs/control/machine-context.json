@@ -3,13 +3,13 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "interface_freeze_v1_1_ready_for_validation",
-  "current_task": "R006 Legacy Compatibility Control V1.1 interface freeze",
-  "current_stage": "pilot-business-catalog.v1.1 freezes operator-controlled legacy compatibility: valid historical TEST stores/products default ENABLED, new PILOT stores/products default DISABLED, SKU inherits Product, C owns status read-back and activation receipts, and B consumes only the final C projection. No code, UI implementation, database, contract, runtime data or service was changed.",
-  "current_gate": "INTERFACE_FREEZE_V1_1_READY_FOR_VALIDATION / R006_IMPLEMENTATION_BLOCKED: rerun static validation for the changed legacy defaults, SKU inheritance, C control boundary, receipt and rollback semantics before any Contracts, C or B implementation.",
+  "status": "interface_validation_v1_1_complete",
+  "current_task": "R006 Pilot Business Catalog Interface Validation V1.1",
+  "current_stage": "Static validation of pilot-business-catalog.v1.1 completed with 6 PASS and 3 CONDITIONAL PASS results. The operator-controlled TEST/PILOT, Store/Product and inherited-SKU model is viable, but exact mixed-record initialization and activation-receipt write/read-back semantics remain unresolved. No code, UI, contracts, database, runtime data or service was changed.",
+  "current_gate": "CONDITIONAL PASS / R006_IMPLEMENTATION_BLOCKED: close IV11-B01 mixed legacy provenance mapping and IV11-B02 exact status-write response plus receipt persistence verification before any Contracts, C or B implementation.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "control/r006-legacy-compatibility-control-v1",
+    "branch": "control/r006-interface-validation-v1-1",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
@@ -50,7 +50,10 @@
     "interface_validation_base": "f9257c214eba4d5cb77d4d7c290a9677bfcb88f2",
     "interface_validation_commit": "1ea6f3e00902f9f6f829e77814a4b9ab0b5bab6f",
     "interface_freeze_v1_1_branch": "control/r006-legacy-compatibility-control-v1",
-    "interface_freeze_v1_1_base": "1ea6f3e00902f9f6f829e77814a4b9ab0b5bab6f"
+    "interface_freeze_v1_1_base": "1ea6f3e00902f9f6f829e77814a4b9ab0b5bab6f",
+    "interface_freeze_v1_1_commit": "7fc4e26f799fa43101cb497dda05e7cefde36f3a",
+    "interface_validation_v1_1_branch": "control/r006-interface-validation-v1-1",
+    "interface_validation_v1_1_base": "7fc4e26f799fa43101cb497dda05e7cefde36f3a"
   },
   "pull_requests": {
     "3": {
@@ -150,20 +153,22 @@
     "R004 AI-CS Pilot Baseline Recovery V1 controlled baseline",
     "R006 pilot-business-catalog.v1 Interface Freeze plan",
     "R006 Pilot Business Catalog Interface Validation V1 static case review",
-    "R006 pilot-business-catalog.v1.1 Legacy Compatibility Control interface freeze"
+    "R006 pilot-business-catalog.v1.1 Legacy Compatibility Control interface freeze",
+    "R006 Pilot Business Catalog Interface Validation V1.1 static case review"
   ],
   "next_tasks": {
-    "CONTROL": "Run AI-CS Pilot Business Catalog Interface Freeze Validation V1.1 only. Validate legacy defaults, Store/Product controls, SKU inheritance, receipt idempotency, parent isolation, B consumer behavior, rollback and safety; do not authorize implementation on the old V1 report.",
-    "C_DATA_QA": "During V1.1 validation, review the deterministic cbc77ed legacy snapshot boundary, structural exception handling, preflight manifest and idempotency version without mutating the database.",
-    "CONTRACTS": "Remain unchanged at 0.2.0 until V1.1 validation passes and implementation is explicitly authorized. The first authorized implementation step must be additive 0.3.0 schemas and compatibility notes.",
-    "B": "Review V1.1 as Consumer only: consume C final projection, isolate invalid items and remove old test-field rejection in the future minimum implementation. Do not modify code or redesign UI yet.",
-    "C": "Review V1.1 as Provider/Data Owner: Store/Product status, read-back, activation receipt, legacy initialization and minimal Admin controls. Do not implement UI, migration or API yet.",
+    "CONTROL": "Run a documentation-only V1.1 freeze remediation. Close IV11-B01 with exact imported-test versus C-created provenance mapping and unknown-record quarantine; close IV11-B02 with exact status-write success/idempotency response and receipt persistence verification semantics. Then repeat the Interface Owner gate review.",
+    "C_DATA_QA": "Review the proposed one-time mapping: IMPORTED_TEST_ONLY to TEST plus ENABLED when valid, MANUAL_CREATED or c-operation-store.v1 to PILOT plus DISABLED, and unknown/conflicting provenance to quarantine. Do not mutate any database.",
+    "CONTRACTS": "Remain unchanged at 0.2.0. Do not create 0.3.0 until IV11-B01 and IV11-B02 are frozen, reviewed and implementation is explicitly authorized.",
+    "B": "No implementation. Continue to require the final C projection and per-item isolation; never infer availability from test_data_mode, production_usable or publishable.",
+    "C": "No implementation. Review only the exact migration-source mapping and activation receipt write/read-back semantics required by IV11-B01 and IV11-B02.",
     "A": "No R006 code or interface change."
   },
   "t02_executed": false,
   "blockers": [
-    "V1.1 changes the legacy default and SKU control semantics, so the prior V1 validation cannot authorize implementation; a dedicated V1.1 static validation is required.",
-    "No contracts 0.3.0 schema, C status persistence, migration, Admin control or B consumer implementation exists; freeze documentation is not runtime evidence.",
+    "IV11-B01: the current catalog tables mix IMPORTED_TEST_ONLY records with MANUAL_CREATED/c-operation-store.v1 records, but V1.1 does not yet freeze the exact one-time provenance mapping and quarantine rule; bulk TEST plus ENABLED initialization is unsafe.",
+    "IV11-B02: V1.1 does not yet freeze the exact Store/Product status-write success response, changed=false idempotency behavior, or a receipt persistence verification/read-back mechanism.",
+    "No contracts 0.3.0 schema, C status persistence, migration, Admin control or B consumer implementation exists; this static validation is not runtime evidence.",
     "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified on one approved runtime SHA.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through R006 business code."
   ],
