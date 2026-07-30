@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`SOURCE_TREE_MATERIALIZED / PHASE_C_NOT_AUTHORIZED`
+> 当前 Gate：`DEPENDENCIES_REPRODUCED / PHASE_D_NOT_AUTHORIZED`
 
 ## 1. 台账目标
 
@@ -98,7 +98,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Target已从唯一Source Tag物化542个跟踪文件，Tree/manifest零差异且clean；Phase C尚未授权。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Target四个组件已在Git忽略目录内完成冻结依赖安装，输入哈希不变且tracked clean；Phase D尚未授权。 |
 
 状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
 
@@ -250,9 +250,9 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
 | 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
 | 完成标准 | 最终只保留`AI-CS/`一个长期目录；保持`backend/frontend/extension/platform_backend/admin_web/contracts/docs/scripts/tests`核心目录原名；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
-| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结`19cc826...`九个目录tree、R001–R006功能入口、数据禁止边界和`cbc77ed...`运行/回滚锚点；[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)建立`ai-cs-monorepo-source-freeze-v1`；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Target分支从Source Tag创建，Source/Target均542个文件、Root Tree与manifest SHA-256一致、19个功能入口齐全、contracts 0.2.0且Runtime未变化。尚无依赖、测试或Target运行证据。 |
-| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)、[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[AI-CS Physical Migration Preflight Checklist V1](AI-CS-Physical-Migration-Preflight-Checklist-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
-| 防止重复错误规则 | 不得把`SOURCE_TREE_MATERIALIZED`解释为依赖已安装、测试通过、Target可运行、Pilot已切换或旧目录可处理；不得修改Target冻结Tree或从dirty Worktree补文件；不得处理当前运行中的Recovery目录；不得向Target加入运行/敏感资产；不得借目录迁移实施R006。 |
+| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明A/C两个独立venv、B `npm ci`、Admin frozen pnpm均成功，完整性检查通过、7项冻结输入哈希不变、Target tracked clean且Runtime未变化。尚无Phase D测试或Target运行证据。 |
+| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
+| 防止重复错误规则 | 不得把`DEPENDENCIES_REPRODUCED`解释为测试通过、依赖安全认证、Target可运行、Pilot已切换或旧目录可处理；不得修改Target冻结Tree、requirements或lockfile；不得从dirty Worktree补文件；不得处理当前运行中的Recovery目录；不得借目录迁移实施R006。 |
 
 ## 7. 历史错误防复发规则
 
@@ -289,6 +289,6 @@ R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处�
 
 R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
 
-R008是与R006并行的项目治理任务。Phase B已在独立`AI-CS/`中从`ai-cs-monorepo-source-freeze-v1@26f8cde...`创建`control/r008-physical-migration-v1`并物化冻结Tree；Target为clean，542个文件、Root Tree和manifest与Source零差异，contracts为0.2.0。下一入口只能在用户另行明确授权后执行Phase C依赖安装；当前禁止安装依赖、创建`.runtime`、测试、运行切换或旧目录处理。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+R008是与R006并行的项目治理任务。Phase C已在独立`AI-CS/`内完成A/C两个venv、B npm与Admin frozen pnpm依赖安装；四个依赖目录均被Git忽略，7项冻结输入哈希不变，Target仍为`26f8cde...`/`9940eb2...`且tracked clean。下一入口只能在用户另行明确授权后执行Phase D测试；测试必须隔离数据库且不得占用标准端口。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
 
-最终状态：`SOURCE_TREE_MATERIALIZED`
+最终状态：`DEPENDENCIES_REPRODUCED`

@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`SOURCE_TREE_MATERIALIZED / PHASE_C_NOT_AUTHORIZED`
+> 当前 Gate：`DEPENDENCIES_REPRODUCED / PHASE_D_NOT_AUTHORIZED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -30,7 +30,7 @@
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | `AI-CS/`已从Source Tag物化至`control/r008-physical-migration-v1@26f8cde...`；542个文件、Tree与manifest零差异，Target clean，Recovery未变化。 | 只可另行授权Phase C安装冻结依赖；当前禁止安装、测试、运行切换。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | A/C两个venv、B npm与Admin frozen pnpm安装成功；依赖完整性检查通过，冻结输入哈希不变，Target tracked clean，Recovery未变化。 | 只可另行授权Phase D隔离测试；当前禁止测试、数据库连接和运行切换。 |
 
 ## 3. 当前真正阻塞点
 
@@ -38,7 +38,7 @@ R004已关闭。R006 V1.1业务方向可行，但静态代码映射发现两个�
 
 并行外部阻塞仍为 R007：第二台客服终端的公司网络可达性尚未验收，本轮本机四服务运行成功不等于 LAN Gate 已关闭。
 
-R008 Phase B执行成功：目标从annotated Source Tag实际Commit `26f8cde...3b4de82`创建迁移分支，HEAD/Index Tree均为`9940eb2...`；Source/Target各542个文件，UTF-8规范化manifest SHA-256同为`4476ffb7...`且差异为0。Runtime仍为clean Recovery `cbc77ed...`且四服务同PID/health 200；数据库、向量和69个源Worktree未处理。Target尚无依赖、`.runtime`、数据库或构建产物。
+R008 Phase C执行成功：Python 3.11.9下A 106项、C Backend 32项分发包安装完成并通过`pip check`；B `npm ci`添加244个包且`npm ls`通过；Admin frozen pnpm复用/安装195个包且list通过。四个依赖目录是Target唯一新增忽略项，7项冻结输入哈希前后一致。Runtime仍为clean Recovery `cbc77ed...`且四服务同PID/health 200；Target没有`.runtime`、数据库、日志或build产物。npm冻结树报告13项漏洞，且Python范围requirements不是完整传递哈希锁，这两项不改变安装Gate但禁止生产安全/严格可重复性声明。
 
 ## 4. 需求依赖与执行顺序
 
@@ -70,13 +70,14 @@ R008 Source Clean & Protection Reference Closure COMPLETE
 R008 Phase 2A Preflight COMPLETE
   ↓ Target Repository Creation COMPLETE
 R008 Phase B Source Tag Code Materialization COMPLETE
-  ↓ Phase C依赖安装（等待另行授权）
-  ↓ 依赖后再进入D–F逐阶段Gate
+  ↓ Phase C Dependency Reproduction COMPLETE
+  ↓ Phase D隔离测试（等待另行授权）
+  ↓ 测试后再进入E–F逐阶段Gate
   ↓ 迁移与运行切换必须分开Gate
 R008 运行切换 / Worktree退役（仍未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能在明确授权后执行Phase C冻结依赖安装，不得自动运行测试、创建业务运行数据或切换服务。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能在明确授权后执行Phase D隔离测试，不得连接Recovery数据库、占用标准端口或切换服务。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
 
 ## 5. 防重复结论
 
@@ -85,6 +86,6 @@ R008 运行切换 / Worktree退役（仍未授权）
 - R003 是问题记录，R006 是解决任务：不要为同一激活问题创建第三个重复需求。
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
-- R008 已完成冻结Tree物化：不要把`SOURCE_TREE_MATERIALIZED`解释为依赖已安装、测试已执行、Target可运行、Pilot已切换或旧目录可退役。
+- R008 已完成依赖复现：不要把`DEPENDENCIES_REPRODUCED`解释为测试通过、依赖安全认证、Target可运行、Pilot已切换或旧目录可退役。
 
-最终状态：`SOURCE_TREE_MATERIALIZED`
+最终状态：`DEPENDENCIES_REPRODUCED`
