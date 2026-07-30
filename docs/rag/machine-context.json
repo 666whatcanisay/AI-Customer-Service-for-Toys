@@ -3,22 +3,26 @@
   "project_id": "ai-cs-target-a-runtime",
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
-  "version": "R008 Runtime Startup Alignment V1",
-  "status": "runtime_startup_alignment_complete",
-  "current_task": "R008 Runtime Startup Alignment V1",
-  "current_gate": "RUNTIME_STARTUP_ALIGNMENT_COMPLETE",
-  "current_stage": "Target standard runtime reads an explicit active RAG collection and has passed managed stop/start/status plus real Ollama chat smoke.",
-  "next_recommended_task": "Keep the Target runtime stable. R006 and Phase F require separate authorization; do not treat this runtime repair as Business Data Activation or old-worktree retirement.",
+  "version": "AI-CS Runtime Identity Alignment V1",
+  "status": "runtime_identity_aligned_ready",
+  "current_task": "AI-CS Runtime Identity Alignment V1",
+  "current_gate": "RUNTIME_IDENTITY_ALIGNED_READY",
+  "current_stage": "The four formal services were re-attested without restart. Deployment role is runtimeMode=standard; the independent network profile is networkMode=LAN. Repository, PID, listener, command, port and health evidence all pass.",
+  "next_recommended_task": "Resume R009 Production Integration only after the separate controllable-browser Gate is available. Use the LAN status entry for the current Pilot and never use identity re-attestation to mask business-code changes.",
   "checked_at": "2026-07-30",
   "runtime": {
     "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-    "branch": "control/r008-runtime-startup-alignment-v1",
+    "branch": "control/runtime-identity-alignment-v1",
     "implementation_commits": [
       "acfdc1a92da652a7ea795b5e497eba5d997f5891",
       "6070ad1a7124346ca8b859c7b655ea8737b89545"
     ],
-    "head_resolution": "Use git rev-parse HEAD; documentation commits do not change the accepted code tree.",
+    "identity_logic_commit": "38b233410fc75c95a476e8775f7821fb80aab7ff",
+    "previous_business_baseline": "dd379278837a4f816dfb626292a26b0c54cce0cc",
+    "head_resolution": "Use git rev-parse HEAD. The final docs-only HEAD is re-attested after commit; protected business directories remain identical to dd379278.",
     "config": ".runtime/phase-e/config/green-standard.local.ps1",
+    "runtime_mode": "standard",
+    "network_mode": "LAN",
     "services": {
       "C_API": 8011,
       "A": 8000,
@@ -48,7 +52,7 @@
   "tests": {
     "backend": "101 passed, 3 opt-in real E2E skipped",
     "windows_ops": "8 script suites passed",
-    "runtime": "Managed stop/start/status passed; four standard ports RUNNING; B/Admin A/C proxies HTTP 200; real qwen3.5:9b chat smoke passed."
+    "runtime": "No-stop identity alignment passed; four original listener PIDs remained unchanged; LAN status reports RUNNING, healthy, runtimeMode=standard, networkMode=LAN and verified repository identity."
   },
   "contracts": ["contracts/version.json 0.2.0 (unchanged)"],
   "recovery": {
@@ -66,6 +70,7 @@
     "vector data deletion"
   ],
   "completed_tasks": [
+    "No-stop formal Runtime Identity Alignment V1",
     "Explicit active collection configuration",
     "Active and available collection status projection",
     "Knowledge degradation warning policy",
