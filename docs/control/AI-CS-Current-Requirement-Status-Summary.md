@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`TARGET_VALIDATION_FAILED / PHASE_E_BLOCKED`
+> 当前 Gate：`PYTHON_RUNTIME_COMPATIBILITY_CONFIRMED / TARGET_C_VENV_REBUILD_REQUIRED / PHASE_E_BLOCKED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -30,7 +30,7 @@
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase D已执行；A、B、Admin、contracts及C迁移通过，C pytest在Python 3.11.9收集阶段因`service.py:144` SyntaxError失败；Target清理后clean，Recovery未变化。 | 先冻结C批准Python版本并完成环境纠正与全套Phase D复验；Phase E禁止进入。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase D1已确认Target/Recovery C tree一致，冻结源码在3.11.9失败、在历史运行的3.12.13通过；批准版本为Python 3.12.13。Target C venv尚未重建。 | 单独授权以3.12.13重建Target C venv并完整重跑Phase D；Phase E禁止进入。 |
 
 ## 3. 当前真正阻塞点
 
@@ -38,7 +38,7 @@ R004已关闭。R006 V1.1业务方向可行，但静态代码映射发现两个�
 
 并行外部阻塞仍为 R007：第二台客服终端的公司网络可达性尚未验收，本轮本机四服务运行成功不等于 LAN Gate 已关闭。
 
-R008 Phase D已完成执行但Gate失败：A import与`101 passed/3 skipped`、B `115 passed`、Admin `54 passed`、两端typecheck/build、contracts 0.2.0/7 schema及C `0008→0007→0008`临时SQLite往返通过；C完整pytest在conftest导入时因Python 3.11.9拒绝`knowledge_materials/service.py:144`而exit 4，没有测试用例执行。所有临时库、缓存和build已清理，Target仍为原HEAD/Tree且clean；Runtime仍为Recovery `cbc77ed...`、原PID且四项HTTP 200，SQLite LastWrite不变。Phase E因此关闭。
+R008 Phase D1已关闭Python版本不确定性：Target与Recovery的`platform_backend` tree及失败文件blob完全一致；Target 3.11.9对line 144确定性解析失败，Recovery 3.12.13解析通过。资产根中7个历史C venv、基线测试文档和当前8011运行记录均为Python 3.12.13，health仍为HTTP 200。批准窗口为`>=3.12,<3.13`，本次精确推荐版本为3.12.13；3.13+未经验证。Target C venv仍是3.11.9，因此环境纠正和完整Phase D复验尚未执行，Phase E继续关闭。
 
 ## 4. 需求依赖与执行顺序
 
@@ -72,13 +72,14 @@ R008 Phase 2A Preflight COMPLETE
 R008 Phase B Source Tag Code Materialization COMPLETE
   ↓ Phase C Dependency Reproduction COMPLETE
   ↓ Phase D Target Validation FAILED（C pytest收集失败）
-  ↓ 冻结C批准Python版本 → 环境纠正 → 完整Phase D复验
+  ↓ Phase D1 Python Runtime Compatibility CONFIRMED（Python 3.12.13）
+  ↓ 单独授权重建Target C venv → 完整Phase D复验
   ↓ 全项PASS后才可申请E–F逐阶段Gate
   ↓ 迁移与运行切换必须分开Gate
 R008 运行切换 / Worktree退役（仍未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能在明确批准C Python版本后，另行授权环境纠正和完整Phase D复验，不得现场修复、连接Recovery数据库、占用标准端口或切换服务。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Target C Python 3.12.13 venv重建与依赖证据恢复，随后完整Phase D复验。不得修改源码、连接Recovery数据库、占用标准端口或切换服务。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
 
 ## 5. 防重复结论
 
@@ -87,6 +88,6 @@ R008 运行切换 / Worktree退役（仍未授权）
 - R003 是问题记录，R006 是解决任务：不要为同一激活问题创建第三个重复需求。
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
-- R008 Phase D已失败：不要用A/B/Admin或C migration的局部PASS覆盖C pytest收集失败，也不要在未冻结Python版本前直接修源码或进入Phase E。
+- R008 Phase D1已确认Python 3.12.13：不要再以3.11重建C环境，也不要把兼容性确认误当成Target测试通过；完整Phase D PASS前不得进入Phase E。
 
-最终状态：`TARGET_VALIDATION_FAILED`
+最终状态：`PYTHON_RUNTIME_COMPATIBILITY_CONFIRMED`

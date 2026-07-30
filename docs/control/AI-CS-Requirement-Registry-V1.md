@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`TARGET_VALIDATION_FAILED / PHASE_E_BLOCKED`
+> 当前 Gate：`PYTHON_RUNTIME_COMPATIBILITY_CONFIRMED / TARGET_C_VENV_REBUILD_REQUIRED / PHASE_E_BLOCKED`
 
 ## 1. 台账目标
 
@@ -98,7 +98,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Phase D已执行；A/B/Admin/contracts及C迁移通过，但C pytest在Python 3.11.9收集阶段因源码SyntaxError失败，Phase E被阻塞。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Phase D1已确认冻结C源码批准Python为3.12.13；Target C venv仍是3.11.9，须另行授权重建并完整复验，Phase E继续阻塞。 |
 
 状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
 
@@ -250,9 +250,9 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
 | 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
 | 完成标准 | 最终只保留`AI-CS/`一个长期目录；保持`backend/frontend/extension/platform_backend/admin_web/contracts/docs/scripts/tests`核心目录原名；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
-| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明四组件依赖可安装；[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)记录A `101 passed/3 skipped`、B `115 passed`、Admin `54 passed`、contracts 7 schema和C Alembic往返通过，但C pytest在Python 3.11.9收集阶段失败。Target最终clean且Recovery未变化。 |
-| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)、[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
-| 防止重复错误规则 | 不得把A/B/Admin或migration单项通过解释为Target整体验证通过；C完整pytest通过前不得进入Phase E。不得在未冻结批准Python版本前现场修代码或重建环境；不得修改Target冻结Tree、requirements或lockfile；不得从dirty Worktree补文件、处理Recovery目录或借迁移实施R006。 |
+| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明四组件依赖可安装；[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)记录C在Python 3.11.9下收集失败；[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)证明Target/Recovery C tree和失败blob一致、3.11.9解析失败、3.12.13解析通过，并将批准运行版本冻结为3.12.13。Target最终clean且Recovery未变化。 |
+| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)、[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)、[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
+| 防止重复错误规则 | 不得把A/B/Admin或migration单项通过解释为Target整体验证通过；C完整pytest通过前不得进入Phase E。不得再把Python 3.11作为冻结C源码的候选，也不得把“已确认3.12.13”误写成“venv已经纠正”；不得修改Target冻结Tree、requirements或lockfile；不得从dirty Worktree补文件、处理Recovery目录或借迁移实施R006。 |
 
 ## 7. 历史错误防复发规则
 
@@ -289,6 +289,6 @@ R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处�
 
 R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
 
-R008是与R006并行的项目治理任务。Phase D已在独立`AI-CS/`执行：A/B/Admin/contracts与C Alembic隔离往返通过，但C完整pytest因冻结源码不能由Phase C的Python 3.11.9解析而在收集阶段失败。下一入口只能先冻结C批准Python版本并另行授权环境纠正/完整Phase D复验；Phase E关闭。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+R008是与R006并行的项目治理任务。Phase D1已通过历史venv、基线文档、当前Recovery 8011运行身份以及同一源码在3.11.9/3.12.13下的解析差异，确认C批准Python为3.12.13。Target C venv仍为3.11.9，下一入口只能在用户单独授权后以显式Python 3.12.13重建独立venv、记录resolved inventory并完整重跑Phase D；Phase E关闭。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
 
-最终状态：`TARGET_VALIDATION_FAILED`
+最终状态：`PYTHON_RUNTIME_COMPATIBILITY_CONFIRMED`
