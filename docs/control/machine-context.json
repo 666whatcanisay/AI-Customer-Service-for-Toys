@@ -3,13 +3,13 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "interface_freeze_ready",
-  "current_task": "R006 Pilot Business Data Activation V1 - Interface Freeze only",
-  "current_stage": "pilot-business-catalog.v1 freezes C as Provider and status authority, B as read-only Consumer, and A as unchanged. Store/Product/SKU fields, TEST/PILOT, DISABLED/ENABLED, parent rules, partial-result semantics, legacy-test compatibility, contracts 0.3.0 implementation target, deployment order, rollback and acceptance are documented. No implementation has been authorized.",
-  "current_gate": "INTERFACE_FREEZE_READY: Interface Owner approval is the only next entry. Business Data Activation code, UI changes, A/RAG changes, Master Data and large database migrations remain prohibited.",
+  "status": "interface_validation_complete",
+  "current_task": "R006 Pilot Business Catalog Interface Validation V1",
+  "current_stage": "Static architecture validation mapped the cbc77ed C/B fields and walked all nine required cases. The design can express every case, but status read-back, the exact legacy activation set, the B non-visual consumer scope, and receipt/persistence details remain P0 gaps. No interface, code, UI, database, contract or runtime change was executed.",
+  "current_gate": "CONDITIONAL_PASS / R006_IMPLEMENTATION_BLOCKED: complete and approve pilot-business-catalog.v1.1 remediation for IV-B01 through IV-B04 before any Contracts, C or B implementation.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "control/r006-interface-freeze-v1",
+    "branch": "control/r006-interface-validation-v1",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
@@ -19,7 +19,7 @@
       "7787606",
       "84366f7"
     ],
-    "base_commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "base_commit": "f9257c214eba4d5cb77d4d7c290a9677bfcb88f2",
     "feature_branch": "codex/mvp-lan-batch-05",
     "mvp_batch_05_squash_commit": "dc48646bcfd20bffc864a6c1ba4d0049cd444870",
     "mvp_batch_05_gateway_fix_squash_commit": "f21eed9beeb07041779f7ab55c681f798090eafe",
@@ -44,7 +44,10 @@
     "pilot_baseline_tag": "ai-cs-pilot-baseline-v1",
     "interface_freeze_branch": "control/r006-interface-freeze-v1",
     "interface_freeze_base": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
-    "contracts_version": "0.2.0"
+    "contracts_version": "0.2.0",
+    "interface_freeze_commit": "f9257c214eba4d5cb77d4d7c290a9677bfcb88f2",
+    "interface_validation_branch": "control/r006-interface-validation-v1",
+    "interface_validation_base": "f9257c214eba4d5cb77d4d7c290a9677bfcb88f2"
   },
   "pull_requests": {
     "3": {
@@ -142,19 +145,23 @@
     "CONTROL-PILOT-BASELINE-MERGE PR consolidation, isolated real smoke and baseline handoff",
     "CONTROL-BASELINE-MERGE-V2 reviewed candidate merge and real closure",
     "R004 AI-CS Pilot Baseline Recovery V1 controlled baseline",
-    "R006 pilot-business-catalog.v1 Interface Freeze plan"
+    "R006 pilot-business-catalog.v1 Interface Freeze plan",
+    "R006 Pilot Business Catalog Interface Validation V1 static case review"
   ],
   "next_tasks": {
-    "CONTROL": "Review and approve docs/control/interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md. Do not imply implementation authorization from INTERFACE_FREEZE_READY.",
-    "CONTRACTS": "After explicit approval only, prepare additive 0.3.0 schemas, changelog, compatibility notes, error-code registry and affected-line review.",
-    "C": "After explicit approval and Contracts freeze only, implement the authoritative customer-service status and B-facing catalog projection without UI redesign, Master Data or large migration.",
-    "B": "After the C Provider is verified, consume only the frozen projection and preserve existing UI and A request context. Do not infer trust from test_data_mode, production_usable or publishable.",
-    "A": "No R006 code or interface change. Participate only in later end-to-end verification using the unchanged request context.",
-    "QA_OPS": "After implementation only, verify contracts, partial-item isolation, old test compatibility, same-SHA runtime and B-to-C rollback. R007 second-terminal network verification remains separate."
+    "CONTROL": "Run pilot-business-catalog.v1.1 remediation only: freeze state read-back, receipt identity type, and the precise non-visual B consumer scope. Do not authorize implementation until IV-B01 through IV-B04 close.",
+    "C_DATA_QA": "Produce a read-only legacy Store/Product/SKU activation manifest from cbc77ed with exact eligibility, counts, idempotency version and rollback evidence; do not mutate the database.",
+    "CONTRACTS": "Remain unchanged at 0.2.0 until V1.1 remediation is approved. Only then may an explicitly authorized implementation start with additive 0.3.0 schemas.",
+    "B": "Review the minimum logic needed to remove the old test-data batch rejection while preserving the exact rendered UI, error priority and manual-copy workflow; do not implement yet.",
+    "C": "Review the minimum durable status/audit storage and migration rollback plan without writing a migration or changing data; do not implement yet.",
+    "A": "No R006 code or interface change."
   },
   "t02_executed": false,
   "blockers": [
-    "R006 implementation is not authorized until Interface Owner approval of pilot-business-catalog.v1.",
+    "IV-B01: pilot-business-catalog.v1 references state GET/read-back after ambiguous writes but freezes no such endpoint or equivalent Admin response fields.",
+    "IV-B02: the exact legacy TEST/ENABLED entity manifest, idempotent initialization version and data rollback evidence are not frozen.",
+    "IV-B03: the current B logic in AiChat.vue rejects any non-test store, so the scope must explicitly permit minimum non-visual consumer logic changes while still prohibiting UI redesign.",
+    "IV-B04: receipt entity_ref typing and the minimum durable status/audit migration and rollback gate are not frozen.",
     "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified on one approved runtime SHA.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through R006 business code."
   ],
