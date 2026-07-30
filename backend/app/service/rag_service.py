@@ -4,6 +4,7 @@ import logging
 import json
 import re
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import replace
@@ -199,6 +200,10 @@ class RAGService:
         ):
             topics.append("packaging")
         if cls._question_has(
+            question, r"材质", r"材料", r"什么做的", r"什么料"
+        ):
+            topics.append("material")
+        if cls._question_has(
             question,
             r"尺寸",
             r"长宽高",
@@ -221,6 +226,7 @@ class RAGService:
         labels = {
             "age": "建议年龄，以及证据中明确写出的必要小颗粒、低龄限制和成人陪同提示",
             "packaging": "客户询问的包装形式",
+            "material": "客户询问的商品材质；没有明确材质证据时不得推断",
             "size": "客户询问的成品或包装尺寸",
             "count": "客户询问的颗粒数或数量",
             "color": "客户询问的颜色或款式颜色",
@@ -260,6 +266,20 @@ class RAGService:
                 "装箱",
                 "手提",
                 "纪念版",
+            ),
+            "material": (
+                "材质",
+                "材料",
+                "ABS",
+                "塑料",
+                "木质",
+                "金属",
+                "亚克力",
+                "硅胶",
+                "EVA",
+                "PVC",
+                "PP",
+                "PE",
             ),
             "size": ("尺寸", "长", "宽", "高", "厘米", "毫米", "cm", "mm", "×"),
             "count": ("颗粒", "颗积木", "数量", "共计"),
@@ -318,6 +338,48 @@ class RAGService:
                 seen.add(fragment)
                 total += len(block)
         return "\n".join(context)
+
+    @classmethod
+    def _requested_topics_have_product_evidence(
+        cls,
+        question: str,
+        results: list[dict[str, Any]],
+        context: FrozenChatContext,
+    ) -> bool:
+        topics = cls._answer_topics(question)
+        if not topics:
+            return True
+        product_evidence = " ".join(
+            cls._answer_content(result)
+            for result in results
+            if result.get("product_id") == context.product_id
+        )
+        store_safety_evidence = " ".join(
+            cls._answer_content(result)
+            for result in results
+            if not result.get("product_id")
+            and result.get("knowledge_type") == "SAFETY_RULE"
+        )
+        patterns = {
+            "age": r"(?:\d+\s*(?:～|~|至|到|-|—|–)\s*\d+\s*岁|\d+\s*岁(?:及以上|以上|以下|以内)|适合.{0,12}\d+\s*岁)",
+            "packaging": r"(?:包装|礼盒|礼袋|彩盒|袋装|盒装|装箱|手提)",
+            "material": r"(?:材质|材料|ABS|塑料|木质|金属|亚克力|硅胶|EVA|PVC|(?:^|\W)PP(?:\W|$)|(?:^|\W)PE(?:\W|$))",
+            "size": r"(?:尺寸|长宽高|\d+(?:\.\d+)?\s*(?:厘米|毫米|cm|mm)|\d+\s*[×xX]\s*\d+)",
+            "count": r"\d+\s*(?:颗|块|件|个积木)",
+            "color": r"(?:颜色|色款|蓝色|粉色|红色|白色|黑色|黄色|紫色|绿色|橙色|灰色|棕色|透明)",
+        }
+        return all(
+            re.search(
+                patterns[topic],
+                (
+                    f"{product_evidence} {store_safety_evidence}"
+                    if topic == "age"
+                    else product_evidence
+                ),
+                re.IGNORECASE,
+            )
+            for topic in topics
+        )
 
     @staticmethod
     def _sanitize_customer_answer(answer: str) -> str:
@@ -536,6 +598,48 @@ class RAGService:
     def _question_has(question: str, *patterns: str) -> bool:
         return any(re.search(pattern, question, re.IGNORECASE) for pattern in patterns)
 
+    @classmethod
+    def _question_allows_store_guard_without_product(cls, question: str) -> bool:
+        """Allow store-level safety/operations guards without product facts.
+
+        Generic product questions must never fall through to unrelated store
+        knowledge. Store guards remain available for the high-risk situations
+        they were designed to control.
+        """
+        return cls._question_has(
+            question,
+            r"缺少.*零件",
+            r"少了.*零件",
+            r"缺件",
+            r"补发",
+            r"破损",
+            r"吞咽",
+            r"误食",
+            r"小零件",
+            r"小颗粒",
+            r"儿童",
+            r"小孩",
+            r"退款",
+            r"退货",
+            r"赔偿",
+            r"补偿",
+            r"发货",
+            r"到货",
+            r"物流",
+            r"库存",
+            r"价格",
+            r"赠品",
+            r"活动",
+            r"投诉",
+            r"差评",
+            r"平台介入",
+            r"安全",
+            r"责任",
+            r"治疗",
+            r"医疗",
+            r"自闭症",
+        )
+
     @staticmethod
     def _result_for(
         results: list[dict[str, Any]],
@@ -591,7 +695,7 @@ class RAGService:
             question, r"多少钱", r"价格", r"库存", r"赠品", r"活动"
         )
         battery = self._question_has(question, r"电池")
-        age_safety = self._question_has(
+        age_safety = "age" in self._answer_topics(question) or self._question_has(
             question, r"[几多五六0-9]+岁", r"小孩", r"儿童", r"小颗粒"
         )
         config_ambiguous = self._question_has(
@@ -848,9 +952,20 @@ class RAGService:
             headers={"Content-Type": "application/json; charset=utf-8"},
             method="POST",
         )
-        with urllib.request.urlopen(
-            request, timeout=self.settings.llm_timeout_seconds
-        ) as response:
+        parsed_base_url = urllib.parse.urlparse(self.settings.llm_base_url)
+        if parsed_base_url.hostname in {"127.0.0.1", "localhost", "::1"}:
+            # Local Ollama must never be routed through an inherited HTTP proxy.
+            # The runtime process can outlive the shell that created it, so relying
+            # on NO_PROXY alone makes readiness non-reproducible.
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            response_context = opener.open(
+                request, timeout=self.settings.llm_timeout_seconds
+            )
+        else:
+            response_context = urllib.request.urlopen(
+                request, timeout=self.settings.llm_timeout_seconds
+            )
+        with response_context as response:
             result = json.loads(response.read().decode("utf-8"))
         answer = str((result.get("message") or {}).get("content") or "").strip()
         return answer or "大模型未返回有效内容，请稍后重试。"
@@ -894,8 +1009,30 @@ class RAGService:
         request_id = str(uuid.uuid4())
         retrieval = self.retrieve(question, context=context)
         results = retrieval.pop("results")
+        missing_product_scope = bool(
+            context
+            and not context.product_id.startswith("__STORE_LEVEL_")
+            and not self._question_allows_store_guard_without_product(question)
+            and not any(
+                result.get("product_id") == context.product_id
+                for result in results
+            )
+        )
 
-        if not results or not retrieval["accepted"]:
+        requested_topics_missing = bool(
+            context
+            and not missing_product_scope
+            and not self._requested_topics_have_product_evidence(
+                question, results, context
+            )
+        )
+
+        if (
+            not results
+            or not retrieval["accepted"]
+            or missing_product_scope
+            or requested_topics_missing
+        ):
             return {
                 "answer": REFUSAL_MESSAGE,
                 "action": "REFUSE",
