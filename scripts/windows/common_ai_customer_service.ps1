@@ -9,6 +9,9 @@ function Get-LocalConfig([string]$ConfigPath) {
     $config = & $configPath
     if ($null -eq $config -or -not ($config -is [hashtable])) { throw 'config.local.ps1 必须返回一个 hashtable（请以示例文件为准）。' }
     $optionalDefaults = [ordered]@{
+        # RuntimeMode identifies the deployment role. Network exposure is
+        # recorded separately as network_mode and must not redefine identity.
+        RuntimeMode = 'standard'
         OllamaBaseUrl = 'http://127.0.0.1:11434'
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
@@ -63,6 +66,11 @@ function Get-LocalConfig([string]$ConfigPath) {
         if ([string]::IsNullOrWhiteSpace($value) -or $value -match '[\r\n]') { throw "配置项 $key 必须是单行非空 Collection 名称。" }
         $config[$key] = $value.Trim()
     }
+    $runtimeMode = ([string]$config.RuntimeMode).Trim().ToLowerInvariant()
+    if ($runtimeMode -notin @('standard', 'shadow', 'recovery')) {
+        throw 'RuntimeMode 只允许 standard、shadow 或 recovery。'
+    }
+    $config.RuntimeMode = $runtimeMode
     foreach ($name in @('RagPort','CustomerWebPort','PlatformPort','AdminWebPort')) {
         $port = 0
         if (-not [int]::TryParse([string]$config[$name], [ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw "$name 必须为 1-65535 的端口。" }
@@ -114,6 +122,16 @@ function Get-LocalConfig([string]$ConfigPath) {
 
 function Get-ServiceRecordPath($Config, [string]$Name) { Join-Path $Config.RuntimeDirectory "$Name.json" }
 function Get-ServiceLogDirectory($Config) { Join-Path $Config.RuntimeDirectory 'logs' }
+function Get-ConfiguredRuntimeMode($Config) {
+    if ($Config.ContainsKey('RuntimeMode') -and -not [string]::IsNullOrWhiteSpace([string]$Config.RuntimeMode)) {
+        return ([string]$Config.RuntimeMode).Trim().ToLowerInvariant()
+    }
+    return 'standard'
+}
+function Get-ConfiguredNetworkMode($Config) {
+    if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) { return 'LAN' }
+    return 'LOCAL'
+}
 function Get-ServiceUrl($Config, [int]$Port, [string]$Path = '/') {
     $serviceHost = [string]$Config.BindAddress
     if ($serviceHost -in @('0.0.0.0', '::')) { $serviceHost = '127.0.0.1' }
@@ -550,7 +568,7 @@ function Get-RepositoryRuntimeIdentity([string]$RepositoryRoot) {
 }
 
 function Test-ManagedServiceRuntimeIdentity($Config, $Record) {
-    $requiredFields = @('repository_root','repository_git_sha','repository_source_state','repository_source_fingerprint','runtime_mode')
+    $requiredFields = @('repository_root','repository_git_sha','repository_source_state','repository_source_fingerprint','runtime_mode','network_mode')
     if ($null -eq $Record -or @($requiredFields | Where-Object { $Record.PSObject.Properties.Name -notcontains $_ }).Count -gt 0) {
         return [pscustomobject]@{ Valid=$false; Reason='运行记录缺少仓库版本身份字段'; Current=$null }
     }
@@ -559,15 +577,16 @@ function Test-ManagedServiceRuntimeIdentity($Config, $Record) {
     if (-not $current.Available) {
         return [pscustomobject]@{ Valid=$false; Reason="当前仓库版本身份不可用：$($current.Reason)"; Current=$current }
     }
-    $expectedMode = if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) { 'LAN' } else { 'LOCAL' }
+    $expectedMode = Get-ConfiguredRuntimeMode $Config
     $sameRoot = [string]::Equals([IO.Path]::GetFullPath([string]$Record.repository_root), $current.RepositoryRoot, [StringComparison]::OrdinalIgnoreCase)
     $sameSha = [string]::Equals([string]$Record.repository_git_sha, $current.GitSha, [StringComparison]::OrdinalIgnoreCase)
     $sameFingerprint = [string]::Equals([string]$Record.repository_source_fingerprint, $current.SourceFingerprint, [StringComparison]::OrdinalIgnoreCase)
     $sameMode = [string]$Record.runtime_mode -eq $expectedMode
-    if ($sameRoot -and $sameSha -and $sameFingerprint -and $sameMode) {
+    $networkModeRecorded = [string]$Record.network_mode -in @('LOCAL', 'LAN')
+    if ($sameRoot -and $sameSha -and $sameFingerprint -and $sameMode -and $networkModeRecorded) {
         return [pscustomobject]@{ Valid=$true; Reason='仓库版本身份已验证'; Current=$current }
     }
-    return [pscustomobject]@{ Valid=$false; Reason="repositoryRoot=$sameRoot; gitSha=$sameSha; sourceFingerprint=$sameFingerprint; runtimeMode=$sameMode"; Current=$current }
+    return [pscustomobject]@{ Valid=$false; Reason="repositoryRoot=$sameRoot; gitSha=$sameSha; sourceFingerprint=$sameFingerprint; runtimeMode=$sameMode; networkModeRecorded=$networkModeRecorded"; Current=$current }
 }
 
 function Assert-ManagedRuntimeSourceConsistency($Config, $Services) {
@@ -677,8 +696,9 @@ function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$Executabl
     $parentProcessId = if ($metadata) { [int]$metadata.ParentProcessId } else { 0 }
     $repositoryRoot = if ($Config.ContainsKey('RepositoryRoot')) { [string]$Config.RepositoryRoot } else { '' }
     $runtimeIdentity = Get-RepositoryRuntimeIdentity $repositoryRoot
-    $runtimeMode = if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) { 'LAN' } else { 'LOCAL' }
-    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config); repository_root=$runtimeIdentity.RepositoryRoot; repository_git_sha=$runtimeIdentity.GitSha; repository_source_state=$runtimeIdentity.SourceState; repository_source_fingerprint=$runtimeIdentity.SourceFingerprint; runtime_mode=$runtimeMode }
+    $runtimeMode = Get-ConfiguredRuntimeMode $Config
+    $networkMode = Get-ConfiguredNetworkMode $Config
+    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config); repository_root=$runtimeIdentity.RepositoryRoot; repository_git_sha=$runtimeIdentity.GitSha; repository_source_state=$runtimeIdentity.SourceState; repository_source_fingerprint=$runtimeIdentity.SourceFingerprint; runtime_mode=$runtimeMode; network_mode=$networkMode }
     $record | ConvertTo-Json | Set-Content -LiteralPath (Get-ServiceRecordPath $Config $Name) -Encoding UTF8
 }
 
@@ -894,7 +914,9 @@ function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUr
     $runtimeGitShortSha = if ($runtimeIdentity -and $runtimeIdentity.Current -and $runtimeIdentity.Current.GitSha) { $runtimeIdentity.Current.GitSha.Substring(0, 12) } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_git_sha') -and -not [string]::IsNullOrWhiteSpace([string]$record.Record.repository_git_sha)) { ([string]$record.Record.repository_git_sha).Substring(0, [Math]::Min(12, ([string]$record.Record.repository_git_sha).Length)) } else { '不可用' }
     $runtimeSourceState = if ($runtimeIdentity -and $runtimeIdentity.Current) { [string]$runtimeIdentity.Current.SourceState } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_source_state')) { [string]$record.Record.repository_source_state } else { '不可用' }
     $runtimeIdentityDetail = if ($runtimeIdentity) { [string]$runtimeIdentity.Reason } else { '没有运行记录' }
-    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; RuntimeIdentityState=$runtimeIdentityState; RuntimeGitShortSha=$runtimeGitShortSha; RuntimeSourceState=$runtimeSourceState; RuntimeIdentityDetail=$runtimeIdentityDetail; Record=$record }
+    $recordRuntimeMode = if ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'runtime_mode')) { [string]$record.Record.runtime_mode } else { '未登记' }
+    $recordNetworkMode = if ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'network_mode')) { [string]$record.Record.network_mode } else { '未登记' }
+    return [pscustomobject]@{ Name=$Name; State=$serviceState; ProcessId=$serviceProcessId; ManagedProcessId=$serviceProcessId; ListenerProcessId=$listenerProcessId; Port=$Port; PortState=$portState; HealthState=$healthState; RuntimeIdentityState=$runtimeIdentityState; RuntimeGitShortSha=$runtimeGitShortSha; RuntimeSourceState=$runtimeSourceState; RuntimeMode=$recordRuntimeMode; NetworkMode=$recordNetworkMode; RuntimeIdentityDetail=$runtimeIdentityDetail; Record=$record }
 }
 
 function Get-TargetPilotHttpProbe([string]$Url) {
