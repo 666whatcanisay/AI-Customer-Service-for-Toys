@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`PHYSICAL_MIGRATION_PLAN_READY / EXECUTION_NOT_AUTHORIZED`
+> 当前 Gate：`TARGET_REPOSITORY_CREATION_READY / CREATION_NOT_EXECUTED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -30,7 +30,7 @@
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | 执行计划已冻结平铺核心目录、唯一Source Tag、A–F阶段、功能/数据/运行与回滚Gate；`AI-CS/`仍不存在。 | 只可在另行明确授权后执行Phase 2A Target Repository Creation；后续阶段分别授权。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase 2A Preflight 14项通过；no-checkout独立clone及GI-01至GI-10标准已冻结；`AI-CS/`仍不存在。 | 只可另行授权Phase 2A创建执行；Phase B仍关闭。 |
 
 ## 3. 当前真正阻塞点
 
@@ -38,7 +38,7 @@ R004已关闭。R006 V1.1业务方向可行，但静态代码映射发现两个�
 
 并行外部阻塞仍为 R007：第二台客服终端的公司网络可达性尚未验收，本轮本机四服务运行成功不等于 LAN Gate 已关闭。
 
-R008的目录树、功能、数据和运行源已经冻结，Control覆盖层与源码保护引用也已闭环。Physical Migration计划进一步确认不再执行`apps/services`重命名，只从`ai-cs-monorepo-source-freeze-v1`物化现有核心目录。8个既有dirty Worktree继续隔离；四服务实际运行根仍是clean `AI-CS-pilot-baseline-recovery-v1@cbc77ed...`，该目录在正式切换、数据路径独立和回滚验收完成前必须原位保留。
+R008的Phase 2A Preflight已只读确认：Source Tag为`26f8cde...`、Runtime为clean Recovery `cbc77ed...`、目标不存在且未登记、C盘容量充足、contracts 0.2.0、19个B/C/A入口无缺失、数据库/向量保持原位、回滚可达。8个dirty和4个detached Worktree继续隔离；Preflight没有创建目标或打开Phase B。
 
 ## 4. 需求依赖与执行顺序
 
@@ -67,14 +67,16 @@ R008 Monorepo Plan READY
   ↓ Source Freeze COMPLETE
 R008 Source Clean & Protection Reference Closure COMPLETE
   ↓ Physical Migration Plan READY
-R008 Phase 2A Target Repository Creation（等待另行授权）
+R008 Phase 2A Preflight COMPLETE
+  ↓ 用户另行明确授权
+R008 Phase 2A Target Repository Creation Execution（尚未执行）
   ↓ A–F逐阶段Gate
 R008 Physical Migration（尚未执行）
   ↓ 迁移与运行切换必须分开Gate
 R008 运行切换 / Worktree退役（仍未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能在明确授权后从`ai-cs-monorepo-source-freeze-v1`执行Phase 2A，不得一次性执行A–F。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能在明确授权后执行no-checkout独立目标创建，不能checkout或自动进入Phase B。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
 
 ## 5. 防重复结论
 
@@ -83,6 +85,6 @@ R008 运行切换 / Worktree退役（仍未授权）
 - R003 是问题记录，R006 是解决任务：不要为同一激活问题创建第三个重复需求。
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
-- R008 已完成Physical Migration计划：不要把`PHYSICAL_MIGRATION_PLAN_READY`解释为已创建目标、已迁移、已安装依赖、已测试、已清理Worktree、已切换运行或已形成`v1.0`。
+- R008 已完成Phase 2A Preflight：不要把`TARGET_REPOSITORY_CREATION_READY`解释为目标已创建、Git独立性已实测、Phase B已开放或已发生任何迁移。
 
-最终状态：`PHYSICAL_MIGRATION_PLAN_READY`
+最终状态：`TARGET_REPOSITORY_CREATION_READY`

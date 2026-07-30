@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "physical_migration_plan_ready",
-  "current_task": "R008 Phase 2 Physical Migration Preparation",
-  "current_stage": "The Physical Migration execution plan preserves the flat backend, frontend, extension, platform_backend, admin_web, contracts, docs, scripts and tests paths and supersedes the earlier apps/services rename design. Code may be materialized only from annotated tag ai-cs-monorepo-source-freeze-v1@26f8cde through Git objects, never copied from dirty worktrees. Execution is split into separately gated target creation, source materialization, dependency reproduction, tests, runtime validation and old-directory retirement. The active Pilot remains unchanged at ai-cs-pilot-baseline-v1@cbc77ed; no AI-CS target directory or migration action exists yet.",
-  "current_gate": "PASS / PHYSICAL_MIGRATION_PLAN_READY / EXECUTION_NOT_AUTHORIZED: the only next entry is separately authorized Phase 2A Target Repository Creation. That approval must not imply source checkout, dependency installation, tests, runtime switch or worktree retirement.",
+  "status": "target_repository_creation_ready",
+  "current_task": "R008 Phase 2A Preflight and Target Repository Creation Preparation",
+  "current_stage": "Read-only Phase 2A Preflight passes for source, runtime, target path, capacity, data protection, 19 frozen B/C/A entrypoints and Recovery rollback. Source remains annotated tag ai-cs-monorepo-source-freeze-v1@26f8cde; the active Pilot remains clean ai-cs-pilot-baseline-v1@cbc77ed with managed records matching listener PIDs and four HTTP 200 checks. The approved creation design is an independent clone with --no-hardlinks --no-checkout followed by GI-01 through GI-10 independence checks. AI-CS does not exist and no clone, checkout, dependency, test, runtime or retirement action occurred.",
+  "current_gate": "PASS / TARGET_REPOSITORY_CREATION_READY / CREATION_NOT_EXECUTED: only a separately authorized Phase 2A Target Repository Creation Execution may run. It must stop after independent no-checkout Git creation and validation; Phase B remains closed.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "control/r006-interface-validation-v1-1",
@@ -67,6 +67,13 @@
     "monorepo_runtime_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1",
     "monorepo_source_freeze_contracts": "0.2.0",
     "physical_migration_plan": "docs/control/AI-CS-Physical-Migration-Execution-Plan-V1.md",
+    "physical_migration_preflight": "docs/control/AI-CS-Physical-Migration-Preflight-Checklist-V1.md",
+    "phase_2a_creation_report": "docs/control/AI-CS-Phase-2A-Target-Repository-Creation-Report-V1.md",
+    "phase_2a_preflight_source_commit": "26f8cde1e8f7373315baa1ac68d02f7823b4de82",
+    "phase_2a_preflight_runtime_commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "phase_2a_target_exists": false,
+    "phase_2a_target_registered_worktree": false,
+    "phase_2a_free_space_gib": 291.62,
     "physical_migration_target_layout": [
       "backend",
       "frontend",
@@ -195,20 +202,21 @@
     "R008 AI-CS Monorepo Consolidation V1 documentation-only migration plan",
     "R008 Phase 1 Monorepo Source Freeze report and runtime identity reconciliation",
     "R008 Phase 1.5 Source Clean and Protection Reference Closure",
-    "R008 Phase 2 Physical Migration Preparation execution plan"
+    "R008 Phase 2 Physical Migration Preparation execution plan",
+    "R008 Phase 2A read-only Preflight and Target Repository Creation preparation"
   ],
   "next_tasks": {
-    "CONTROL": "Wait for separate explicit authorization before Phase 2A Target Repository Creation. Resolve ai-cs-monorepo-source-freeze-v1 to 26f8cde, verify target AI-CS does not exist, and create only an independent no-checkout Git target. Do not continue automatically to materialization or later phases.",
-    "OPS": "Preserve the current Recovery runtime root, ai-cs-pilot-baseline-v1 reference, database, vectors and records. Do not stop, restart, rename, move or retire them. Dependency, test and runtime phases each need later separate authorization.",
+    "CONTROL": "Wait for separate explicit authorization before Phase 2A Target Repository Creation Execution. Re-run Preflight immediately before action, clone only with --no-hardlinks --no-checkout, validate GI-01 through GI-10, and stop. Do not checkout or enter Phase B.",
+    "OPS": "Preserve the current Recovery runtime root, ai-cs-pilot-baseline-v1 reference, database, vectors and records. Target Git creation requires no service action; do not stop, restart, rename, move or retire anything.",
     "A_B_C": "Keep implementation and UI paths frozen under their existing flat directory names. Review the eight pre-existing dirty and four detached worktrees separately before any retirement; never copy from them or auto-commit, discard, move or delete their content.",
     "CONTRACTS": "Remain unchanged at 0.2.0 throughout structural migration planning. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
-    "QA": "Use the frozen tree objects and R004 results as the later parity baseline. Verify B chat/answer/feedback, C knowledge/product/FAQ/safety/gap/import/AI-issue capabilities, A RAG/model/retrieval, database continuity and four-service identity. No migration test has been executed yet."
+    "QA": "For Phase 2A creation, verify only Git independence, exact Tag reachability, empty no-checkout worktree and unchanged Source/Runtime. Functional, dependency and runtime QA remain future Phase B-D-E gates; no migration test has been executed yet."
   },
   "t02_executed": false,
   "blockers": [
     "SF-R01: ai-cs-monorepo-source-freeze-v1 is currently a local annotated tag. A remote or controlled offline copy is required before retiring the source directory, but this does not block a separately authorized isolated Physical Migration.",
     "SF-R02: eight pre-existing dirty worktrees and four detached worktrees remain quarantined or pending classification. No worktree may be removed or force-cleaned; this blocks their retirement, not the new target migration entry.",
-    "PM-R01: target AI-CS does not exist and Physical Migration execution is not authorized. PHYSICAL_MIGRATION_PLAN_READY authorizes no filesystem, dependency, test, runtime or retirement action.",
+    "PM-R01: target AI-CS does not exist and creation execution is not authorized. TARGET_REPOSITORY_CREATION_READY authorizes no clone, checkout, dependency, test, runtime or retirement action.",
     "PM-R02: code migration does not migrate business data. If target runtime later references the Recovery root database or vectors, that root remains an active dependency and cannot be archived until a separately authorized stable data-path plan and rollback evidence exist.",
     "The active Pilot uses AI-CS-pilot-baseline-recovery-v1@cbc77ed, not the migration-source root. The Recovery directory, runtime records, SQLite and vector assets must remain in place until a later controlled switch and rollback rehearsal pass.",
     "IV11-B01: the current catalog tables mix IMPORTED_TEST_ONLY records with MANUAL_CREATED/c-operation-store.v1 records, but V1.1 does not yet freeze the exact one-time provenance mapping and quarantine rule; bulk TEST plus ENABLED initialization is unsafe.",
