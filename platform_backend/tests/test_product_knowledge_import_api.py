@@ -1,6 +1,7 @@
 from io import BytesIO
 from datetime import datetime, timezone
 import json
+import time
 
 from openpyxl import Workbook
 from sqlalchemy import func, select
@@ -424,3 +425,63 @@ def test_other_templates_are_explicitly_unavailable(client):
     )
     assert response.status_code == 422
     assert response.json()["error"]["message"] == "该模板导入功能暂未开放"
+
+
+def test_missing_product_name_is_blocked_before_formal_write(client, session):
+    store = create_store(client)
+    response = upload(
+        client,
+        store,
+        product_knowledge_workbook(
+            store_name=store["store_name"],
+            product_name="",
+        ),
+        key="missing-product-name",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "PREFLIGHT_FAILED"
+    preflight = client.get(
+        f"/api/v1/admin/product-knowledge-imports/{response.json()['batch_id']}/preflight"
+    ).json()
+    missing = [
+        issue
+        for issue in preflight["field_validation_result"]["issues"]
+        if issue["code"] == "REQUIRED_FIELD_MISSING"
+    ]
+    assert any(issue["field"] == "商品名称" for issue in missing)
+    assert session.scalar(select(func.count()).select_from(CatalogProduct)) == 0
+
+
+def test_parser_handles_100_rows_within_stability_budget():
+    class Cell:
+        def __init__(self, value):
+            self.value = value
+
+    class SyntheticSheet:
+        max_row = 105
+
+        def cell(self, row, column):
+            if row <= 5:
+                return Cell(None)
+            values = {
+                1: "玩趣乐园积木店-拼多多",
+                2: f"稳定性批量商品-{row - 5:03d}",
+                3: "100 条纯代码解析稳定性样例",
+                14: "2026-07-30",
+            }
+            return Cell(values.get(column, ""))
+
+    parser = ProductKnowledgeTemplateParser()
+    started = time.perf_counter()
+    products, issues = parser._parse_data_rows(
+        SyntheticSheet(),
+        header_row=5,
+        max_rows=100,
+        system_import_date="2026-07-30",
+    )
+    elapsed_ms = (time.perf_counter() - started) * 1000
+
+    assert len(products) == 100
+    assert not any(issue["code"] == "ROW_LIMIT_EXCEEDED" for issue in issues)
+    assert elapsed_ms < 1000
