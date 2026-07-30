@@ -4,10 +4,10 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "R009 Product Knowledge Import V1.1 Integration Fix",
-  "current_task": "R009 商品知识采集模板导入 V1",
-  "current_stage": "Real-workbook compatibility and isolated integration acceptance are complete. The parser auto-detects the frozen 16-field header, optional governance fields are handled without replacing system review, and the full upload-to-approval flow passed on an isolated 0009 runtime.",
-  "current_gate": "PRODUCT_KNOWLEDGE_IMPORT_ACCEPTANCE_READY",
-  "status": "integration_acceptance_ready_not_formal_runtime_deployed",
+  "current_task": "R009 Production Integration & Browser Acceptance V1",
+  "current_stage": "The R009 feature is merged into a controlled integration branch and all code plus isolated migration gates pass. Formal database migration and standard-port cutover are intentionally withheld because no controllable browser is available and the current R008 runtime configuration does not pass runtimeMode identity verification.",
+  "current_gate": "PRODUCT_KNOWLEDGE_IMPORT_PRODUCTION_BLOCKED_RUNTIME_AND_BROWSER_GATES",
+  "status": "production_integration_verified_runtime_and_browser_gates_blocked",
   "contracts": [
     "contracts/version.json 0.2.0 (unchanged)",
     "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
@@ -78,7 +78,7 @@
     "AI_FEEDBACK": "NOT_OPEN",
     "KNOWLEDGE_GAP": "NOT_OPEN"
   },
-  "last_test_result": "2026-07-30: C Backend 101 pytest and R009 focused 6 tests passed; isolated SQLite 0009 round trip and alembic check passed; Admin 25 files/55 tests, typecheck and build passed. Real Excel parsed 19 rows and isolated runtime acceptance produced ADD/UPDATE/KEEP/NO_CHANGE, 19 APPLIED receipts and a COMPLETED batch. Formal Pilot remained dd379278/0008.",
+  "last_test_result": "2026-07-30 production integration preflight: controlled merge 87a040c5; C Backend 101 pytest; Admin 25 files/55 tests, typecheck and build; formal 0008 SQLite read-only snapshot upgraded/downgraded/upgraded to 0009 with integrity ok. Browser list was empty, so formal backup/migration, cutover and production browser acceptance were not performed. Formal Pilot remained dd379278/0008.",
   "test_commands": [
     "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
     "cd platform_backend; isolated DATABASE_URL; python -m alembic upgrade head; python -m alembic check; python -m alembic downgrade 0008_customer_feedback_loop_v1; python -m alembic upgrade head",
@@ -90,7 +90,7 @@
     "Automatic redaction is not implemented; operators must remove customer personal information before upload.",
     "Downgrading 0009 does not undo product knowledge already applied by an approved review receipt.",
     "Formal Runtime deployment and live database migration were not performed in this task.",
-    "No controlled browser was available; final visual click-through remains available on the isolated Admin runtime."
+    "No controlled browser is available; formal migration and cutover are blocked until real browser click-through and screenshots can be executed."
   ],
   "out_of_scope": [
     "The other five workbook import implementations",
@@ -98,14 +98,19 @@
     "A, B, RAG, Prompt or contracts changes",
     "Automatic knowledge publication, customer activation, messaging, refunds, orders or ERP writes"
   ],
-  "blockers": [],
+  "blockers": [
+    "No controllable Browser or Chrome session is available for mandatory production UI acceptance and screenshots.",
+    "R008 status reports runtimeMode identity mismatch for all four services; the recorded B health URL is 127.0.0.1:5173 while the current listener is 192.168.1.11:5173."
+  ],
   "git": {
-    "branch": "feature/r009-product-knowledge-import-v1",
+    "branch": "control/r009-production-integration-v1",
     "base": "dd379278837a4f816dfb626292a26b0c54cce0cc",
     "implementation_commit": "871b6290301f8587488bb8b282d4f60034fb37ba",
     "integration_fix_commit": "817198a",
+    "feature_head": "4ab8f632b0edfe73433e88c5985f9e402bdd9874",
+    "production_integration_merge_commit": "87a040c5806ec61e4e92dfe323aac752b4edef23",
     "runtime_deployed": false
   },
-  "next_recommended_task": "Run an operator visual click-through on the isolated 15179 Admin, then use a separately authorized formal deployment task to back up the Platform database, verify the release SHA, apply 0009, and run controlled 8011/5174 smoke. RAG/B consumption remains a separate requirement.",
+  "next_recommended_task": "Freeze the correct standard/LAN runtime configuration and pass Runtime Identity Gate; enable a controllable Browser or Chrome session; then resume final formal database backup, 0009 migration, Runtime cutover and full 5174 browser acceptance with screenshots. RAG/B consumption remains out of scope.",
   "last_updated": "2026-07-30"
 }
