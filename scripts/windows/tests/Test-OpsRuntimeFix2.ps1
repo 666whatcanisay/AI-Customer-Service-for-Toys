@@ -159,12 +159,15 @@ try {
     Remove-Item -LiteralPath Function:\Get-Json -Force
 
     $script:cleanupOrder = @()
+    function Update-ManagedServiceListenerRecord($Config, [string]$Name) { throw 'No record exists in this isolated cleanup-order test.' }
     function Stop-ManagedService($Config, [string]$Name) { $script:cleanupOrder += $Name }
-    Stop-StartedServices $config @('platform','rag','customer-web','admin-web') | Out-Null
+    $cleanupFailures = @(Stop-StartedServices $config @('platform','rag','customer-web','admin-web'))
+    if ($cleanupFailures.Count -gt 0) { throw "Isolated cleanup unexpectedly failed: $($cleanupFailures -join ',')" }
     if (($script:cleanupOrder -join ',') -ne 'admin-web,customer-web,rag,platform') {
         throw "Partial-start cleanup order is unsafe: $($script:cleanupOrder -join ',')"
     }
     Remove-Item -LiteralPath Function:\Stop-ManagedService -Force
+    Remove-Item -LiteralPath Function:\Update-ManagedServiceListenerRecord -Force
 
     $startScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\start_ai_customer_service.ps1') -Raw
     $statusScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\status_ai_customer_service.ps1') -Raw

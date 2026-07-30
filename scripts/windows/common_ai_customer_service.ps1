@@ -1188,10 +1188,29 @@ function Stop-StartedServices($Config, [string[]]$StartedServices) {
     foreach ($name in @('admin-web','customer-web','rag','platform')) {
         if ($StartedServices -notcontains $name) { continue }
         try {
+            $record = $null
+            $recordPath = Get-ServiceRecordPath $Config $name
+            if (Test-Path -LiteralPath $recordPath) {
+                $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                if (-not ($record.PSObject.Properties.Name -contains 'listener_pid')) {
+                    # A failure can occur after HTTP readiness but before the listener
+                    # child was written to the record. Reuse the normal identity gate
+                    # before stopping; never infer ownership from the port alone.
+                    Update-ManagedServiceListenerRecord $Config $name | Out-Null
+                }
+            }
             Stop-ManagedService $Config $name
+            $remainingRecord = Test-Path -LiteralPath $recordPath
+            $remainingOwners = @()
+            if ($null -ne $record -and $record.PSObject.Properties.Name -contains 'port') {
+                $remainingOwners = @(Get-PortOwner ([int]$record.port))
+            }
+            if ($remainingRecord -or $remainingOwners.Count -gt 0) {
+                throw "$name 自动清理后仍存在运行记录或监听进程。"
+            }
         } catch {
             $cleanupFailures += $name
-            Write-Warning "启动失败自动清理未能停止 $name；请使用状态脚本核对受管记录。"
+            Write-Warning "启动失败自动清理未能停止 $name：$($_.Exception.Message)。请使用状态脚本核对受管记录。"
         }
     }
     if ($cleanupFailures.Count -eq 0 -and $StartedServices.Count -gt 0) {
