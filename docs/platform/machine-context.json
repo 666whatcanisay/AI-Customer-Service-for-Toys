@@ -3,11 +3,11 @@
   "project_id": "AI-CS-C",
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
-  "version": "R009 Acceptance Runtime Preparation V1",
-  "current_task": "AI-CS R009 Acceptance Runtime Preparation V1",
-  "current_stage": "An isolated acceptance runtime now runs the exact R009 RC 8b83a20 on Admin 5179, C API 19011 and A 19000. Its SQLite snapshot is independently migrated to 0009, the controlled browser shows the R009 three-step page, and the formal 4edf131/0008 Pilot remains unchanged.",
-  "current_gate": "R009_ACCEPTANCE_RUNTIME_READY",
-  "status": "r009_acceptance_runtime_ready",
+  "version": "R009 Browser Acceptance Retry V1",
+  "current_task": "AI-CS R009 Browser Acceptance Retry V1",
+  "current_stage": "An isolated Playwright chromium session completed the real R009 file upload, four-sheet parse, 19-product Merge preview, 19 UI approvals and product-knowledge visibility check on RC 8b83a20/0009. The formal 4edf131/0008 Pilot remains unchanged.",
+  "current_gate": "R009_BROWSER_ACCEPTANCE_COMPLETE",
+  "status": "r009_browser_acceptance_complete",
   "contracts": [
     "contracts/version.json 0.2.0 (unchanged)",
     "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
@@ -78,7 +78,7 @@
     "AI_FEEDBACK": "NOT_OPEN",
     "KNOWLEDGE_GAP": "NOT_OPEN"
   },
-  "last_test_result": "2026-07-30 acceptance runtime: exact RC 8b83a20 runs on 5179/19011/19000; controlled Chrome shows the R009 store-template-Excel three-step page with two stores loaded. C health/OpenAPI and four R009 routes pass; isolated SQLite is 0009 with integrity ok and all three R009 tables; A is ready with active test_knowledge_v031 and 47 chunks. Formal 4edf131/0008 and 5173/5174/8000/8011 are unchanged.",
+  "last_test_result": "2026-07-30 browser retry: Playwright chromium performed a real UI upload of a byte-identical desktop workbook copy on 5179. All four sheets passed; 19 rows produced 19 new products, ADD=205 and KEEP=4 with zero blockers. Before review the formal-product table stayed at 5; 19 UI approvals produced 19 APPLIED receipts, batch COMPLETED and isolated products 5->24. Knowledge Center shows 19 approved products. Formal 4edf131/0008 and 5173/5174/8000/8011 are unchanged.",
   "test_commands": [
     "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
     "cd platform_backend; static-only AST and Alembic ScriptDirectory graph validation for 0009 (no database URL, no upgrade/downgrade)",
@@ -90,8 +90,9 @@
     "Automatic redaction is not implemented; operators must remove customer personal information before upload.",
     "Downgrading 0009 does not undo product knowledge already applied by an approved review receipt.",
     "Formal Runtime deployment and live database migration were not performed in this task.",
-    "Controlled Chrome is available, but file upload requires the user to enable file URL access in the ChatGPT Chrome Extension.",
-    "The acceptance Runtime is local and ephemeral; its database, logs, knowledge copies and PID record are Git-ignored and must not be treated as production assets."
+    "The acceptance Runtime is local and ephemeral; its database, logs, knowledge copies and PID record are Git-ignored and must not be treated as production assets.",
+    "The isolated acceptance database now contains 19 approved test products and must never be copied into the formal database.",
+    "This browser dataset produced ADD and KEEP only because no workbook product identity matched the isolated snapshot; UPDATE and NO_CHANGE were not observed in this retry."
   ],
   "out_of_scope": [
     "The other five workbook import implementations",
@@ -99,9 +100,7 @@
     "A, B, RAG, Prompt or contracts changes",
     "Automatic knowledge publication, customer activation, messaging, refunds, orders or ERP writes"
   ],
-  "blockers": [
-    "The acceptance Runtime itself is ready. Full Excel browser acceptance still requires enabling file URL access in the ChatGPT Chrome Extension."
-  ],
+  "blockers": [],
   "git": {
     "branch": "control/browser-acceptance-environment-v1",
     "base": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33",
@@ -117,14 +116,18 @@
     "acceptance_runtime_sha": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33"
   },
   "browser_acceptance": {
-    "browser": "Google Chrome 151.0.7922.71 via ChatGPT Chrome Extension",
+    "browser": "Playwright 1.62.0 chromium BrowserType with Google Chrome 151.0.7922.71 executable in a fresh isolated context",
     "url": "http://127.0.0.1:5179/knowledge-materials",
-    "control": "PASS: isolated R009 page open, DOM read, screenshot and store options loaded",
-    "file_upload": "BLOCKED: enable Allow access to file URLs",
+    "control": "PASS: real page navigation, store/template selection, file input, upload, Merge preview, 19 UI reviews, screenshots and knowledge-center verification",
+    "file_upload": "PASS: browser uploaded a byte-identical copy of the desktop workbook through input[type=file]",
     "runtime": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33",
     "database_revision": "0009_product_knowledge_import_v1",
-    "database_write": false,
-    "report": "docs/platform/31_AI-CS_R009_Acceptance_Runtime_Ready_Report_V1.md"
+    "batch_id": "e11f8ad4-4ce4-4a30-8fad-96aa8766dd7b",
+    "batch_status": "COMPLETED",
+    "merge_result": "ADD=205, KEEP=4, UPDATE=0, NO_CHANGE=0",
+    "review_result": "19 APPROVE decisions and 19 APPLIED receipts through UI buttons",
+    "database_write": "isolated acceptance database only; products 5->24",
+    "report": "docs/platform/32_AI-CS_R009_Browser_Acceptance_Retry_Report_V1.md"
   },
   "acceptance_runtime": {
     "repository_root": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-r009-release-candidate-v1",
@@ -135,6 +138,6 @@
     "database_revision": "0009_product_knowledge_import_v1",
     "formal_runtime_unchanged": true
   },
-  "next_recommended_task": "Enable file URL access for the ChatGPT Chrome Extension, then rerun R009 browser acceptance only on 5179/19011/19000 and the isolated 0009 database. Do not use formal 5174/8011; RAG/B consumption remains out of scope.",
+  "next_recommended_task": "Run a separately authorized formal R009 release gate: confirm a quiet window and final SHA, back up the formal 0008 database, migrate it to 0009, switch the formal Runtime, and recheck 5174/8011. Do not copy the isolated acceptance database; RAG/B consumption remains out of scope.",
   "last_updated": "2026-07-30"
 }
