@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`RUNTIME_MIGRATION_PLAN_READY / RUNTIME_MIGRATION_EXECUTION_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED`
+> 当前 Gate：`SHADOW_RUNTIME_PASS / PHASE_E2_ENTRY_READY / STANDARD_PORT_CUTOVER_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED`
 
 ## 1. 台账目标
 
@@ -98,7 +98,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Phase D Retry全项通过：A/C/B/Admin/contracts及隔离迁移均PASS，C实际收集并执行95项；Target clean、Recovery未变化。Phase E具备申请条件但尚未授权执行。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Phase E1影子运行PASS：Target四服务在15173/15174/18000/18011从同一SHA运行，独立数据路径、Admin实际路由、页面/API/模型均通过；Recovery标准端口与数据锚点未变化。E2标准端口切换尚未授权。 |
 
 状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
 
@@ -250,9 +250,9 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
 | 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
 | 完成标准 | 最终只保留`AI-CS/`一个长期目录；保持`backend/frontend/extension/platform_backend/admin_web/contracts/docs/scripts/tests`核心目录原名；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
-| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明四组件依赖可安装；[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)记录初次C失败；[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)冻结3.12.13；[Phase D2 C Backend Environment Rebuild Report V1](AI-CS-Phase-D2-C-Backend-Environment-Rebuild-Report-V1.md)记录venv重建；[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)记录365 passed/3 skipped、C 95项、隔离迁移、构建、schema、清理与Recovery保护全PASS；[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)冻结独立数据快照、影子端口、受管标准切换、健康检查和Recovery回滚方案。 |
-| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)、[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)、[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)、[Phase D2 C Backend Environment Rebuild Report V1](AI-CS-Phase-D2-C-Backend-Environment-Rebuild-Report-V1.md)、[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)、[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
-| 防止重复错误规则 | Phase E计划已就绪，但不得把它解释为Target已运行或执行已授权。执行必须先走独立数据快照和影子端口验证，再在人工静默窗口按受管记录切换；Admin影子地址必须显式指向Green，禁止共享Recovery可写数据路径。不得提交`.venv`、修改冻结Tree/requirements/lockfile、从dirty Worktree补文件、处理Recovery目录或借迁移实施R006。 |
+| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明四组件依赖可安装；[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)记录初次C失败；[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)冻结3.12.13；[Phase D2 C Backend Environment Rebuild Report V1](AI-CS-Phase-D2-C-Backend-Environment-Rebuild-Report-V1.md)记录venv重建；[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)记录365 passed/3 skipped；[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)冻结蓝绿方案；[Phase E1 Shadow Runtime Execution Report V1](AI-CS-Phase-E1-Shadow-Runtime-Execution-Report-V1.md)记录独立快照、四服务PID/SHA、Admin实际18000/18011路由、浏览器/API验证与Recovery保护PASS。 |
+| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)、[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)、[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)、[Phase E1 Shadow Runtime Execution Report V1](AI-CS-Phase-E1-Shadow-Runtime-Execution-Report-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
+| 防止重复错误规则 | Phase E1已经通过，但不得把影子运行解释为标准端口已切换或R008已完成。E2必须单独授权，先受管停止影子、确认无写入窗口，再复核Recovery最终备份并按受管记录切换；禁止按端口强杀。不得提交`.runtime`/`.venv`、修改冻结Tree/requirements/lockfile、处理Recovery目录或借迁移实施R006。 |
 
 ## 7. 历史错误防复发规则
 
@@ -289,6 +289,6 @@ R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处�
 
 R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
 
-R008是与R006并行的项目治理任务。Phase D Retry已在不变Target HEAD/Tree上全项通过；Phase E计划与只读预检查也已完成。推荐先在15173/15174/18000/18011运行独立数据影子环境，再经人工静默窗口将标准端口受管切换到Target；Recovery保持原样作为回滚锚点。下一入口只能是用户另行授权的Phase E Runtime Migration Execution；计划就绪不等于已停止Recovery、已复制数据或已切换Runtime。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+R008是与R006并行的项目治理任务。Phase E1已在15173/15174/18000/18011完成独立数据影子运行：四服务同一Target SHA、Admin实际请求18000/18011、A模型与47 chunks、B/C页面均PASS，Recovery标准端口和数据锚点未变化。下一入口只能是用户另行授权的Phase E2标准端口切换与人工无写入窗口；影子PASS不等于已切换Runtime，也不授权停止Recovery。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
 
-最终状态：`RUNTIME_MIGRATION_PLAN_READY`
+最终状态：`SHADOW_RUNTIME_PASS`

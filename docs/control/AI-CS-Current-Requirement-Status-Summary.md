@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`RUNTIME_MIGRATION_PLAN_READY / RUNTIME_MIGRATION_EXECUTION_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED`
+> 当前 Gate：`SHADOW_RUNTIME_PASS / PHASE_E2_ENTRY_READY / STANDARD_PORT_CUTOVER_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -30,7 +30,7 @@
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase E运行迁移计划与只读预检查完成：Recovery身份/health有效，Target clean且未运行；蓝绿、独立数据快照、受管切换和回滚Gate已冻结。 | 另行授权Phase E Execution及人工静默窗口；不得直接停Recovery。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase E1影子运行PASS：Target四服务同SHA运行于15173/15174/18000/18011，独立SQLite/RAG路径、Admin实际路由、页面/API/模型均通过；Recovery未变化。 | 另行授权Phase E2标准端口切换及人工无写入窗口；不得直接停Recovery。 |
 
 ## 3. 当前真正阻塞点
 
@@ -40,7 +40,7 @@ R004已关闭。R006 V1.1业务方向可行，但静态代码映射发现两个�
 
 R008 Phase D Retry已关闭PM-D03：失败版和Retry使用相同`26f8cde.../9940eb2...`，唯一批准环境差异为C Python `3.11.9→3.12.13`。本轮重新执行全部矩阵，A `101 passed/3 skipped`、C `95/95`、B `115`、Admin `54`、两端typecheck/build、contracts 0.2.0/7 schema及`0008→0007→0008`隔离迁移全部通过。130个外部临时文件与两端Vitest缓存已清理；7项输入哈希、Target clean、RAG保护目录、Recovery四PID/HTTP和SQLite元数据均不变。
 
-R008 Phase E Preparation已把运行切换风险转化为执行Gate：Target必须先在15173/15174/18000/18011使用独立SQLite、知识和向量快照完成Green验证；Admin必须显式连接影子A/C，不能用默认8000/8011代理伪装通过；标准端口切换必须在人工静默窗口内通过受管记录执行。当前Recovery继续运行，Target未启动、数据未复制。
+R008 Phase E1已关闭Green验证风险：Target在15173/15174/18000/18011使用独立SQLite、知识和向量快照运行；Admin实际注入并请求18000/18011，A ready且47 chunks，B/C页面与业务只读投影通过。Target向量副本在A初始化后产生仅限Target的运行写入，而Recovery源哈希保持不变，证明未共享可写路径。当前影子四服务保持受管运行；Recovery继续占用标准端口且未变化。剩余运行阻塞只有Phase E2尚未授权、无写入窗口尚未建立、标准端口切换与回滚尚未验收。
 
 ## 4. 需求依赖与执行顺序
 
@@ -78,12 +78,13 @@ R008 Phase B Source Tag Code Materialization COMPLETE
   ↓ Phase D2 Target C venv REBUILT（Python 3.12.13）
   ↓ Phase D Retry PASS（完整矩阵）
   ↓ Phase E Runtime Migration Plan READY
-  ↓ 单独授权Phase E Execution与人工静默窗口
-  ↓ Green影子验证 → 受管标准端口切换 → Recovery回滚验收
+  ↓ Phase E1 Green Shadow Runtime PASS
+  ↓ 单独授权Phase E2与人工无写入窗口
+  ↓ 受管停止影子 → 受管标准端口切换 → Recovery回滚验收
 R008 Worktree退役 / Phase F（仍未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase E Runtime Migration Execution。执行必须先走独立数据影子环境，再在静默窗口验证受管PID/目录/SHA、数据路径、四服务health和失败回滚；不得把计划READY或Phase D PASS写成已切换。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase E2 Runtime Cutover。E2必须先用受管记录停止本次影子、确认无写入窗口和Recovery最终备份，再验证标准端口PID/目录/SHA、数据路径、四服务health和失败回滚；不得把影子PASS写成已切换。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
 
 ## 5. 防重复结论
 
@@ -92,6 +93,6 @@ R008 Worktree退役 / Phase F（仍未授权）
 - R003 是问题记录，R006 是解决任务：不要为同一激活问题创建第三个重复需求。
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
-- R008 Phase E计划已READY：不要把计划、影子页面HTTP 200或Phase D通过误写成Target已经运行；必须验证Admin确实连接Green、数据路径不指向Recovery、标准端口由Target SHA受管运行并可恢复Recovery。
+- R008 Phase E1已PASS：不要把影子运行误写成标准端口已切换或R008已完成；Phase E2必须重新验证Target标准端口SHA、数据路径和Recovery可恢复性。
 
-最终状态：`RUNTIME_MIGRATION_PLAN_READY`
+最终状态：`SHADOW_RUNTIME_PASS`
