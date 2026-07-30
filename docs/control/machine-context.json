@@ -3,10 +3,22 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "target_validation_pass",
-  "current_task": "R008 Phase D Target Validation Test Retry",
-  "current_stage": "The complete Phase D matrix passed on the unchanged Target after the C venv rebuild. A passes import smoke and 101 tests with three opt-in skips; C collects and executes 95 tests under Python 3.12.13 and passes an isolated 0008-to-0007-to-0008 Alembic round trip; B passes 115 tests/typecheck/build; Admin passes 54 tests/typecheck/build; contracts 0.2.0 and seven schemas validate. Temporary artifacts are removed, Target is clean, and Recovery runtime/data are unchanged.",
-  "current_gate": "PASS / TARGET_VALIDATION_PASS / PHASE_E_ENTRY_READY / PHASE_E_NOT_EXECUTED: Phase D permits a separately authorized Phase E request, but no Target service was started or switched and no runtime migration has occurred.",
+  "status": "runtime_migration_plan_ready",
+  "current_task": "R008 Phase E Runtime Migration Preparation",
+  "current_stage": "The Phase E blue-green runtime migration plan and read-only preflight are complete. Recovery remains the only active runtime at cbc77ed with four verified managed services, C revision 0008 and A 47-chunk MATCH. Target remains clean at 26f8cde and has not been started. A future execution must use isolated Target SQLite/knowledge/vector snapshots, loopback shadow ports 15173/15174/18000/18011, explicit Admin shadow API targets, a user-approved no-write window, managed standard-port cutover, and verified Recovery rollback.",
+  "current_gate": "RUNTIME_MIGRATION_PLAN_READY / RUNTIME_MIGRATION_EXECUTION_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED: no service was stopped or started, no Target runtime/data was created, and no runtime switch occurred.",
+  "phase_e_plan": {
+    "report": "docs/control/AI-CS-Phase-E-Runtime-Migration-Plan-V1.md",
+    "recovery": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "target": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS@26f8cde1e8f7373315baa1ac68d02f7823b4de82",
+    "standard_ports": {"B": 5173, "C_ADMIN": 5174, "A": 8000, "C_API": 8011},
+    "shadow_ports": {"B": 15173, "C_ADMIN": 15174, "A": 18000, "C_API": 18011},
+    "startup_order": ["C_API", "A", "B", "C_ADMIN"],
+    "data_policy": "Target-isolated SQLite online backup plus knowledge/vector manifests; never share Recovery writable paths",
+    "write_policy": "No customer or operations writes during shadow and cutover acceptance",
+    "admin_shadow_api_override_required": true,
+    "runtime_migration_executed": false
+  },
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "control/r006-interface-validation-v1-1",
@@ -350,20 +362,24 @@
     "R008 Phase D target validation execution completed with C pytest collection failure and Phase E blocked",
     "R008 Phase D1 C Python runtime compatibility confirmed as Python 3.12.13 without source or runtime changes",
     "R008 Phase D2 Target C venv rebuilt with explicit Python 3.12.13 and frozen requirements",
-    "R008 Phase D Target Validation Retry passed the complete A/C/B/Admin/contracts matrix without runtime changes"
+    "R008 Phase D Target Validation Retry passed the complete A/C/B/Admin/contracts matrix without runtime changes",
+    "R008 Phase E Runtime Migration Preparation completed the read-only preflight and blue-green execution plan without runtime changes"
   ],
   "next_tasks": {
-    "CONTROL": "Phase D passed. Wait for separate user authorization before Phase E; do not represent test success as a runtime switch. Phase E must preserve the frozen Target identity and produce a separate runtime migration report.",
-    "OPS": "Until Phase E is explicitly authorized, preserve AI-CS-pilot-baseline-recovery-v1@cbc77ed, its four listeners, database, vectors and records. In Phase E, require verified managed stop/start, Target PID/path/SHA identity, data-path protection and rollback; never stop by port alone.",
-    "A_B_C": "Keep code, UI, contracts, requirements and lockfiles frozen. Phase D is complete; no line may add fixes or rerun only its own scope as a substitute for the future Phase E runtime identity and functional protection gates.",
+    "CONTROL": "Wait for separate user authorization of Phase E Runtime Migration Execution and a controlled no-write window. Start at E-G01; do not directly stop Recovery or occupy standard ports.",
+    "OPS": "Preserve AI-CS-pilot-baseline-recovery-v1@cbc77ed and all data/records. On explicit authorization, create isolated Target snapshots, run the four loopback shadow ports with explicit Admin green targets, stop shadow, then use only verified managed records for the standard-port cutover and Recovery rollback.",
+    "A_B_C": "Keep code, UI, contracts, requirements and lockfiles frozen. During Phase E execution, verify capabilities through read-only/synthetic smoke only; no business writes, R006 implementation, model/prompt/RAG changes or UI redesign.",
     "CONTRACTS": "Remain unchanged at 0.2.0; all seven schemas pass. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
-    "QA": "Retain the initial Phase D failure, D1, D2 and successful Retry evidence. During a separately authorized Phase E, verify Target service identity, four health/proxy paths, protected data paths, minimum browser/function protection and successful Recovery rollback; do not reuse Phase D test evidence as runtime evidence."
+    "QA": "During separately authorized Phase E execution, verify Green API routing rather than page-only HTTP, Target PID/path/SHA, SQLite revision/integrity/count invariants, 47-chunk RAG state, B/C page protection, no automatic action, and successful Recovery rollback. Do not reuse plan or Phase D evidence as runtime evidence."
   },
   "t02_executed": false,
   "blockers": [
     "SF-R01: ai-cs-monorepo-source-freeze-v1 is currently a local annotated tag. A remote or controlled offline copy is required before retiring the source directory, but this does not block a separately authorized isolated Physical Migration.",
     "SF-R02: eight pre-existing dirty worktrees and four detached worktrees remain quarantined or pending classification. No worktree may be removed or force-cleaned; this blocks their retirement, not the new target migration entry.",
-    "PM-E01: Phase D passed, but Phase E Runtime Migration has not been authorized or executed. Target managed PID, working directory, SHA, four health/proxy paths, protected data paths and Recovery rollback must be verified before any runtime-ready claim.",
+    "PM-E02: Phase E Runtime Migration Execution and its no-write window have not been authorized. Recovery must not be stopped and Target must not be started until explicit authorization.",
+    "PM-E03: Target data snapshots do not yet exist. Execution must use SQLite online backup plus knowledge/vector manifests and must reject any Target reference to Recovery writable paths.",
+    "PM-E04: Admin shadow validation requires explicit VITE_PLATFORM_API_BASE_URL and VITE_AI_API_BASE_URL pointing to 18011/18000; the default proxy points to Recovery standard ports and cannot prove Green integration.",
+    "PM-E05: Immediate rollback is lossless only while the cutover window remains write-free. If Target accepts writes after opening, backup and separate data reconciliation are required before database rollback.",
     "PM-R03: frontend npm ci reports 13 frozen-tree vulnerabilities (4 moderate, 8 high, 1 critical), and Python requirements contain ranges rather than a full transitive hash lock. This does not fail Phase C installation, but production security and immutable dependency claims require separate governed remediation; no automatic upgrade is authorized.",
     "PM-R02: code migration does not migrate business data. If target runtime later references the Recovery root database or vectors, that root remains an active dependency and cannot be archived until a separately authorized stable data-path plan and rollback evidence exist.",
     "The active Pilot uses AI-CS-pilot-baseline-recovery-v1@cbc77ed, not the migration-source root. The Recovery directory, runtime records, SQLite and vector assets must remain in place until a later controlled switch and rollback rehearsal pass.",
