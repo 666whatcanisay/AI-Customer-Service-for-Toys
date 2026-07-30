@@ -3,13 +3,13 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "admin_ui_hotfix_release_candidate",
-  "current_task": "ADMIN-UI-HOTFIX-RELEASE-V1",
-  "current_stage": "Two Admin-only UI hotfixes were cherry-picked from 07eb962 in the authorized release order: source metadata table containment (7787606) followed by overview metric/unit alignment (84366f7). Admin typecheck, 42 Vitest tests, production build, and diff checks passed; the current runtime still requires controlled SHA reconciliation.",
-  "current_gate": "RUNTIME_RELEASE_PENDING: promote the clean Admin UI hotfix candidate, then use formal OPS scripts to replace the trusted 07eb962 runtime with the exact released SHA and verify A/C/B/Admin health plus the 5174 browser pages. No interface, database, AI, automatic action, or network-policy change is authorized.",
+  "status": "interface_freeze_ready",
+  "current_task": "R006 Pilot Business Data Activation V1 - Interface Freeze only",
+  "current_stage": "pilot-business-catalog.v1 freezes C as Provider and status authority, B as read-only Consumer, and A as unchanged. Store/Product/SKU fields, TEST/PILOT, DISABLED/ENABLED, parent rules, partial-result semantics, legacy-test compatibility, contracts 0.3.0 implementation target, deployment order, rollback and acceptance are documented. No implementation has been authorized.",
+  "current_gate": "INTERFACE_FREEZE_READY: Interface Owner approval is the only next entry. Business Data Activation code, UI changes, A/RAG changes, Master Data and large database migrations remain prohibited.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "develop",
+    "branch": "control/r006-interface-freeze-v1",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
@@ -19,7 +19,7 @@
       "7787606",
       "84366f7"
     ],
-    "base_commit": "6ea5dddc0b1e5b536e3833f353d34a7ac731930d",
+    "base_commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
     "feature_branch": "codex/mvp-lan-batch-05",
     "mvp_batch_05_squash_commit": "dc48646bcfd20bffc864a6c1ba4d0049cd444870",
     "mvp_batch_05_gateway_fix_squash_commit": "f21eed9beeb07041779f7ab55c681f798090eafe",
@@ -38,7 +38,13 @@
     "pilot_baseline_pr51_squash_commit": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
     "pilot_baseline_develop": "3dd5c03f8bfb7d912e45d37bb3efe9cffeb534e4",
     "pilot_candidate_baseline_v2": "d1d2ba281cc1a05a04cdd4349ec74e100e05f947",
-    "pilot_candidate_baseline_v2_merge_branch": "codex/pilot-baseline-v2-merge"
+    "pilot_candidate_baseline_v2_merge_branch": "codex/pilot-baseline-v2-merge",
+    "pilot_baseline_branch": "control/pilot-baseline-recovery-v1",
+    "pilot_baseline_sha": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "pilot_baseline_tag": "ai-cs-pilot-baseline-v1",
+    "interface_freeze_branch": "control/r006-interface-freeze-v1",
+    "interface_freeze_base": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "contracts_version": "0.2.0"
   },
   "pull_requests": {
     "3": {
@@ -134,20 +140,23 @@
     "OPS-TARGET-PILOT-READY real host preparation and controlled customer-entry simulation",
     "OPS-PILOT-HARDENING-V1 internal pilot hardening and recovery rehearsal",
     "CONTROL-PILOT-BASELINE-MERGE PR consolidation, isolated real smoke and baseline handoff",
-    "CONTROL-BASELINE-MERGE-V2 reviewed candidate merge and real closure"
+    "CONTROL-BASELINE-MERGE-V2 reviewed candidate merge and real closure",
+    "R004 AI-CS Pilot Baseline Recovery V1 controlled baseline",
+    "R006 pilot-business-catalog.v1 Interface Freeze plan"
   ],
   "next_tasks": {
-    "A": "Do not start a new A change for this baseline; real feedback analysis is verified. Any efficiency-analysis work remains blocked behind the frozen Provider compatibility repair.",
-    "B": "Second controlled customer-computer acceptance may be performed after the scoped firewall rule is explicitly configured; do not start efficiency events until the Provider contract is repaired.",
-    "C": "Create a separate Interface Owner repair task for customer-efficiency.v1 before merging PR #37 or its dependent C chain. Preserve migration rollback evidence and do not invent enum mappings."
+    "CONTROL": "Review and approve docs/control/interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md. Do not imply implementation authorization from INTERFACE_FREEZE_READY.",
+    "CONTRACTS": "After explicit approval only, prepare additive 0.3.0 schemas, changelog, compatibility notes, error-code registry and affected-line review.",
+    "C": "After explicit approval and Contracts freeze only, implement the authoritative customer-service status and B-facing catalog projection without UI redesign, Master Data or large migration.",
+    "B": "After the C Provider is verified, consume only the frozen projection and preserve existing UI and A request context. Do not infer trust from test_data_mode, production_usable or publishable.",
+    "A": "No R006 code or interface change. Participate only in later end-to-end verification using the unchanged request context.",
+    "QA_OPS": "After implementation only, verify contracts, partial-item isolation, old test compatibility, same-SHA runtime and B-to-C rollback. R007 second-terminal network verification remains separate."
   },
   "t02_executed": false,
   "blockers": [
-    "Formal Productization V2 runtime restart is blocked: the formal develop worktree has user-owned uncommitted documents and 8000/8011/5173/5174 are occupied by mixed old-worktree processes without a complete current trusted record set. The official stop script correctly refused an unrecorded 8011 listener rather than killing by port.",
-    "A second controlled customer computer must run browser and TCP 5173 acceptance. If company Wi-Fi and wired clients cannot route after the controlled Private firewall rule is verified, record NETWORK_SEGMENTED rather than treating it as an application failure.",
-    "The required AI Customer Service LAN 5173 (Private) rule is not configured. The current session has no administrator rights, so no UAC bypass or firewall change was attempted.",
-    "Customer-efficiency.v1 is interface-blocked: C PR #37 uses DIRECT_ADOPTION/EDITED_ADOPTION/NOT_ADOPTED and a reduced payload, while frozen B fields are AI_DIRECT_ADOPT/AI_EDIT_ADOPT/AI_REJECT with required correlation and privacy fields. PRs #37/#38/#39 and C descendants #43/#44/#47/#50 remain unmerged.",
-    "PR #32 is stale, PR #33 is DIRTY, and PR #42 conflicts with the cumulative B/UI chain and crosses A/B ownership. They require separate review rather than forced baseline inclusion."
+    "R006 implementation is not authorized until Interface Owner approval of pilot-business-catalog.v1.",
+    "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified on one approved runtime SHA.",
+    "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through R006 business code."
   ],
-  "last_updated": "2026-07-28"
+  "last_updated": "2026-07-30"
 }
