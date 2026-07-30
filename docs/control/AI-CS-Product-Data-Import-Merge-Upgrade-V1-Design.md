@@ -14,6 +14,8 @@
 >
 > 当前 Gate：`PRODUCT_IMPORT_MERGE_DESIGN_READY / R009_IMPLEMENTATION_INTERFACE_FREEZE_REQUIRED`
 
+> 2026-07-30实施范围调整：R009 V1只授权规划《商品知识采集模板V1.xlsx》的纯Python固定规则导入。其他五类模板暂不实现，选择时必须提示“该模板导入功能暂未开放，请先使用商品知识采集模板。”本文件保留为总体架构分析；当前实施入口以[AI-CS Product Knowledge Import V1 Implementation Plan](AI-CS-Product-Knowledge-Import-V1-Implementation-Plan.md)为准。不得按本文件原六模板范围直接进入开发。
+
 ## 0. 设计结论
 
 R009 将 C Admin 现有“资料上传与审核”从“先选单个商品/SKU，再补一份资料”升级为店铺范围内的批量 Excel 识别、增量 Merge 预览和人工审核流程。
