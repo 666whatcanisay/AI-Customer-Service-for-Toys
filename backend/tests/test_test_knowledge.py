@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import time
+import urllib.request
 from dataclasses import replace
 from pathlib import Path
 
@@ -557,6 +558,170 @@ def test_no_hit_refuses_without_sources(scoped_service):
     result = service.query(
         "火星公司税率与量子发动机维修流程", context(product_id="P-Q80")
     )
+    assert result["action"] == "REFUSE"
+    assert result["sources"] == []
+    assert result["warnings"] == ["NO_SCOPED_KNOWLEDGE"]
+
+
+def test_unknown_product_refuses_even_when_store_guard_matches(
+    scoped_service, monkeypatch
+):
+    service, _ = scoped_service
+
+    monkeypatch.setattr(
+        service,
+        "retrieve",
+        lambda question, top_k=None, context=None: {
+            "accepted": True,
+            "threshold": 0.45,
+            "top_distance": 0.05,
+            "sources": [{"product_id": "", "source_ids": ["STORE-GUARD"]}],
+            "results": [
+                {
+                    "product_id": "",
+                    "sku_id": "",
+                    "knowledge_type": "FAQ",
+                    "answer_action": "REQUIRE_LOOKUP",
+                    "risk_level": "HIGH",
+                }
+            ],
+        },
+    )
+
+    result = service.query(
+        "这个不存在的商品有什么功能？",
+        context(product_id="P-UNKNOWN"),
+    )
+
+    assert result["action"] == "REFUSE"
+    assert result["sources"] == []
+    assert result["warnings"] == ["NO_SCOPED_KNOWLEDGE"]
+
+
+def test_local_ollama_bypasses_environment_proxy(scoped_service, monkeypatch):
+    service, _ = scoped_service
+    service.settings = replace(
+        service.settings,
+        llm_provider="ollama",
+        llm_base_url="http://127.0.0.1:11434",
+        llm_model="qwen3.5:9b",
+    )
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"message": {"content": "OK"}}, ensure_ascii=False
+            ).encode("utf-8")
+
+    class FakeOpener:
+        def open(self, request, timeout):
+            captured["url"] = request.full_url
+            captured["timeout"] = timeout
+            return FakeResponse()
+
+    def fake_build_opener(handler):
+        captured["handler"] = handler
+        return FakeOpener()
+
+    monkeypatch.setattr(urllib.request, "build_opener", fake_build_opener)
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: pytest.fail(
+            "loopback Ollama must not use the environment-proxy opener"
+        ),
+    )
+
+    answer = service._call_ollama(
+        [{"role": "user", "content": "只回复 OK"}]
+    )
+
+    assert answer == "OK"
+    assert captured["url"] == "http://127.0.0.1:11434/api/chat"
+    assert isinstance(captured["handler"], urllib.request.ProxyHandler)
+
+
+def test_age_wording_uses_age_control_instead_of_unrelated_store_guard(
+    scoped_service, monkeypatch
+):
+    service, _ = scoped_service
+    results = [
+        {
+            "file": "store-guard",
+            "page": 0,
+            "chunk_id": "shipping-guard",
+            "distance": 0.01,
+            "content": "发货时间需要查询后确认。",
+            "product_id": "",
+            "sku_id": "",
+            "knowledge_type": "FAQ",
+            "answer_action": "REQUIRE_LOOKUP",
+            "risk_level": "HIGH",
+            "source_ids": ["STORE-GUARD"],
+        },
+        {
+            "file": "product-age",
+            "page": 0,
+            "chunk_id": "product-age",
+            "distance": 0.05,
+            "content": "Q80适合6～12岁儿童使用。",
+            "product_id": "P-Q80",
+            "sku_id": "",
+            "knowledge_type": "PRODUCT_FACT",
+            "answer_action": "DIRECT_ANSWER",
+            "risk_level": "LOW",
+            "source_ids": ["PRODUCT-AGE"],
+        },
+    ]
+    monkeypatch.setattr(
+        service,
+        "retrieve",
+        lambda question, top_k=None, context=None: {
+            "accepted": True,
+            "threshold": 0.45,
+            "top_distance": 0.01,
+            "sources": service._source_items(results),
+            "results": list(results),
+        },
+    )
+    monkeypatch.setattr(
+        service,
+        "call_llm",
+        lambda question, model_context, **kwargs: model_context,
+    )
+
+    result = service.query("商品适合年龄？", context(product_id="P-Q80"))
+
+    assert result["action"] == "CONTROLLED_ANSWER"
+    assert result["sources"]
+    assert any(source["product_id"] == "P-Q80" for source in result["sources"])
+    assert all(
+        source["product_id"] in {"", "P-Q80"}
+        for source in result["sources"]
+    )
+
+
+def test_missing_material_evidence_refuses_without_model_completion(
+    scoped_service, monkeypatch
+):
+    service, _ = scoped_service
+    monkeypatch.setattr(
+        service,
+        "call_llm",
+        lambda *args, **kwargs: pytest.fail(
+            "missing material evidence must not reach the model"
+        ),
+    )
+
+    result = service.query("材质是什么？", context(product_id="P-Q80"))
+
     assert result["action"] == "REFUSE"
     assert result["sources"] == []
     assert result["warnings"] == ["NO_SCOPED_KNOWLEDGE"]
