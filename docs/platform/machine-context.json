@@ -3,11 +3,11 @@
   "project_id": "AI-CS-C",
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
-  "version": "R009 Product Knowledge Import V1",
+  "version": "R009 Product Knowledge Import V1.1 Integration Fix",
   "current_task": "R009 商品知识采集模板导入 V1",
-  "current_stage": "The fixed Product Knowledge V1 workbook now supports store-scoped parsing, preflight, product recognition, field-level Merge preview, human approval/rejection, and append-only review receipts. Only approval writes existing C-owned formal product knowledge.",
-  "current_gate": "PRODUCT_KNOWLEDGE_IMPORT_IMPLEMENTED",
-  "status": "implementation_verified_not_runtime_deployed",
+  "current_stage": "Real-workbook compatibility and isolated integration acceptance are complete. The parser auto-detects the frozen 16-field header, optional governance fields are handled without replacing system review, and the full upload-to-approval flow passed on an isolated 0009 runtime.",
+  "current_gate": "PRODUCT_KNOWLEDGE_IMPORT_ACCEPTANCE_READY",
+  "status": "integration_acceptance_ready_not_formal_runtime_deployed",
   "contracts": [
     "contracts/version.json 0.2.0 (unchanged)",
     "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
@@ -60,6 +60,8 @@
     "missing_excel_fields_delete_data": false,
     "uploaded_binary_retained": false,
     "file_hash_and_template_evidence_retained": true,
+    "blank_source_date_uses_system_import_date": true,
+    "excel_human_confirmation_controls_system_review": false,
     "automatic_redaction_enabled": false,
     "published_to_rag": false,
     "automatic_customer_activation": false,
@@ -76,7 +78,7 @@
     "AI_FEEDBACK": "NOT_OPEN",
     "KNOWLEDGE_GAP": "NOT_OPEN"
   },
-  "last_test_result": "2026-07-30: C Backend 100 pytest passed; R009 migration round trip and alembic check passed on isolated SQLite; Admin Vitest 25 files/55 tests, vue-tsc and Vite production build passed. No service was started and no Recovery/Target database was connected.",
+  "last_test_result": "2026-07-30: C Backend 101 pytest and R009 focused 6 tests passed; isolated SQLite 0009 round trip and alembic check passed; Admin 25 files/55 tests, typecheck and build passed. Real Excel parsed 19 rows and isolated runtime acceptance produced ADD/UPDATE/KEEP/NO_CHANGE, 19 APPLIED receipts and a COMPLETED batch. Formal Pilot remained dd379278/0008.",
   "test_commands": [
     "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
     "cd platform_backend; isolated DATABASE_URL; python -m alembic upgrade head; python -m alembic check; python -m alembic downgrade 0008_customer_feedback_loop_v1; python -m alembic upgrade head",
@@ -87,7 +89,8 @@
     "Internal Admin endpoints still lack formal login, RBAC, retention policy and production security certification.",
     "Automatic redaction is not implemented; operators must remove customer personal information before upload.",
     "Downgrading 0009 does not undo product knowledge already applied by an approved review receipt.",
-    "Runtime deployment and live database migration were not authorized or performed in this task."
+    "Formal Runtime deployment and live database migration were not performed in this task.",
+    "No controlled browser was available; final visual click-through remains available on the isolated Admin runtime."
   ],
   "out_of_scope": [
     "The other five workbook import implementations",
@@ -100,8 +103,9 @@
     "branch": "feature/r009-product-knowledge-import-v1",
     "base": "dd379278837a4f816dfb626292a26b0c54cce0cc",
     "implementation_commit": "871b6290301f8587488bb8b282d4f60034fb37ba",
+    "integration_fix_commit": "817198a",
     "runtime_deployed": false
   },
-  "next_recommended_task": "After explicit Runtime deployment authorization, back up the Platform database, verify the intended release SHA, apply 0009, and run controlled 8011/5174 smoke. Do not start another template implementation under R009 V1.",
+  "next_recommended_task": "Run an operator visual click-through on the isolated 15179 Admin, then use a separately authorized formal deployment task to back up the Platform database, verify the release SHA, apply 0009, and run controlled 8011/5174 smoke. RAG/B consumption remains a separate requirement.",
   "last_updated": "2026-07-30"
 }
