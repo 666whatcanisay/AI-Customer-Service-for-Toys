@@ -1,5 +1,7 @@
 # AI-CS Pilot Business Catalog Interface Validation Report V1
 
+> **版本提示（2026-07-30）：** 本报告只验证 `pilot-business-catalog.v1`。R006 后续已冻结 [V1.1 Legacy Compatibility Control](AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)，改变了旧TEST默认策略、SKU控制层级和C运营入口；因此本报告不能作为V1.1实现授权，必须重新执行V1.1验证。
+
 > 需求：R006 — Pilot Business Data Activation V1
 >
 > 代码基线：`ai-cs-pilot-baseline-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38`
