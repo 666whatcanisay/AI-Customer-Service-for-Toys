@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`SHADOW_RUNTIME_PASS / PHASE_E2_ENTRY_READY / STANDARD_PORT_CUTOVER_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED`
+> 当前 Gate：`RUNTIME_STARTUP_ALIGNMENT_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED`
 
 ## 1. 台账目标
 
@@ -98,7 +98,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Runtime Handover已完成：日常唯一入口、启停/状态命令、四服务、体验入口、Target数据路径和Recovery回滚边界均已固化；Phase F旧目录处理尚未授权。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Runtime Startup Alignment完成：Target标准启动、活动集合、status、Target Pilot入口与失败清理已对齐；四服务从clean `dd37927...`运行。Phase F仍未授权。 |
 
 状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
 
@@ -250,7 +250,7 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
 | 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
 | 完成标准 | 最终只保留`AI-CS/`一个长期目录；保持`backend/frontend/extension/platform_backend/admin_web/contracts/docs/scripts/tests`核心目录原名；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
-| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明四组件依赖可安装；[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)记录初次C失败；[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)冻结3.12.13；[Phase D2 C Backend Environment Rebuild Report V1](AI-CS-Phase-D2-C-Backend-Environment-Rebuild-Report-V1.md)记录venv重建；[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)记录365 passed/3 skipped；[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)冻结蓝绿方案；[Phase E1 Shadow Runtime Execution Report V1](AI-CS-Phase-E1-Shadow-Runtime-Execution-Report-V1.md)记录独立影子验证；[Phase E2 Standard Port Cutover Report V1](AI-CS-Phase-E2-Standard-Port-Cutover-Report-V1.md)记录标准端口切换；[AI-CS Runtime Handover Report V1](AI-CS-Runtime-Handover-Report-V1.md)记录未来开发者日常运行、体验、数据和回滚操作边界。 |
+| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结源码与运行双锚点；[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)记录独立clone和GI-01至GI-10全PASS；[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)证明Source/Target 542个文件、Tree/manifest零差异；[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)证明四组件依赖可安装；[Phase D Target Validation Report V1](AI-CS-Phase-D-Target-Validation-Report-V1.md)记录初次C失败；[Platform Backend Runtime Compatibility Report V1](AI-CS-Platform-Backend-Runtime-Compatibility-Report-V1.md)冻结3.12.13；[Phase D2 C Backend Environment Rebuild Report V1](AI-CS-Phase-D2-C-Backend-Environment-Rebuild-Report-V1.md)记录venv重建；[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)记录365 passed/3 skipped；[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)冻结蓝绿方案；[Phase E1 Shadow Runtime Execution Report V1](AI-CS-Phase-E1-Shadow-Runtime-Execution-Report-V1.md)记录独立影子验证；[Phase E2 Standard Port Cutover Report V1](AI-CS-Phase-E2-Standard-Port-Cutover-Report-V1.md)记录标准端口切换；[AI-CS Runtime Handover Report V1](AI-CS-Runtime-Handover-Report-V1.md)记录日常运行边界；[Runtime Startup Alignment V1 Report](AI-CS-Runtime-Startup-Alignment-V1-Report.md)记录活动集合、启动/status、清理竞态和最终stop/start/status验收。 |
 | 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)、[Phase 2A Target Repository Creation Execution Report V1](AI-CS-Phase-2A-Target-Repository-Creation-Execution-Report-V1.md)、[Phase B Code Materialization Report V1](AI-CS-Phase-B-Code-Materialization-Report-V1.md)、[Phase C Dependency Reproduction Report V1](AI-CS-Phase-C-Dependency-Reproduction-Report-V1.md)、[Phase D Target Validation Retry Report V1](AI-CS-Phase-D-Target-Validation-Retry-Report-V1.md)、[Phase E Runtime Migration Plan V1](AI-CS-Phase-E-Runtime-Migration-Plan-V1.md)、[Phase E1 Shadow Runtime Execution Report V1](AI-CS-Phase-E1-Shadow-Runtime-Execution-Report-V1.md)、[Phase E2 Standard Port Cutover Report V1](AI-CS-Phase-E2-Standard-Port-Cutover-Report-V1.md)、[AI-CS Runtime Handover Report V1](AI-CS-Runtime-Handover-Report-V1.md)、[Source Tree Manifest V1](manifests/AI-CS-Phase-B-Source-Tree-Manifest-V1.md)、[Target Tree Manifest V1](manifests/AI-CS-Phase-B-Target-Tree-Manifest-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
 | 防止重复错误规则 | Phase E2标准端口切换和Runtime Handover均已完成，不得重复切换或重新发明启停方式。日常只允许从`AI-CS/`使用`green-standard.local.ps1`和Target独立数据路径；Target受管记录是当前运行事实，Recovery只作为停止状态的回滚锚点。Phase F必须单独授权，完成保护引用、dirty Worktree、稳定观察和回滚保留判断前不得删除旧目录。不得提交`.runtime`/`.venv`或借迁移实施R006。 |
 
@@ -289,6 +289,6 @@ R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处�
 
 R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
 
-R008是与R006并行的项目治理任务。Phase E2已经把标准端口切换到`AI-CS@26f8cde...`，Runtime Handover已固化唯一日常目录、标准启停/状态命令、四服务职责、B/C体验入口、Target数据路径与Recovery回滚边界。Recovery `cbc77ed...`已停止但目录、数据和最终备份完整保留。下一入口只能是用户另行授权的Phase F旧目录/Worktree处理；不得因Runtime交接完成而删除Recovery或关闭整个R008。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+R008是与R006并行的项目治理任务。Runtime Startup Alignment已把标准启动、RAG活动集合、status、Target Pilot入口和失败清理对齐，当前标准端口均由clean `AI-CS@dd37927...`运行，活动集合为`test_knowledge_v031=47`。Recovery `cbc77ed...`已停止但目录、数据和最终备份完整保留。下一入口只能是用户另行授权的Phase F旧目录/Worktree处理；不得因Runtime修复完成而删除Recovery或关闭整个R008。R008不得绕过R006的Interface Gate，也不得把运行修复作为R003/R005业务验收。
 
-最终状态：`RUNTIME_HANDOVER_READY`
+最终状态：`RUNTIME_STARTUP_ALIGNMENT_COMPLETE`

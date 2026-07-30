@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`RUNTIME_HANDOVER_READY / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED`
+> 当前 Gate：`RUNTIME_STARTUP_ALIGNMENT_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -30,7 +30,7 @@
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Runtime Handover已完成：`AI-CS/`是唯一日常目录，标准启停/状态命令、B/C入口、Target数据和Recovery回滚规则已固化；当前四服务继续从`26f8cde...`运行。 | 按Handover维护Target并保留Recovery；Phase F旧目录处理必须另行授权。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Runtime Startup Alignment已完成；四服务从clean `dd37927...`运行，活动集合为`test_knowledge_v031=47`，标准启停/status与失败清理已验收。 | 保持Target运行与Recovery锚点；Phase F旧目录处理必须另行授权。 |
 
 ## 3. 当前真正阻塞点
 
@@ -43,6 +43,8 @@ R008 Phase D Retry已关闭PM-D03：失败版和Retry使用相同`26f8cde.../994
 R008 Phase E2已关闭标准端口迁移风险：影子服务先受管停止并释放端口；Recovery最终PID/health、SQLite online backup和RAG manifest已留存；Recovery按Admin→B→A→C停止，Target按C→A→B→Admin启动。当前标准端口全部由Target `26f8cde...`运行，C revision 0008、A ready/47 chunks、B真实合成问题AI建议、Admin实际8000/8011路由均PASS。Recovery目录与数据完整保留但服务已停止。剩余R008工作是单独授权的Phase F和旧Worktree治理，不是再次切换Runtime。
 
 R008 Runtime Handover已将唯一主目录、完整启动环境变量、`green-standard`配置、受管停止/状态命令、四服务职责、B/C本机入口、正式SQLite/RAG路径和Recovery回滚前置条件写成长期交接。该文档不改变Runtime，当前Target仍为同一SHA且clean。未来维护不得省略Target独立数据环境变量、使用旧Worktree或把Recovery当日常开发目录。
+
+R008 Runtime Startup Alignment已关闭Handover后的真实启动回归：活动集合由配置统一为`test_knowledge_v031`，status同时显示实际可见集合；`documents=0`不再阻断启动。最终四服务从clean `dd37927...`运行，A ready/model configured、47 chunks，四条B/Admin代理200且真实Ollama smoke通过。一次中间复验暴露的listener记录清理竞态已通过受控身份回填和清理后双校验关闭。
 
 ## 4. 需求依赖与执行顺序
 
@@ -84,6 +86,7 @@ R008 Phase B Source Tag Code Materialization COMPLETE
   ↓ Phase E2 Standard Port Cutover COMPLETE
   ↓ Target标准端口持续运行；Recovery停止并保留回滚锚点
   ↓ Runtime Handover READY
+  ↓ Runtime Startup Alignment COMPLETE（active collection / start / status / cleanup）
 R008 Worktree退役 / Phase F（仍未授权）
 ```
 
@@ -96,6 +99,6 @@ R008 Worktree退役 / Phase F（仍未授权）
 - R003 是问题记录，R006 是解决任务：不要为同一激活问题创建第三个重复需求。
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
-- R008 Phase E1已PASS：不要把影子运行误写成标准端口已切换或R008已完成；Phase E2必须重新验证Target标准端口SHA、数据路径和Recovery可恢复性。
+- R008 Runtime Startup Alignment已完成：不得再固定检查`documents`，也不得把知识warning误写成AI smoke通过；Phase F仍需单独授权。
 
-最终状态：`SHADOW_RUNTIME_PASS`
+最终状态：`RUNTIME_STARTUP_ALIGNMENT_COMPLETE`

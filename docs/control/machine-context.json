@@ -3,10 +3,38 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "runtime_handover_ready",
-  "current_task": "R008 AI-CS Runtime Handover V1",
-  "current_stage": "Runtime Handover V1 is complete. AI-CS is the sole daily development and runtime root; the handover freezes the exact green-standard start environment, managed stop/status commands, four service responsibilities, local B/Admin entries, Target SQLite/RAG paths and Recovery rollback prerequisites. A read-only gate confirmed the existing Target services still run from clean 26f8cde with C revision 0008 and A ready/model configured with 47 chunks. No service, Target source or runtime data was changed. Recovery remains stopped and rollback-only; Phase F is not authorized.",
-  "current_gate": "RUNTIME_HANDOVER_READY / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED",
+  "status": "runtime_startup_alignment_complete",
+  "current_task": "R008 Runtime Startup Alignment V1",
+  "current_stage": "Target standard startup now uses explicit RAG paths and active collection test_knowledge_v031. Managed stop/start/status passed from clean dd37927; four standard services are running, active chunks are 47, all B/Admin A/C proxy checks returned 200 and real Ollama chat smoke passed. Knowledge degradation warns without collapsing all services, while A health and model readiness remain hard gates. Partial-start cleanup closes the listener-record race without port-based killing. Recovery remains stopped and rollback-only; R006 and Phase F are not authorized.",
+  "current_gate": "RUNTIME_STARTUP_ALIGNMENT_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED",
+  "runtime_startup_alignment": {
+    "report": "docs/control/AI-CS-Runtime-Startup-Alignment-V1-Report.md",
+    "result": "RUNTIME_STARTUP_ALIGNMENT_COMPLETE",
+    "target": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS@dd379278837a4f816dfb626292a26b0c54cce0cc",
+    "branch": "control/r008-runtime-startup-alignment-v1",
+    "source_state": "CLEAN",
+    "active_collection": "test_knowledge_v031",
+    "active_collection_chunks": 47,
+    "available_collections": {"documents": 0, "test_knowledge_v031": 47},
+    "services": {
+      "C_API": {"port": 8011, "managed_pid": 19188, "listener_pid": 636},
+      "A": {"port": 8000, "managed_pid": 21840, "listener_pid": 24188},
+      "B": {"port": 5173, "managed_pid": 17516, "listener_pid": 17516},
+      "C_ADMIN": {"port": 5174, "managed_pid": 25720, "listener_pid": 20820}
+    },
+    "validation": {
+      "backend": "101 passed, 3 opt-in real E2E skipped",
+      "windows_ops_suites": 8,
+      "proxy_checks": "Admin-A/Admin-C/B-A/B-C HTTP 200",
+      "chat_smoke": "PASS; CONTROLLED_ANSWER; 3 sources; SUGGESTION_ONLY; AUTO_SEND_DISABLED"
+    },
+    "recovery_changed": false,
+    "contracts_changed": false,
+    "database_schema_changed": false,
+    "vector_data_deleted": false,
+    "phase_f_authorized": false,
+    "r006_executed": false
+  },
   "phase_e_plan": {
     "report": "docs/control/AI-CS-Phase-E-Runtime-Migration-Plan-V1.md",
     "recovery": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
