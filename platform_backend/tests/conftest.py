@@ -21,7 +21,9 @@ def session() -> Iterator[Session]:
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    with Session(engine, expire_on_commit=False) as database_session:
+    # Match the production SessionLocal behavior so integration-only flush
+    # ordering defects are visible in the test suite.
+    with Session(engine, autoflush=False, expire_on_commit=False) as database_session:
         yield database_session
     Base.metadata.drop_all(engine)
     engine.dispose()

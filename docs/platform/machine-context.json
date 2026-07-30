@@ -1,18 +1,17 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-ai-control-center-v2-platform",
-  "project_id": "mumu-C",
-  "project_name": "C-line knowledge governance and operations platform",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-r009-product-knowledge-import-v1",
+  "project_id": "AI-CS-C",
+  "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
-  "version": "0.1.0",
-  "current_task": "TARGET MODE V5 AI control center and 5174 operations productization",
-  "current_stage": "C Admin provides concise Chinese workspaces for operations, knowledge, imports, customer operations, and a typed read-only AI control center. The AI screen consumes only frozen ai-control.v1.1 A overview data; C-native knowledge-quality and feedback views remain separate. This UI is stacked on C Provider #70; browser integration awaits the Interface/A candidates in an isolated combined baseline.",
-  "current_gate": "C_UI_VERIFIED_ENV_BLOCKED_CREATE_PR: Admin typecheck, 19-file/39-test Vitest suite, production build and diff check pass. Branch cf1f070 is pushed; two Draft PR attempts failed only on GitHub API TLS handshake. The A Provider endpoint must be present in the same isolated candidate baseline before browser smoke can be claimed.",
-  "status": "target_mode_v5_c_ui_verified_env_blocked_create_pr",
+  "version": "R009 Product Knowledge Import V1.1 Integration Fix",
+  "current_task": "R009 Production Integration & Browser Acceptance V1",
+  "current_stage": "The R009 feature is merged into a controlled integration branch and all code plus isolated migration gates pass. Formal database migration and standard-port cutover are intentionally withheld because no controllable browser is available and the current R008 runtime configuration does not pass runtimeMode identity verification.",
+  "current_gate": "PRODUCT_KNOWLEDGE_IMPORT_PRODUCTION_BLOCKED_RUNTIME_AND_BROWSER_GATES",
+  "status": "production_integration_verified_runtime_and_browser_gates_blocked",
   "contracts": [
-    "contracts/version.json 0.1.0 (unchanged)",
-    "Frozen TARGET MODE V2 interface: docs/control/interfaces/knowledge-quality-loop.v1.md (not modified)",
-    "Frozen AI control interface: docs/control/interfaces/ai-control.v1.md v1.1 (read-only Consumer; not modified)",
-    "Existing experience-case and ai-feedback frozen interface documents remain unchanged."
+    "contracts/version.json 0.2.0 (unchanged)",
+    "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
+    "A, B, RAG and Prompt interfaces are unchanged"
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -26,84 +25,92 @@
     "contracts/**"
   ],
   "entrypoints": [
-    "platform_backend/app/main.py:app",
-    "platform_backend/app/knowledge_materials/models.py",
-    "platform_backend/app/knowledge_materials/service.py",
-    "platform_backend/app/api/knowledge_material_routes.py",
-    "platform_backend/migrations/versions/0007_target_mode_v2_knowledge_quality_loop.py",
+    "platform_backend/app/product_knowledge_import/routes.py",
+    "platform_backend/app/product_knowledge_import/service.py",
+    "platform_backend/app/product_knowledge_import/parser.py",
+    "platform_backend/app/product_knowledge_import/product_knowledge_mapping.py",
+    "platform_backend/migrations/versions/0009_product_knowledge_import_v1.py",
     "admin_web/src/views/KnowledgeMaterialsView.vue",
-    "admin_web/src/views/KnowledgeQualityPoolView.vue",
-    "admin_web/src/views/AiCapabilityCenterView.vue",
-    "admin_web/src/views/ImportCenterView.vue",
-    "admin_web/src/views/KnowledgeCenterView.vue",
-    "docs/platform/15_商品资料与知识质量闭环.md",
-    "docs/platform/19_AI控制中心V2与运营产品化.md"
+    "docs/platform/25_AI-CS_Product_Knowledge_Import_V1_Implementation_Report.md"
   ],
   "provided_interfaces": [
-    "POST/GET /api/v1/admin/knowledge-materials",
-    "POST /api/v1/admin/knowledge-materials/{material_id}/review",
-    "GET /api/v1/admin/knowledge-quality/analysis-inputs",
-    "POST /api/v1/admin/knowledge-quality/analysis-results",
-    "GET /api/v1/admin/knowledge-quality/assessments",
-    "GET /api/v1/customer-knowledge-status",
-    "Existing customer experience, AI feedback, catalog, import and health interfaces (unchanged)"
+    "POST /api/v1/admin/product-knowledge-imports",
+    "GET /api/v1/admin/product-knowledge-imports/{batch_id}/preflight",
+    "GET /api/v1/admin/product-knowledge-imports/{batch_id}/merge-preview",
+    "POST /api/v1/admin/product-knowledge-imports/{batch_id}/change-sets/{change_set_id}/reviews"
   ],
-  "required_interfaces": [
-    "A reads only APPROVED_FOR_ANALYSIS material snapshots and posts matching material_id/revision/content_hash evidence.",
-    "B reads only the compact customer knowledge-status summary and never material binary, raw path or analysis text.",
-    "C Admin reads A only through GET /ai-api/api/admin/ai/control-center/overview and unwraps the frozen success-envelope data; it never treats errors as empty or zero operational data.",
-    "No direct A/C database access or cross-line automatic action."
+  "lifecycle": [
+    "XLSX upload",
+    "fixed parser and store validation",
+    "product recognition and Merge preview",
+    "IDENTIFIED_PENDING_REVIEW",
+    "APPROVE to field-level formal write or REJECT with zero formal write"
   ],
   "cross_line_compatibility": {
-    "affected_lines": ["A", "B"],
-    "change": "C productizes only admin_web. Its AI control screen consumes the separately frozen A overview projection; knowledge-quality and feedback data remain C-native. No contracts or existing customer paths change.",
-    "shared_contract_version": "0.1.0 unchanged",
-    "database_change": false,
-    "verified": "Admin typecheck, 19-file/39-test Vitest suite and production build pass. Browser verification of the typed A overview is pending the A Provider candidate; no mock provider state is claimed."
+    "affected_lines": [],
+    "change": "C internal provider, database and Admin UI only. Import Center files and positioning remain unchanged.",
+    "shared_contract_version": "0.2.0 unchanged",
+    "database_change": true,
+    "migration": "0009_product_knowledge_import_v1",
+    "verified": "Backend 100 tests; isolated SQLite upgrade/downgrade/upgrade and alembic check; Admin 25 files/55 tests, typecheck and production build."
   },
   "data_boundaries": {
-    "source": "Synthetic local test values only",
-    "production_data_imported": false,
-    "attachment_binary_stored": true,
-    "knowledge_material_raw_storage": "Local controlled runtime directory only; Git ignored; not returned by B-facing APIs or logs.",
-    "case_content_logged": false,
+    "formal_data_write_before_review": false,
+    "excel_overwrites_database": false,
+    "missing_excel_fields_delete_data": false,
+    "uploaded_binary_retained": false,
+    "file_hash_and_template_evidence_retained": true,
+    "blank_source_date_uses_system_import_date": true,
+    "excel_human_confirmation_controls_system_review": false,
     "automatic_redaction_enabled": false,
-    "published_to_a_line": false,
-    "a_b_live_integration_claimed": false,
-    "formal_permissions_enabled": false,
+    "published_to_rag": false,
+    "automatic_customer_activation": false,
     "automatic_training_enabled": false,
     "prompt_change_enabled": false,
-    "knowledge_publication_enabled": false,
     "customer_message_enabled": false,
-    "order_or_erp_write_enabled": false
+    "order_refund_or_erp_write_enabled": false
   },
-  "last_test_result": "2026-07-28 TARGET MODE V5: Admin pnpm typecheck passed; Vitest passed 19 files / 40 tests; production build and git diff --check passed. The AI control overview adapter has focused tests for frozen data-envelope extraction, failed-envelope rejection, and display-only fractional pass_rate conversion (0.6786 → 67.86%). Browser/provider smoke remains pending the stacked A candidate.",
+  "supported_templates": {
+    "PRODUCT_KNOWLEDGE": "IMPLEMENTED",
+    "SKU_DIFFERENCE": "NOT_OPEN",
+    "FAQ": "NOT_OPEN",
+    "SAFETY_RULE": "NOT_OPEN",
+    "AI_FEEDBACK": "NOT_OPEN",
+    "KNOWLEDGE_GAP": "NOT_OPEN"
+  },
+  "last_test_result": "2026-07-30 production integration preflight: controlled merge 87a040c5; C Backend 101 pytest; Admin 25 files/55 tests, typecheck and build; formal 0008 SQLite read-only snapshot upgraded/downgraded/upgraded to 0009 with integrity ok. Browser list was empty, so formal backup/migration, cutover and production browser acceptance were not performed. Formal Pilot remained dd379278/0008.",
   "test_commands": [
-    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q tests/test_knowledge_material_api.py tests/test_ai_response_feedback_api.py",
-    "cd platform_backend; isolated DATABASE_URL; .venv/Scripts/python.exe -m alembic upgrade head; downgrade 0006_mvp_plus_02_ai_feedback_idempotency; upgrade head",
-    "cd platform_backend; .venv/Scripts/python.exe -m pytest -q",
-    "cd admin_web; pnpm typecheck; pnpm test -- --run; pnpm build",
+    "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
+    "cd platform_backend; isolated DATABASE_URL; python -m alembic upgrade head; python -m alembic check; python -m alembic downgrade 0008_customer_feedback_loop_v1; python -m alembic upgrade head",
+    "cd admin_web; pnpm test; pnpm typecheck; pnpm build",
     "git diff --check"
   ],
   "known_risks": [
-    "The internal-test administration APIs have no formal authentication, authorization, persistent audit, retention or production security certification.",
-    "Knowledge material binary is retained only in a local runtime path. Operators must manually deidentify before upload; phone/identity-number checks are limited safeguards, not automatic redaction.",
-    "CORS is not authentication or authorization.",
-    "The AI control overview is unavailable until Interface #73, C Provider #70 and A Provider codex/ai-control-center-v2-rag (#74) are in the same candidate baseline; C must show a controlled error, not fake operational data."
+    "Internal Admin endpoints still lack formal login, RBAC, retention policy and production security certification.",
+    "Automatic redaction is not implemented; operators must remove customer personal information before upload.",
+    "Downgrading 0009 does not undo product knowledge already applied by an approved review receipt.",
+    "Formal Runtime deployment and live database migration were not performed in this task.",
+    "No controlled browser is available; formal migration and cutover are blocked until real browser click-through and screenshots can be executed."
   ],
   "out_of_scope": [
-    "Automatic training, Prompt modification, knowledge publication, customer-message sending, order changes, ERP writes, refunds and after-sales actions.",
-    "Formal login, roles, retention, access audit, and production data.",
-    "A/B business code and shared contract changes.",
-    "Automatic model changes, Prompt changes, knowledge publication, customer messages, orders, refunds, after-sales and ERP writes."
+    "The other five workbook import implementations",
+    "Import Center redesign",
+    "A, B, RAG, Prompt or contracts changes",
+    "Automatic knowledge publication, customer activation, messaging, refunds, orders or ERP writes"
   ],
-  "blockers": [],
+  "blockers": [
+    "No controllable Browser or Chrome session is available for mandatory production UI acceptance and screenshots.",
+    "R008 status reports runtimeMode identity mismatch for all four services; the recorded B health URL is 127.0.0.1:5173 while the current listener is 192.168.1.11:5173."
+  ],
   "git": {
-    "branch": "codex/ai-control-center-v2-platform",
-    "base": "codex/data-intelligence-platform-v1 (C Provider Draft PR #70)",
-    "commit": "cf1f070ef1cc8879c50b99091c9ddbe4ec42c55e",
-    "draft_pr": "ENV_BLOCKED_CREATE_PR: two gh pr create attempts hit GitHub API TLS handshake timeout; branch is pushed and ready for Draft PR creation."
+    "branch": "control/r009-production-integration-v1",
+    "base": "dd379278837a4f816dfb626292a26b0c54cce0cc",
+    "implementation_commit": "871b6290301f8587488bb8b282d4f60034fb37ba",
+    "integration_fix_commit": "817198a",
+    "feature_head": "4ab8f632b0edfe73433e88c5985f9e402bdd9874",
+    "production_integration_merge_commit": "87a040c5806ec61e4e92dfe323aac752b4edef23",
+    "runtime_deployed": false
   },
-  "next_recommended_task": "Run isolated browser validation after the planned candidate order Interface #73 → C Provider #70 → A #74 → C V5 UI → B #75. Do not add publication, training, Prompt writes or customer/ERP actions.",
-  "last_updated": "2026-07-28"
+  "next_recommended_task": "Freeze the correct standard/LAN runtime configuration and pass Runtime Identity Gate; enable a controllable Browser or Chrome session; then resume final formal database backup, 0009 migration, Runtime cutover and full 5174 browser acceptance with screenshots. RAG/B consumption remains out of scope.",
+  "last_updated": "2026-07-30"
 }
