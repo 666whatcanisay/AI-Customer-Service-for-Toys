@@ -41,7 +41,7 @@ if ($LASTEXITCODE -ne 0) { throw "PreviousGitSha 不可解析：$PreviousGitSha"
 & git -C $repositoryRoot merge-base --is-ancestor $PreviousGitSha $currentIdentity.GitSha
 if ($LASTEXITCODE -ne 0) { throw 'PreviousGitSha 不是当前HEAD祖先，拒绝重新证明。' }
 
-$changedPaths = @(& git -C $repositoryRoot diff --name-only $PreviousGitSha $currentIdentity.GitSha --)
+$changedPaths = @(& git -c core.quotepath=false -C $repositoryRoot diff --name-only $PreviousGitSha $currentIdentity.GitSha --)
 if ($LASTEXITCODE -ne 0) { throw '无法读取身份对齐版本差异。' }
 $unexpectedPaths = @($changedPaths | Where-Object {
     $_ -notlike 'scripts/windows/*' -and $_ -notlike 'docs/rag/*' -and $_ -notlike 'docs/control/*'
