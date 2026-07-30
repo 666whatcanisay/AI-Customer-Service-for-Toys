@@ -89,6 +89,14 @@ def test_knowledge_statistics_is_available(api_client):
     assert data["document_count"] == 1
     assert data["chunk_count"] == 2
     assert data["collection_name"] == "test_documents"
+    assert data["primary_collection_name"] == "test_documents"
+    assert data["active_collection_name"] == "test_documents"
+    assert data["active_collection_chunk_count"] == 2
+    assert data["active_collection_available"] is True
+    assert data["available_collections"] == [
+        {"name": "test_documents", "chunk_count": 2},
+        {"name": "test_knowledge_v031", "chunk_count": 0},
+    ]
 
 
 def test_knowledge_counts_include_the_queryable_test_collection(api_client):
@@ -111,6 +119,13 @@ def test_knowledge_counts_include_the_queryable_test_collection(api_client):
 
     assert statistics_response.status_code == 200
     assert statistics_response.json()["data"]["chunk_count"] == 3
+    assert (
+        statistics_response.json()["data"]["active_collection_chunk_count"] == 2
+    )
+    assert statistics_response.json()["data"]["available_collections"] == [
+        {"name": "test_documents", "chunk_count": 2},
+        {"name": "test_knowledge_v031", "chunk_count": 1},
+    ]
     assert module_response.status_code == 200
     assert module_response.json()["data"]["knowledge_count"] == 3
 

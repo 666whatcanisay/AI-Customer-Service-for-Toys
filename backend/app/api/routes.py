@@ -153,6 +153,7 @@ def statistics_data(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     stats = rag.vector_store.get_collection_stats()
     primary_chunk_count, test_knowledge_chunk_count = knowledge_collection_counts(rag)
+    collection_status = rag.collection_runtime_status()
     document_count = (
         len(list(settings.knowledge_base_path.glob("*.pdf")))
         if settings.knowledge_base_path.exists()
@@ -163,7 +164,9 @@ def statistics_data(request: Request) -> dict[str, Any]:
         "chunk_count": primary_chunk_count + test_knowledge_chunk_count,
         "embedding_model": stats["model_name"],
         "vector_database": "ChromaDB",
-        "collection_name": stats["collection_name"],
+        "collection_name": collection_status["active_collection_name"],
+        "primary_collection_name": stats["collection_name"],
+        **collection_status,
         "model_configured": rag.model_configured,
     }
 

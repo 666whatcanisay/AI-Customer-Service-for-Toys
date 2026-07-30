@@ -127,8 +127,52 @@ class RAGService:
         )
 
     def warm_up(self) -> None:
-        if self.vector_store.get_collection_stats()["total_chunks"] > 0:
-            self.vector_store.search("测试", top_k=1)
+        active_store = self.active_vector_store()
+        if (
+            active_store is not None
+            and active_store.get_collection_stats()["total_chunks"] > 0
+        ):
+            active_store.search("测试", top_k=1)
+
+    def active_vector_store(self) -> VectorStore | None:
+        """Return the configured collection used by runtime readiness checks."""
+        for store in (self.vector_store, self.test_vector_store):
+            if store.collection_name == self.settings.active_collection_name:
+                return store
+        return None
+
+    def collection_runtime_status(self) -> dict[str, Any]:
+        """Describe configured queryable collections without reading their content."""
+        available_collections: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+        for collection in self.vector_store.client.list_collections():
+            name = str(collection.name)
+            if name in seen_names:
+                continue
+            seen_names.add(name)
+            available_collections.append(
+                {"name": name, "chunk_count": int(collection.count())}
+            )
+        available_collections.sort(key=lambda collection: collection["name"])
+
+        active_collection = next(
+            (
+                collection
+                for collection in available_collections
+                if collection["name"] == self.settings.active_collection_name
+            ),
+            None,
+        )
+        return {
+            "active_collection_name": self.settings.active_collection_name,
+            "active_collection_chunk_count": (
+                active_collection["chunk_count"]
+                if active_collection is not None
+                else None
+            ),
+            "active_collection_available": active_collection is not None,
+            "available_collections": available_collections,
+        }
 
     def close(self) -> None:
         self.test_vector_store.close()

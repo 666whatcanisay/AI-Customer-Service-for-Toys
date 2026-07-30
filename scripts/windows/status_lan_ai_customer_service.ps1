@@ -60,11 +60,14 @@ try {
     Write-Host "A 同步知识历史：$syncState"
 
     $knowledgeRuntime = Get-RagKnowledgeRuntimeStatistics $config
-    $knowledgeConsistency = Get-TestKnowledgeRuntimeConsistency $syncHistory $knowledgeRuntime
+    $knowledgeConsistency = Get-TestKnowledgeRuntimeConsistency $syncHistory $knowledgeRuntime $config.RagActiveCollectionName
     if ($knowledgeRuntime.State -eq 'AVAILABLE') {
-        Write-Host "A 当前运行时知识：状态=$knowledgeConsistency；collection=$($knowledgeRuntime.CollectionName)；chunks=$($knowledgeRuntime.ChunkCount)；documents=$($knowledgeRuntime.DocumentCount)；database=$($knowledgeRuntime.VectorDatabase)"
+        Write-Host "A active collection：状态=$knowledgeConsistency；collection=$($knowledgeRuntime.ActiveCollectionName)；chunks=$($knowledgeRuntime.ActiveCollectionChunkCount)"
+        Write-Host "A available collections：$(Format-RagAvailableCollections $knowledgeRuntime)；total_chunks=$($knowledgeRuntime.ChunkCount)；documents=$($knowledgeRuntime.DocumentCount)；database=$($knowledgeRuntime.VectorDatabase)"
         if ($knowledgeConsistency -eq 'MISMATCH') {
-            Write-Host "警告：A 当前运行时 chunks=$($knowledgeRuntime.ChunkCount) 与历史同步 collectionCount=$($syncHistory.CollectionCount) 不一致。不能将历史记录视为当前服务状态；请恢复可信运行记录后重新启动并同步。" -ForegroundColor Red
+            Write-Host "警告：A active collection chunks=$($knowledgeRuntime.ActiveCollectionChunkCount) 与历史同步 collectionCount=$($syncHistory.CollectionCount) 不一致。不能将历史记录视为当前服务状态。" -ForegroundColor Red
+        } elseif ($knowledgeConsistency -eq 'ACTIVE_COLLECTION_MISMATCH') {
+            Write-Host "警告：A active collection=$($knowledgeRuntime.ActiveCollectionName) 与配置=$($config.RagActiveCollectionName) 不一致。" -ForegroundColor Red
         }
     } else {
         Write-Host "警告：无法读取 A 当前运行时知识统计：$($knowledgeRuntime.Error)" -ForegroundColor Red

@@ -13,6 +13,8 @@ function Get-LocalConfig([string]$ConfigPath) {
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
         AutoSyncTestKnowledge = $true
+        RagPrimaryCollectionName = 'documents'
+        RagActiveCollectionName = 'test_knowledge_v031'
         # The dedicated LAN launcher always resolves this value again at startup.
         # 'auto' prevents a stale hotspot or office address from being reused.
         LanAddress = 'auto'
@@ -43,6 +45,24 @@ function Get-LocalConfig([string]$ConfigPath) {
     foreach ($directory in @('backend','frontend','platform_backend')) { if (-not (Test-Path -LiteralPath (Join-Path $root $directory))) { throw "RepositoryRoot 不含 $directory：$root" } }
     $config.RepositoryRoot = $root
     if ([string]::IsNullOrWhiteSpace([string]$config.RuntimeDirectory)) { $config.RuntimeDirectory = Join-Path $root '.runtime' }
+    $runtimePathDefaults = [ordered]@{
+        RagKnowledgeBasePath = (Join-Path $root 'backend\knowledge_base')
+        RagVectorDbPath = (Join-Path $root 'backend\vector_db')
+        RagLogDirectory = (Join-Path $root 'logs')
+        PlatformKnowledgeMaterialStorageDirectory = (Join-Path $root 'platform_backend\.runtime\knowledge-materials')
+    }
+    $rootPrefix = $root.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    foreach ($entry in $runtimePathDefaults.GetEnumerator()) {
+        $configuredPath = if (-not $config.ContainsKey($entry.Key) -or [string]::IsNullOrWhiteSpace([string]$config[$entry.Key])) { [string]$entry.Value } else { [string]$config[$entry.Key] }
+        $fullPath = if ([IO.Path]::IsPathRooted($configuredPath)) { [IO.Path]::GetFullPath($configuredPath) } else { [IO.Path]::GetFullPath((Join-Path $root $configuredPath)) }
+        if ($fullPath -ne $root -and -not $fullPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw "$($entry.Key) 必须位于 RepositoryRoot 内：$fullPath" }
+        $config[$entry.Key] = $fullPath
+    }
+    foreach ($key in @('RagPrimaryCollectionName','RagActiveCollectionName')) {
+        $value = [string]$config[$key]
+        if ([string]::IsNullOrWhiteSpace($value) -or $value -match '[\r\n]') { throw "配置项 $key 必须是单行非空 Collection 名称。" }
+        $config[$key] = $value.Trim()
+    }
     foreach ($name in @('RagPort','CustomerWebPort','PlatformPort','AdminWebPort')) {
         $port = 0
         if (-not [int]::TryParse([string]$config[$name], [ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw "$name 必须为 1-65535 的端口。" }
@@ -287,18 +307,29 @@ function Get-LanPlatformEnvironment($Config) {
     return @{
         DATABASE_URL = [string]$Config.PlatformDatabaseUrl
         CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
+        PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
     }
 }
 
-function Get-LanRagEnvironment($Config) {
+function Get-RagRuntimeEnvironment($Config, [string]$CorsAllowedOrigins) {
     return @{
-        CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
+        CORS_ALLOWED_ORIGINS = $CorsAllowedOrigins
         LLM_PROVIDER = 'ollama'
         LLM_MODEL = [string]$Config.OllamaModel
         LLM_BASE_URL = [string]$Config.OllamaBaseUrl
         PLATFORM_API_BASE_URL = "http://127.0.0.1:$($Config.PlatformPort)"
+        KNOWLEDGE_BASE_PATH = [string]$Config.RagKnowledgeBasePath
+        VECTOR_DB_PATH = [string]$Config.RagVectorDbPath
+        LOG_DIR = [string]$Config.RagLogDirectory
+        CHROMA_COLLECTION_NAME = [string]$Config.RagPrimaryCollectionName
+        TEST_KNOWLEDGE_COLLECTION_NAME = [string]$Config.RagActiveCollectionName
+        ACTIVE_COLLECTION_NAME = [string]$Config.RagActiveCollectionName
     }
 }
+
+function Get-LanRagEnvironment($Config) { Get-RagRuntimeEnvironment $Config ([string]$Config.LanCorsAllowedOrigins) }
+
+function Get-LocalRagEnvironment($Config) { Get-RagRuntimeEnvironment $Config ((@($Config.CorsAllowedOrigins) -join ',')) }
 
 function Get-LanFrontendEnvironment($Config) {
     return @{
@@ -1152,6 +1183,23 @@ function Write-StartupFailureSummary($Config, [string[]]$StartedServices) {
     }
 }
 
+function Stop-StartedServices($Config, [string[]]$StartedServices) {
+    $cleanupFailures = @()
+    foreach ($name in @('admin-web','customer-web','rag','platform')) {
+        if ($StartedServices -notcontains $name) { continue }
+        try {
+            Stop-ManagedService $Config $name
+        } catch {
+            $cleanupFailures += $name
+            Write-Warning "启动失败自动清理未能停止 $name；请使用状态脚本核对受管记录。"
+        }
+    }
+    if ($cleanupFailures.Count -eq 0 -and $StartedServices.Count -gt 0) {
+        Write-Host '启动失败自动清理完成：本轮已启动服务均已停止。' -ForegroundColor Yellow
+    }
+    return @($cleanupFailures)
+}
+
 function Normalize-ProcessPathEnvironment {
     $environment = [Environment]::GetEnvironmentVariables('Process')
     $pathKeys = @($environment.Keys | Where-Object { [string]$_ -match '^path$' })
@@ -1336,12 +1384,20 @@ function Get-RagKnowledgeRuntimeStatistics($Config) {
     try {
         $response = Get-Json $runtimeUrl 'A 运行时知识统计'
         $data = if ($null -ne $response.data) { $response.data } else { $response }
+        $activeCollectionName = if ($data.PSObject.Properties.Name -contains 'active_collection_name') { [string]$data.active_collection_name } else { [string]$data.collection_name }
+        $activeCollectionChunkCount = if ($data.PSObject.Properties.Name -contains 'active_collection_chunk_count' -and $null -ne $data.active_collection_chunk_count) { [int]$data.active_collection_chunk_count } else { [int]$data.chunk_count }
+        $activeCollectionAvailable = if ($data.PSObject.Properties.Name -contains 'active_collection_available') { [bool]$data.active_collection_available } else { -not [string]::IsNullOrWhiteSpace($activeCollectionName) }
+        $availableCollections = if ($data.PSObject.Properties.Name -contains 'available_collections') { @($data.available_collections) } else { @([pscustomobject]@{ name=$activeCollectionName; chunk_count=$activeCollectionChunkCount }) }
         return [pscustomobject]@{
             State = 'AVAILABLE'
             RuntimeUrl = $runtimeUrl
             DocumentCount = [int]$data.document_count
             ChunkCount = [int]$data.chunk_count
-            CollectionName = [string]$data.collection_name
+            CollectionName = $activeCollectionName
+            ActiveCollectionName = $activeCollectionName
+            ActiveCollectionChunkCount = $activeCollectionChunkCount
+            ActiveCollectionAvailable = $activeCollectionAvailable
+            AvailableCollections = $availableCollections
             VectorDatabase = [string]$data.vector_database
             Error = $null
         }
@@ -1352,17 +1408,46 @@ function Get-RagKnowledgeRuntimeStatistics($Config) {
             DocumentCount = $null
             ChunkCount = $null
             CollectionName = $null
+            ActiveCollectionName = $null
+            ActiveCollectionChunkCount = $null
+            ActiveCollectionAvailable = $false
+            AvailableCollections = @()
             VectorDatabase = $null
             Error = $_.Exception.Message
         }
     }
 }
 
-function Get-TestKnowledgeRuntimeConsistency($SyncHistory, $RuntimeStatistics) {
+function Get-TestKnowledgeRuntimeConsistency($SyncHistory, $RuntimeStatistics, [string]$ExpectedCollectionName = '') {
     if ($RuntimeStatistics.State -ne 'AVAILABLE') { return 'STATISTICS_UNAVAILABLE' }
     if ($SyncHistory.State -ne 'HISTORICAL_SYNC') { return 'NO_HISTORICAL_COMPARISON' }
-    if ($RuntimeStatistics.ChunkCount -ne $SyncHistory.CollectionCount) { return 'MISMATCH' }
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedCollectionName) -and $RuntimeStatistics.ActiveCollectionName -ne $ExpectedCollectionName) { return 'ACTIVE_COLLECTION_MISMATCH' }
+    if ($RuntimeStatistics.ActiveCollectionChunkCount -ne $SyncHistory.CollectionCount) { return 'MISMATCH' }
     return 'MATCH'
+}
+
+function Format-RagAvailableCollections($RuntimeStatistics) {
+    $items = @($RuntimeStatistics.AvailableCollections | ForEach-Object { "$([string]$_.name)=$([int]$_.chunk_count)" })
+    if ($items.Count -eq 0) { return '无' }
+    return ($items -join '，')
+}
+
+function Get-RagActiveCollectionStartupState($Config) {
+    $statistics = Get-RagKnowledgeRuntimeStatistics $Config
+    if ($statistics.State -ne 'AVAILABLE') {
+        Write-Warning "A 知识统计不可用：$($statistics.Error)。A/C/B/Admin继续启动，但AI知识smoke将跳过。"
+        return [pscustomobject]@{ Ready=$false; Statistics=$statistics; Reason='STATISTICS_UNAVAILABLE' }
+    }
+    if ($statistics.ActiveCollectionName -ne [string]$Config.RagActiveCollectionName) {
+        Write-Warning "A active collection与配置不一致：配置=$($Config.RagActiveCollectionName)，运行=$($statistics.ActiveCollectionName)。服务继续启动，但AI知识smoke将跳过。"
+        return [pscustomobject]@{ Ready=$false; Statistics=$statistics; Reason='ACTIVE_COLLECTION_MISMATCH' }
+    }
+    if (-not $statistics.ActiveCollectionAvailable -or [int]$statistics.ActiveCollectionChunkCount -le 0) {
+        Write-Warning "A active collection无可用知识：$($statistics.ActiveCollectionName)=$($statistics.ActiveCollectionChunkCount) chunks；available=$(Format-RagAvailableCollections $statistics)。服务继续启动，但AI知识smoke将跳过。"
+        return [pscustomobject]@{ Ready=$false; Statistics=$statistics; Reason='ACTIVE_COLLECTION_EMPTY' }
+    }
+    Write-Host "A active collection检查通过：$($statistics.ActiveCollectionName)=$($statistics.ActiveCollectionChunkCount) chunks；available=$(Format-RagAvailableCollections $statistics)。"
+    return [pscustomobject]@{ Ready=$true; Statistics=$statistics; Reason='READY' }
 }
 
 function Sync-TestKnowledge($Config) {

@@ -38,6 +38,7 @@ function New-ServiceStatuses([int]$CustomerPort, [int]$AdminPort) {
 try {
     $scriptPaths = @(
         'scripts\windows\common_ai_customer_service.ps1',
+        'scripts\windows\start_ai_customer_service.ps1',
         'scripts\windows\check_target_pilot_readiness.ps1',
         'scripts\windows\start_target_pilot.ps1',
         'scripts\windows\recover_target_pilot.ps1',
@@ -135,7 +136,9 @@ try {
     $stopScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\stop_ai_customer_service.ps1') -Raw
     $componentRecoveryScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\test_target_pilot_component_recovery.ps1') -Raw
     $backupScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\backup_target_pilot_data.ps1') -Raw
+    $targetPilotStartScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\start_target_pilot.ps1') -Raw
     if ($recoveryScript -notmatch 'ConfirmRestart' -or $recoveryScript -notmatch 'AllowFirewallGate' -or $recoveryScript -match 'Stop-Process' -or $stopScript -notmatch 'Get-LocalConfig \$ConfigPath' -or $componentRecoveryScript -notmatch 'ConfirmDisruption' -or $componentRecoveryScript -match 'Stop-Process' -or $backupScript -notmatch 'ConfirmBackup' -or $backupScript -notmatch 'source_db.backup') { throw 'Recovery confirmation, backup, config forwarding, or managed-stop boundary is missing.' }
+    if ($targetPilotStartScript -notmatch 'start_ai_customer_service\.ps1' -or $targetPilotStartScript -match 'start_lan_ai_customer_service\.ps1' -or $targetPilotStartScript -notmatch '-Mode Local') { throw 'Target pilot does not use the standard local runtime entry.' }
     $newScriptText = @($scriptPaths | ForEach-Object { Get-Content -LiteralPath (Join-Path $repositoryRoot $_) -Raw }) -join "`n"
     $commonScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1') -Raw
     if ($newScriptText -notmatch 'NoBrowser' -or $newScriptText -match '(?i)(pnpm\s+install|Set-NetFirewall|New-NetFirewall|netsh\s+advfirewall)' -or $commonScriptText -match 'Get-NetTCPConnection') { throw 'Pilot scripts do not preserve the browser, listener-query, dependency, or firewall boundary.' }

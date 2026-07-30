@@ -64,6 +64,7 @@ def api_client(tmp_path: Path):
         llm_provider="bailian",
         llm_model="qwen-turbo",
         dashscope_api_key="",
+        active_collection_name="test_documents",
         rag_distance_threshold=0.35,
         top_k=2,
     )
