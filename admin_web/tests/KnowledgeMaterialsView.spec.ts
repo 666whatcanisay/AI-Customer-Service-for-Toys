@@ -2,93 +2,159 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import KnowledgeMaterialsView from '../src/views/KnowledgeMaterialsView.vue'
-import {
-  getKnowledgeMaterial,
-  getProductKnowledgeOverview,
-  listKnowledgeMaterials,
-  listOperationStores,
-  listProductKnowledgeProducts,
-} from '../src/api/client'
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
-
-vi.mock('../src/api/client', () => ({
+const apiMocks = vi.hoisted(() => ({
   apiErrorMessage: vi.fn(() => '资料服务暂时不可用'),
-  getKnowledgeMaterial: vi.fn(),
-  getProductKnowledgeOverview: vi.fn(),
-  getProductKnowledgeProduct: vi.fn(),
-  listKnowledgeMaterials: vi.fn(),
+  getProductKnowledgeImportMergePreview: vi.fn(),
+  getProductKnowledgeImportPreflight: vi.fn(),
   listOperationStores: vi.fn(),
-  listProductKnowledgeProducts: vi.fn(),
-  reviewKnowledgeMaterial: vi.fn(),
-  uploadKnowledgeMaterial: vi.fn(),
+  reviewProductKnowledgeImport: vi.fn(),
+  uploadProductKnowledgeImport: vi.fn(),
 }))
 
-const mockedList = vi.mocked(listKnowledgeMaterials)
-const mockedDetail = vi.mocked(getKnowledgeMaterial)
-const mockedOverview = vi.mocked(getProductKnowledgeOverview)
-const mockedProducts = vi.mocked(listProductKnowledgeProducts)
-const mockedOperationStores = vi.mocked(listOperationStores)
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
+vi.mock('../src/api/client', () => apiMocks)
 
-const material = {
-  material_id: 'KMT-TEST-1', revision: 1, store_code: 'STORE-ONE', product_id: 'PRODUCT-ONE', sku_id: null,
-  material_type: 'PRODUCT_SPEC' as const, display_name: '积木规格说明', original_filename: 'spec.txt',
-  content_hash: 'sha256:test', redaction_version: 'v1-reminder-only', material_status: 'RECOGNIZED' as const,
-  recognition_summary: { readable: true, file_extension: '.xlsx', detected_fields: ['适用年龄'], missing_expected_fields: ['包装内容'], privacy_reminder: '请确认不包含客户隐私。', template_type: 'PRODUCT_KNOWLEDGE' as const, template_name: '商品知识采集模板', record_count: 1, warnings: [], high_risk_source_confirmed: null },
-  submitted_by: '运营测试', reviewed_by: null, reviewed_at: null, review_note: null,
-  created_at: '2026-07-28T00:00:00Z', updated_at: '2026-07-28T00:00:00Z',
+const preflight = {
+  batch_id: 'batch-r009-1',
+  status: 'IDENTIFIED_PENDING_REVIEW',
+  can_review: true,
+  file_result: { filename: '商品知识采集模板V1.xlsx', valid: true },
+  sheet_results: ['填写说明', '数据填写', '示例数据', '字段说明'].map((sheet_name) => ({
+    sheet_name, present: true, visible: true, valid: true, errors: [],
+  })),
+  field_validation_result: { valid: true, data_row_count: 1, blocking_issue_count: 0, issues: [] },
+  product_identification_result: { total_products: 1, new_count: 1, existing_count: 0, conflict_count: 0 },
 }
 
-describe('KnowledgeMaterialsView', () => {
+const mergePreview = {
+  batch_id: 'batch-r009-1',
+  status: 'IDENTIFIED_PENDING_REVIEW',
+  page: 1,
+  page_size: 200,
+  total: 1,
+  items: [{
+    product: {
+      change_set_id: 'change-1',
+      product_name: '积木小屋',
+      target_product_id: null,
+      operation: 'CREATE',
+      status: 'IDENTIFIED_PENDING_REVIEW',
+      base_snapshot_hash: 'a'.repeat(64),
+      version: 1,
+    },
+    fields: [{
+      field_key: 'product_knowledge.product_summary',
+      field_label: '商品简介',
+      old_value: null,
+      incoming_value: '儿童拼装积木玩具。',
+      merged_value: '儿童拼装积木玩具。',
+      change_type: 'ADD',
+    }],
+  }],
+}
+
+describe('KnowledgeMaterialsView R009', () => {
   beforeEach(() => {
-    mockedList.mockReset()
-    mockedDetail.mockReset()
-    mockedOverview.mockReset()
-    mockedProducts.mockReset()
-    mockedOperationStores.mockReset()
-    mockedOverview.mockResolvedValue({
-      generated_at: '2026-07-28T00:00:00Z', has_data: true,
-      stats: { store_count: 1, product_count: 1, ai_usable_product_count: 1, gap_count: 2, pending_review_count: 1 },
-      stores: [{
-        store_name: '木木小栈拼多多旗舰店', platform_name: '拼多多', product_count: 1,
-        ai_usable_product_count: 1, gap_count: 2, pending_review_count: 1,
-        technical_details: { store_code: 'STORE-ONE', platform: 'pinduoduo', product_id: null, product_code: null, sku_id: null, sku_code: null, source_id: null, material_id: null, revision: null, content_hash: null },
-      }], boundary_note: '不代表知识已发布到 RAG。',
-    })
-    mockedProducts.mockResolvedValue({
+    sessionStorage.clear()
+    vi.clearAllMocks()
+    vi.stubGlobal('alert', vi.fn())
+    apiMocks.listOperationStores.mockResolvedValue({
       items: [{
-        store_name: '木木小栈拼多多旗舰店', product_name: 'Q66城市消防局机械积木玩具套装',
-        product_summary: '消防主题机械积木。', core_selling_points: ['机械联动'], sku_names: ['豪华版'],
-        applicable_age: '8—14 岁', material_safety: 'ABS', package_contents: '积木、说明书', faq_count: 1,
-        coverage_percent: 80, ai_usable: true, knowledge_state: 'BASIC_AVAILABLE', answerable_topics: ['商品介绍'],
-        data_status: 'APPROVED', ai_status: 'PARTIALLY_AVAILABLE',
-        missing_topics: ['适用年龄'], gap_count: 1,
-        technical_details: { store_code: 'STORE-ONE', platform: 'pinduoduo', product_id: 'PRODUCT-ONE', product_code: null, sku_id: null, sku_code: null, source_id: null, material_id: null, revision: null, content_hash: null },
-      }], total: 1,
+        store_ref: 7,
+        store_name: '玩趣乐园积木店-拼多多',
+        platform_name: '拼多多',
+        status: 'ACTIVE',
+        status_name: '正常',
+        product_count: 0,
+        created_at: '2026-07-30T00:00:00Z',
+        remarks: '',
+      }],
+      total: 1,
     })
-    mockedOperationStores.mockResolvedValue({ items: [], total: 0 })
-    mockedList.mockResolvedValue({ items: [material], total: 1, page: 1, size: 20 })
-    mockedDetail.mockResolvedValue({ ...material, analysis_text_preview: '适用年龄：6-12岁。' })
+    apiMocks.uploadProductKnowledgeImport.mockResolvedValue({
+      batch_id: 'batch-r009-1',
+      status: 'IDENTIFIED_PENDING_REVIEW',
+    })
+    apiMocks.getProductKnowledgeImportPreflight.mockResolvedValue(preflight)
+    apiMocks.getProductKnowledgeImportMergePreview.mockResolvedValue(mergePreview)
+    apiMocks.reviewProductKnowledgeImport.mockResolvedValue({
+      receipt_id: 'receipt-1',
+      batch_id: 'batch-r009-1',
+      change_set_id: 'change-1',
+      decision: 'APPROVE',
+      outcome: 'APPLIED',
+      reviewed_by: '知识运营',
+      reviewed_at: '2026-07-30T00:00:00Z',
+      applied_product_id: 'product-1',
+      applied_field_count: 1,
+      before_snapshot_hash: 'a'.repeat(64),
+      after_snapshot_hash: 'b'.repeat(64),
+    })
   })
 
-  it('shows the Chinese controlled upload workflow and never advertises automatic publication', async () => {
-    const wrapper = mount(KnowledgeMaterialsView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+  it('shows the three-step fixed-template workflow and marks five templates as developing', async () => {
+    const wrapper = mount(KnowledgeMaterialsView, {
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('资料上传与审核')
-    expect(wrapper.text()).toContain('下载中文资料模板')
-    expect(wrapper.text()).toContain('不会自动发布')
-    expect(wrapper.text()).toContain('木木小栈拼多多旗舰店')
-    expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装')
-    expect(wrapper.text()).toContain('积木规格说明')
-    expect(wrapper.text()).toContain('已识别，待审核')
-    expect(wrapper.text()).not.toContain('RECOGNIZED')
-    expect(wrapper.text()).not.toContain('自动训练')
+    expect(wrapper.text()).toContain('Step 1 · 目标业务店铺')
+    expect(wrapper.text()).toContain('Step 2 · 导入模板类型')
+    expect(wrapper.text()).toContain('Step 3 · 商品知识 Excel')
+    expect(wrapper.text()).toContain('商品知识采集模板 · 已支持')
+    expect(wrapper.text().match(/开发中/g)).toHaveLength(5)
+    expect(wrapper.text()).toContain('不调用 AI')
+    expect(wrapper.text()).toContain('审核前正式数据零写入')
 
-    await wrapper.get('.link-button').trigger('click')
+    const templateSelect = wrapper.findAll('select')[1]
+    await templateSelect.setValue('FAQ')
+    expect(window.alert).toHaveBeenCalledWith('该模板导入功能暂未开放')
+    expect(wrapper.text()).toContain('该模板导入功能暂未开放')
+  })
+
+  it('uploads the supported workbook, renders field merge values, and submits approval', async () => {
+    const wrapper = mount(KnowledgeMaterialsView, {
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
     await flushPromises()
-    expect(wrapper.text()).toContain('人工核对')
-    expect(wrapper.text()).toContain('适用年龄：6-12岁。')
-    expect(wrapper.text()).not.toContain('raw_storage_path')
+
+    await wrapper.findAll('select')[0].setValue('7')
+    await wrapper.get('input[placeholder="填写运营人员姓名或账号"]').setValue('知识运营')
+    const fileInput = wrapper.get('input[type="file"]')
+    const file = new File(['workbook'], '商品知识采集模板V1.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    Object.defineProperty(fileInput.element, 'files', { configurable: true, value: [file] })
+    await fileInput.trigger('change')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(apiMocks.uploadProductKnowledgeImport).toHaveBeenCalledWith(
+      file,
+      { store_ref: 7, template_type: 'PRODUCT_KNOWLEDGE', operator: '知识运营' },
+      expect.stringContaining('product-knowledge-upload-'),
+    )
+    expect(wrapper.text()).toContain('文件预检结果')
+    expect(wrapper.text()).toContain('积木小屋')
+    expect(wrapper.text()).toContain('商品简介')
+    expect(wrapper.text()).toContain('儿童拼装积木玩具。')
+    expect(wrapper.text()).toContain('新增')
+    expect(wrapper.text()).toContain('已识别待审核')
+
+    await wrapper.get('.review-actions .button').trigger('click')
+    await flushPromises()
+    expect(apiMocks.reviewProductKnowledgeImport).toHaveBeenCalledWith(
+      'batch-r009-1',
+      'change-1',
+      expect.objectContaining({
+        decision: 'APPROVE',
+        operator: '知识运营',
+        expected_base_snapshot_hash: 'a'.repeat(64),
+        expected_change_set_version: 1,
+      }),
+      expect.stringContaining('product-knowledge-approve-'),
+    )
+    expect(wrapper.text()).toContain('已审核通过并完成字段级 Merge')
   })
 })
