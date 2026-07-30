@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`C_BACKEND_RUNTIME_REBUILT / PHASE_D_RERUN_READY / PHASE_E_BLOCKED`
+> 当前 Gate：`TARGET_VALIDATION_PASS / PHASE_E_ENTRY_READY / PHASE_E_NOT_EXECUTED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -30,7 +30,7 @@
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase D2已用显式Python 3.12.13重建Target C venv；冻结requirements安装、pip check、30项inventory、哈希和Git Gate通过。 | 另行授权完整重跑Phase D；Phase E禁止进入。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase D Retry全项PASS：365 passed/3 skipped，C 95项实际执行、迁移往返、两端构建和7 schema通过；Target clean、Recovery不变。 | 可另行申请Phase E；本轮未启动或切换Runtime。 |
 
 ## 3. 当前真正阻塞点
 
@@ -38,7 +38,7 @@ R004已关闭。R006 V1.1业务方向可行，但静态代码映射发现两个�
 
 并行外部阻塞仍为 R007：第二台客服终端的公司网络可达性尚未验收，本轮本机四服务运行成功不等于 LAN Gate 已关闭。
 
-R008 Phase D2已关闭Target解释器环境阻塞：旧venv 3.11.9经显式3.12.13解释器`venv --clear`受控重建，新Python为3.12.13、pip为25.0.1；30项freeze依赖集合与旧环境一致，`pip check`通过。requirements SHA-256前后均为`73A11B...B986`，Target仍为`26f8cde...`且clean，Source Tag不变；Recovery C venv哈希、原8011 PID与HTTP 200保持。完整Phase D尚未重跑，Phase E继续关闭。
+R008 Phase D Retry已关闭PM-D03：失败版和Retry使用相同`26f8cde.../9940eb2...`，唯一批准环境差异为C Python `3.11.9→3.12.13`。本轮重新执行全部矩阵，A `101 passed/3 skipped`、C `95/95`、B `115`、Admin `54`、两端typecheck/build、contracts 0.2.0/7 schema及`0008→0007→0008`隔离迁移全部通过。130个外部临时文件与两端Vitest缓存已清理；7项输入哈希、Target clean、RAG保护目录、Recovery四PID/HTTP和SQLite元数据均不变。
 
 ## 4. 需求依赖与执行顺序
 
@@ -74,13 +74,13 @@ R008 Phase B Source Tag Code Materialization COMPLETE
   ↓ Phase D Target Validation FAILED（C pytest收集失败）
   ↓ Phase D1 Python Runtime Compatibility CONFIRMED（Python 3.12.13）
   ↓ Phase D2 Target C venv REBUILT（Python 3.12.13）
-  ↓ 单独授权完整Phase D复验
-  ↓ 全项PASS后才可申请E–F逐阶段Gate
+  ↓ Phase D Retry PASS（完整矩阵）
+  ↓ 单独授权Phase E Runtime Migration
   ↓ 迁移与运行切换必须分开Gate
 R008 运行切换 / Worktree退役（仍未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的完整Phase D复验。不得只重跑C后沿用旧PASS，不得修改源码、连接Recovery数据库、占用标准端口或切换服务。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase E Runtime Migration。Phase E必须验证受管PID/目录/SHA、数据路径、四服务health和失败回滚，不得把Phase D PASS直接写成已切换。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
 
 ## 5. 防重复结论
 
@@ -89,6 +89,6 @@ R008 运行切换 / Worktree退役（仍未授权）
 - R003 是问题记录，R006 是解决任务：不要为同一激活问题创建第三个重复需求。
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
-- R008 Phase D2已完成venv重建：不要把环境可用、AST解析或`pip check`误当成Target测试通过；完整Phase D PASS前不得进入Phase E。
+- R008 Phase D已PASS：不要把测试通过误写成Target已经运行、数据已迁移或Phase E已完成；下一阶段仍须独立授权和Runtime Gate。
 
-最终状态：`C_BACKEND_RUNTIME_REBUILT`
+最终状态：`TARGET_VALIDATION_PASS`
