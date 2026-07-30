@@ -3,11 +3,11 @@
   "project_id": "AI-CS-C",
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
-  "version": "R009 Browser Acceptance Phase 5 V1",
-  "current_task": "AI-CS R009 Browser Acceptance Environment Enablement and Phase 5",
-  "current_stage": "Chrome extension-backed control now works for 5174 navigation, click, select and fill. File selection is blocked because the extension lacks file URL access. The actual formal runtime remains 4edf131/0008 and exposes the pre-R009 knowledge-material flow, so R009 parse, Merge and review cannot run without a separately authorized runtime/database deployment.",
-  "current_gate": "R009_BROWSER_ACCEPTANCE_BLOCKED_RUNTIME_AND_UPLOAD_PERMISSION",
-  "status": "browser_control_ready_r009_business_acceptance_blocked",
+  "version": "R009 Acceptance Runtime Preparation V1",
+  "current_task": "AI-CS R009 Acceptance Runtime Preparation V1",
+  "current_stage": "An isolated acceptance runtime now runs the exact R009 RC 8b83a20 on Admin 5179, C API 19011 and A 19000. Its SQLite snapshot is independently migrated to 0009, the controlled browser shows the R009 three-step page, and the formal 4edf131/0008 Pilot remains unchanged.",
+  "current_gate": "R009_ACCEPTANCE_RUNTIME_READY",
+  "status": "r009_acceptance_runtime_ready",
   "contracts": [
     "contracts/version.json 0.2.0 (unchanged)",
     "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
@@ -52,7 +52,7 @@
     "shared_contract_version": "0.2.0 unchanged",
     "database_change": true,
     "migration": "0009_product_knowledge_import_v1",
-    "verified": "RC Backend 101 tests; Admin 25 files/55 tests, typecheck and production build; 0009 AST and Alembic graph static validation. No database migration was executed during RC assembly."
+    "verified": "RC Backend 101 tests; Admin 25 files/55 tests, typecheck and production build; 0009 graph validation. The acceptance-only SQLite copy is now at 0009 with integrity ok; the formal database remains 0008."
   },
   "data_boundaries": {
     "formal_data_write_before_review": false,
@@ -78,7 +78,7 @@
     "AI_FEEDBACK": "NOT_OPEN",
     "KNOWLEDGE_GAP": "NOT_OPEN"
   },
-  "last_test_result": "2026-07-30 Phase 5: Chrome 151, ChatGPT Chrome Extension and native host verified; controlled 5174 open/navigation/store/template/text interactions passed with screenshots. setFiles was denied because file URL access is off. Formal runtime is still 4edf131/0008; current page is the legacy store-product-SKU-material flow, R009 tables are absent, and no upload/review/database write occurred.",
+  "last_test_result": "2026-07-30 acceptance runtime: exact RC 8b83a20 runs on 5179/19011/19000; controlled Chrome shows the R009 store-template-Excel three-step page with two stores loaded. C health/OpenAPI and four R009 routes pass; isolated SQLite is 0009 with integrity ok and all three R009 tables; A is ready with active test_knowledge_v031 and 47 chunks. Formal 4edf131/0008 and 5173/5174/8000/8011 are unchanged.",
   "test_commands": [
     "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
     "cd platform_backend; static-only AST and Alembic ScriptDirectory graph validation for 0009 (no database URL, no upgrade/downgrade)",
@@ -90,8 +90,8 @@
     "Automatic redaction is not implemented; operators must remove customer personal information before upload.",
     "Downgrading 0009 does not undo product knowledge already applied by an approved review receipt.",
     "Formal Runtime deployment and live database migration were not performed in this task.",
-    "Controlled Chrome is now available, but file upload requires the user to enable file URL access in the ChatGPT Chrome Extension.",
-    "The formal 5174/8011 runtime remains 4edf131/0008 and cannot provide R009 parse, Merge or review evidence until separately deployed."
+    "Controlled Chrome is available, but file upload requires the user to enable file URL access in the ChatGPT Chrome Extension.",
+    "The acceptance Runtime is local and ephemeral; its database, logs, knowledge copies and PID record are Git-ignored and must not be treated as production assets."
   ],
   "out_of_scope": [
     "The other five workbook import implementations",
@@ -100,8 +100,7 @@
     "Automatic knowledge publication, customer activation, messaging, refunds, orders or ERP writes"
   ],
   "blockers": [
-    "ChatGPT Chrome Extension file URL access is disabled; the controlled file chooser rejects setFiles.",
-    "Formal runtime is 4edf131 with database revision 0008; R009 RC and 0009 are intentionally not deployed, so the requested business acceptance surface is unavailable."
+    "The acceptance Runtime itself is ready. Full Excel browser acceptance still requires enabling file URL access in the ChatGPT Chrome Extension."
   ],
   "git": {
     "branch": "control/browser-acceptance-environment-v1",
@@ -113,18 +112,29 @@
     "r009_source_anchor": "aacdc07adc401c6972aaa279bb6f55c434a976ad",
     "release_candidate_code_merge": "b714b1d6954c14eefff061dc8cd841d89315cce4",
     "formal_runtime_head": "4edf131cb341993b12a0143b0388d932b29faf84",
-    "runtime_deployed": false
+    "runtime_deployed": false,
+    "acceptance_runtime_deployed": true,
+    "acceptance_runtime_sha": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33"
   },
   "browser_acceptance": {
     "browser": "Google Chrome 151.0.7922.71 via ChatGPT Chrome Extension",
-    "url": "http://127.0.0.1:5174/knowledge-materials",
-    "control": "PASS: open, navigate, click, select, fill and DOM/screenshot read",
+    "url": "http://127.0.0.1:5179/knowledge-materials",
+    "control": "PASS: isolated R009 page open, DOM read, screenshot and store options loaded",
     "file_upload": "BLOCKED: enable Allow access to file URLs",
-    "runtime": "4edf131cb341993b12a0143b0388d932b29faf84",
-    "database_revision": "0008_customer_feedback_loop_v1",
+    "runtime": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33",
+    "database_revision": "0009_product_knowledge_import_v1",
     "database_write": false,
-    "report": "docs/platform/30_AI-CS_R009_Browser_Acceptance_Report_V1.md"
+    "report": "docs/platform/31_AI-CS_R009_Acceptance_Runtime_Ready_Report_V1.md"
   },
-  "next_recommended_task": "User enables file URL access for the ChatGPT Chrome Extension. Then obtain separate authorization to deploy R009 RC/0009 or provide an isolated R009 acceptance runtime; rerun Phase 5 only on the correct SHA and schema revision. RAG/B consumption remains out of scope.",
+  "acceptance_runtime": {
+    "repository_root": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-r009-release-candidate-v1",
+    "runtime_root": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-r009-release-candidate-v1\\.runtime\\r009-acceptance-runtime-v1",
+    "admin_url": "http://127.0.0.1:5179/knowledge-materials",
+    "platform_url": "http://127.0.0.1:19011",
+    "ai_url": "http://127.0.0.1:19000",
+    "database_revision": "0009_product_knowledge_import_v1",
+    "formal_runtime_unchanged": true
+  },
+  "next_recommended_task": "Enable file URL access for the ChatGPT Chrome Extension, then rerun R009 browser acceptance only on 5179/19011/19000 and the isolated 0009 database. Do not use formal 5174/8011; RAG/B consumption remains out of scope.",
   "last_updated": "2026-07-30"
 }
