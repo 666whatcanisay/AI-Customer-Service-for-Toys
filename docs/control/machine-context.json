@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "shadow_runtime_pass",
-  "current_task": "R008 Phase E1 Green Shadow Runtime Execution",
-  "current_stage": "Phase E1 passed. Target 26f8cde is running four verified loopback shadow services on 15173/15174/18000/18011 from isolated SQLite, knowledge, vector and runtime paths. B and Admin browser checks passed; Admin runtime configuration and direct read-only requests prove AI traffic targets 18000 and Platform traffic targets 18011. A is ready with 47 queryable chunks and one successful model call since startup. Recovery cbc77ed remains running unchanged on all standard ports. Phase E2 standard-port cutover still requires separate authorization and a controlled no-write window.",
-  "current_gate": "SHADOW_RUNTIME_PASS / PHASE_E2_ENTRY_READY / STANDARD_PORT_CUTOVER_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED",
+  "status": "runtime_migration_complete",
+  "current_task": "R008 Phase E2 Standard Port Cutover Execution",
+  "current_stage": "Phase E2 passed. The standard runtime now runs from AI-CS@26f8cde on 5173/5174/8000/8011 with verified managed records, clean source identity, C revision 0008, A ready/model configured with 47 chunks, B catalog plus synthetic AI-answer smoke, and Admin runtime routing to 8000/8011. Shadow services are stopped. Recovery cbc77ed is stopped but its repository, final SQLite online backup, RAG assets and original configuration remain preserved as the rollback anchor. Phase F worktree or old-directory handling is not authorized.",
+  "current_gate": "RUNTIME_MIGRATION_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_STOPPED_PRESERVED / PHASE_F_NOT_AUTHORIZED",
   "phase_e_plan": {
     "report": "docs/control/AI-CS-Phase-E-Runtime-Migration-Plan-V1.md",
     "recovery": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
@@ -19,8 +19,8 @@
     "admin_shadow_api_override_required": true,
     "shadow_runtime_executed": true,
     "shadow_runtime_passed": true,
-    "standard_port_cutover_executed": false,
-    "runtime_migration_executed": false
+    "standard_port_cutover_executed": true,
+    "runtime_migration_executed": true
   },
   "phase_e1_execution": {
     "report": "docs/control/AI-CS-Phase-E1-Shadow-Runtime-Execution-Report-V1.md",
@@ -59,7 +59,52 @@
     },
     "recovery_standard_listener_pids": {"B_5173": 33360, "C_ADMIN_5174": 38224, "A_8000": 24844, "C_API_8011": 44428},
     "phase_e2_entry_ready": true,
-    "phase_e2_authorized": false
+    "phase_e2_authorized": true
+  },
+  "phase_e2_execution": {
+    "report": "docs/control/AI-CS-Phase-E2-Standard-Port-Cutover-Report-V1.md",
+    "result": "RUNTIME_MIGRATION_COMPLETE",
+    "completed_utc": "2026-07-30T05:39:18.6480152Z",
+    "quiet_window_confirmed": true,
+    "shadow_ports_released": [15173, 15174, 18000, 18011],
+    "target_runtime": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS@26f8cde1e8f7373315baa1ac68d02f7823b4de82",
+    "target_branch": "control/r008-physical-migration-v1",
+    "target_source_state": "CLEAN",
+    "services": {
+      "C_API": {"port": 8011, "managed_pid": 21372, "listener_pid": 20424},
+      "A": {"port": 8000, "managed_pid": 27616, "listener_pid": 25528},
+      "B": {"port": 5173, "managed_pid": 13412, "listener_pid": 13412},
+      "C_ADMIN": {"port": 5174, "managed_pid": 42400, "listener_pid": 6188}
+    },
+    "data_isolation": {
+      "platform_database": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/data/standard-platform.sqlite3",
+      "database_integrity": "ok",
+      "database_revision": "0008_customer_feedback_loop_v1",
+      "knowledge_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/standard-rag/knowledge-base",
+      "vector_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS/.runtime/phase-e/standard-rag/vector-db",
+      "recovery_writable_path_shared": false,
+      "recovery_final_backup_preserved": true,
+      "recovery_rag_preserved": true
+    },
+    "validation": {
+      "C_health_revision": "PASS; 0008_customer_feedback_loop_v1",
+      "A_health_status_model": "PASS; ready=true; model_configured=true",
+      "A_queryable_chunks": 47,
+      "B_browser_catalog_and_ai_answer": "PASS; synthetic question; no adoption or feedback write",
+      "Admin_browser": "PASS",
+      "Admin_AI_target": "http://127.0.0.1:8000",
+      "Admin_Platform_target": "http://127.0.0.1:8011",
+      "shadow_port_reference_absent": true,
+      "browser_console_errors": 0,
+      "browser_console_warnings": 0
+    },
+    "recovery": {
+      "runtime": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+      "services": "STOPPED",
+      "repository_and_data_preserved": true,
+      "rollback_triggered": false
+    },
+    "phase_f_authorized": false
   },
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
@@ -342,6 +387,7 @@
     "B": "Node v24.14.0, npm 10.9.2; typecheck exit 0; production build exit 0; no test script",
     "C_backend": "Python 3.12.13; pytest 3 passed; GET /health HTTP 200; request header, response header, and response body request_id matched",
     "C_admin": "Node v24.14.0, pnpm 11.9.0; typecheck exit 0; Vitest 3 passed; production build exit 0",
+    "R008_PHASE_E2_STANDARD_PORT_CUTOVER": "The authorized quiet window had no sustained standard-port client sessions and stable Recovery SQLite metadata. Target shadow services were stopped through managed records and all four shadow ports released. Recovery final runtime records, SQLite online backup and RAG manifests were preserved; Recovery then stopped in Admin/B/A/C order. Target 26f8cde started C/A/B/Admin on 8011/8000/5173/5174 with verified paths, PIDs, clean source identity, C revision 0008, A ready/model configured with 47 chunks, B synthetic AI-answer smoke and Admin runtime routing to 8000/8011. Recovery remains stopped and preserved; rollback was not triggered.",
     "R008_PHASE_E1_SHADOW_RUNTIME": "Target 26f8cde started C/A/B/Admin in the frozen order on 18011/18000/15173/15174 from isolated .runtime/phase-e data. Official status verified all runtime identities clean, C revision 0008, A ready with 47 chunks, and one successful model call. Browser checks passed for B chat and Admin control center. The served Admin runtime module contained AI 18000, Platform 18011 and Target short SHA with no standard-port fallback; both Admin-origin read-only endpoints returned HTTP 200 and correct CORS. Recovery cbc77ed services, standard listener PIDs, SQLite metadata and RAG source hashes remained unchanged.",
     "CONTROL_LOCAL_DEMO_FINAL": "C parser tests: 60 passed with one existing TestClient deprecation warning; OPS runtime script unit checks passed. After the user released an external 5173 listener, the official script applied Alembic revisions 0001 and 0002, imported PDD-SM-2026-001-TEST, synced 47/47 items, passed a sourced real Ollama chat smoke, and the official status script exited 0. C direct raw-ZIP preflight, catalog 1/5/18 counts, allowed/denied CORS checks, A health/status, and B HTTP 200 were independently verified.",
     "CONTROL_LAN_BATCH_05": "A LAN CORS squash and OPS LAN startup squash were integrated without conflicts. Main-tree A regression: 52 passed, 2 explicitly gated real-RAG skips. Main-tree OPS LAN self-test passed. After the user changed Ethernet to Private, official LAN startup completed migration, imported-test-only package validation, 47/47 sync, real Ollama smoke, LAN CORS, C catalog 1/5/18, and B LAN HTTP 200. A scope collision in Invoke-WithProcessEnvironment overwrote service names with environment variable names.",
@@ -407,24 +453,24 @@
     "R008 Phase D2 Target C venv rebuilt with explicit Python 3.12.13 and frozen requirements",
     "R008 Phase D Target Validation Retry passed the complete A/C/B/Admin/contracts matrix without runtime changes",
     "R008 Phase E Runtime Migration Preparation completed the read-only preflight and blue-green execution plan without runtime changes",
-    "R008 Phase E1 Green Shadow Runtime passed with isolated data, verified Admin routing and unchanged Recovery"
+    "R008 Phase E1 Green Shadow Runtime passed with isolated data, verified Admin routing and unchanged Recovery",
+    "R008 Phase E2 Standard Port Cutover completed with Target standard runtime active and Recovery stopped but preserved"
   ],
   "next_tasks": {
-    "CONTROL": "Wait for separate user authorization of Phase E2 standard-port cutover and a controlled no-write window. Do not treat shadow PASS as full migration or stop Recovery before that authorization.",
-    "OPS": "Preserve Recovery cbc77ed and all data/records. On explicit Phase E2 authorization, first stop the four Target shadow services through their verified managed records, confirm shadow ports are free, take the final Recovery backup, then use only verified managed records for standard-port cutover and rollback.",
-    "A_B_C": "Keep code, UI, contracts, requirements and lockfiles frozen. During Phase E2, verify capabilities through read-only/synthetic smoke only; no business writes, R006 implementation, model/prompt/RAG changes or UI redesign.",
+    "CONTROL": "Keep R008 IN_PROGRESS until Phase F is separately authorized and closed. Treat AI-CS@26f8cde as the active standard runtime and Recovery cbc77ed as a stopped rollback anchor; do not repeat Phase E2 or delete Recovery.",
+    "OPS": "Operate 5173/5174/8000/8011 only through Target green-standard managed records. Preserve Recovery repository, final backup, RAG assets and config. If a core failure occurs before real writes, perform managed Target stop and Recovery restart; after real writes, take a backup and govern data reconciliation first.",
+    "A_B_C": "Keep code, UI, contracts, requirements and lockfiles frozen until a new registered task is authorized. Runtime migration does not authorize R006, model/prompt/RAG changes, UI redesign or business-data activation.",
     "CONTRACTS": "Remain unchanged at 0.2.0; all seven schemas pass. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
-    "QA": "During separately authorized Phase E2, re-verify Target standard-port PID/path/SHA, SQLite revision/integrity/count invariants, 47-chunk RAG state, B/C pages, Admin standard-port routing, no automatic action, and successful Recovery rollback. Do not reuse shadow evidence as standard-port evidence."
+    "QA": "For any later restart or Phase F entry, re-verify Target PID/path/SHA, SQLite revision/integrity/count invariants, 47-chunk RAG state, B/C pages and Admin 8000/8011 routing. Do not infer R006 or Pilot business acceptance from the runtime migration."
   },
   "t02_executed": false,
   "blockers": [
     "SF-R01: ai-cs-monorepo-source-freeze-v1 is currently a local annotated tag. A remote or controlled offline copy is required before retiring the source directory, but this does not block a separately authorized isolated Physical Migration.",
     "SF-R02: eight pre-existing dirty worktrees and four detached worktrees remain quarantined or pending classification. No worktree may be removed or force-cleaned; this blocks their retirement, not the new target migration entry.",
-    "PM-E02: Phase E1 is complete, but Phase E2 standard-port cutover and its no-write window have not been authorized. Recovery must not be stopped until explicit Phase E2 authorization.",
-    "PM-E05: Immediate rollback is lossless only while the cutover window remains write-free. If Target accepts writes after opening, backup and separate data reconciliation are required before database rollback.",
+    "PM-E05: Immediate database rollback remains lossless only while Target has accepted no new business writes. If Target accepts writes, backup and separate data reconciliation are required before returning to the Recovery database.",
     "PM-R03: frontend npm ci reports 13 frozen-tree vulnerabilities (4 moderate, 8 high, 1 critical), and Python requirements contain ranges rather than a full transitive hash lock. This does not fail Phase C installation, but production security and immutable dependency claims require separate governed remediation; no automatic upgrade is authorized.",
-    "PM-R02: code migration does not migrate business data. If target runtime later references the Recovery root database or vectors, that root remains an active dependency and cannot be archived until a separately authorized stable data-path plan and rollback evidence exist.",
-    "The active Pilot uses AI-CS-pilot-baseline-recovery-v1@cbc77ed, not the migration-source root. The Recovery directory, runtime records, SQLite and vector assets must remain in place until a later controlled switch and rollback rehearsal pass.",
+    "PM-R02: Target standard runtime now uses an isolated final SQLite and RAG snapshot, not Recovery writable paths. Recovery data remains a rollback asset and cannot be archived until a separately authorized retention and rollback decision is complete.",
+    "PM-E06: The active standard runtime is AI-CS@26f8cde and Recovery cbc77ed is stopped but preserved. Phase F cannot remove or rename Recovery until Target stability, protection references and rollback retention are explicitly accepted.",
     "IV11-B01: the current catalog tables mix IMPORTED_TEST_ONLY records with MANUAL_CREATED/c-operation-store.v1 records, but V1.1 does not yet freeze the exact one-time provenance mapping and quarantine rule; bulk TEST plus ENABLED initialization is unsafe.",
     "IV11-B02: V1.1 does not yet freeze the exact Store/Product status-write success response, changed=false idempotency behavior, or a receipt persistence verification/read-back mechanism.",
     "No contracts 0.3.0 schema, C status persistence, migration, Admin control or B consumer implementation exists; this static validation is not runtime evidence.",

@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`SHADOW_RUNTIME_PASS / PHASE_E2_ENTRY_READY / STANDARD_PORT_CUTOVER_NOT_AUTHORIZED / RECOVERY_RUNTIME_UNCHANGED`
+> 当前 Gate：`RUNTIME_MIGRATION_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_STOPPED_PRESERVED / PHASE_F_NOT_AUTHORIZED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -26,11 +26,11 @@
 | R001 | C商品知识运营中心V2 | `DONE` | 中文业务展示、知识模板、知识状态和知识缺口已进入正式 Recovery 基线。 | 不得重做结构。 |
 | R002 | AI客服反馈沉淀闭环 | `DONE` | 采用状态、反馈保存、C问题中心和知识优化链路已按 B/C/contracts 拆分进入正式基线。 | 真实效果转 R005。 |
 | R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | C能新增、B不能消费；R006 V1.1验证已完成但Implementation仍被两个P0空白阻塞。 | 先关闭IV11-B01/B02，再实施并按目标链路验收。 |
-| R004 | AI-CS运行版本统一 | `DONE` | 唯一 Recovery 分支、独立提交、contracts 0.2.0、全量测试和四服务同 SHA 运行已完成。 | 继续保持 `ai-cs-pilot-baseline-v1` 为 R006 唯一基线。 |
+| R004 | AI-CS运行版本统一 | `DONE` | Baseline Tag、独立提交、contracts 0.2.0和全量测试均已建立；R008已把相同受保护应用Tree物化并切换到Target标准Runtime。 | 开发前核验Target目录、SHA、受管记录与contracts；Recovery Tag继续作为回滚保护引用。 |
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 只有工程和隔离验证，没有真实客服运行后的改善证据。 | 统一基线和业务数据可用后开展受控 Pilot。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase E1影子运行PASS：Target四服务同SHA运行于15173/15174/18000/18011，独立SQLite/RAG路径、Admin实际路由、页面/API/模型均通过；Recovery未变化。 | 另行授权Phase E2标准端口切换及人工无写入窗口；不得直接停Recovery。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Phase E2已完成：5173/5174/8000/8011由Target `26f8cde...`同SHA运行；C/A/B/Admin、独立数据路径与实际路由通过，Recovery已停止并完整保留。 | 先保持Target稳定运行和Recovery回滚锚点；Phase F旧目录处理必须另行授权。 |
 
 ## 3. 当前真正阻塞点
 
@@ -40,7 +40,7 @@ R004已关闭。R006 V1.1业务方向可行，但静态代码映射发现两个�
 
 R008 Phase D Retry已关闭PM-D03：失败版和Retry使用相同`26f8cde.../9940eb2...`，唯一批准环境差异为C Python `3.11.9→3.12.13`。本轮重新执行全部矩阵，A `101 passed/3 skipped`、C `95/95`、B `115`、Admin `54`、两端typecheck/build、contracts 0.2.0/7 schema及`0008→0007→0008`隔离迁移全部通过。130个外部临时文件与两端Vitest缓存已清理；7项输入哈希、Target clean、RAG保护目录、Recovery四PID/HTTP和SQLite元数据均不变。
 
-R008 Phase E1已关闭Green验证风险：Target在15173/15174/18000/18011使用独立SQLite、知识和向量快照运行；Admin实际注入并请求18000/18011，A ready且47 chunks，B/C页面与业务只读投影通过。Target向量副本在A初始化后产生仅限Target的运行写入，而Recovery源哈希保持不变，证明未共享可写路径。当前影子四服务保持受管运行；Recovery继续占用标准端口且未变化。剩余运行阻塞只有Phase E2尚未授权、无写入窗口尚未建立、标准端口切换与回滚尚未验收。
+R008 Phase E2已关闭标准端口迁移风险：影子服务先受管停止并释放端口；Recovery最终PID/health、SQLite online backup和RAG manifest已留存；Recovery按Admin→B→A→C停止，Target按C→A→B→Admin启动。当前标准端口全部由Target `26f8cde...`运行，C revision 0008、A ready/47 chunks、B真实合成问题AI建议、Admin实际8000/8011路由均PASS。Recovery目录与数据完整保留但服务已停止。剩余R008工作是单独授权的Phase F和旧Worktree治理，不是再次切换Runtime。
 
 ## 4. 需求依赖与执行顺序
 
@@ -79,12 +79,12 @@ R008 Phase B Source Tag Code Materialization COMPLETE
   ↓ Phase D Retry PASS（完整矩阵）
   ↓ Phase E Runtime Migration Plan READY
   ↓ Phase E1 Green Shadow Runtime PASS
-  ↓ 单独授权Phase E2与人工无写入窗口
-  ↓ 受管停止影子 → 受管标准端口切换 → Recovery回滚验收
+  ↓ Phase E2 Standard Port Cutover COMPLETE
+  ↓ Target标准端口持续运行；Recovery停止并保留回滚锚点
 R008 Worktree退役 / Phase F（仍未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase E2 Runtime Cutover。E2必须先用受管记录停止本次影子、确认无写入窗口和Recovery最终备份，再验证标准端口PID/目录/SHA、数据路径、四服务health和失败回滚；不得把影子PASS写成已切换。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008 Runtime迁移已经完成，下一项只能是用户另行授权的Phase F。当前必须按Target受管记录维护标准端口，并保留停止状态的Recovery目录、最终备份与RAG锚点；不得重复执行E2、删除Recovery或把迁移结果写成R006/R003/R005验收。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
 
 ## 5. 防重复结论
 
