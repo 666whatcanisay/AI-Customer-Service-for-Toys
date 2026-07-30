@@ -18,6 +18,8 @@
 >
 > 当前Gate：`MONOREPO_MIGRATION_PLAN_READY / MIGRATION_NOT_AUTHORIZED`
 
+> 后续裁决：本文件第3、5、8、10节中涉及`apps/**`、`services/**`及核心目录重命名的方案，已被[AI-CS Physical Migration Execution Plan V1](AI-CS-Physical-Migration-Execution-Plan-V1.md)取代。Physical Migration保持`backend`、`frontend`、`extension`、`platform_backend`、`admin_web`等核心目录原名；本文件其他历史资产、治理原则和风险记录继续保留。
+
 ## 0. 执行结论
 
 AI-CS已经具备单仓库代码形态，但物理开发方式仍是多Worktree、多长期分支、多运行来源。R008的目标不是重新开发A/B/C，而是把已经收敛的正式Pilot能力搬到一个长期目录、一个版本事实源和一个运行身份中。
