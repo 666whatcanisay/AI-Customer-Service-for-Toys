@@ -246,13 +246,30 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 需求名称 | AI-CS Project Structure Simplification V1 / AI-CS Monorepo Consolidation V1 |
 | 用户原始目标 | 将当前多Worktree、多目录、多版本开发模式收敛为一个长期维护的AI-CS Monorepo，历史资产可追溯，未来按大版本发布。 |
 | 业务背景 | 目前同一Git仓库登记69个Worktree，其中8个dirty、4个detached；A/B/C和Control长期目录、旧运行路径及多份machine-context造成版本、职责和阻塞事实漂移。 |
-| 当前状态 | `IN_PROGRESS` |
+| 当前状态 | `DONE` |
 | 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
 | 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
-| 完成标准 | 最终只保留`AI-CS/`一个长期目录；应用按`apps/`与`services/`归位；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
-| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结`19cc826...`九个目录tree、R001–R006功能入口、数据禁止边界和`cbc77ed...`运行/回滚锚点；[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)确认9项Control资产独立提交边界，并以`ai-cs-monorepo-source-freeze-v1`建立迁移源码保护引用。四服务仍从clean Recovery目录运行且health 200；尚无物理迁移证据。 |
+| 完成标准 | `AI-CS/`成为唯一正式运行和后续开发目录；保持冻结核心目录名；R001–R006成果和Pilot基线不丢失；四服务从同一 SHA 运行；Recovery仅作为回滚锚点，旧Worktree后续按独立归档任务处理。 |
+| 验收证据 | 源冻结、独立仓库创建、源码物化、依赖复现、全量测试、影子运行和标准端口切换均已完成；当前正式目录为`AI-CS`。本次稳定性冲刺在`AI-CS@42bafcf`完成三轮启停，5173/5174/8000/8011同SHA且health 200；Recovery未删除，仅保留为回滚锚点。 |
 | 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)、[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)、[Pilot Baseline Inventory Report](AI-CS-Pilot-Baseline-Inventory-Report-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
-| 防止重复错误规则 | 不得把`SOURCE_FREEZE_CLOSED`解释为已经迁移或已切换Pilot；不得处理当前运行中的Recovery目录；不得把“只保留一个长期目录”解释为立即批量删除；不得复制整仓到`archive/`；不得把dirty、运行或敏感资产带入Git；不得借目录迁移实施R006。 |
+| 防止重复错误规则 | 不得继续把旧Worktree当正式开发源；不得删除Recovery回滚锚点或未经归属确认批量清理旧目录；不得把dirty、运行或敏感资产带入Git；不得借目录迁移实施R006。 |
+
+### R009 — 商品知识采集模板导入 V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R009 |
+| 提出时间 | 2026-07-30 |
+| 需求名称 | 商品知识采集模板导入 V1 |
+| 用户原始目标 | 在 C Admin 资料上传与审核页面，以固定规则解析《商品知识采集模板V1.xlsx》，完成店铺校验、字段级 Merge、待审核和人工写入闭环。 |
+| 业务背景 | 原资料上传偏单条补充，无法支持运营批量维护；Import Center 的六模板下载定位保持不变，本需求只实现第一个商品知识模板。 |
+| 当前状态 | `DONE` |
+| 负责模块 | C：Parser、Merge、审核、Admin 页面和 0009；Control/QA：隔离数据与浏览器验收。A/B/RAG不在范围。 |
+| 影响范围 | `platform_backend/**`、`admin_web/**`、0009隔离迁移、商品知识导入审核；不修改A/B/RAG/Prompt/contracts，不实现其他五模板。 |
+| 完成标准 | 浏览器完成店铺→模板→真实Excel上传→四Sheet解析→Merge预览→人工审核；空模板、缺商品名、错店铺、重复上传和未开放模板均受控；审核前正式数据零写入。 |
+| 验收证据 | RC `8b83a20` 的隔离 0009 Runtime 完成真实浏览器验收：19商品、19条APPLIED审核，重复上传NO_CHANGE，错店铺/空模板PREFLIGHT_FAILED，未开放模板提示正确；正式数据库仍为0008。 |
+| 关联代码/文档 | R009 Interface Freeze、Implementation Report、Browser Acceptance系列报告、[本次稳定性报告](AI-CS-Product-Stabilization-Reliability-Report-V1.md)。 |
+| 防止重复错误规则 | 不得把R009扩展成通用模板理解AI；不得改变Import Center定位；不得自动发布RAG或声称B已消费；正式0009部署必须另行授权、备份和验收。 |
 
 ## 7. 历史错误防复发规则
 
@@ -289,6 +306,6 @@ R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处�
 
 R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
 
-R008是与R006并行的项目治理任务。Source Freeze Closure已关闭SF-B01/SF-B02：`ai-cs-monorepo-source-freeze-v1`是未来物理迁移源码入口，`ai-cs-pilot-baseline-v1@cbc77ed...`仍是当前实际运行与回滚锚点。下一入口只能在用户另行明确授权后执行Physical Migration；仍不得删除Worktree、处理Recovery运行根或切换Pilot。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+R008物理迁移和标准端口切换已完成：`AI-CS/`是唯一正式运行与后续开发目录，Recovery仅保留为回滚锚点。旧Worktree是否退役仍须按独立归档计划逐一确认，不能因R008完成而批量删除。R008结果不替代R003/R005业务验收，也不授权R006。
 
-最终状态：`SOURCE_FREEZE_CLOSED`
+当前稳定性 Gate：Runtime、A、C、R009回归通过；`BUG-B-001`仍受R006 Implementation阻塞。只有R006实施并重新通过B-001至B-006后，才可声明`AI_CS_PRODUCT_STABLE_V1_READY`。
