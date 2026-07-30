@@ -1,111 +1,79 @@
 {
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-rag-v12-1-ai",
-  "project_id": "mumu-A",
-  "project_name": "A: RAG Core and safe-answer services",
-  "line": "A",
-  "version": "0.3.1-test",
-  "status": "ai_control_center_provider_ready",
-  "current_task": "TARGET MODE V5 A AI control-center overview provider",
-  "next_recommended_task": "C Admin should consume the frozen overview through its existing /ai-api loopback proxy and verify Chinese business-summary rendering plus safe not-ready state. Do not expose A directly to LAN, add writes, or auto-change models, prompts, or knowledge.",
-  "current_stage": "A provides the frozen read-only AI control-center overview from existing module state, model configuration, queryable knowledge count, process-local metrics, and a safe persisted-evaluation summary. It remains separate from controlled C→A→C analysis consumers.",
-  "current_gate": "A provider gate is PASS: the frozen overview is read-only, uses only real in-process state, returns a stable 503 AI_CONTROL_NOT_READY when A is unavailable, and hides customer content, source text, full prompts, keys, paths, tracebacks, and raw evaluation records. C browser integration remains a separate consumer gate.",
-  "last_test_result": "2026-07-28: overview API tests 25 passed; full pytest backend 96 passed, 3 opt-in integration tests skipped, 38 existing warnings. Coverage verifies live projection, unavailable knowledge, safe latest-evaluation field selection, and stable not-ready error without private failure content.",
-  "blockers": [],
-  "historical_blockers": [
-    "Live C evaluation remains 19/28 rather than the required 28/28",
-    "Frozen rag-export omits or conflicts with required facts for CASE 007, 011, 019, 020, 023 and 027",
-    "Expected TEST-001 or cross-product REFERENCE source attribution is absent from compatible scoped knowledge for CASE 009, 011, 019, 021, 022, 023 and 026",
-    "CASE 019 expected MEDIUM risk is not supported by the retrieved LOW-risk knowledge metadata"
-  ],
-  "known_risks": [
-    "Live report contains frozen non-production test questions and model answers but removes source excerpts",
-    "Future C package changes may require recalibration of intent and metadata-based structured decisions",
-    "Test package withdrawal, expiry and cross-version cleanup are not implemented",
-    "A-T03 remains historically blocked at 19/28 frozen fact/source attribution quality; A-REPLY-QUALITY-FIX1 does not alter that Gate",
-    "The reply-quality smoke and live C integration use frozen non-production test knowledge and do not establish production knowledge quality",
-    "AI capability metrics are intentionally process-local and reset on restart; they are not historical monitoring or an audit store",
-    "AI admin routes add no authentication scheme because no shared authentication contract is available in A-line scope; no access-control claim is made"
-  ],
-  "git": {
-    "branch": "codex/ai-control-center-v2-rag",
-    "clean": true,
-    "baseline_commit": "f5fccfd9685440f0e43ee5be35207ab4372f6a2d",
-    "commit": "PENDING_DELIVERY",
-    "task_commit": "PENDING_DELIVERY",
-    "remote_branch": "origin/codex/rag-v12-1-ai",
-    "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git"
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
+  "project_id": "ai-cs-target-a-runtime",
+  "project_name": "AI-CS Target A runtime and RAG service",
+  "line": "A + OPS runtime",
+  "version": "R008 Runtime Startup Alignment V1",
+  "status": "runtime_startup_alignment_complete",
+  "current_task": "R008 Runtime Startup Alignment V1",
+  "current_gate": "RUNTIME_STARTUP_ALIGNMENT_COMPLETE",
+  "current_stage": "Target standard runtime reads an explicit active RAG collection and has passed managed stop/start/status plus real Ollama chat smoke.",
+  "next_recommended_task": "Keep the Target runtime stable. R006 and Phase F require separate authorization; do not treat this runtime repair as Business Data Activation or old-worktree retirement.",
+  "checked_at": "2026-07-30",
+  "runtime": {
+    "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
+    "branch": "control/r008-runtime-startup-alignment-v1",
+    "implementation_commit": "acfdc1a92da652a7ea795b5e497eba5d997f5891",
+    "head_resolution": "Use git rev-parse HEAD; documentation commits do not change the accepted code tree.",
+    "config": ".runtime/phase-e/config/green-standard.local.ps1",
+    "services": {
+      "C_API": 8011,
+      "A": 8000,
+      "B": 5173,
+      "C_ADMIN": 5174
+    },
+    "data_paths": {
+      "platform_database": ".runtime/phase-e/data/standard-platform.sqlite3",
+      "rag_vector_db": ".runtime/phase-e/standard-rag/vector-db",
+      "rag_knowledge_base": ".runtime/phase-e/standard-rag/knowledge-base",
+      "knowledge_materials": ".runtime/phase-e/standard-knowledge-materials"
+    }
   },
-  "checked_at": "2026-07-28",
-  "contracts": ["contracts/version.json 0.1.0 (unchanged)"],
-  "entrypoints": [
-    "backend/app/service/rag_service.py",
-    "backend/app/service/ai_capability.py",
-    "backend/app/service/experience_evaluation.py",
-    "backend/app/service/feedback_analysis.py",
-    "backend/app/service/knowledge_quality.py",
-    "backend/app/api/routes.py",
-    "backend/app/models/chat.py"
-  ],
-  "owned_paths": ["backend/**", "docs/rag/**"],
-  "forbidden_paths": [
-    "frontend/**",
-    "extension/**",
-    "platform_backend/**",
-    "admin_web/**",
-    "contracts/**",
-    "backend/vector_db/**"
-  ],
-  "test_commands": [
-    "source read-only venv python -m pytest backend/tests/test_test_knowledge.py -q",
-    "python -m pytest backend/tests/test_knowledge_quality.py -q",
-    "source read-only venv python -m pytest backend -q",
-    "RUN_REAL_FEEDBACK_ANALYSIS_E2E=1 with an isolated C service and human-confirmed de-identified feedback python -m pytest backend/tests/test_real_feedback_analysis_e2e.py -q -s",
-    "RUN_REAL_RAG_E2E=1 source read-only venv python -m pytest backend/tests/test_real_scoped_rag_e2e.py -q -s",
-    "PLATFORM_API_BASE_URL=http://127.0.0.1:8012 source read-only venv python backend/scripts/evaluate_test_knowledge.py PDD-SM-2026-001-TEST --output-dir docs/rag/evaluations/a-t03-v031-live"
+  "rag": {
+    "primary_collection": "documents",
+    "active_collection": "test_knowledge_v031",
+    "observed_collections": {
+      "documents": 0,
+      "test_knowledge_v031": 47
+    },
+    "startup_policy": {
+      "hard_gates": ["A health", "ready=true", "model_configured=true"],
+      "warning_only": ["knowledge sync failure", "active collection missing or empty"],
+      "chat_smoke": "Run when the configured active collection is available and non-empty."
+    }
+  },
+  "tests": {
+    "backend": "101 passed, 3 opt-in real E2E skipped",
+    "windows_ops": "8 script suites passed",
+    "runtime": "Managed stop/start/status passed; four standard ports RUNNING; B/Admin A/C proxies HTTP 200; real qwen3.5:9b chat smoke passed."
+  },
+  "contracts": ["contracts/version.json 0.2.0 (unchanged)"],
+  "recovery": {
+    "repository": "AI-CS-pilot-baseline-recovery-v1",
+    "commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "state": "stopped rollback anchor only"
+  },
+  "owned_paths": ["backend/**", "scripts/windows/**", "docs/rag/**", "docs/control/**"],
+  "forbidden_changes": [
+    "UI changes",
+    "contracts changes",
+    "database schema changes",
+    "R006 Business Data Activation",
+    "Prompt or model changes",
+    "vector data deletion"
   ],
   "completed_tasks": [
-    "A-T01 static capability audit and blocked baseline documentation",
-    "A-T02 synthetic-PDF real local RAG loop and API validation",
-    "A-T03 A-line V0.3.1 consumer implementation and synthetic 28-case validation",
-    "A-T03-FIX1 strict 0.3.1-test schema, store-scope safety compatibility and live C evaluation",
-    "A-T03-FIX2 structured decision repair, evaluator semantics and blocked 19/28 live diagnosis",
-    "A-T04-LAN-CORS explicit browser Origin configuration and CORS regression coverage",
-    "A-REPLY-QUALITY-FIX1 customer reply and internal evidence separation",
-    "A-REPLY-QUALITY-FIX1-DELIVERY age-range fidelity and supervision deduplication",
-    "A-REPLY-QUALITY-FIX1-FINAL frozen fixture restoration and live C-to-A-to-Ollama delivery validation",
-    "A-T04-LONG AI capability center backend baseline (functional PASS; Draft PR pending)",
-    "MVP-PLUS-01 CONTRACT-FIX1 controlled experience-evaluation consumer (ready for cross-line integration)",
-    "NIGHT-SHIFT A P1 bounded feedback-analysis JSON parsing and synthetic local qwen smoke",
-    "V12.1 A combined knowledge-count projection and browser-safe initialization error normalization",
-    "TARGET MODE V2 explicit C-approved material quality-analysis consumer (real C provider integration pending)",
-    "TARGET MODE V5 frozen read-only AI control-center overview provider"
+    "Explicit active collection configuration",
+    "Active and available collection status projection",
+    "Knowledge degradation warning policy",
+    "Partial-start managed cleanup",
+    "Target pilot standard-entry correction",
+    "Real standard runtime acceptance"
   ],
-  "required_interfaces": [
-    "GET C /api/v1/test-knowledge-packages/{package_id}/rag-export version V0.3.1 schema 0.3.1-test",
-    "GET C /api/v1/test-knowledge-packages/{package_id}/evaluations version V0.3.1 schema 0.3.1-test",
-    "GET C /api/v1/admin/ai-optimization/cases/export approved immutable snapshots",
-    "POST C /api/v1/admin/ai-optimization/evaluation-results traceable evaluation evidence",
-    "GET C /api/v1/admin/ai-quality/badcases frozen manually confirmed feedback snapshots",
-    "POST C /api/v1/admin/ai-quality/analysis-results immutable feedback analysis evidence",
-    "GET C /api/v1/admin/knowledge-quality/analysis-inputs approved immutable material snapshots",
-    "POST C /api/v1/admin/knowledge-quality/analysis-results traceable material quality evidence"
-  ],
-  "provided_interfaces": [
-    "POST /api/chat with frozen question/context and data response",
-    "POST /api/retrieval/search with frozen context filtering",
-    "POST /api/test-knowledge/sync/{package_id}",
-    "GET /api/health",
-    "GET /api/status",
-    "Explicit CORS policy configured by CORS_ALLOWED_ORIGINS (no shared contract change)",
-    "POST /api/chat answer remains field-compatible while sources retain internal evidence",
-    "GET /api/admin/ai/modules and GET /api/admin/ai/modules/{module_id}",
-    "GET /api/admin/ai/modules/{module_id}/prompt",
-    "POST /api/admin/ai/modules/{module_id}/test",
-    "GET /api/admin/ai/modules/{module_id}/evaluations/latest",
-    "POST /api/admin/ai/experience-evaluations/run explicit controlled evaluation",
-    "POST /api/admin/ai/feedback-analysis/run explicit loopback-only feedback analysis",
-    "POST /api/admin/ai/knowledge-quality/run explicit loopback-only knowledge-material analysis",
-    "GET /api/admin/ai/control-center/overview frozen read-only operator-safe overview"
-  ],
-  "out_of_scope": ["Other-line business code", "Shared contract changes", "A-T03 frozen knowledge quality remediation", "Knowledge package changes"]
+  "blockers": [],
+  "known_risks": [
+    "documents remains empty by design; operators must use active collection status.",
+    "An empty active collection permits degraded service startup but does not satisfy AI smoke or Pilot acceptance.",
+    "R007 second-computer network access and R006 business-data activation remain separate tasks."
+  ]
 }
