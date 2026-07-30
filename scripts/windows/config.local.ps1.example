@@ -15,6 +15,13 @@
     OllamaModel = 'qwen3.5:9b'
     OllamaBaseUrl = 'http://127.0.0.1:11434'
     PlatformDatabaseUrl = 'sqlite:///./platform.db'
+    # A运行路径和active collection由本配置统一提供；启动脚本不再依赖调用终端预先设置环境变量。
+    RagKnowledgeBasePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\knowledge_base')
+    RagVectorDbPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\vector_db')
+    RagLogDirectory = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'logs')
+    RagPrimaryCollectionName = 'documents'
+    RagActiveCollectionName = 'test_knowledge_v031'
+    PlatformKnowledgeMaterialStorageDirectory = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'platform_backend\.runtime\knowledge-materials')
     TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
     AutoSyncTestKnowledge = $true
     CorsAllowedOrigins = @('http://127.0.0.1:5173')

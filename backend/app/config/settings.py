@@ -178,6 +178,7 @@ class Settings:
     chunk_overlap: int
     chroma_collection_name: str
     test_knowledge_collection_name: str
+    active_collection_name: str
     platform_api_base_url: str
     platform_api_timeout_seconds: float
     experience_evaluation_prompt_version: str
@@ -191,6 +192,16 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        chroma_collection_name = os.getenv(
+            "CHROMA_COLLECTION_NAME", "documents"
+        ).strip()
+        test_knowledge_collection_name = os.getenv(
+            "TEST_KNOWLEDGE_COLLECTION_NAME", "test_knowledge_v031"
+        ).strip()
+        active_collection_name = (
+            os.getenv("ACTIVE_COLLECTION_NAME", test_knowledge_collection_name).strip()
+            or test_knowledge_collection_name
+        )
         return cls(
             backend_root=BACKEND_ROOT,
             project_root=PROJECT_ROOT,
@@ -217,12 +228,9 @@ class Settings:
             embedding_offline=_as_bool(os.getenv("EMBEDDING_OFFLINE"), True),
             chunk_size=max(100, int(os.getenv("CHUNK_SIZE", "500"))),
             chunk_overlap=max(0, int(os.getenv("CHUNK_OVERLAP", "100"))),
-            chroma_collection_name=os.getenv(
-                "CHROMA_COLLECTION_NAME", "documents"
-            ).strip(),
-            test_knowledge_collection_name=os.getenv(
-                "TEST_KNOWLEDGE_COLLECTION_NAME", "test_knowledge_v031"
-            ).strip(),
+            chroma_collection_name=chroma_collection_name,
+            test_knowledge_collection_name=test_knowledge_collection_name,
+            active_collection_name=active_collection_name,
             platform_api_base_url=os.getenv(
                 "PLATFORM_API_BASE_URL", ""
             ).strip().rstrip("/"),

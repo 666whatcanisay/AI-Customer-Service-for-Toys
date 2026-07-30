@@ -70,7 +70,10 @@ try {
         $config.OllamaBaseUrl -ne 'http://127.0.0.1:11434' -or
         $config.PlatformDatabaseUrl -ne 'sqlite:///./platform.db' -or
         $config.TestKnowledgePackageId -ne 'PDD-SM-2026-001-TEST' -or
-        -not $config.AutoSyncTestKnowledge
+        -not $config.AutoSyncTestKnowledge -or
+        $config.RagPrimaryCollectionName -ne 'documents' -or
+        $config.RagActiveCollectionName -ne 'test_knowledge_v031' -or
+        $config.RagVectorDbPath -ne (Join-Path $temporaryRepository 'backend\vector_db')
     ) {
         throw 'Legacy config did not receive the required optional defaults.'
     }
@@ -93,7 +96,15 @@ try {
                 data = [pscustomobject]@{
                     document_count = 0
                     chunk_count = 0
-                    collection_name = 'documents'
+                    collection_name = 'test_knowledge_v031'
+                    primary_collection_name = 'documents'
+                    active_collection_name = 'test_knowledge_v031'
+                    active_collection_chunk_count = 0
+                    active_collection_available = $true
+                    available_collections = @(
+                        [pscustomobject]@{ name='documents'; chunk_count=0 },
+                        [pscustomobject]@{ name='test_knowledge_v031'; chunk_count=0 }
+                    )
                     vector_database = 'ChromaDB'
                 }
             }
@@ -101,20 +112,68 @@ try {
         return [pscustomobject]@{ ready=$true; model_configured=$true; initialization_error=$null }
     }
     $runtimeStatistics = Get-RagKnowledgeRuntimeStatistics $config
-    if ($runtimeStatistics.State -ne 'AVAILABLE' -or $runtimeStatistics.ChunkCount -ne 0 -or $runtimeStatistics.CollectionName -ne 'documents') {
+    if ($runtimeStatistics.State -ne 'AVAILABLE' -or $runtimeStatistics.ActiveCollectionChunkCount -ne 0 -or $runtimeStatistics.ActiveCollectionName -ne 'test_knowledge_v031') {
         throw 'Runtime knowledge statistics were not read from the live statistics response.'
     }
-    if ((Get-TestKnowledgeRuntimeConsistency $syncHistory $runtimeStatistics) -ne 'MISMATCH') {
+    if ((Get-TestKnowledgeRuntimeConsistency $syncHistory $runtimeStatistics $config.RagActiveCollectionName) -ne 'MISMATCH') {
         throw 'Historical sync and runtime statistics mismatch was not detected.'
+    }
+    $emptyCollectionState = Get-RagActiveCollectionStartupState $config
+    if ($emptyCollectionState.Ready -or $emptyCollectionState.Reason -ne 'ACTIVE_COLLECTION_EMPTY') {
+        throw 'An empty active collection was not downgraded to a startup warning.'
+    }
+    Remove-Item -LiteralPath Function:\Get-Json -Force
+
+    function Get-Json([string]$Url, [string]$Label) {
+        if ($Url -like '*/api/knowledge/statistics') {
+            return [pscustomobject]@{
+                data = [pscustomobject]@{
+                    document_count = 0
+                    chunk_count = 47
+                    collection_name = 'test_knowledge_v031'
+                    primary_collection_name = 'documents'
+                    active_collection_name = 'test_knowledge_v031'
+                    active_collection_chunk_count = 47
+                    active_collection_available = $true
+                    available_collections = @(
+                        [pscustomobject]@{ name='documents'; chunk_count=0 },
+                        [pscustomobject]@{ name='test_knowledge_v031'; chunk_count=47 }
+                    )
+                    vector_database = 'ChromaDB'
+                }
+            }
+        }
+        return [pscustomobject]@{ ready=$true; model_configured=$true; initialization_error=$null }
+    }
+    $readyCollectionState = Get-RagActiveCollectionStartupState $config
+    if (-not $readyCollectionState.Ready -or $readyCollectionState.Statistics.ActiveCollectionChunkCount -ne 47) {
+        throw 'A populated configured active collection did not pass the startup check.'
     }
     Remove-Item -LiteralPath Function:\Get-Json -Force
 
     function Get-Json([string]$Url, [string]$Label) { throw 'statistics endpoint unavailable' }
     $unavailableStatistics = Get-RagKnowledgeRuntimeStatistics $config
-    if ($unavailableStatistics.State -ne 'UNAVAILABLE' -or (Get-TestKnowledgeRuntimeConsistency $syncHistory $unavailableStatistics) -ne 'STATISTICS_UNAVAILABLE') {
+    if ($unavailableStatistics.State -ne 'UNAVAILABLE' -or (Get-TestKnowledgeRuntimeConsistency $syncHistory $unavailableStatistics $config.RagActiveCollectionName) -ne 'STATISTICS_UNAVAILABLE') {
         throw 'Unavailable runtime statistics were not represented explicitly.'
     }
     Remove-Item -LiteralPath Function:\Get-Json -Force
+
+    $script:cleanupOrder = @()
+    function Stop-ManagedService($Config, [string]$Name) { $script:cleanupOrder += $Name }
+    Stop-StartedServices $config @('platform','rag','customer-web','admin-web') | Out-Null
+    if (($script:cleanupOrder -join ',') -ne 'admin-web,customer-web,rag,platform') {
+        throw "Partial-start cleanup order is unsafe: $($script:cleanupOrder -join ',')"
+    }
+    Remove-Item -LiteralPath Function:\Stop-ManagedService -Force
+
+    $startScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\start_ai_customer_service.ps1') -Raw
+    $statusScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\status_ai_customer_service.ps1') -Raw
+    if ($startScriptText -notmatch 'Stop-StartedServices' -or $startScriptText -notmatch 'Get-RagActiveCollectionStartupState' -or $startScriptText -notmatch 'KNOWLEDGE_SYNC_NON_FATAL') {
+        throw 'Standard startup does not enforce active-collection readiness and partial-start cleanup.'
+    }
+    if ($statusScriptText -notmatch 'A active collection' -or $statusScriptText -notmatch 'A available collections') {
+        throw 'Standard status does not display active and available collection state.'
+    }
 
     Assert-Throws { Assert-OllamaReady @{ OllamaBaseUrl='http://127.0.0.1:1'; OllamaModel='qwen3.5:9b' } | Out-Null } 'Unavailable Ollama check'
     Assert-Throws { Assert-OllamaReady @{ OllamaBaseUrl='http://127.0.0.1:11434'; OllamaModel='does-not-exist:0' } | Out-Null } 'Missing Ollama model check'
