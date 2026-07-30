@@ -26,7 +26,7 @@ try {
         $listener.Stop()
     }
     $shellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
-    $config = @{ RepositoryRoot=$repositoryRoot; RuntimeDirectory=(Join-Path $temporaryRoot 'runtime'); BindAddress='127.0.0.1'; LanMode=$false }
+    $config = @{ RepositoryRoot=$repositoryRoot; RuntimeDirectory=(Join-Path $temporaryRoot 'runtime'); BindAddress='127.0.0.1'; RuntimeMode='standard'; LanMode=$false }
     $command = '$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, ' + $port + '); $listener.Start(); Start-Sleep -Seconds 60'
     $script:testProcess = Start-ManagedService $config 'runtime-version-test' $shellPath @('-NoProfile','-Command',$command) $temporaryRoot 'TcpListener' $port
     Start-Sleep -Milliseconds 300
@@ -34,14 +34,20 @@ try {
 
     $recordPath = Get-ServiceRecordPath $config 'runtime-version-test'
     $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($field in @('repository_root','repository_git_sha','repository_source_state','repository_source_fingerprint','runtime_mode')) {
+    foreach ($field in @('repository_root','repository_git_sha','repository_source_state','repository_source_fingerprint','runtime_mode','network_mode')) {
         if ($record.PSObject.Properties.Name -notcontains $field) { throw "Runtime record is missing $field." }
     }
-    if ([string]$record.repository_git_sha -ne $identity.GitSha -or [string]$record.repository_source_fingerprint -ne $identity.SourceFingerprint -or [string]$record.runtime_mode -ne 'LOCAL') {
+    if ([string]$record.repository_git_sha -ne $identity.GitSha -or [string]$record.repository_source_fingerprint -ne $identity.SourceFingerprint -or [string]$record.runtime_mode -ne 'standard' -or [string]$record.network_mode -ne 'LOCAL') {
         throw 'Runtime record did not preserve the current repository identity.'
     }
     $matchingIdentity = Test-ManagedServiceRuntimeIdentity $config $record
     if (-not $matchingIdentity.Valid) { throw "Matching repository identity was rejected: $($matchingIdentity.Reason)" }
+    $wrongNetworkConfig = @{} + $config
+    $wrongNetworkConfig.LanMode = $true
+    if (-not (Test-ManagedServiceRuntimeIdentity $wrongNetworkConfig $record).Valid) { throw 'Network exposure incorrectly redefined deployment runtime identity.' }
+    $wrongRuntimeConfig = @{} + $config
+    $wrongRuntimeConfig.RuntimeMode = 'shadow'
+    if ((Test-ManagedServiceRuntimeIdentity $wrongRuntimeConfig $record).Valid) { throw 'Mismatched deployment runtime mode was accepted.' }
     Assert-ManagedRuntimeSourceConsistency $config @(@{Name='runtime-version-test';Port=$port})
 
     $tampered = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json

@@ -1,4 +1,6 @@
 @{
+    # 发布运行角色与网络暴露分离。正式端口使用 standard；影子环境使用 shadow。
+    RuntimeMode = 'standard'
     RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     RagPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\.venv\Scripts\python.exe')
     PlatformPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'platform_backend\.venv\Scripts\python.exe')
