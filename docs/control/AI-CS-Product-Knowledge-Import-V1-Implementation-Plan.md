@@ -1,5 +1,7 @@
 # AI-CS Product Knowledge Import V1 Implementation Plan
 
+> 2026-07-30冻结更新：后端接口、状态、幂等、审核收据和数据库结构以[AI-CS Product Knowledge Import V1 Interface Freeze](interfaces/AI-CS-Product-Knowledge-Import-V1-Interface-Freeze.md)为唯一实施依据。该冻结统一采用import_batches、import_rows、import_change_sets、import_field_changes、import_review_records五表；本计划早期提出的product-specific candidate/review表名已被替代，不得按旧名称实现。
+
 > 中文名称：《AI-CS Product Knowledge Import V1 Implementation Plan》
 >
 > 需求：R009 商品知识采集模板导入 V1

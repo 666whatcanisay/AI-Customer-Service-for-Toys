@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`PRODUCT_KNOWLEDGE_IMPORT_V1_READY / IMPLEMENTATION_NOT_AUTHORIZED / TARGET_STANDARD_RUNTIME_UNCHANGED`
+> 当前 Gate：`PRODUCT_KNOWLEDGE_IMPORT_INTERFACE_READY / IMPLEMENTATION_NOT_AUTHORIZED / TARGET_STANDARD_RUNTIME_UNCHANGED`
 
 ## 1. 台账目标
 
@@ -99,7 +99,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
 | R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Runtime Startup Alignment完成：Target标准启动、活动集合、status、Target Pilot入口与失败清理已对齐；四服务从clean `dd37927...`运行。Phase F仍未授权。 |
-| R009 | C运营数据导入升级 V1 | `IN_PROGRESS` | Control / Interface Owner、C、QA | V1范围已收敛为商品知识采集模板的纯Python固定规则导入；其他五模板开发中且必须阻断。实施计划已完成，尚未授权编码。 |
+| R009 | C运营数据导入升级 V1 | `IN_PROGRESS` | Control / Interface Owner、C、QA | 商品知识单模板的上传、预检、Merge、逐商品审核、五表结构、幂等收据和0009回滚设计已冻结；尚未授权编码。 |
 
 状态数量：`DONE=3`、`IN_PROGRESS=3`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
 
@@ -266,11 +266,11 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 业务背景 | 当前页面要求先选店铺、商品、SKU后上传，适合单条资料补充；旧ingestion虽有批次/行预检，但只支持技术型商品SKU模板。上一版总体设计覆盖六模板，但当前Controlled Pilot需要先交付风险最低、规则最明确的商品知识单模板垂直闭环，不建设通用模板理解或大模型解析。 |
 | 当前状态 | `IN_PROGRESS` |
 | 负责模块 | Control / Interface Owner：范围、状态、接口和Gate；C：`platform_backend/**`、`admin_web/**`、`docs/platform/**`；QA：固定模板Parser、Mapping、Merge、迁移、UI和安全回归。A、B、共享contracts当前不修改。 |
-| 影响范围 | C“资料上传与审核”、现有`import_batches/import_rows`、新增商品知识导入候选/审核、`operation_management`、`TestProduct/TestSourceEvidence`；Import Center和其他五模板实现、A/RAG/Prompt/模型、B客服、R006激活、自动发送/退款/ERP均不在范围。 |
-| 完成标准 | Import Center六模板保持不变；上传页为店铺→模板→Excel三步且只商品知识模板显示已支持；其他五模板显示开发中并弹出指定提示，后端同时422阻断；`ProductKnowledgeTemplateParser`以纯Python读取并校验四个固定Sheet，使用固定`product_knowledge_mapping.py`输出标准结构；店铺不一致整批阻断；非空字段生成ADD/UPDATE，空字段KEEP，相同值NO_CHANGE，未出现商品不修改；新增/修改进入`IDENTIFIED_PENDING_REVIEW`；审核通过才写`TestProduct/TestSourceEvidence`并生成收据，驳回留痕；隔离迁移、Backend、Admin和禁止AI/RAG/激活负向测试通过。 |
-| 验收证据 | [AI-CS Product Knowledge Import V1 Implementation Plan](AI-CS-Product-Knowledge-Import-V1-Implementation-Plan.md)已基于真实模板SHA-256 `903FB5...F507`核验四Sheet、16字段并完成Parser、Mapping、Merge、数据库、UI和测试计划；[总体设计](AI-CS-Product-Data-Import-Merge-Upgrade-V1-Design.md)保留为背景。本轮没有代码、数据库或运行验收，需求不能关闭。 |
-| 关联代码/文档 | `admin_web/public/templates/商品知识采集模板V1.xlsx`、`platform_backend/app/ingestion/**`、`platform_backend/app/knowledge_materials/**`、`platform_backend/app/operation_management/**`、`platform_backend/app/product_knowledge/**`、`platform_backend/app/test_catalog/**`、`admin_web/src/views/KnowledgeMaterialsView.vue`、`admin_web/src/views/ImportCenterView.vue`和上述两份R009文档。 |
-| 防止重复错误规则 | 不得构建通用模板理解AI、调用LLM、动态推断字段或实现其他五模板；不得改造或删除Import Center六模板；不得新建第二套批次/行表；不得把`APPROVED_FOR_ANALYSIS`当正式数据生效；不得用Excel覆盖/删除数据库、空白清空字段或模糊匹配商品；不得把R009审核通过解释为R006客服激活或RAG发布。 |
+| 影响范围 | C“资料上传与审核”、现有`import_batches/import_rows`、新增`import_change_sets/import_field_changes/import_review_records`、`operation_management`、`TestProduct/TestSourceEvidence`；Import Center和其他五模板实现、A/RAG/Prompt/模型、B客服、R006激活、自动发送/退款/ERP均不在范围。 |
+| 完成标准 | Import Center六模板保持不变；上传页为店铺→模板→Excel三步且只商品知识模板显示已支持；其他五模板显示开发中并弹出指定提示，后端同时422阻断；`ProductKnowledgeTemplateParser`以纯Python读取并校验四个固定Sheet，使用固定`product_knowledge_mapping.py`输出标准结构；上传/预检/Merge/逐商品审核严格实现冻结接口；五表迁移兼容0008；非空字段ADD/UPDATE、空字段KEEP、相同值NO_CHANGE；审核通过才字段级写`TestProduct/TestSourceEvidence`并生成append-only收据，驳回留痕；隔离迁移、Backend、Admin、幂等并发和禁止AI/RAG/激活负向测试通过。 |
+| 验收证据 | [AI-CS Product Knowledge Import V1 Implementation Plan](AI-CS-Product-Knowledge-Import-V1-Implementation-Plan.md)完成单模板实现计划；[AI-CS Product Knowledge Import V1 Interface Freeze](interfaces/AI-CS-Product-Knowledge-Import-V1-Interface-Freeze.md)已冻结上传、预检、Merge、APPROVE/REJECT、review_receipt、五表结构、正式写入、幂等和0009回滚；[总体设计](AI-CS-Product-Data-Import-Merge-Upgrade-V1-Design.md)只保留为背景。本轮没有代码、数据库或运行验收，需求不能关闭。 |
+| 关联代码/文档 | `admin_web/public/templates/商品知识采集模板V1.xlsx`、`platform_backend/app/ingestion/**`、`platform_backend/app/operation_management/**`、`platform_backend/app/product_knowledge/**`、`platform_backend/app/test_catalog/**`、`admin_web/src/views/KnowledgeMaterialsView.vue`、`admin_web/src/views/ImportCenterView.vue`和上述三份R009文档。 |
+| 防止重复错误规则 | 不得构建通用模板理解AI、调用LLM、动态推断字段或实现其他五模板；不得改造Import Center；不得新建第二套批次/行表，也不得使用已被冻结替代的candidate/review旧表名；不得把`APPROVED_FOR_ANALYSIS`当正式数据生效；不得用Excel覆盖/删除数据库、空白清空字段或模糊匹配商品；不得把R009审核通过解释为R006客服激活或RAG发布。 |
 
 ## 7. 历史错误防复发规则
 
@@ -309,6 +309,6 @@ R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface 
 
 R008是与R006并行的项目治理任务。Runtime Startup Alignment已把标准启动、RAG活动集合、status、Target Pilot入口和失败清理对齐，当前标准端口均由clean `AI-CS@dd37927...`运行，活动集合为`test_knowledge_v031=47`。Recovery `cbc77ed...`已停止但目录、数据和最终备份完整保留。下一入口只能是用户另行授权的Phase F旧目录/Worktree处理；不得因Runtime修复完成而删除Recovery或关闭整个R008。R008不得绕过R006的Interface Gate，也不得把运行修复作为R003/R005业务验收。
 
-R009 V1已从六模板总体架构收敛为商品知识单模板固定规则实现。当前实施计划READY但需求保持`IN_PROGRESS`；下一入口只能是商品知识导入C内部接口/状态/幂等收据复核、`0009`数据库迁移评审和独立C Feature工作区授权。明确授权前不得修改C代码/UI/数据库或正在运行的Target。其他五模板继续显示开发中，不得建设通用模板理解AI、接入LLM、发布RAG或实现R006激活。
+R009 V1商品知识导入接口与数据库设计已冻结，需求保持`IN_PROGRESS`。上传、预检、Merge、逐商品APPROVE/REJECT、review receipt、五表结构、正式写入、幂等和`0009`回滚均以Interface Freeze为唯一事实来源。下一入口只剩用户明确授权的独立C Feature工作区实现；授权前不得修改C代码/UI/数据库或正在运行的Target。其他五模板继续显示开发中，不得建设通用模板理解AI、接入LLM、发布RAG或实现R006激活。
 
-最终状态：`PRODUCT_KNOWLEDGE_IMPORT_V1_READY`
+最终状态：`PRODUCT_KNOWLEDGE_IMPORT_INTERFACE_READY`

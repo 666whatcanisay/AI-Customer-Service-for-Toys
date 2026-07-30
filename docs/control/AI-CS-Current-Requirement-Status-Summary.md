@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`PRODUCT_KNOWLEDGE_IMPORT_V1_READY / IMPLEMENTATION_NOT_AUTHORIZED / TARGET_STANDARD_RUNTIME_UNCHANGED`
+> 当前 Gate：`PRODUCT_KNOWLEDGE_IMPORT_INTERFACE_READY / IMPLEMENTATION_NOT_AUTHORIZED / TARGET_STANDARD_RUNTIME_UNCHANGED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -31,7 +31,7 @@
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
 | R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Runtime Startup Alignment已完成；四服务从clean `dd37927...`运行，活动集合为`test_knowledge_v031=47`，标准启停/status与失败清理已验收。 | 保持Target运行与Recovery锚点；Phase F旧目录处理必须另行授权。 |
-| R009 | C运营数据导入升级 V1 | `IN_PROGRESS` | V1只实现商品知识采集模板；真实四Sheet/16字段已核验，纯Python Parser、固定Mapping、Merge、审核和数据库/UI计划已完成。其他五模板开发中。 | 先复核C内部接口/收据和0009迁移，再由用户单独授权独立C Feature实现。 |
+| R009 | C运营数据导入升级 V1 | `IN_PROGRESS` | V1只实现商品知识采集模板；上传、预检、Merge、逐商品审核、review receipt、五表结构和0009回滚设计已冻结。其他五模板开发中。 | 由用户另行授权独立C Feature工作区实施；当前仍禁止编码和修改标准Runtime。 |
 
 ## 3. 当前真正阻塞点
 
@@ -47,7 +47,7 @@ R008 Runtime Handover已将唯一主目录、完整启动环境变量、`green-s
 
 R008 Runtime Startup Alignment已关闭Handover后的真实启动回归：活动集合由配置统一为`test_knowledge_v031`，status同时显示实际可见集合；`documents=0`不再阻断启动。最终四服务从clean `dd37927...`运行，A ready/model configured、47 chunks，四条B/Admin代理200且真实Ollama smoke通过。一次中间复验暴露的listener记录清理竞态已通过受控身份回填和清理后双校验关闭。
 
-R009不再以六模板同时实施为当前阻塞。V1已明确只做《商品知识采集模板V1.xlsx》：固定四Sheet、固定16列、纯Python Parser和固定Mapping；其余五模板由UI显示开发中并由后端422阻断。实施前剩余Gate是商品知识导入内部API/状态/幂等收据复核、复用`import_batches/import_rows`并新增专项候选/审核表的`0009`迁移评审，以及不承载标准Runtime的C Feature工作区授权。通用模板AI、LLM、RAG和R006均不在入口内。
+R009不再以六模板同时实施为当前阻塞。V1只做《商品知识采集模板V1.xlsx》；其余五模板由UI显示开发中并由后端422阻断。C内部product-knowledge-import.v1已冻结上传、批次预检、Merge预览、逐商品审核和幂等收据；数据库统一为`import_batches/import_rows/import_change_sets/import_field_changes/import_review_records`，`0009`只做向后兼容增量。Interface和Database Gate已关闭，当前唯一实施前阻塞是用户尚未授权独立C Feature工作区；通用模板AI、LLM、RAG和R006均不在入口内。
 
 ## 4. 需求依赖与执行顺序
 
@@ -95,11 +95,11 @@ R008 Worktree退役 / Phase F（仍未授权）
 R009 Product Import Merge总体设计 READY
   ↓ V1范围收敛：仅商品知识模板
 R009 Product Knowledge Import V1 Plan READY
-  ↓ 仅允许内部接口/收据复核 + 0009迁移评审 + Feature工作区授权
-R009 Implementation（未授权；其他五模板继续DEFERRED）
+  ↓ Interface Freeze & Database Design READY
+R009 Implementation（仅待明确授权与独立Feature工作区；其他五模板继续DEFERRED）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase F；R009下一项只能是商品知识导入内部接口/收据复核、0009迁移评审和独立Feature工作区授权。当前必须按Runtime Handover维护标准端口并保留Recovery。R009计划不授权修改正在运行的Target，也不能扩展到其他五模板、LLM、R006激活、RAG发布或A分析。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase F；R009下一项只能是用户明确授权后在独立C Feature工作区按冻结接口实施。当前必须按Runtime Handover维护标准端口并保留Recovery。R009 Interface Freeze不授权修改正在运行的Target，也不能扩展到其他五模板、LLM、R006激活、RAG发布或A分析。
 
 ## 5. 防重复结论
 
@@ -111,4 +111,4 @@ R009 Implementation（未授权；其他五模板继续DEFERRED）
 - R008 Runtime Startup Alignment已完成：不得再固定检查`documents`，也不得把知识warning误写成AI smoke通过；Phase F仍需单独授权。
 - R009 V1只做商品知识采集模板：不得构建通用模板理解AI、接入LLM、实现其他五模板、删除或改造Import Center；不得用Excel覆盖/删除数据库、让空白清空旧值或把资料分析审核状态复用为正式数据审核状态。
 
-最终状态：`PRODUCT_KNOWLEDGE_IMPORT_V1_READY`
+最终状态：`PRODUCT_KNOWLEDGE_IMPORT_INTERFACE_READY`
