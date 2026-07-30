@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from io import BytesIO
 from typing import Any
 from zipfile import BadZipFile
@@ -12,13 +12,12 @@ from openpyxl.utils.exceptions import InvalidFileException
 
 from app.product_knowledge_import.product_knowledge_mapping import (
     DATA_SHEET,
-    DATA_START_ROW,
     EXAMPLE_SHEET,
     EXPECTED_HEADERS,
     EXPECTED_SHEETS,
     EXPECTED_SHEET_TITLES,
     FIELD_DESCRIPTION_SHEET,
-    HEADER_ROW,
+    HEADER_SCAN_MAX_ROWS,
     MAPPING_BY_HEADER,
     PARSER_VERSION,
     REQUIRED_HEADERS,
@@ -44,14 +43,51 @@ def _text(value: Any) -> str:
     return str(value).strip()
 
 
-def _normalized_header_row(sheet) -> tuple[str, ...]:
-    return tuple(_text(sheet.cell(HEADER_ROW, index).value) for index in range(1, 17))
+def _normalized_header_row(sheet, row_number: int) -> tuple[str, ...]:
+    return tuple(
+        _text(sheet.cell(row_number, index).value)
+        for index in range(1, len(EXPECTED_HEADERS) + 1)
+    )
+
+
+def _matching_header_rows(sheet) -> list[int]:
+    """Find the frozen 16-column header without assuming a physical row number."""
+
+    return [
+        row_number
+        for row_number in range(1, min(sheet.max_row, HEADER_SCAN_MAX_ROWS) + 1)
+        if _normalized_header_row(sheet, row_number) == EXPECTED_HEADERS
+    ]
+
+
+def _matching_field_description_starts(sheet) -> list[int]:
+    """Find the frozen vertical field list used to validate the mapping evidence."""
+
+    last_start = min(sheet.max_row, HEADER_SCAN_MAX_ROWS) - len(EXPECTED_HEADERS) + 1
+    if last_start < 1:
+        return []
+    return [
+        row_number
+        for row_number in range(1, last_start + 1)
+        if tuple(
+            _text(sheet.cell(row_number + offset, 1).value)
+            for offset in range(len(EXPECTED_HEADERS))
+        )
+        == EXPECTED_HEADERS
+    ]
 
 
 class ProductKnowledgeTemplateParser:
     """Parse exactly the frozen V1 workbook without AI or dynamic inference."""
 
-    def parse(self, content: bytes, *, max_rows: int) -> ProductKnowledgeParseResult:
+    def parse(
+        self,
+        content: bytes,
+        *,
+        max_rows: int,
+        imported_at: datetime | None = None,
+    ) -> ProductKnowledgeParseResult:
+        system_import_date = (imported_at or datetime.now(timezone.utc)).date().isoformat()
         try:
             workbook = load_workbook(
                 BytesIO(content),
@@ -140,55 +176,71 @@ class ProductKnowledgeTemplateParser:
             )
 
         products: list[ParsedProductKnowledgeRow] = []
+        detected_header_rows: dict[str, int] = {}
+        field_description_start_row: int | None = None
         if DATA_SHEET in workbook.sheetnames:
             data_sheet = workbook[DATA_SHEET]
-            actual_headers = _normalized_header_row(data_sheet)
-            if actual_headers != EXPECTED_HEADERS:
+            header_rows = _matching_header_rows(data_sheet)
+            if len(header_rows) != 1:
+                issue_code = "HEADER_MISMATCH" if not header_rows else "HEADER_AMBIGUOUS"
                 issues.append(
                     {
-                        "code": "HEADER_MISMATCH",
+                        "code": issue_code,
                         "sheet": DATA_SHEET,
-                        "row": HEADER_ROW,
+                        "row": header_rows[0] if header_rows else None,
                         "field": None,
-                        "message": "数据填写表头与商品知识采集模板 V1 不一致。",
+                        "message": (
+                            "数据填写表未找到完整且唯一的16字段表头。"
+                            if not header_rows
+                            else "数据填写表包含多个16字段表头，无法确定业务数据起始位置。"
+                        ),
                         "expected": list(EXPECTED_HEADERS),
-                        "actual": list(actual_headers),
+                        "matched_rows": header_rows,
                     }
                 )
             else:
-                products, row_issues = self._parse_data_rows(data_sheet, max_rows=max_rows)
+                detected_header_rows[DATA_SHEET] = header_rows[0]
+                products, row_issues = self._parse_data_rows(
+                    data_sheet,
+                    header_row=header_rows[0],
+                    max_rows=max_rows,
+                    system_import_date=system_import_date,
+                )
                 issues.extend(row_issues)
 
         for support_sheet in (EXAMPLE_SHEET,):
             if support_sheet in workbook.sheetnames:
-                support_headers = _normalized_header_row(workbook[support_sheet])
-                if support_headers != EXPECTED_HEADERS:
+                support_header_rows = _matching_header_rows(workbook[support_sheet])
+                if len(support_header_rows) != 1:
                     issues.append(
                         {
                             "code": "EXAMPLE_HEADER_MISMATCH",
                             "sheet": support_sheet,
-                            "row": HEADER_ROW,
+                            "row": support_header_rows[0] if support_header_rows else None,
                             "field": None,
-                            "message": "示例数据表头与数据填写表头不一致。",
+                            "message": "示例数据表未找到完整且唯一的16字段表头。",
+                            "matched_rows": support_header_rows,
                         }
                     )
+                else:
+                    detected_header_rows[support_sheet] = support_header_rows[0]
 
         if FIELD_DESCRIPTION_SHEET in workbook.sheetnames:
             field_sheet = workbook[FIELD_DESCRIPTION_SHEET]
-            described = tuple(
-                _text(field_sheet.cell(row, 1).value)
-                for row in range(4, 4 + len(EXPECTED_HEADERS))
-            )
-            if described != EXPECTED_HEADERS:
+            description_starts = _matching_field_description_starts(field_sheet)
+            if len(description_starts) != 1:
                 issues.append(
                     {
                         "code": "FIELD_DESCRIPTION_MISMATCH",
                         "sheet": FIELD_DESCRIPTION_SHEET,
-                        "row": 3,
+                        "row": description_starts[0] if description_starts else None,
                         "field": None,
-                        "message": "字段说明与冻结字段映射不一致。",
+                        "message": "字段说明未找到完整且唯一的16字段映射清单。",
+                        "matched_rows": description_starts,
                     }
                 )
+            else:
+                field_description_start_row = description_starts[0]
 
         if not products and not any(item["code"] == "HEADER_MISMATCH" for item in issues):
             issues.append(
@@ -224,6 +276,7 @@ class ProductKnowledgeTemplateParser:
             "UNEXPECTED_SHEETS",
             "FORMULA_NOT_ALLOWED",
             "HEADER_MISMATCH",
+            "HEADER_AMBIGUOUS",
             "EXAMPLE_HEADER_MISMATCH",
             "FIELD_DESCRIPTION_MISMATCH",
             "REQUIRED_FIELD_MISSING",
@@ -249,6 +302,9 @@ class ProductKnowledgeTemplateParser:
                 "instruction_rows": instruction_rows,
                 "field_mapping_source": FIELD_DESCRIPTION_SHEET,
                 "field_mapping_mode": "FIXED_CODE_VALIDATED_BY_WORKBOOK",
+                "detected_header_rows": detected_header_rows,
+                "field_description_start_row": field_description_start_row,
+                "system_import_date": system_import_date,
             },
             sheet_results=sheet_results,
             field_validation_result={
@@ -269,12 +325,14 @@ class ProductKnowledgeTemplateParser:
         self,
         sheet,
         *,
+        header_row: int,
         max_rows: int,
+        system_import_date: str,
     ) -> tuple[list[ParsedProductKnowledgeRow], list[dict[str, Any]]]:
         products: list[ParsedProductKnowledgeRow] = []
         issues: list[dict[str, Any]] = []
         seen_rows = 0
-        for row_number in range(DATA_START_ROW, sheet.max_row + 1):
+        for row_number in range(header_row + 1, sheet.max_row + 1):
             values = {
                 header: _text(sheet.cell(row_number, index).value)
                 for index, header in enumerate(EXPECTED_HEADERS, start=1)
@@ -304,8 +362,8 @@ class ProductKnowledgeTemplateParser:
                             "message": f"第 {row_number} 行缺少必填字段“{header}”。",
                         }
                     )
-            source_date = values["来源日期"]
-            if source_date and not self._valid_date(source_date):
+            incoming_source_date = values["来源日期"]
+            if incoming_source_date and not self._valid_date(incoming_source_date):
                 issues.append(
                     {
                         "code": "SOURCE_DATE_INVALID",
@@ -315,6 +373,7 @@ class ProductKnowledgeTemplateParser:
                         "message": f"第 {row_number} 行来源日期不是有效日期。",
                     }
                 )
+            source_date = incoming_source_date or system_import_date
             if values["是否人工确认"] and values["是否人工确认"] not in CONFIRMATION_VALUES:
                 issues.append(
                     {
@@ -337,7 +396,10 @@ class ProductKnowledgeTemplateParser:
                     fields=fields,
                     source_name=values["资料来源"],
                     source_date=source_date,
-                    human_confirmation=values["是否人工确认"],
+                    source_date_origin=(
+                        "EXCEL" if incoming_source_date else "SYSTEM_IMPORT_DATE"
+                    ),
+                    human_confirmation=values["是否人工确认"] or None,
                     remark=values["备注"] or None,
                 )
             )
