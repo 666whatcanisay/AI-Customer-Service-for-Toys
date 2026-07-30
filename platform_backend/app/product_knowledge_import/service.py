@@ -221,7 +221,11 @@ class ProductKnowledgeImportService:
         self.session.commit()
 
         try:
-            result = self.parser.parse(content, max_rows=self.max_rows)
+            result = self.parser.parse(
+                content,
+                max_rows=self.max_rows,
+                imported_at=batch.created_at or utc_now(),
+            )
             store_issues = self._store_scope_issues(result.products, store)
             field_result = dict(result.field_validation_result)
             issues = list(field_result.get("issues", [])) + store_issues
@@ -744,6 +748,7 @@ class ProductKnowledgeImportService:
                 "evidence": {
                     "source_name": parsed.source_name,
                     "source_date": parsed.source_date,
+                    "source_date_origin": parsed.source_date_origin,
                     "human_confirmation": parsed.human_confirmation,
                     "remark": parsed.remark,
                     "source_row_number": parsed.source_row_number,
@@ -897,9 +902,9 @@ class ProductKnowledgeImportService:
         )
         raw["_product_knowledge_import_history"] = history[-50:]
         product.raw_data_json = _json_dump(raw)
-        product.review_status = (
-            "APPROVED" if evidence.get("human_confirmation") == "已确认" else "REVIEWING"
-        )
+        # The Excel confirmation column is source evidence only. The formal
+        # review status is controlled by this explicit system approval.
+        product.review_status = "APPROVED"
         product.publishable = False
 
         source = TestSourceEvidence(
@@ -985,6 +990,9 @@ class ProductKnowledgeImportService:
         return record
 
     def _refresh_batch_status(self, batch: ImportBatch) -> None:
+        # Runtime sessions disable autoflush. Persist the just-reviewed
+        # change-set status before counting remaining pending items.
+        self.session.flush()
         pending = self._count_change_sets(batch.id, ChangeSetStatus.IDENTIFIED_PENDING_REVIEW)
         if pending:
             batch.status = BatchStatus.PARTIALLY_REVIEWED

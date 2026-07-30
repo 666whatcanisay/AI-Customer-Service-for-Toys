@@ -64,7 +64,8 @@ class ParsedProductKnowledgeRow(BaseModel):
     fields: dict[str, Any]
     source_name: str
     source_date: str
-    human_confirmation: str
+    source_date_origin: str
+    human_confirmation: str | None = None
     remark: str | None = None
 
 

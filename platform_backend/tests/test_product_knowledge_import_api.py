@@ -1,10 +1,12 @@
 from io import BytesIO
+from datetime import datetime, timezone
 import json
 
 from openpyxl import Workbook
 from sqlalchemy import func, select
 
-from app.ingestion.models import ImportBatch, ImportReviewRecord
+from app.ingestion.models import ImportBatch, ImportReviewRecord, ImportRow
+from app.product_knowledge_import.parser import ProductKnowledgeTemplateParser
 from app.product_knowledge_import.product_knowledge_mapping import EXPECTED_HEADERS
 from app.test_catalog.models import TestProduct as CatalogProduct
 from app.test_catalog.models import TestSourceEvidence as SourceEvidence
@@ -30,6 +32,8 @@ def product_knowledge_workbook(
     source_name: str = "包装标签",
     source_date: str = "2026-07-30",
     confirmation: str = "已确认",
+    header_row: int = 4,
+    field_description_start_row: int = 4,
 ) -> bytes:
     workbook = Workbook()
     instructions = workbook.active
@@ -39,7 +43,7 @@ def product_knowledge_workbook(
     data = workbook.create_sheet("数据填写")
     data["A1"] = "商品知识采集模板 V1｜数据填写"
     for column, header in enumerate(EXPECTED_HEADERS, start=1):
-        data.cell(4, column, header)
+        data.cell(header_row, column, header)
     values = (
         store_name,
         product_name,
@@ -59,19 +63,28 @@ def product_knowledge_workbook(
         "测试导入",
     )
     for column, value in enumerate(values, start=1):
-        data.cell(5, column, value)
+        data.cell(header_row + 1, column, value)
 
     example = workbook.create_sheet("示例数据")
     example["A1"] = "商品知识采集模板 V1｜示例数据"
     for column, header in enumerate(EXPECTED_HEADERS, start=1):
-        example.cell(4, column, header)
+        example.cell(header_row, column, header)
 
     descriptions = workbook.create_sheet("字段说明")
     descriptions.append(["商品知识采集模板 V1｜字段说明"])
     descriptions.append(["固定字段说明"])
-    descriptions.append(["字段名称", "字段用途", "是否必填", "知识等级", "AI用途", "填写规则"])
-    for header in EXPECTED_HEADERS:
-        descriptions.append([header, "用途", "选填", "治理", "受控使用", "按模板填写"])
+    for column, value in enumerate(
+        ("字段名称", "字段用途", "是否必填", "知识等级", "AI用途", "填写规则"),
+        start=1,
+    ):
+        descriptions.cell(field_description_start_row - 1, column, value)
+    for offset, header in enumerate(EXPECTED_HEADERS):
+        row_number = field_description_start_row + offset
+        for column, value in enumerate(
+            (header, "用途", "选填", "治理", "受控使用", "按模板填写"),
+            start=1,
+        ):
+            descriptions.cell(row_number, column, value)
 
     output = BytesIO()
     workbook.save(output)
@@ -204,6 +217,65 @@ def test_new_product_upload_is_staged_then_approval_applies_formal_knowledge(
     assert replay.headers["Idempotency-Replayed"] == "true"
     assert replay.json()["batch_id"] == batch["batch_id"]
     assert replay.json()["status"] == "COMPLETED"
+
+
+def test_real_template_layout_is_detected_and_optional_governance_fields_are_defaulted(
+    client, session
+):
+    store = create_store(client)
+    content = product_knowledge_workbook(
+        store_name=store["store_name"],
+        source_date="",
+        confirmation="",
+        header_row=5,
+        field_description_start_row=5,
+    )
+
+    parsed = ProductKnowledgeTemplateParser().parse(
+        content,
+        max_rows=100,
+        imported_at=datetime(2026, 7, 30, 9, 15, tzinfo=timezone.utc),
+    )
+    assert parsed.field_validation_result["valid"] is True
+    assert parsed.template_metadata["detected_header_rows"] == {
+        "数据填写": 5,
+        "示例数据": 5,
+    }
+    assert parsed.template_metadata["field_description_start_row"] == 5
+    assert parsed.products[0].source_date == "2026-07-30"
+    assert parsed.products[0].source_date_origin == "SYSTEM_IMPORT_DATE"
+    assert parsed.products[0].human_confirmation is None
+
+    response = upload(client, store, content, key="real-template-layout")
+    assert response.status_code == 201
+    batch_id = response.json()["batch_id"]
+    assert response.json()["status"] == "IDENTIFIED_PENDING_REVIEW"
+    batch = session.get(ImportBatch, batch_id)
+    row = session.scalar(select(ImportRow).where(ImportRow.batch_id == batch_id))
+    normalized = json.loads(row.normalized_data_json)
+    assert normalized["source_date"] == batch.created_at.date().isoformat()
+    assert normalized["source_date_origin"] == "SYSTEM_IMPORT_DATE"
+    assert normalized["human_confirmation"] is None
+
+    preview = client.get(
+        f"/api/v1/admin/product-knowledge-imports/{batch_id}/merge-preview"
+    ).json()["items"][0]
+    change_set = preview["product"]
+    approved = client.post(
+        f"/api/v1/admin/product-knowledge-imports/{batch_id}/change-sets/{change_set['change_set_id']}/reviews",
+        json={
+            "decision": "APPROVE",
+            "operator": "知识运营",
+            "review_note": "系统人工审核通过",
+            "expected_base_snapshot_hash": change_set["base_snapshot_hash"],
+            "expected_change_set_version": change_set["version"],
+        },
+        headers={"Idempotency-Key": "real-template-review"},
+    )
+    assert approved.status_code == 201
+    saved = session.scalar(select(CatalogProduct))
+    assert saved.review_status == "APPROVED"
+    assert session.get(ImportBatch, batch_id).status == "COMPLETED"
 
 
 def test_existing_product_merge_keeps_blank_fields_and_reject_writes_no_formal_data(

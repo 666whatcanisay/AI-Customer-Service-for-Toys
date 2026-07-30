@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 TEMPLATE_TYPE = "PRODUCT_KNOWLEDGE"
 TEMPLATE_VERSION = "1.0"
-PARSER_VERSION = "product-knowledge-template-parser.v1"
+PARSER_VERSION = "product-knowledge-parser.v1.1"
 EXPECTED_SHEETS = ("填写说明", "数据填写", "示例数据", "字段说明")
 EXPECTED_SHEET_TITLES = {
     "填写说明": "商品知识采集模板 V1",
@@ -20,8 +20,7 @@ EXPECTED_SHEET_TITLES = {
 DATA_SHEET = "数据填写"
 EXAMPLE_SHEET = "示例数据"
 FIELD_DESCRIPTION_SHEET = "字段说明"
-HEADER_ROW = 4
-DATA_START_ROW = 5
+HEADER_SCAN_MAX_ROWS = 100
 
 EXPECTED_HEADERS = (
     "店铺名称",
@@ -48,8 +47,6 @@ REQUIRED_HEADERS = (
     "商品简介",
     "核心卖点",
     "资料来源",
-    "来源日期",
-    "是否人工确认",
 )
 
 CONFIRMATION_VALUES = {"已确认", "待确认"}
