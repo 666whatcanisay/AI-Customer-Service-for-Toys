@@ -3,13 +3,39 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "source_freeze_closed",
-  "current_task": "R008 Phase 1.5 Source Clean & Protection Reference Closure",
-  "current_stage": "The formal R008 Control overlay is closed as one docs/control-only commit whose parent is 19cc826, and annotated tag ai-cs-monorepo-source-freeze-v1 is the sole future Physical Migration source reference. The active Pilot remains protected at clean ai-cs-pilot-baseline-v1@cbc77ed in AI-CS-pilot-baseline-recovery-v1; ports 5173, 5174, 8000 and 8011 remain healthy and unchanged. No target AI-CS directory, physical migration, runtime switch, worktree retirement, implementation, contract, database or business-data change occurred.",
-  "current_gate": "PASS / SOURCE_FREEZE_CLOSED / PHYSICAL_MIGRATION_ENTRY_READY: Phase 2 may begin only after separate explicit authorization and only from ai-cs-monorepo-source-freeze-v1. Runtime switch, Recovery-root changes and worktree deletion remain unauthorized.",
+  "status": "product_stabilization_conditional_pass",
+  "current_task": "AI-CS Product Stabilization & Reliability Sprint V1",
+  "current_stage": "R008 physical migration and runtime convergence are complete. The formal runtime is AI-CS@42bafcf on ports 5173/5174/8000/8011 with runtimeMode=standard, networkMode=LAN, database revision 0008, active Chroma collection test_knowledge_v031 with 47 chunks, and real qwen3.5:9b inference. A P1 runtime/model and scoping defects are fixed and verified. C and isolated R009 browser regressions pass. B daily consultation remains blocked because one incompatible C catalog row causes the legacy B consumer to clear the full catalog; the correct remediation is the separately authorized R006 implementation.",
+  "current_gate": "CONDITIONAL PASS / AI_CS_PRODUCT_STABLE_V1_BLOCKED_BY_R006: runtime, A, C and R009 gates pass; BUG-B-001 remains an open P1 and B-001 through B-006 cannot all pass. Do not implement a B-side filter, mutate catalog data, or claim AI_CS_PRODUCT_STABLE_V1_READY. Next business entry is explicit R006 authorization followed by full B browser regression.",
+  "product_stabilization": {
+    "date": "2026-07-30",
+    "worktree": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-browser-acceptance-environment-v1",
+    "branch": "stabilization/product-stable-v1",
+    "a_fix_commit": "18a20f70ec5cd4c4da7baef0179cc30db0dbff5a",
+    "formal_runtime_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "formal_runtime_branch": "stabilization/product-stable-runtime-v1",
+    "formal_runtime_sha": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "runtime_mode": "standard",
+    "network_mode": "LAN",
+    "database_revision": "0008_customer_feedback_loop_v1",
+    "active_collection": "test_knowledge_v031",
+    "active_chunks": 47,
+    "model": "qwen3.5:9b",
+    "tests": {
+      "A": "105 passed, 3 skipped",
+      "C_backend": "full suite PASS; R009 targeted 8 passed",
+      "B": "115 Vitest passed; typecheck and build PASS; browser daily flow BLOCKED by BUG-B-001",
+      "C_admin": "55 Vitest passed; typecheck and build PASS; browser operations PASS",
+      "R009": "isolated 0009 browser upload, merge, 19 approvals, idempotency and negative cases PASS",
+      "runtime": "three stop/start/status cycles plus A and C fault recovery PASS"
+    },
+    "open_p1": [
+      "BUG-B-001 / R006 implementation required"
+    ]
+  },
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "control/r006-interface-validation-v1-1",
+    "branch": "stabilization/product-stable-v1",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
@@ -57,7 +83,7 @@
     "monorepo_plan_base": "19cc82682074dc0f11096d4191ad8d19a9f0cc0b",
     "monorepo_candidate_physical_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-r006-interface-validation-v1",
     "monorepo_target_physical_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
-    "monorepo_target_exists": false,
+    "monorepo_target_exists": true,
     "monorepo_source_freeze_head": "19cc82682074dc0f11096d4191ad8d19a9f0cc0b",
     "monorepo_source_protection_ref": "ai-cs-monorepo-source-freeze-v1",
     "monorepo_source_protection_ref_rule": "Resolve the annotated tag to obtain the closure commit; its direct parent must be 19cc82682074dc0f11096d4191ad8d19a9f0cc0b and its changed paths must be limited to docs/control/**.",
@@ -136,7 +162,8 @@
     "OPS_TARGET_PILOT_READY": "The daily pilot wrapper starts C/A/B/Admin and then probes trusted service state, TCP 5173, the customer page, /rag-api/api/health, and /platform-api/health. A real Private-network host closure passed twice across explicit safe stop and recovery: migrations, test-package idempotency, 47-item sync, real Ollama smoke, all four health checks, customer entry, fixed proxies, and loopback-only Admin passed. Runtime evidence is sanitised; a second customer computer remains a manual acceptance gate.",
     "OPS_PILOT_HARDENING_V1": "The hardening pass introduced a read-only gate for one enabled Private/current-subnet/TCP-5173 firewall rule, a second-computer client check, sanitised JSONL operation events, and a local SQLite online backup entrypoint. The real host completed A, C, and B stop-to-full-recovery rehearsals; after each, all four services, the customer page, and both fixed proxies recovered. The server-side client emulation passed. No scoped firewall rule exists and the current session is non-administrator, so second-computer reachability remains unverified.",
     "CONTROL_PILOT_BASELINE_MERGE": "After merging PR #49 and #51, an isolated SQLite verification completed Alembic, original-test-package import, 47-item sync, real qwen3.5:9b chat, 5173 /rag-api and /platform-api HTTP 200, one de-identified experience case NEW->REVIEWING->APPROVED, one de-identified feedback NEW->ANALYZING->ANALYZED, Admin HTTP 200, and managed stop with all four ports released. The readiness state correctly remained FIREWALL_CONFIGURATION_REQUIRED because no current-subnet Private TCP 5173 rule exists.",
-    "CONTROL_BASELINE_MERGE_V2": "Reviewed candidates were squash merged in the frozen order Interface #58, C #55, B #57, A 2ac537f and OPS #56 to develop@d1d2ba2. Backend 77 passed/3 skipped, C Admin 33 Vitest passed, B 100 Vitest passed and selected OPS lifecycle suites exited 0. Official scripts in an isolated worktree verified migration 0006, package import, 47/47 sync, four verified runtime records, fixed proxy health, sourced real qwen3.5:9b answer, case approval/evaluation, feedback analysis and Admin visibility. External firewall and second-computer gates remain."
+    "CONTROL_BASELINE_MERGE_V2": "Reviewed candidates were squash merged in the frozen order Interface #58, C #55, B #57, A 2ac537f and OPS #56 to develop@d1d2ba2. Backend 77 passed/3 skipped, C Admin 33 Vitest passed, B 100 Vitest passed and selected OPS lifecycle suites exited 0. Official scripts in an isolated worktree verified migration 0006, package import, 47/47 sync, four verified runtime records, fixed proxy health, sourced real qwen3.5:9b answer, case approval/evaluation, feedback analysis and Admin visibility. External firewall and second-computer gates remain.",
+    "PRODUCT_STABILIZATION_V1": "Formal AI-CS@42bafcf passed three LAN lifecycle cycles, A/C failure recovery, database and vector protection, and real qwen3.5:9b chat. A 105 passed/3 skipped; C full suite and R009 targeted 8 passed; B 115 and Admin 55 Vitest passed with typecheck/build. Isolated R009 browser acceptance uploaded the real workbook, parsed four sheets, approved 19 products, and passed idempotency and negative cases. B browser daily flow remains blocked by BUG-B-001 and requires R006 implementation."
   },
   "agent_worktrees": {
     "A": {
@@ -179,25 +206,24 @@
     "R006 Pilot Business Catalog Interface Validation V1.1 static case review",
     "R008 AI-CS Monorepo Consolidation V1 documentation-only migration plan",
     "R008 Phase 1 Monorepo Source Freeze report and runtime identity reconciliation",
-    "R008 Phase 1.5 Source Clean and Protection Reference Closure"
+    "R008 Phase 1.5 Source Clean and Protection Reference Closure",
+    "R008 physical migration, target validation and standard-port runtime cutover",
+    "Runtime Identity Alignment and Runtime Startup Alignment",
+    "R009 Product Knowledge Import V1 implementation and isolated browser acceptance"
   ],
   "next_tasks": {
-    "CONTROL": "Wait for separate explicit authorization before Phase 2 Physical Migration. Resolve ai-cs-monorepo-source-freeze-v1, verify its parent and docs/control-only closure scope, then apply the approved source-to-target map. Do not combine migration with runtime switch or worktree retirement.",
-    "OPS": "Preserve the current Recovery runtime root, ai-cs-pilot-baseline-v1 reference and records. Do not stop, restart, rename or retire it. Re-run full runtime identity only when a later controlled switch is separately authorized.",
-    "A_B_C": "Keep implementation paths frozen. Review the eight pre-existing dirty worktrees separately before any retirement; do not auto-commit, discard, move, delete or copy runtime data.",
-    "CONTRACTS": "Remain unchanged at 0.2.0 throughout structural migration planning. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
-    "QA": "Use the frozen tree objects and R004 results as the later parity baseline. No migration test was executed in Source Freeze and no PASS may be claimed for the future layout."
+    "CONTROL": "Keep the product-stable gate conditional. Obtain explicit R006 implementation authorization before changing the catalog provider/consumer behavior; do not hide BUG-B-001 with data mutation or B-side filtering.",
+    "OPS": "Keep AI-CS@42bafcf on the standard LAN runtime and preserve Recovery as rollback. Use the LAN status entrypoint. R009 production migration remains a separate backed-up release task.",
+    "A": "Preserve fix commit 18a20f7 and its regression tests. BUG-A-004 is P2 and must not trigger prompt changes inside this stabilization scope.",
+    "B_C": "After authorized R006 delivery, rerun B-001 through B-006 and the customer Playwright suite. R009 does not authorize RAG publishing or immediate B consumption.",
+    "QA": "A full tests/e2e PASS, including customer/daily-flow.cjs, is required before changing the gate to AI_CS_PRODUCT_STABLE_V1_READY."
   },
   "t02_executed": false,
   "blockers": [
-    "SF-R01: ai-cs-monorepo-source-freeze-v1 is currently a local annotated tag. A remote or controlled offline copy is required before retiring the source directory, but this does not block a separately authorized isolated Physical Migration.",
-    "SF-R02: eight pre-existing dirty worktrees and four detached worktrees remain quarantined or pending classification. No worktree may be removed or force-cleaned; this blocks their retirement, not the new target migration entry.",
-    "The active Pilot uses AI-CS-pilot-baseline-recovery-v1@cbc77ed, not the migration-source root. The Recovery directory, runtime records, SQLite and vector assets must remain in place until a later controlled switch and rollback rehearsal pass.",
-    "IV11-B01: the current catalog tables mix IMPORTED_TEST_ONLY records with MANUAL_CREATED/c-operation-store.v1 records, but V1.1 does not yet freeze the exact one-time provenance mapping and quarantine rule; bulk TEST plus ENABLED initialization is unsafe.",
-    "IV11-B02: V1.1 does not yet freeze the exact Store/Product status-write success response, changed=false idempotency behavior, or a receipt persistence verification/read-back mechanism.",
-    "No contracts 0.3.0 schema, C status persistence, migration, Admin control or B consumer implementation exists; this static validation is not runtime evidence.",
+    "BUG-B-001 / R006: one incompatible store in the legacy C catalog response causes B to clear the entire selectable catalog. Correct closure requires C final customer-service projection and receipt rules under explicit R006 implementation authorization.",
     "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified on one approved runtime SHA.",
-    "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through R006 business code."
+    "R009 is accepted only in an isolated 0009 runtime. Formal production remains at 0008 and no RAG publication or B consumption is implied.",
+    "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
   ],
   "last_updated": "2026-07-30"
 }
