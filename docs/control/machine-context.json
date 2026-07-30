@@ -3,10 +3,10 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "interface_validation_v1_1_complete",
-  "current_task": "R006 Pilot Business Catalog Interface Validation V1.1",
-  "current_stage": "Static validation of pilot-business-catalog.v1.1 completed with 6 PASS and 3 CONDITIONAL PASS results. The operator-controlled TEST/PILOT, Store/Product and inherited-SKU model is viable, but exact mixed-record initialization and activation-receipt write/read-back semantics remain unresolved. No code, UI, contracts, database, runtime data or service was changed.",
-  "current_gate": "CONDITIONAL PASS / R006_IMPLEMENTATION_BLOCKED: close IV11-B01 mixed legacy provenance mapping and IV11-B02 exact status-write response plus receipt persistence verification before any Contracts, C or B implementation.",
+  "status": "source_freeze_closed",
+  "current_task": "R008 Phase 1.5 Source Clean & Protection Reference Closure",
+  "current_stage": "The formal R008 Control overlay is closed as one docs/control-only commit whose parent is 19cc826, and annotated tag ai-cs-monorepo-source-freeze-v1 is the sole future Physical Migration source reference. The active Pilot remains protected at clean ai-cs-pilot-baseline-v1@cbc77ed in AI-CS-pilot-baseline-recovery-v1; ports 5173, 5174, 8000 and 8011 remain healthy and unchanged. No target AI-CS directory, physical migration, runtime switch, worktree retirement, implementation, contract, database or business-data change occurred.",
+  "current_gate": "PASS / SOURCE_FREEZE_CLOSED / PHYSICAL_MIGRATION_ENTRY_READY: Phase 2 may begin only after separate explicit authorization and only from ai-cs-monorepo-source-freeze-v1. Runtime switch, Recovery-root changes and worktree deletion remain unauthorized.",
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "branch": "control/r006-interface-validation-v1-1",
@@ -53,7 +53,29 @@
     "interface_freeze_v1_1_base": "1ea6f3e00902f9f6f829e77814a4b9ab0b5bab6f",
     "interface_freeze_v1_1_commit": "7fc4e26f799fa43101cb497dda05e7cefde36f3a",
     "interface_validation_v1_1_branch": "control/r006-interface-validation-v1-1",
-    "interface_validation_v1_1_base": "7fc4e26f799fa43101cb497dda05e7cefde36f3a"
+    "interface_validation_v1_1_base": "7fc4e26f799fa43101cb497dda05e7cefde36f3a",
+    "monorepo_plan_base": "19cc82682074dc0f11096d4191ad8d19a9f0cc0b",
+    "monorepo_candidate_physical_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-r006-interface-validation-v1",
+    "monorepo_target_physical_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "monorepo_target_exists": false,
+    "monorepo_source_freeze_head": "19cc82682074dc0f11096d4191ad8d19a9f0cc0b",
+    "monorepo_source_protection_ref": "ai-cs-monorepo-source-freeze-v1",
+    "monorepo_source_protection_ref_rule": "Resolve the annotated tag to obtain the closure commit; its direct parent must be 19cc82682074dc0f11096d4191ad8d19a9f0cc0b and its changed paths must be limited to docs/control/**.",
+    "monorepo_runtime_rollback_head": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
+    "monorepo_runtime_protection_ref": "ai-cs-pilot-baseline-v1",
+    "monorepo_runtime_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-pilot-baseline-recovery-v1",
+    "monorepo_source_freeze_contracts": "0.2.0",
+    "monorepo_source_freeze_tree_objects": {
+      "backend": "46f1f4aa0ee755393bf78ce1ee92dad9a8c7875e",
+      "frontend": "4d799481555c34407f9f05c3ac05a3b54eb356c5",
+      "extension": "a59d7037e4b998c9555f279c89e1a27944fc385f",
+      "platform_backend": "236ab010ec6d93fe389c0408b5698cdebd4c6b19",
+      "admin_web": "b16494deab348a689164acb348d4d974737cd748",
+      "contracts": "0d5ed3f5d06cc9a6c36a8973c1f9d25c41764640",
+      "docs_committed": "d0c7745e9f10590f1347a73533d9ae6c8e64c6e8",
+      "scripts": "d28a084515aa638fcd731d75a944dc5b866ad7d9",
+      "tests": "333267b947df8e3e6332709a6c5242f3841197d5"
+    }
   },
   "pull_requests": {
     "3": {
@@ -154,18 +176,23 @@
     "R006 pilot-business-catalog.v1 Interface Freeze plan",
     "R006 Pilot Business Catalog Interface Validation V1 static case review",
     "R006 pilot-business-catalog.v1.1 Legacy Compatibility Control interface freeze",
-    "R006 Pilot Business Catalog Interface Validation V1.1 static case review"
+    "R006 Pilot Business Catalog Interface Validation V1.1 static case review",
+    "R008 AI-CS Monorepo Consolidation V1 documentation-only migration plan",
+    "R008 Phase 1 Monorepo Source Freeze report and runtime identity reconciliation",
+    "R008 Phase 1.5 Source Clean and Protection Reference Closure"
   ],
   "next_tasks": {
-    "CONTROL": "Run a documentation-only V1.1 freeze remediation. Close IV11-B01 with exact imported-test versus C-created provenance mapping and unknown-record quarantine; close IV11-B02 with exact status-write success/idempotency response and receipt persistence verification semantics. Then repeat the Interface Owner gate review.",
-    "C_DATA_QA": "Review the proposed one-time mapping: IMPORTED_TEST_ONLY to TEST plus ENABLED when valid, MANUAL_CREATED or c-operation-store.v1 to PILOT plus DISABLED, and unknown/conflicting provenance to quarantine. Do not mutate any database.",
-    "CONTRACTS": "Remain unchanged at 0.2.0. Do not create 0.3.0 until IV11-B01 and IV11-B02 are frozen, reviewed and implementation is explicitly authorized.",
-    "B": "No implementation. Continue to require the final C projection and per-item isolation; never infer availability from test_data_mode, production_usable or publishable.",
-    "C": "No implementation. Review only the exact migration-source mapping and activation receipt write/read-back semantics required by IV11-B01 and IV11-B02.",
-    "A": "No R006 code or interface change."
+    "CONTROL": "Wait for separate explicit authorization before Phase 2 Physical Migration. Resolve ai-cs-monorepo-source-freeze-v1, verify its parent and docs/control-only closure scope, then apply the approved source-to-target map. Do not combine migration with runtime switch or worktree retirement.",
+    "OPS": "Preserve the current Recovery runtime root, ai-cs-pilot-baseline-v1 reference and records. Do not stop, restart, rename or retire it. Re-run full runtime identity only when a later controlled switch is separately authorized.",
+    "A_B_C": "Keep implementation paths frozen. Review the eight pre-existing dirty worktrees separately before any retirement; do not auto-commit, discard, move, delete or copy runtime data.",
+    "CONTRACTS": "Remain unchanged at 0.2.0 throughout structural migration planning. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
+    "QA": "Use the frozen tree objects and R004 results as the later parity baseline. No migration test was executed in Source Freeze and no PASS may be claimed for the future layout."
   },
   "t02_executed": false,
   "blockers": [
+    "SF-R01: ai-cs-monorepo-source-freeze-v1 is currently a local annotated tag. A remote or controlled offline copy is required before retiring the source directory, but this does not block a separately authorized isolated Physical Migration.",
+    "SF-R02: eight pre-existing dirty worktrees and four detached worktrees remain quarantined or pending classification. No worktree may be removed or force-cleaned; this blocks their retirement, not the new target migration entry.",
+    "The active Pilot uses AI-CS-pilot-baseline-recovery-v1@cbc77ed, not the migration-source root. The Recovery directory, runtime records, SQLite and vector assets must remain in place until a later controlled switch and rollback rehearsal pass.",
     "IV11-B01: the current catalog tables mix IMPORTED_TEST_ONLY records with MANUAL_CREATED/c-operation-store.v1 records, but V1.1 does not yet freeze the exact one-time provenance mapping and quarantine rule; bulk TEST plus ENABLED initialization is unsafe.",
     "IV11-B02: V1.1 does not yet freeze the exact Store/Product status-write success response, changed=false idempotency behavior, or a receipt persistence verification/read-back mechanism.",
     "No contracts 0.3.0 schema, C status persistence, migration, Admin control or B consumer implementation exists; this static validation is not runtime evidence.",

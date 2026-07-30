@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`INTERFACE_VALIDATION_COMPLETE`
+> 当前 Gate：`SOURCE_FREEZE_CLOSED / PHYSICAL_MIGRATION_ENTRY_READY`
 
 ## 1. 台账目标
 
@@ -98,8 +98,9 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
 | R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
+| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Source Freeze覆盖层已形成独立Control提交，源码/运行双保护引用成立；可在另行明确授权后进入Physical Migration。 |
 
-状态数量：`DONE=3`、`IN_PROGRESS=1`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
+状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
 
 ## 6. 需求明细
 
@@ -236,6 +237,23 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 关联代码/文档 | [控制面状态看板](01_三线状态看板.md)、`scripts/windows/` 下既有 LAN 启停与诊断工具、`docs/control/machine-context.json` 的 LAN 验证记录。 |
 | 防止重复错误规则 | 不得把网络隔离重复登记成 B 页面故障，不得通过修改 UI、接口或业务代码规避公司网络策略；只有出现应用监听或代理证据时才转为 AI-CS 代码缺陷。 |
 
+### R008 — AI-CS Project Structure Simplification V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R008 |
+| 提出时间 | 2026-07-30 |
+| 需求名称 | AI-CS Project Structure Simplification V1 / AI-CS Monorepo Consolidation V1 |
+| 用户原始目标 | 将当前多Worktree、多目录、多版本开发模式收敛为一个长期维护的AI-CS Monorepo，历史资产可追溯，未来按大版本发布。 |
+| 业务背景 | 目前同一Git仓库登记69个Worktree，其中8个dirty、4个detached；A/B/C和Control长期目录、旧运行路径及多份machine-context造成版本、职责和阻塞事实漂移。 |
+| 当前状态 | `IN_PROGRESS` |
+| 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
+| 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
+| 完成标准 | 最终只保留`AI-CS/`一个长期目录；应用按`apps/`与`services/`归位；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
+| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结`19cc826...`九个目录tree、R001–R006功能入口、数据禁止边界和`cbc77ed...`运行/回滚锚点；[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)确认9项Control资产独立提交边界，并以`ai-cs-monorepo-source-freeze-v1`建立迁移源码保护引用。四服务仍从clean Recovery目录运行且health 200；尚无物理迁移证据。 |
+| 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)、[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)、[Pilot Baseline Inventory Report](AI-CS-Pilot-Baseline-Inventory-Report-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
+| 防止重复错误规则 | 不得把`SOURCE_FREEZE_CLOSED`解释为已经迁移或已切换Pilot；不得处理当前运行中的Recovery目录；不得把“只保留一个长期目录”解释为立即批量删除；不得复制整仓到`archive/`；不得把dirty、运行或敏感资产带入Git；不得借目录迁移实施R006。 |
+
 ## 7. 历史错误防复发规则
 
 1. 不要重复开发已经完成的模块。先检索需求 ID、验收证据和关联代码；`DONE` 能力只允许登记回归、修复或明确的新目标。
@@ -269,6 +287,8 @@ R005 Feedback Loop真实运行验证（TODO）
 
 R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处理。
 
-当前唯一允许的下一入口是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
+R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
 
-最终状态：`INTERFACE_VALIDATION_V1_1_COMPLETE`
+R008是与R006并行的项目治理任务。Source Freeze Closure已关闭SF-B01/SF-B02：`ai-cs-monorepo-source-freeze-v1`是未来物理迁移源码入口，`ai-cs-pilot-baseline-v1@cbc77ed...`仍是当前实际运行与回滚锚点。下一入口只能在用户另行明确授权后执行Physical Migration；仍不得删除Worktree、处理Recovery运行根或切换Pilot。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+
+最终状态：`SOURCE_FREEZE_CLOSED`
