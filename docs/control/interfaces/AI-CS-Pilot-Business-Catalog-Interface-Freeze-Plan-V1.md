@@ -1,5 +1,7 @@
 # AI-CS Pilot Business Catalog Interface Freeze Plan V1
 
+> **版本提示（2026-07-30）：** R006 已形成 [Interface Freeze Plan V1.1](AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)。V1继续保留为历史冻结证据；旧TEST默认值、SKU独立启停、父级级联改写、C控制入口和activation receipt以V1.1为准。V1.1重新验证前不得据此进入实现。
+
 > 需求：R006 — Pilot Business Data Activation V1
 >
 > 基线：`ai-cs-pilot-baseline-v1` / `cbc77ed883cb99e2eff76ccb8eb3193bbddaba38`
