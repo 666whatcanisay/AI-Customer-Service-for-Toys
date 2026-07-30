@@ -13,7 +13,10 @@
   "runtime": {
     "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
     "branch": "control/r008-runtime-startup-alignment-v1",
-    "implementation_commit": "acfdc1a92da652a7ea795b5e497eba5d997f5891",
+    "implementation_commits": [
+      "acfdc1a92da652a7ea795b5e497eba5d997f5891",
+      "6070ad1a7124346ca8b859c7b655ea8737b89545"
+    ],
     "head_resolution": "Use git rev-parse HEAD; documentation commits do not change the accepted code tree.",
     "config": ".runtime/phase-e/config/green-standard.local.ps1",
     "services": {
