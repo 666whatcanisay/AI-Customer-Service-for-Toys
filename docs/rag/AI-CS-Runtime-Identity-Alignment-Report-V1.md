@@ -25,6 +25,7 @@ R008旧逻辑按全局 `LanMode` 把四服务 `runtime_mode` 写成 `LAN` 或 `L
 - 分支：`control/runtime-identity-alignment-v1`
 - 原正式业务基线：`dd379278837a4f816dfb626292a26b0c54cce0cc`
 - 身份逻辑提交：`38b233410fc75c95a476e8775f7821fb80aab7ff`
+- 中文路径保护修复：`2e9e93a6b98950c073badc40f9e84741a3b8fdaa`（Git路径不转义后再执行允许范围判断）
 - 业务目录差异：`backend`、`frontend`、`platform_backend`、`admin_web`、`extension`、`contracts` 均为零差异
 - 最终运行记录SHA：以本报告所在分支的clean HEAD为准；文档提交后由受控对齐脚本再次重新证明并写入四份记录
 - 配置来源：`.runtime/phase-e/config/green-standard.local.ps1`
