@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`RUNTIME_STARTUP_ALIGNMENT_COMPLETE / TARGET_STANDARD_RUNTIME_ACTIVE / RECOVERY_ROLLBACK_ONLY / PHASE_F_NOT_AUTHORIZED`
+> 当前 Gate：`PRODUCT_IMPORT_MERGE_DESIGN_READY / R009_IMPLEMENTATION_INTERFACE_FREEZE_REQUIRED / TARGET_STANDARD_RUNTIME_UNCHANGED`
 
 本文件是当前状态快照，不是第二份需求台账。任何需求变更必须先更新 Requirement Registry，再同步本摘要。
 
@@ -13,11 +13,11 @@
 | 状态 | 数量 | 需求 |
 | --- | ---: | --- |
 | `DONE` | 3 | R001、R002、R004 |
-| `IN_PROGRESS` | 2 | R003、R008 |
+| `IN_PROGRESS` | 3 | R003、R008、R009 |
 | `TODO` | 2 | R005、R006 |
 | `BLOCKED` | 1 | R007 |
 | `DEPRECATED` | 0 | 无 |
-| 合计 | 8 | R001–R008 |
+| 合计 | 9 | R001–R009 |
 
 ## 2. 当前需求状态
 
@@ -31,6 +31,7 @@
 | R006 | Pilot Business Data Activation V1 | `TODO` | V1.1九个Case得到`6 PASS / 3 CONDITIONAL PASS`；混合来源映射及receipt response/read-back仍未冻结。 | 当前不允许Implementation；只允许关闭IV11-B01/B02。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 当前判断是公司网络隔离、VLAN或端口策略，不是业务代码问题。 | OPS与公司网络管理完成第二终端可达性验收或给出 `NETWORK_SEGMENTED` 结论。 |
 | R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Runtime Startup Alignment已完成；四服务从clean `dd37927...`运行，活动集合为`test_knowledge_v031=47`，标准启停/status与失败清理已验收。 | 保持Target运行与Recovery锚点；Phase F旧目录处理必须另行授权。 |
+| R009 | C运营数据导入升级 V1 | `IN_PROGRESS` | “资料上传与审核”的三步批量Excel、店铺强校验、字段级Merge、待审核与生效收据设计已完成；Import Center保持六模板管理中心。 | 先冻结接口、六模板字段落点和向后兼容数据库迁移；未授权实施。 |
 
 ## 3. 当前真正阻塞点
 
@@ -45,6 +46,8 @@ R008 Phase E2已关闭标准端口迁移风险：影子服务先受管停止并�
 R008 Runtime Handover已将唯一主目录、完整启动环境变量、`green-standard`配置、受管停止/状态命令、四服务职责、B/C本机入口、正式SQLite/RAG路径和Recovery回滚前置条件写成长期交接。该文档不改变Runtime，当前Target仍为同一SHA且clean。未来维护不得省略Target独立数据环境变量、使用旧Worktree或把Recovery当日常开发目录。
 
 R008 Runtime Startup Alignment已关闭Handover后的真实启动回归：活动集合由配置统一为`test_knowledge_v031`，status同时显示实际可见集合；`documents=0`不再阻断启动。最终四服务从clean `dd37927...`运行，A ready/model configured、47 chunks，四条B/Admin代理200且真实Ollama smoke通过。一次中间复验暴露的listener记录清理竞态已通过受控身份回填和清理后双校验关闭。
+
+R009当前真正阻塞点不是页面样式，而是实施接口和正式数据落点尚未冻结：安全规则当前没有商品关系；运营知识缺口不能伪装成A Assessment或无来源的KnowledgeOptimizationTask；AI反馈必须复用去敏、append-only语义；六模板字段到规范列/扩展JSON的映射、状态/错误码/幂等/收据以及Alembic兼容迁移仍需正式评审。设计明确复用`import_batches/import_rows`，保留旧`staged_product_skus`兼容，禁止再建第二套批次/行表。
 
 ## 4. 需求依赖与执行顺序
 
@@ -88,9 +91,13 @@ R008 Phase B Source Tag Code Materialization COMPLETE
   ↓ Runtime Handover READY
   ↓ Runtime Startup Alignment COMPLETE（active collection / start / status / cleanup）
 R008 Worktree退役 / Phase F（仍未授权）
+
+R009 Product Import Merge Design READY
+  ↓ 仅允许 Interface / Data Mapping / Database Freeze
+R009 Implementation（未授权）
 ```
 
-新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008 Runtime迁移与交接已经完成，下一项只能是用户另行授权的Phase F。当前必须按Runtime Handover和Target受管记录维护标准端口，并保留停止状态的Recovery目录、最终备份与RAG锚点；不得重复执行E2、删除Recovery或把迁移结果写成R006/R003/R005验收。两个任务互不替代：R008不得实施Business Data Activation，R006也不得借机移动或清理项目目录。
+新功能开发入口仍关闭。R006下一项受控工作仍是Interface Freeze V1.1 Remediation；R008下一项只能是用户另行授权的Phase F；R009下一项只能是导入接口、六模板字段落点和数据库迁移冻结。当前必须按Runtime Handover维护标准端口并保留Recovery。R009设计不授权修改正在运行的Target，也不能把业务数据审核通过解释为R006激活、RAG发布或A分析。
 
 ## 5. 防重复结论
 
@@ -100,5 +107,6 @@ R008 Worktree退役 / Phase F（仍未授权）
 - R004 已完成：后续开发必须从 Recovery 基线派生，并先复核运行 SHA 与 contracts 0.2.0。
 - R007 是网络问题：不要修改 UI 或业务逻辑规避网络隔离。
 - R008 Runtime Startup Alignment已完成：不得再固定检查`documents`，也不得把知识warning误写成AI smoke通过；Phase F仍需单独授权。
+- R009只改“资料上传与审核”：不得删除或改造Import Center六模板，不得用Excel覆盖/删除数据库，不得让空白清空旧值，不得把资料分析审核状态复用为正式数据审核状态。
 
-最终状态：`RUNTIME_STARTUP_ALIGNMENT_COMPLETE`
+最终状态：`PRODUCT_IMPORT_MERGE_DESIGN_READY`
