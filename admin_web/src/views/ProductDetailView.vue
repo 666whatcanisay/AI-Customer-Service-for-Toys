@@ -4,7 +4,11 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   apiErrorMessage,
   getProductKnowledgeProduct,
+  listCatalogActivationReceipts,
+  setProductCustomerServiceStatus,
   updateProductBasicInfo,
+  type CatalogActivationReceipt,
+  type CustomerServiceStatus,
   type ProductKnowledgeDetail,
   type TopicCoverage,
 } from '../api/client'
@@ -18,6 +22,12 @@ const editingBasicInfo = ref(false)
 const savingBasicInfo = ref(false)
 const saveError = ref('')
 const saveReceipt = ref('')
+const activationOperator = ref('')
+const activationBusy = ref(false)
+const activationMessage = ref('')
+const activationError = ref('')
+const activationReceipts = ref<CatalogActivationReceipt[]>([])
+const receiptsVisible = ref(false)
 const basicInfo = reactive({
   product_display_name: '',
   product_summary: '',
@@ -34,6 +44,17 @@ function topicStatusLabel(topic: TopicCoverage): string {
     PARTIAL: '可基础回答',
     MISSING: '资料缺失',
   }[topic.status]
+}
+
+function dataSourceLabel(value: 'TEST' | 'PILOT' | 'UNKNOWN'): string {
+  return { TEST: '历史测试', PILOT: '试运行', UNKNOWN: '待确认' }[value]
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(value))
 }
 
 async function load(): Promise<void> {
@@ -90,6 +111,46 @@ async function saveBasicInfo(): Promise<void> {
   }
 }
 
+async function changeCustomerServiceStatus(status: CustomerServiceStatus): Promise<void> {
+  const operator = activationOperator.value.trim()
+  if (!operator) {
+    activationError.value = '请先填写本次操作人。'
+    return
+  }
+  activationBusy.value = true
+  activationError.value = ''
+  activationMessage.value = ''
+  try {
+    const result = await setProductCustomerServiceStatus(
+      props.productId,
+      status,
+      operator,
+      `product-${props.productId}-${status}-${crypto.randomUUID()}`,
+    )
+    activationMessage.value = result.changed && result.activation_receipt
+      ? `客服状态已更新，收据：${result.activation_receipt.activation_receipt_id}`
+      : '商品已经是目标客服状态，没有重复生成收据。'
+    await load()
+    await viewActivationReceipts()
+  } catch (reason: unknown) {
+    activationError.value = apiErrorMessage(reason)
+  } finally {
+    activationBusy.value = false
+  }
+}
+
+async function viewActivationReceipts(): Promise<void> {
+  activationError.value = ''
+  try {
+    const result = await listCatalogActivationReceipts('PRODUCT', props.productId)
+    activationReceipts.value = result.items
+    receiptsVisible.value = true
+  } catch (reason: unknown) {
+    activationReceipts.value = []
+    activationError.value = apiErrorMessage(reason)
+  }
+}
+
 watch(() => props.productId, load)
 onMounted(load)
 </script>
@@ -143,6 +204,8 @@ onMounted(load)
             <div class="status-row">
               <span class="status-pill">资料：{{ displayStatus(detail.data_status) }}</span>
               <span class="status-pill ai">AI：{{ displayStatus(detail.ai_status) }}</span>
+              <span class="status-pill">来源：{{ dataSourceLabel(detail.product.data_source) }}</span>
+              <span class="status-pill">客服：{{ detail.product.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span>
             </div>
           </div>
           <div class="overview-actions">
@@ -162,6 +225,28 @@ onMounted(load)
           <div class="form-actions"><button class="button" type="submit" :disabled="savingBasicInfo">{{ savingBasicInfo ? '正在保存…' : '保存基础信息' }}</button><button class="button secondary" type="button" :disabled="savingBasicInfo" @click="cancelBasicInfoEdit">取消</button></div>
         </form>
         <p v-if="saveReceipt" class="notice success" role="status">{{ saveReceipt }}</p>
+        <section class="activation-panel" aria-label="商品客服使用状态">
+          <div>
+            <strong>客服使用控制</strong>
+            <p>由运营确认商品是否进入 B 客服目录；不会自动发布知识或发送客户消息。</p>
+          </div>
+          <label>本次操作人<input v-model.trim="activationOperator" maxlength="128" placeholder="填写姓名或运营账号"></label>
+          <div class="form-actions">
+            <button class="button secondary" type="button" :disabled="activationBusy || detail.product.data_source === 'UNKNOWN'" @click="changeCustomerServiceStatus(detail.product.customer_service_status === 'ENABLED' ? 'DISABLED' : 'ENABLED')">{{ detail.product.customer_service_status === 'ENABLED' ? '关闭客服使用' : '启用客服使用' }}</button>
+            <button class="text-button" type="button" @click="viewActivationReceipts">查看 activation receipt</button>
+          </div>
+          <p v-if="activationMessage" class="notice success" role="status">{{ activationMessage }}</p>
+          <p v-if="activationError" class="notice error" role="alert">{{ activationError }}</p>
+          <div v-if="receiptsVisible" class="receipt-list">
+            <p v-if="activationReceipts.length === 0" class="notice">该商品尚无客服状态变更收据。</p>
+            <article v-for="item in activationReceipts" v-else :key="item.activation_receipt_id">
+              <strong>{{ item.customer_service_status === 'ENABLED' ? '启用客服使用' : '关闭客服使用' }}</strong>
+              <span>{{ formatDate(item.confirmed_at) }} · {{ item.confirmed_by }}</span>
+              <code>{{ item.activation_receipt_id }}</code>
+              <p>{{ item.confirmation_note }}</p>
+            </article>
+          </div>
+        </section>
         <p class="summary">{{ detail.product.product_summary || '当前资料未提供商品简介。' }}</p>
         <dl class="business-facts">
           <div><dt>核心卖点</dt><dd>{{ detail.product.core_selling_points.join('；') || '当前资料未提供' }}</dd></div>
@@ -260,6 +345,7 @@ onMounted(load)
 .eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }.answer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }.answer-card { display: grid; align-content: start; gap: 10px; min-height: 180px; padding: 19px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }.answer-card > span { color: #526279; font-size: 13px; }.answer-card > strong { color: #172554; font-size: 26px; }.answer-card.supported { border-top: 4px solid #3d9b6b; }.answer-card.missing { border-top: 4px solid #d69735; }.answer-card.action { border-top: 4px solid #3973c4; }.answer-card ul { margin: 0; padding-left: 18px; color: #526279; line-height: 1.55; }
 .topic-chips { display: flex; flex-wrap: wrap; gap: 6px; }.topic-chips span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.section-heading { display: flex; justify-content: space-between; gap: 18px; align-items: start; }.section-heading h2, .section-card h2 { margin: 0; color: #172554; }.coverage-score { display: grid; justify-items: end; }.coverage-score strong { color: #2e6db0; font-size: 30px; }.coverage-score span { color: #617087; font-size: 12px; }.status-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }.status-pill { padding: 5px 9px; border-radius: 999px; color: #365174; background: #edf2f8; font-size: 12px; }.status-pill.ai { color: #285493; background: #eaf2ff; }.summary { color: #526279; line-height: 1.65; }.business-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }.business-facts div { padding: 13px; border-radius: 9px; background: #f7f9fc; }.business-facts dt { color: #617087; font-size: 12px; }.business-facts dd { margin: 5px 0 0; color: #2f4259; line-height: 1.5; }
 .overview-actions { display: grid; justify-items: end; gap: 12px; }.basic-info-form { display: grid; gap: 14px; margin: 18px 0; padding: 18px; border: 1px solid #b9cde9; border-radius: 11px; background: #f8fbff; }.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }.form-grid label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.form-grid input, .form-grid textarea { min-height: 41px; padding: 9px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.form-grid textarea { min-height: 92px; resize: vertical; }.form-grid .wide { grid-column: 1 / -1; }.form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.activation-panel { display: grid; gap: 12px; margin: 18px 0; padding: 16px; border: 1px solid #cbd7e6; border-radius: 10px; background: #f8fbff; }.activation-panel > div > p { margin: 5px 0 0; color: #617087; }.activation-panel label { display: grid; gap: 6px; max-width: 360px; color: #526279; font-size: 13px; }.activation-panel input { min-height: 41px; padding: 9px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.text-button { padding: 0; border: 0; color: #285493; background: transparent; font: inherit; cursor: pointer; }.receipt-list { display: grid; gap: 9px; }.receipt-list article { display: grid; gap: 5px; padding: 12px; border-radius: 8px; background: #fff; }.receipt-list span, .receipt-list code { color: #617087; font-size: 12px; }.receipt-list p { margin: 0; color: #425b78; }
 .section-card { margin-top: 20px; }.section-card > .eyebrow + h2 { margin-bottom: 16px; }.sku-grid, .source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }.sku-card, .source-grid article { padding: 15px; border: 1px solid #e0e7f0; border-radius: 10px; }.sku-card h3 { margin: 0; color: #25466f; }.sku-card p { color: #526279; line-height: 1.55; }.sku-card .confirmed { color: #217447; font-weight: 700; }.coverage-layout, .lower-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }.coverage-list { display: grid; gap: 8px; margin-top: 16px; }.coverage-item { display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: #edf7f1; color: #276a49; }.coverage-item.partial { background: #eef4ff; color: #315f9d; }.coverage-item.missing { background: #fff5e7; color: #9a641c; }.coverage-item strong { font-size: 12px; }
 .gap-list { display: grid; gap: 10px; margin-top: 16px; }.gap-card { padding: 15px; border-left: 4px solid #d69735; border-radius: 8px; background: #fffaf2; }.gap-card > div { display: flex; justify-content: space-between; gap: 12px; color: #704911; }.gap-card p { margin: 8px 0; color: #526279; line-height: 1.55; }.gap-card blockquote { margin: 10px 0 0; padding: 10px 12px; border-radius: 7px; background: #fff; color: #75570a; }.faq-item { padding: 11px 0; border-bottom: 1px solid #e5ebf2; }.faq-item summary { color: #25466f; cursor: pointer; }.faq-item p, .safety-item p { color: #526279; line-height: 1.55; }.faq-item small, .safety-item small { color: #617087; }.safety-item { padding: 12px 0; border-bottom: 1px solid #e5ebf2; }.source-grid article { display: grid; gap: 6px; }.source-grid article > span { color: #617087; font-size: 12px; }.boundary { margin-top: 20px; color: #75570a; background: #fff8df; line-height: 1.6; }
 @media (max-width: 900px) { .answer-grid, .coverage-layout, .lower-grid { grid-template-columns: 1fr; }.business-facts, .sku-grid, .source-grid, .form-grid { grid-template-columns: 1fr; }.form-grid .wide { grid-column: span 1; } }

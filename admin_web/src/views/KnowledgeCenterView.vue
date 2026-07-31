@@ -136,6 +136,7 @@ onMounted(load)
                 <div class="status-pair">
                   <span class="state-pill data">资料：{{ displayStatus(product.data_status) }}</span>
                   <span :class="['state-pill', product.ai_status.toLowerCase()]">AI：{{ displayStatus(product.ai_status) }}</span>
+                  <span class="state-pill data">客服：{{ product.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span>
                 </div>
               </div>
               <p class="summary">{{ product.product_summary || '当前资料未提供商品简介。' }}</p>

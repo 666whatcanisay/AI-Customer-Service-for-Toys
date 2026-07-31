@@ -7,6 +7,8 @@ import { getProductKnowledgeProduct, updateProductBasicInfo, type ProductKnowled
 vi.mock('../src/api/client', () => ({
   apiErrorMessage: vi.fn(() => '暂时不可用'),
   getProductKnowledgeProduct: vi.fn(),
+  listCatalogActivationReceipts: vi.fn(),
+  setProductCustomerServiceStatus: vi.fn(),
   updateProductBasicInfo: vi.fn(),
 }))
 
@@ -18,7 +20,7 @@ describe('ProductDetailView', () => {
   it('answers the three operator questions and preserves the missing-age fallback', async () => {
     const productDetail = {
       store: { store_name: '木木小栈拼多多旗舰店', platform_name: '拼多多', product_count: 1, ai_usable_product_count: 1, gap_count: 1, pending_review_count: 0, technical_details: tech },
-      product: { product_name: 'Q66城市消防局机械积木玩具套装', product_summary: '消防主题机械积木。', core_selling_points: ['机械联动'], applicable_age: null, material: 'ABS', package_contents: '积木、说明书', usage_instructions: '按步骤拼装', technical_details: tech },
+      product: { product_name: 'Q66城市消防局机械积木玩具套装', product_summary: '消防主题机械积木。', core_selling_points: ['机械联动'], applicable_age: null, material: 'ABS', package_contents: '积木、说明书', usage_instructions: '按步骤拼装', data_source: 'PILOT', customer_service_status: 'DISABLED', customer_service_status_updated_at: null, customer_service_status_updated_by: null, technical_details: tech },
       skus: [{ sku_name: '豪华版', color_style: '红色', specification_difference: '含灯光组件', package_difference: '独立彩盒', faq_count: 1, difference_confirmed: true, attributes: ['颜色：红色'], technical_details: { ...tech, product_id: null, sku_id: 'SKU-L', sku_code: 'Q66-L' } }],
       faqs: [{ question: '有什么特点？', recommended_reply: '消防主题，支持机械联动。', answer_strategy: 'DIRECT_ANSWER', risk_level: 'LOW', sku_name: null }],
       safety_information: [{ title: '安全说明', content: '含小零件，需成人陪同。', risk_level: 'MEDIUM', forbidden_claim: '不得承诺绝对安全', handoff_condition: '发生误食时转人工' }],
@@ -46,6 +48,7 @@ describe('ProductDetailView', () => {
     expect(wrapper.text()).toContain('含灯光组件')
     expect(wrapper.text()).toContain('当前资料未提供年龄信息，建议人工确认。')
     expect(wrapper.text()).toContain('不代表知识已发布到 RAG')
+    expect(wrapper.text()).toContain('客服：已禁用')
 
     const editButton = wrapper.findAll('button').find((item) => item.text() === '编辑基础信息')
     await editButton!.trigger('click')
