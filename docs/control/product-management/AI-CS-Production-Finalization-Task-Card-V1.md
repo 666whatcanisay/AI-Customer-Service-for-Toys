@@ -41,4 +41,18 @@
 
 ## Gate
 
-当前：`IMPLEMENTATION_IN_PROGRESS`。
+当前：`AI_CS_INTERNAL_PRODUCTION_READY`。
+
+## 完成证据
+
+- 正式化主体提交：`9f2b500dc0d6469a04a6953b7886d65e34412a22`。
+- P2 文案补丁：`9911ba67cef330a7a1b4f03f82de227cbee6982d`，详见 `BUG-B-003`。
+- 防复发测试：`0f230c6f50f8b6162c4e52f3b167053e6592c656`。
+- 正式版本引用：`ai-cs-v1.0.0`。
+- Contracts：`0.5.0`；数据库：`0012_internal_production_finalization_v1`，integrity check 为 `ok`。
+- 四服务标准/LAN Runtime、模型 ready、活动集合 56 chunks 均已验证。
+- A/B/C/Admin/contracts 全量或专项测试、类型检查与构建通过。
+- Admin 正式页面、六模板、B 商品选择、PUBLISHED 状态、3 条同商品引用和安全边界已完成 Playwright 验收。
+- 数据库与 RAG 在线/离线快照、SHA256 与回滚路径已记录在《AI-CS Production Finalization Report V1》。
+
+最终报告：[AI-CS-Production-Finalization-Report-V1.md](../AI-CS-Production-Finalization-Report-V1.md)

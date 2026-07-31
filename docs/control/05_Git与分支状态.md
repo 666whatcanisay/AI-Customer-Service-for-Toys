@@ -1,5 +1,15 @@
 # Git 与分支状态
 
+## 2026-07-31 — AI-CS V1.0.0 内部生产正式基线
+
+- 唯一正式仓库：`C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS`；发布分支：`release/ai-cs-v1.0.0`。
+- 主正式化提交：`9f2b500dc0d6469a04a6953b7886d65e34412a22`；P2正式文案补丁：`9911ba67cef330a7a1b4f03f82de227cbee6982d`；防复发测试：`0f230c6f50f8b6162c4e52f3b167053e6592c656`。
+- 正式稳定标签为`ai-cs-v1.0.0`。精确解析SHA不在自引用文档中硬编码，交接时执行`git rev-parse ai-cs-v1.0.0^{commit}`并与Runtime记录复核。
+- 共享contracts版本为0.5.0；数据库revision为`0012_internal_production_finalization_v1`，正式Runtime已完成standard/LAN四服务与浏览器验收。
+- 当前`origin`指向本地历史保护仓库，不是可据此声称已发布的正式远端。本轮没有push、没有改写Git历史，也没有删除Recovery或旧保护引用。
+
+## 历史分支记录（2026-07-22起）
+
 - 正式远端：`https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git`。
 - PR #3：`agent/rag-core` → `develop`，Head `52e4325`，2026-07-22 09:00:14 +08:00 squash merge 为 `6284fcd014262427603338295d9fc13a757851f9`。
 - B 第一次 rebase：无冲突，Head 更新为 `12a2c99eb547c531b34622b83f5f24bbeb4e7cff`。

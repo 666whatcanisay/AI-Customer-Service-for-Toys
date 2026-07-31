@@ -2,11 +2,71 @@
   "project_id": "mumu-control",
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
-  "version": "0.1.0",
-  "status": "r006_2_experience_complete",
-  "current_task": "R006.2 Customer Experience Polish V1",
-  "current_stage": "R006.2 implementation and isolated browser acceptance are complete. B refreshes C catalog on focus and every 60 seconds while visible; Admin shows pending counts, filtered select-all, confirmation and refresh guidance. Formal Runtime remains on the R006.1 release.",
-  "current_gate": "R006_2_EXPERIENCE_COMPLETE / PRODUCTION_RELEASE_PENDING / R003_PILOT_ACCEPTANCE_PENDING",
+  "version": "1.0.0",
+  "status": "internal_production_ready",
+  "current_task": "AI-CS Production Finalization V1",
+  "current_stage": "AI-CS V1.0.0 code, database, contract, automated-test, browser and standard Runtime evidence are complete. The canonical identity is the ai-cs-v1.0.0 annotated tag.",
+  "current_gate": "AI_CS_INTERNAL_PRODUCTION_READY",
+  "production_finalization_v1": {
+    "date": "2026-07-31",
+    "branch": "release/ai-cs-v1.0.0",
+    "implementation_anchors": [
+      "9f2b500dc0d6469a04a6953b7886d65e34412a22",
+      "9911ba67cef330a7a1b4f03f82de227cbee6982d",
+      "0f230c6f50f8b6162c4e52f3b167053e6592c656"
+    ],
+    "planned_stable_reference": "ai-cs-v1.0.0",
+    "planned_stable_reference_resolution": "Canonical annotated tag; resolve the exact commit from Git and the standard Runtime records instead of duplicating a self-referential SHA here.",
+    "target_gate": "AI_CS_INTERNAL_PRODUCTION_READY",
+    "contracts": "0.5.0 additive and backward-compatible; historical 0.2.0/0.3.0/0.4.0 consumers remain valid",
+    "database": {
+      "revision": "0012_internal_production_finalization_v1",
+      "integrity_check": "ok",
+      "formalization": "Only eligible Store source TEST was audited and changed to INITIAL_IMPORT. Products, activation receipts, publication receipts, RAG chunks and embeddings were preserved.",
+      "rag_rebuild": false
+    },
+    "runtime_target": {
+      "mode": "standard",
+      "network_mode": "LAN",
+      "ports": {
+        "B": 5173,
+        "C_ADMIN": 5174,
+        "A": 8000,
+        "C_API": 8011
+      },
+      "final_same_sha_attestation": "PASS through the standard start/status workflow; exact identity follows ai-cs-v1.0.0"
+    },
+    "ai_runtime_evidence": {
+      "model": "qwen3.5:9b",
+      "model_ready": true,
+      "active_collection": "test_knowledge_v031",
+      "active_collection_note": "Physical legacy/internal collection name; not a user-visible environment label and must not be renamed during finalization.",
+      "active_chunks": 56,
+      "available_collections": {
+        "documents": 0,
+        "test_knowledge_v031": 56
+      }
+    },
+    "browser_acceptance": "PASS: B selected C-PRODUCT-0ff808af95ce419db9be49427f1c4813 with PUBLISHED status, 3 product chunks and 3 citations; safety boundary passed. Four Admin views and all six Import Center templates passed.",
+    "tests": {
+      "A": "109 passed, 3 opt-in real E2E skipped",
+      "B": "120 passed",
+      "C_ADMIN": "64 passed",
+      "C_BACKEND": "full suite PASS; contracts 5 passed"
+    },
+    "unchanged_boundaries": [
+      "A answer behavior",
+      "Prompt",
+      "RAG publication behavior",
+      "Windows start/status/stop scripts",
+      "business data and audit-history retention"
+    ],
+    "next_requirement_sequence": [
+      "R003 business acceptance",
+      "R005 real Pilot validation"
+    ],
+    "external_blocker": "R007 LAN access remains an external network/VLAN/port-policy issue"
+  },
   "r006_2_experience": {
     "date": "2026-07-31",
     "branch": "feature/r006-2-customer-experience-polish-v1",
