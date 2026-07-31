@@ -2,7 +2,7 @@
 
 - 等级：P2
 - 模块：Windows OPS自动测试
-- 状态：FIXED_TESTED_RELEASE_PENDING
+- 状态：FIXED_VERIFIED_PRODUCTION
 - 发现时间：2026-07-31
 
 ## 问题描述
@@ -28,3 +28,4 @@
 - 过期PID夹具补齐当前Runtime身份记录要求的`repository_root`和`network_mode`；未修改正式状态脚本的身份校验。
 - “仅C”夹具改为5秒上限的端口就绪轮询，消除固定300ms造成的偶发误报。
 - `Test-OpsT04Fix1.ps1`已通过：无服务、仅C、过期PID、`$PID`冲突、缺少`.runtime`、缺少A venv和脚本语法均完成验证。
+- R006.1正式发布后再次执行`Test-OpsT04Fix1.ps1`、`Test-OpsLanMode.ps1`和`Test-OpsRuntimeFix2.ps1`，全部通过；四服务保持RUNNING。

@@ -2,7 +2,7 @@
 
 - 等级：P2
 - 模块：B 客服展示 / C知识资料状态 / R006.1商品知识发布
-- 状态：FIXED_TESTED_RELEASE_PENDING
+- 状态：FIXED_VERIFIED_PRODUCTION
 - 发现时间：2026-07-31
 
 ## 问题描述
@@ -33,4 +33,5 @@ B准备度继续读取既有知识资料审核投影；R006.1发布的是C商品
 - C新增只读投影`customer-product-ai-knowledge-status.v1`，仅对已经进入客服可用目录的商品返回AI知识状态、发布收据ID、collection、chunk与embedding数量。
 - C负责校验`PUBLISHED`必须同时具备有效发布收据、`chunk_count > 0`和完整embedding证据；B不推断商品准入。
 - B原“AI参考准备度”改为“AI知识状态”，展示发布状态、引用数量和收据是否生成，不再读取旧资料审核投影。
-- C专项9项、contracts 5项、B专项41项与B全量117项均通过；正式浏览器验证将在R006.1发布Smoke中完成。
+- C专项9项、contracts 5项、B专项41项与B全量117项均通过。
+- 正式浏览器Smoke显示`AI知识状态：已发布`、引用数量3和publication receipt；A回答展开后3条来源均属于当前商品。
