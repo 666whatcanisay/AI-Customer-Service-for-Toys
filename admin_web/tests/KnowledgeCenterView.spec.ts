@@ -69,17 +69,23 @@ describe('KnowledgeCenterView', () => {
       publication_receipt: { publication_receipt_id: 'RAG-1', product_id: 'PRODUCT-Q66', knowledge_fingerprint: 'current', active_collection: 'test', chunk_count: 2, embedding_count: 2, status: 'PUBLISHED', operator: '运营A', created_at: '2026-07-31T00:00:00Z' },
     })
 
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const wrapper = mount(KnowledgeCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
+    expect(wrapper.get('[data-testid="pending-enable-count"]').text()).toContain('当前待启用：1 个')
     await wrapper.get('[data-testid="knowledge-activation-operator"]').setValue('运营A')
-    await wrapper.get('[data-testid="select-product-PRODUCT-Q66"]').setValue(true)
+    await wrapper.get('[data-testid="select-all-filtered-products"]').setValue(true)
+    expect(wrapper.get('[data-testid="batch-enable-products"]').text()).toContain('批量启用客服（1）')
     await wrapper.get('[data-testid="batch-enable-products"]').trigger('click')
     await flushPromises()
+    expect(confirm).toHaveBeenCalledWith('确认启用当前选择的 1 个商品供客服使用？')
     expect(enableProductsForCustomerService).toHaveBeenCalledWith(['PRODUCT-Q66'], '运营A', expect.stringContaining('batch-enable-'))
+    expect(wrapper.text()).toContain('客服工作台刷新目录后即可使用')
 
     await wrapper.get('[data-testid="publish-product-PRODUCT-Q66"]').trigger('click')
     await flushPromises()
     expect(publishProductAiKnowledge).toHaveBeenCalledWith('PRODUCT-Q66', '运营A', expect.stringContaining('publish-PRODUCT-Q66-'))
+    confirm.mockRestore()
   })
 
   it('uses 暂无统计 instead of inventing metrics when there is no data', async () => {
