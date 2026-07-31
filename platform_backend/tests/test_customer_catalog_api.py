@@ -249,6 +249,8 @@ def test_operator_activation_receipts_idempotency_and_parent_blocking(
     product = _seed_product(
         session, store, product_id="PRODUCT-ACT", status="DISABLED"
     )
+    product.review_status = "APPROVED"
+    session.commit()
     product_url = "/api/v1/admin/operations/products/PRODUCT-ACT/customer-service-status"
     store_url = f"/api/v1/admin/operations/stores/{store.id}/customer-service-status"
 
@@ -389,3 +391,58 @@ def test_unknown_source_cannot_be_enabled(client: TestClient, session: Session) 
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CUSTOMER_SERVICE_ENTITY_QUARANTINED"
+
+
+def test_batch_enable_only_approved_products_and_isolate_failures(
+    client: TestClient, session: Session
+) -> None:
+    store = _seed_scope(
+        session,
+        package_id="PKG-BATCH",
+        store_code="BATCH",
+        data_source="PILOT",
+        status="ENABLED",
+        import_status="MANUAL_CREATED",
+        schema_version="c-operation-store.v1",
+    )
+    approved = _seed_product(
+        session, store, product_id="BATCH-APPROVED", status="DISABLED"
+    )
+    approved.review_status = "APPROVED"
+    draft = _seed_product(session, store, product_id="BATCH-DRAFT", status="DISABLED")
+    draft.review_status = "DRAFT"
+    session.commit()
+
+    payload = {
+        "product_ids": [approved.product_id, draft.product_id, "BATCH-MISSING"],
+        "confirmed_by": "pytest-operator",
+        "confirmation_note": "批量启用已审核商品",
+    }
+    first = client.post(
+        "/api/v1/admin/operations/products/customer-service-status:batch",
+        json=payload,
+        headers={"Idempotency-Key": "batch-enable-001"},
+    )
+    assert first.status_code == 200
+    body = first.json()
+    assert body["result_status"] == "PARTIAL"
+    assert body["changed_count"] == 1
+    assert body["failed_count"] == 2
+    assert body["items"][0]["status"] == "CHANGED"
+    assert body["items"][0]["activation_receipt"]["entity_ref"] == approved.product_id
+    assert body["items"][1]["error_code"] == "CUSTOMER_SERVICE_PRODUCT_NOT_APPROVED"
+    assert body["items"][2]["error_code"] == "CUSTOMER_SERVICE_ENTITY_NOT_FOUND"
+
+    session.refresh(approved)
+    session.refresh(draft)
+    assert approved.customer_service_status == "ENABLED"
+    assert draft.customer_service_status == "DISABLED"
+
+    replay = client.post(
+        "/api/v1/admin/operations/products/customer-service-status:batch",
+        json=payload,
+        headers={"Idempotency-Key": "batch-enable-001"},
+    )
+    assert replay.status_code == 200
+    assert replay.headers["Idempotency-Replayed"] == "true"
+    assert replay.json() == body

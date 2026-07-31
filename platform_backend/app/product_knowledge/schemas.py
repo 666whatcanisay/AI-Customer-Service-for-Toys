@@ -5,6 +5,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from app.knowledge_publishing.schemas import AiKnowledgeSummary
+
 
 class KnowledgeTopicStatus(StrEnum):
     SUPPORTED = "SUPPORTED"
@@ -129,6 +131,7 @@ class ProductKnowledgeListItem(BaseModel):
     customer_service_status: str
     customer_service_status_updated_at: datetime | None = None
     customer_service_status_updated_by: str | None = None
+    ai_knowledge: AiKnowledgeSummary
     technical_details: TechnicalDetails
 
 
@@ -187,6 +190,7 @@ class ProductKnowledgeDetail(BaseModel):
     knowledge_state: ProductKnowledgeState
     data_status: KnowledgeDataStatus
     ai_status: KnowledgeAiStatus
+    ai_knowledge: AiKnowledgeSummary
     topic_coverage: list[TopicCoverage]
     answerable_topics: list[str]
     missing_topics: list[str]

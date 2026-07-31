@@ -159,6 +159,60 @@ class ActivationResponse(BaseModel):
     server_time: datetime
 
 
+class BatchActivationResultStatus(StrEnum):
+    COMPLETE = "COMPLETE"
+    PARTIAL = "PARTIAL"
+    FAILED = "FAILED"
+
+
+class BatchActivationItemStatus(StrEnum):
+    CHANGED = "CHANGED"
+    UNCHANGED = "UNCHANGED"
+    FAILED = "FAILED"
+
+
+class BatchActivationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_ids: list[str] = Field(min_length=1, max_length=100)
+    confirmed_by: str = Field(min_length=1, max_length=128)
+    confirmation_note: str = Field(min_length=1, max_length=500)
+
+    @field_validator("product_ids")
+    @classmethod
+    def product_ids_must_be_unique(cls, values: list[str]) -> list[str]:
+        normalized = [value.strip() for value in values]
+        if any(not value or "\r" in value or "\n" in value for value in normalized):
+            raise ValueError("product_ids 必须是非空单行文本")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("product_ids 不能重复")
+        return normalized
+
+    @field_validator("confirmed_by", "confirmation_note")
+    @classmethod
+    def strip_batch_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class BatchActivationItem(BaseModel):
+    product_id: str
+    status: BatchActivationItemStatus
+    activation_receipt: ActivationReceipt | None = None
+    error_code: str | None = None
+    message: str
+
+
+class BatchActivationResponse(BaseModel):
+    schema_version: str = "pilot-business-catalog-batch-activation.v1"
+    result_status: BatchActivationResultStatus
+    target_status: CustomerServiceStatus = CustomerServiceStatus.ENABLED
+    items: list[BatchActivationItem]
+    changed_count: int = Field(ge=0)
+    unchanged_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    server_time: datetime
+
+
 class ActivationReceiptListResponse(BaseModel):
     items: list[ActivationReceipt]
     total: int = Field(ge=0)
