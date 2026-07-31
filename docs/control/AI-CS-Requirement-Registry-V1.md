@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`R006_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING`
+> 当前 Gate：`R006_PRODUCTION_RELEASE_COMPLETE / R003_BUSINESS_ACCEPTANCE_PENDING`
 
 ## 1. 台账目标
 
@@ -93,10 +93,10 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | --- | --- | --- | --- | --- |
 | R001 | C商品知识运营中心V2 | `DONE` | C | 已由 R004 收敛进入正式 Pilot 基线；不得重做结构。 |
 | R002 | AI客服反馈沉淀闭环 | `DONE` | B、C、contracts | 已由 R004 按所有权收敛；真实 Pilot 效果由 R005 单独验证。 |
-| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006候选实现和隔离浏览器验收已通过；等待正式发布与业务验收。 |
+| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006已正式发布并通过目录Smoke；等待真实PILOT人工启用/禁用业务验收。 |
 | R004 | AI-CS运行版本统一 | `DONE` | Control、OPS、A/B/C、contracts | Recovery 分支、独立提交、contracts 0.2.0、全量测试和四服务同 SHA 运行均已建立。 |
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
-| R006 | Pilot Business Data Activation V1 | `DONE` | Control / Interface Owner、C、B，A 无变更 | contracts 0.3.0、C Provider/Admin、B Consumer、0010及隔离浏览器验收已完成；正式发布另立任务。 |
+| R006 | Pilot Business Data Activation V1 | `DONE` | Control / Interface Owner、C、B，A 无变更 | contracts 0.3.0、C Provider/Admin、B Consumer、正式0010及Production Smoke已完成。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
 | R008 | AI-CS Project Structure Simplification V1 | `DONE` | Control、OPS、A/B/C、QA | 物理迁移、目标验证与标准端口切换完成；AI-CS为正式目录。 |
 | R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 实现和隔离0009浏览器验收完成；正式发布仍是独立任务。 |
@@ -203,8 +203,8 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | 负责模块 | Control / Interface Owner：冻结所有权、状态、路径和兼容性；C：Provider 与客服可用状态权威；B：Consumer；A：不修改，后续只验证既有请求可以使用同一激活范围。 |
 | 影响范围 | Store/Product客服状态、SKU继承、历史TEST初始化、新PILOT默认值、C运营启停入口、activation receipt、C→B消费和AI下游使用；明确禁止Master Data重构。 |
 | 完成标准 | 历史有效TEST数据默认ENABLED且运营可关闭；新PILOT Store/Product默认DISABLED且运营可开启；SKU只继承Product；B只消费C最终投影；每次实际状态变化有C权威receipt；单个商品关闭不影响其他商品；安全与回滚证据齐全。 |
-| 验收证据 | [Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)：contracts `4 passed`、C `110 passed`、B `117 passed`、Admin `58 passed`、两端typecheck/build和隔离浏览器E2E通过；异常Store/Product/SKU逐条隔离，PILOT启停、Store阻断不改Product、SKU继承及receipt均有运行证据。 |
-| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；[Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)；实现提交`673dca6`、`68457e1`、`e858c02`、`04e4a84`、`8cbd92b`。 |
+| 验收证据 | [Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)：contracts `4 passed`、C `110 passed`、B `117 passed`、Admin `58 passed`、两端typecheck/build和隔离浏览器E2E通过；[Production Release Report V1](AI-CS-R006-Production-Release-Report-V1.md)：正式备份、0008→0009→0010、四服务、C/B目录和Admin浏览器Smoke通过。 |
+| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；[Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)；[Production Release Report V1](AI-CS-R006-Production-Release-Report-V1.md)；发布代码`b66506a`。 |
 | 防止重复错误规则 | 不得恢复“系统根据旧测试字段自动选择可信数据”的方案；不得把全部旧表记录无差别初始化为TEST；不得扩大成Master Data；不得让B判断C数据可信度；不得为SKU增加独立启停；实现必须遵守Implementation Plan的provenance、receipt和隔离规则。 |
 
 #### R006 增补需求 — Legacy Compatibility Control
@@ -305,8 +305,8 @@ R005 Feedback Loop真实运行验证（TODO）
 
 R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处理。
 
-R006当前下一入口为受控编码实施：先提交additive contracts 0.3.0，再完成C状态持久化/投影和最小控制入口，最后切换B Consumer并由QA执行隔离验收。正式数据库迁移、Runtime切换和业务数据变更不包含在Implementation阶段，必须另立发布任务。
+R006已完成受控实现与正式发布：additive contracts 0.3.0、C状态持久化/投影/控制、B Consumer、0010迁移和正式Smoke均已通过。下一入口是R003真实PILOT人工启用/禁用业务结果验收，不是继续修改R006。
 
 R008物理迁移和标准端口切换已完成：`AI-CS/`是唯一正式运行与后续开发目录，Recovery仅保留为回滚锚点。旧Worktree是否退役仍须按独立归档计划逐一确认，不能因R008完成而批量删除。R008结果不替代R003/R005业务验收，也不授权R006。
 
-当前稳定性 Gate：Runtime、A、C、R009回归通过；`BUG-B-001`仍受R006 Implementation阻塞。只有R006实施并重新通过B-001至B-006后，才可声明`AI_CS_PRODUCT_STABLE_V1_READY`。
+当前稳定性 Gate：Runtime、A、C、R009回归和R006正式目录Smoke通过；`BUG-B-001`为`FIXED_VERIFIED_PRODUCTION_SMOKE`。B-001至B-006完整日常业务回归及R003人工激活仍需另行执行，不能由发布Smoke替代。

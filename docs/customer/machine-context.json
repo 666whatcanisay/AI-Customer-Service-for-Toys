@@ -2,11 +2,11 @@
   "project_id": "mumu-B",
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-browser-acceptance-environment-v1",
-  "current_task": "R006 Customer Available Catalog Consumer implementation",
-  "current_stage": "B consumes only the three /api/v1/customer-service/catalog paths and pilot-business-catalog.v1.1 final items. Old trial/test/publishable business checks are removed without adding a local fallback. Unit, type, build and isolated browser tests pass; formal deployment is pending.",
-  "current_gate": "R006_B_CONSUMER_COMPLETE / PRODUCTION_RELEASE_PENDING",
-  "status": "r006_b_consumer_complete",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
+  "current_task": "R006 Customer Available Catalog Consumer production release",
+  "current_stage": "B is formally deployed at release b66506a and consumes only the three C-owned /api/v1/customer-service/catalog paths. Production browser smoke shows one projected TEST Store and five Products while the disabled PILOT Store does not clear the catalog.",
+  "current_gate": "R006_B_CONSUMER_PRODUCTION_READY",
+  "status": "r006_b_consumer_production_ready",
   "last_updated": "2026-07-31",
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
@@ -23,7 +23,9 @@
     "clean": true,
     "task_commit": "04e4a84",
     "e2e_commit": "8cbd92b",
-    "runtime_deployed": false
+    "runtime_deployed": true,
+    "formal_release_branch": "release/r006-customer-available-catalog-v1",
+    "formal_release_sha": "b66506ab7706113df5207182d326f1cf03b40726"
   },
   "owned_paths": [
     "frontend/**",
@@ -75,10 +77,8 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-31 R006: full Vitest 28 files / 117 tests PASS; vue-tsc --noEmit PASS; vite build PASS. Isolated browser E2E verified valid TEST data survives malformed Store/Product/SKU records and manually activated PILOT Store/Product become visible. Formal AI-CS@42bafcf was not switched.",
-  "blockers": [
-    "The verified R006 consumer is not yet deployed to formal AI-CS@42bafcf; Production verification requires a separate authorized release."
-  ],
+  "last_test_result": "2026-07-31 R006 production: full candidate Vitest 28 files / 117 tests, typecheck and build PASS; formal B proxy and Chrome smoke PASS with 1 projected Store and 5 Products. BUG-B-001 is FIXED_VERIFIED_PRODUCTION_SMOKE.",
+  "blockers": [],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
     "Tester identity is local browser state and is not authentication or authorization",
@@ -106,7 +106,8 @@
     "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added",
     "TARGET MODE V2 customer knowledge-status consumer: strict same-origin client, compact Chinese status indicator and non-blocking fallback implemented against knowledge-quality-loop.v1",
     "TARGET MODE V5 customer usability: visible consultation scope, AI reference readiness actions, and human review-to-copy path implemented without adding API consumption",
-    "R006 Customer Available Catalog consume-only adaptation and isolated browser verification"
+    "R006 Customer Available Catalog consume-only adaptation and isolated browser verification",
+    "R006 Customer Available Catalog formal deployment and production read-only browser smoke"
   ],
   "out_of_scope": [
     "Automatic customer message sending",
