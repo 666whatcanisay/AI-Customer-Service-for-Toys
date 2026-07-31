@@ -202,7 +202,7 @@ onMounted(load)
 
       <section v-if="!overview.has_data" class="card empty-state">
         <h2>暂无商品知识数据</h2>
-        <p>请先按现有试点流程导入并审核可核对的商品资料。页面不会生成示例统计或虚构商品。</p>
+        <p>请先按现有运营流程导入并审核可核对的商品资料。页面不会生成示例统计或虚构商品。</p>
         <RouterLink class="button secondary" to="/import-center">查看中文资料模板</RouterLink>
       </section>
 

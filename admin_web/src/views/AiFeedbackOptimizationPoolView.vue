@@ -75,7 +75,7 @@ onMounted(load)
 <template>
   <main class="page">
     <div class="page-header"><div><p class="eyebrow">客服运营 · AI 质量</p><h1>AI 问题中心</h1><p>查看客服人工确认后、已完成分析的问题。这里的建议只供运营判断，不会自动修改 Prompt、知识或客户回复。</p></div><button class="button secondary" type="button" @click="load">刷新数据</button></div>
-    <p class="notice trial-note">当前仅展示测试/试运行中已经完成的分析证据；未分析的问题不会被当作结果显示。</p>
+    <p class="notice trial-note">当前仅展示已经完成的分析证据；未分析的问题不会被当作结果显示。</p>
     <p v-if="loading" class="notice" role="status">正在读取已分析问题…</p>
     <p v-else-if="error" class="notice error" role="alert">暂时无法读取 AI 问题。{{ error }}</p>
     <p v-else-if="results.length === 0" class="notice">{{ total === 0 ? '尚无已完成分析的 AI 问题。客服提交反馈并完成分析后，会在这里显示。' : '当前没有可展示的 AI 问题。请刷新后重试。' }}</p>

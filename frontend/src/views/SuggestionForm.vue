@@ -3,7 +3,7 @@
     <header>
       <p class="eyebrow">意见与建议</p>
       <h1>告诉我们哪里需要改进</h1>
-      <p>建议会关联当前测试客服，提交后可在“我的建议”中查看。</p>
+      <p>建议会关联当前客服工作台身份，提交后可在“我的建议”中查看。</p>
     </header>
 
     <el-alert
@@ -110,7 +110,7 @@ onMounted(() => {
 })
 
 const validate = (): string => {
-  if (!identity.value.reporterName) return '请先在右上角设置测试客服姓名。'
+  if (!identity.value.reporterName) return '请先在右上角设置客服工作台姓名。'
   if (!findWorkbenchModule(form.moduleKey)) return '请选择相关模块。'
   if (!form.title.trim()) return '请填写建议标题。'
   if (form.title.trim().length < 4) return '标题至少需要 4 个字。'

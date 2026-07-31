@@ -13,7 +13,7 @@ def test_health_returns_service_status_and_request_id() -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["service"] == "platform-backend"
-    assert body["version"] == "0.1.0"
+    assert body["version"] == "1.0.0"
     assert body["request_id"]
     assert response.headers["X-Request-ID"] == body["request_id"]
 

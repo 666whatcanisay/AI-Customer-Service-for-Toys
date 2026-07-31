@@ -780,7 +780,7 @@ export interface ProductKnowledgeListItem {
   answerable_topics: string[]
   missing_topics: string[]
   gap_count: number
-  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  data_source: 'TEST' | 'INITIAL_IMPORT' | 'PILOT' | 'UNKNOWN'
   customer_service_status: CustomerServiceStatus
   customer_service_status_updated_at: string | null
   customer_service_status_updated_by: string | null
@@ -815,7 +815,7 @@ export interface ProductKnowledgeDetail {
     material: string | null
     package_contents: string | null
     usage_instructions: string | null
-    data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+    data_source: 'TEST' | 'INITIAL_IMPORT' | 'PILOT' | 'UNKNOWN'
     customer_service_status: CustomerServiceStatus
     customer_service_status_updated_at: string | null
     customer_service_status_updated_by: string | null
@@ -915,7 +915,7 @@ export interface StoreOperationItem {
   product_count: number
   created_at: string
   remarks: string
-  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  data_source: 'TEST' | 'INITIAL_IMPORT' | 'PILOT' | 'UNKNOWN'
   customer_service_status: CustomerServiceStatus
   customer_service_status_updated_at: string | null
   customer_service_status_updated_by: string | null
@@ -942,7 +942,7 @@ export interface ProductOperationItem {
   data_status_name: string
   sku_count: number
   created_at: string
-  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  data_source: 'TEST' | 'INITIAL_IMPORT' | 'PILOT' | 'UNKNOWN'
   customer_service_status: CustomerServiceStatus
 }
 
@@ -951,7 +951,7 @@ export interface CatalogActivationReceipt {
   activation_receipt_id: string
   entity_type: 'STORE' | 'PRODUCT'
   entity_ref: string
-  data_source: 'TEST' | 'PILOT'
+  data_source: 'TEST' | 'INITIAL_IMPORT' | 'PILOT'
   previous_status: CustomerServiceStatus | null
   customer_service_status: CustomerServiceStatus
   activation_source: 'LEGACY_INITIALIZATION' | 'OPERATOR'
@@ -966,7 +966,7 @@ export interface CatalogActivationResponse {
   entity: {
     entity_type: 'STORE' | 'PRODUCT'
     entity_ref: string
-    data_source: 'TEST' | 'PILOT'
+    data_source: 'TEST' | 'INITIAL_IMPORT' | 'PILOT'
     customer_service_status: CustomerServiceStatus
     customer_service_status_updated_at: string | null
     customer_service_status_updated_by: string | null
@@ -1717,7 +1717,7 @@ export function apiErrorMessage(error: unknown): string {
   if (error instanceof AxiosError) {
     const status = error.response?.status
     if (status === 400 || status === 422) return '筛选条件或提交内容不符合要求。请检查页面中的必填项和格式。'
-    if (status === 401 || status === 403) return '当前试运行账号没有访问此项数据的权限。请联系管理员确认。'
+    if (status === 401 || status === 403) return '当前账号没有访问此项数据的权限。请联系管理员确认。'
     if (status === 404) return '没有找到所需记录。请刷新页面并确认筛选条件。'
     if (status === 409) return '这条记录的状态已发生变化。请刷新后再核对和操作。'
     if (status !== undefined && status >= 500) return '运营平台暂时无法处理请求。请稍后重试；若持续出现，请查看服务状态。'

@@ -1,5 +1,20 @@
 # Contract changelog
 
+## 0.5.0 - 2026-07-31
+
+- Added `INITIAL_IMPORT` to the additive C-owned customer-service catalog,
+  activation-receipt, and C-to-A knowledge-publication source enums. It is the
+  formal current label for a Store
+  whose existing provenance proves it was initialized from the retained
+  `IMPORTED_TEST_ONLY + 0.3.1-test` package.
+- `TEST` remains valid for prior immutable activation receipts, historical
+  reads, test fixtures and compatibility consumers. No schema version, endpoint
+  or availability rule is removed or changed.
+- C remains the only data-source and catalog-projection owner. B continues to
+  consume the final projection and must not infer availability from a source
+  label, legacy test flags, publication evidence or local fallback rules. A
+  accepts the additive source label without changing publication behavior.
+
 ## 0.4.0 - 2026-07-31
 
 - Added the C-owned `customer-product-ai-knowledge-status.v1` read projection

@@ -80,7 +80,7 @@ class ProductKnowledgePublishingService:
                 status_code=409,
             )
         canonical = build_canonical_product_knowledge(self.session, product)
-        if canonical.data_source not in {"TEST", "PILOT"}:
+        if canonical.data_source not in {"TEST", "INITIAL_IMPORT", "PILOT"}:
             raise AppError(
                 "AI_KNOWLEDGE_SOURCE_UNCONFIRMED",
                 "商品数据来源尚未确认，不能发布AI知识",

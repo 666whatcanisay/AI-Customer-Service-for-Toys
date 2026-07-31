@@ -70,6 +70,14 @@ describe('platformAdapter Customer Available Catalog contract', () => {
     }]))[0]).toMatchObject({ skuId: 'SKU-RED', componentSkuRefs: [] })
   })
 
+  it('accepts the formalized INITIAL_IMPORT source without changing availability rules', () => {
+    expect(adaptStoresResponse(envelope([{ ...store, data_source: 'INITIAL_IMPORT' }]))[0])
+      .toMatchObject({
+        dataSource: 'INITIAL_IMPORT',
+        customerServiceStatus: 'ENABLED'
+      })
+  })
+
   it('rejects legacy envelopes and never infers missing status as enabled', () => {
     expect(() => adaptStoresResponse({ items: [store], total: 1 }))
       .toThrow(PlatformAdapterError)

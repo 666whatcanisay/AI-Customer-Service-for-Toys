@@ -121,3 +121,21 @@ def test_publication_endpoints_require_safe_scope(api_client):
         json=payload,
     )
     assert response.status_code == 422
+
+
+def test_publication_accepts_formalized_initial_import_source(api_client):
+    client, _ = api_client
+    document = "商品名称：初始化商品\n材质：ABS"
+    fingerprint = hashlib.sha256(document.encode("utf-8")).hexdigest()
+    payload = publication_payload(fingerprint=fingerprint, document=document)
+    payload["data_source"] = "INITIAL_IMPORT"
+    payload["product_id"] = "PRODUCT-INITIAL-IMPORT"
+    payload["idempotency_key"] = "publish-initial-import"
+
+    response = client.post(
+        "/api/admin/ai/knowledge-publications/products",
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "PUBLISHED"

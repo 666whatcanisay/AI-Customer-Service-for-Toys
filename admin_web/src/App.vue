@@ -9,7 +9,7 @@ import {
 } from './api/client'
 
 type ServiceState = 'loading' | 'available' | 'unavailable' | 'not-probed'
-type EnvironmentState = 'loading' | 'test' | 'production-preparation' | 'unknown'
+type EnvironmentState = 'loading' | 'internal-production' | 'unknown'
 
 const platformState = ref<ServiceState>('loading')
 const aiState = ref<ServiceState>('loading')
@@ -63,8 +63,7 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to?: strin
 ]
 
 const environmentLabel = computed(() => {
-  if (environmentState.value === 'test') return '测试环境'
-  if (environmentState.value === 'production-preparation') return '生产准备'
+  if (environmentState.value === 'internal-production') return '内部生产就绪'
   if (environmentState.value === 'loading') return '正在确认环境'
   return '环境未确认'
 })
@@ -86,7 +85,7 @@ async function refreshStatus(): Promise<void> {
   ])
 
   if (overviewResult.status === 'fulfilled') {
-    environmentState.value = overviewResult.value.test_data_mode ? 'test' : 'production-preparation'
+    environmentState.value = 'internal-production'
   } else {
     environmentState.value = 'unknown'
   }
@@ -113,6 +112,7 @@ async function refreshStatus(): Promise<void> {
 
 const runtimeDetails = {
   version: import.meta.env.VITE_ADMIN_VERSION ?? 'unavailable',
+  releaseStatus: 'INTERNAL_PRODUCTION_READY',
   gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
   buildMode: import.meta.env.VITE_BUILD_MODE ?? 'development'
 }
@@ -146,7 +146,7 @@ onMounted(() => { void refreshStatus() })
       </section>
 
       <div class="sidebar-boundary">
-        <strong>内部测试管理</strong>
+        <strong>内部运营管理</strong>
         <p>当前页面不提供正式认证、自动客户发送、订单修改、退款或 ERP 写入。</p>
       </div>
     </aside>
@@ -175,11 +175,12 @@ onMounted(() => { void refreshStatus() })
       </header>
 
       <p class="environment-banner">
-        {{ environmentState === 'test' ? '测试环境：仅使用测试或已去标识化数据，所有业务动作都需人工确认。' : '当前环境状态未确认：不要据此执行客户、订单或数据写入动作。' }}
+        {{ environmentState === 'internal-production' ? 'AI-CS V1.0.0 已进入内部生产使用。所有业务动作均需人工确认；系统不会自动发送消息、自动退款或修改订单。' : '当前环境状态未确认：不要据此执行客户、订单或数据写入动作。' }}
       </p>
 
       <section v-if="showTechnicalDetails" class="technical-panel" data-testid="admin-technical-details">
         <div><span>管理端版本</span><code>{{ runtimeDetails.version }}</code></div>
+        <div><span>运行状态</span><code>{{ runtimeDetails.releaseStatus }}</code></div>
         <div><span>Git Commit</span><code>{{ runtimeDetails.gitCommit }}</code></div>
         <div><span>构建模式</span><code>{{ runtimeDetails.buildMode }}</code></div>
         <div><span>平台版本</span><code>{{ health?.version ?? '未取得' }}</code></div>

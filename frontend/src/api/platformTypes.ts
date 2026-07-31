@@ -8,7 +8,7 @@ export interface CatalogStore {
   platform: string
   storeCode: string
   name: string
-  dataSource: 'TEST' | 'PILOT'
+  dataSource: 'TEST' | 'INITIAL_IMPORT' | 'PILOT'
   customerServiceStatus: 'ENABLED'
   allowAutoSend: boolean
 }
@@ -24,7 +24,7 @@ export interface CatalogProduct {
   ageMax: number | null
   safetySummary: string | null
   knowledgeStatus: string
-  dataSource: 'TEST' | 'PILOT'
+  dataSource: 'TEST' | 'INITIAL_IMPORT' | 'PILOT'
   customerServiceStatus: 'ENABLED'
 }
 
@@ -38,7 +38,7 @@ export interface CatalogSku {
   canonicalSkuId: string | null
   referenceSkuId: string | null
   componentSkuRefs: string[]
-  dataSource: 'TEST' | 'PILOT'
+  dataSource: 'TEST' | 'INITIAL_IMPORT' | 'PILOT'
   customerServiceStatus: 'ENABLED'
 }
 

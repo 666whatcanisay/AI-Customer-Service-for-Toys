@@ -22,7 +22,7 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
-const operator = ref('运营测试员')
+const operator = ref('运营人员')
 const selectedType = ref<AiProblemType>('UNCLASSIFIED')
 const statusNote = ref('')
 const missingTopic = ref('')
@@ -180,7 +180,7 @@ onMounted(() => { void load() })
     </div>
 
     <p class="notice boundary">
-      当前保存去标识化摘要；客服身份是试点报告人标识，不是正式登录或 RBAC。知识补充仍须走既有人工审核流程。
+      当前保存去标识化摘要；客服身份是工作台报告人标识，不是正式登录或 RBAC。知识补充仍须走既有人工审核流程。
     </p>
     <p v-if="loading" class="notice" role="status">正在读取 AI 问题…</p>
     <p v-else-if="error && !selected" class="notice error" role="alert">暂时无法读取 AI 问题。{{ error }}</p>

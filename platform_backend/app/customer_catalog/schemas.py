@@ -16,6 +16,7 @@ ACTIVATION_RECEIPT_SCHEMA_VERSION = "pilot-business-catalog-activation-receipt.v
 
 class DataSource(StrEnum):
     TEST = "TEST"
+    INITIAL_IMPORT = "INITIAL_IMPORT"
     PILOT = "PILOT"
 
 

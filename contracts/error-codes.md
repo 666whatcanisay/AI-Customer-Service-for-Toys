@@ -54,7 +54,7 @@
   different product/version request.
 - `AI_KNOWLEDGE_PRODUCT_NOT_FOUND`: the requested Product does not exist.
 - `AI_KNOWLEDGE_NOT_APPROVED`: only approved Product knowledge may be published.
-- `AI_KNOWLEDGE_SOURCE_UNCONFIRMED`: source provenance is not TEST or PILOT.
+- `AI_KNOWLEDGE_SOURCE_UNCONFIRMED`: source provenance is not TEST, INITIAL_IMPORT, or PILOT.
 - `AI_KNOWLEDGE_PUBLISH_FAILED`: incremental publication or receipt verification
   failed; the previous published product version remains intact.
 - `AI_KNOWLEDGE_VISIBILITY_UNAVAILABLE`: product-level RAG evidence could not be

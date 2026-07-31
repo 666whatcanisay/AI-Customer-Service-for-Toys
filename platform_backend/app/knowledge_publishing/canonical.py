@@ -78,7 +78,8 @@ def build_canonical_product_knowledge(
     )
     data_source = (
         store.data_source
-        if store is not None and store.data_source in {"TEST", "PILOT"}
+        if store is not None
+        and store.data_source in {"TEST", "INITIAL_IMPORT", "PILOT"}
         else "UNKNOWN"
     )
     raw = _json_dict(product.raw_data_json)

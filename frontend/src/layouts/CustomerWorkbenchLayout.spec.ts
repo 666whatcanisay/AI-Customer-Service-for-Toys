@@ -41,7 +41,7 @@ describe('CustomerWorkbenchLayout', () => {
     expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('AI 可用')
     expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('平台 可用')
     expect(wrapper.get('[data-testid="global-system-status"]').text()).toContain('客服 当前页面')
-    expect(wrapper.get('[data-testid="global-test-banner"]').text()).toContain('禁止填写真实客户隐私')
+    expect(wrapper.get('[data-testid="global-test-banner"]').text()).toContain('AI 生成建议须由客服确认后发送')
     expect(wrapper.find('[data-testid="product-technical-details"]').exists()).toBe(false)
     await wrapper.get('[data-testid="product-technical-toggle"]').trigger('click')
     expect(wrapper.get('[data-testid="product-technical-details"]').text()).toContain('Git Commit')
@@ -51,7 +51,7 @@ describe('CustomerWorkbenchLayout', () => {
   it('asks a first-time tester for a display name without claiming authentication', async () => {
     const wrapper = await mountLayout()
     await flushPromises()
-    expect(document.body.textContent).toContain('设置测试客服身份')
+    expect(document.body.textContent).toContain('设置客服工作台身份')
     expect(document.body.textContent).toContain('不是登录或权限认证')
     wrapper.unmount()
   })
@@ -64,7 +64,7 @@ describe('CustomerWorkbenchLayout', () => {
     const wrapper = await mountLayout()
     await flushPromises()
 
-    expect(document.body.textContent).toContain('AI客服助手（测试版）')
+    expect(document.body.textContent).toContain('AI客服助手')
     expect(document.body.textContent).toContain('选择商品 / SKU')
     expect(document.body.textContent).toContain('人工确认后复制发送')
     expect(document.body.textContent).toContain('AI 建议需要人工确认')

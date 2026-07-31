@@ -285,7 +285,11 @@ class CustomerAvailableCatalogService:
                 "店铺客服状态无法识别，已隔离该记录。",
             )
             return None
-        if store.data_source not in {DataSource.TEST, DataSource.PILOT}:
+        if store.data_source not in {
+            DataSource.TEST,
+            DataSource.INITIAL_IMPORT,
+            DataSource.PILOT,
+        }:
             warnings.add(
                 "CUSTOMER_SERVICE_SOURCE_UNKNOWN",
                 CatalogEntityType.STORE,
@@ -787,7 +791,11 @@ class CatalogActivationService:
 
     @staticmethod
     def _store_source(store: TestStore) -> DataSource:
-        if store.data_source not in {DataSource.TEST, DataSource.PILOT}:
+        if store.data_source not in {
+            DataSource.TEST,
+            DataSource.INITIAL_IMPORT,
+            DataSource.PILOT,
+        }:
             raise AppError(
                 "CUSTOMER_SERVICE_ENTITY_QUARANTINED",
                 "数据来源无法确认，不能变更客服状态",

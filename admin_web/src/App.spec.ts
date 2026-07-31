@@ -60,7 +60,8 @@ describe('App product shell', () => {
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('平台 可用')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('AI 可用')
     expect(wrapper.get('[data-testid="admin-service-statuses"]').text()).toContain('客服 未检测')
-    expect(wrapper.text()).toContain('测试环境')
+    expect(wrapper.text()).toContain('内部生产就绪')
+    expect(wrapper.text()).toContain('AI-CS V1.0.0 已进入内部生产使用')
     expect(wrapper.find('[data-testid="admin-technical-details"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="admin-technical-toggle"]').trigger('click')

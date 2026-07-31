@@ -10,7 +10,7 @@ export type ModuleStatus = (typeof MODULE_STATUSES)[number]
 
 export const MODULE_STATUS_LABELS: Readonly<Record<ModuleStatus, string>> = {
   AVAILABLE: '可用',
-  TESTING: '测试中',
+  TESTING: '验证中',
   DEVELOPING: '开发中',
   PLANNED: '规划中',
   PAUSED: '已暂停'
@@ -35,7 +35,7 @@ export const WORKBENCH_MODULES = [
     name: 'AI 客服',
     description: '根据已审核的商品资料生成客服建议回复和引用。',
     status: 'AVAILABLE',
-    stage: '已上线，可进行内部测试',
+    stage: '已上线，可供内部使用',
     expectedInput: '店铺、商品、可选 SKU 和客户问题',
     expectedOutput: '可编辑的建议回复、动作提示和引用来源',
     requiresHuman: true,
@@ -48,7 +48,7 @@ export const WORKBENCH_MODULES = [
     description: '提交工作台问题、改进意见和新功能建议。',
     status: 'AVAILABLE',
     stage: '已上线，可提交和查询建议',
-    expectedInput: '测试客服身份、模块、分类和建议内容',
+    expectedInput: '客服工作台身份、模块、分类和建议内容',
     expectedOutput: '建议编号、处理状态和历史记录',
     requiresHuman: true,
     automationLevel: '人工提交，人工处理',

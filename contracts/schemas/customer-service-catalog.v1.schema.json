@@ -23,7 +23,7 @@
     "warnings": {"type": "array", "items": {"$ref": "#/$defs/warning"}}
   },
   "$defs": {
-    "dataSource": {"enum": ["TEST", "PILOT"]},
+    "dataSource": {"enum": ["TEST", "INITIAL_IMPORT", "PILOT"]},
     "enabledStatus": {"const": "ENABLED"},
     "store": {
       "type": "object",

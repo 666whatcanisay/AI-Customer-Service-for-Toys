@@ -10,7 +10,7 @@
     "activation_receipt_id": {"type": "string", "minLength": 1, "maxLength": 64},
     "entity_type": {"enum": ["STORE", "PRODUCT"]},
     "entity_ref": {"type": "string", "minLength": 1, "maxLength": 128},
-    "data_source": {"enum": ["TEST", "PILOT"]},
+    "data_source": {"enum": ["TEST", "INITIAL_IMPORT", "PILOT"]},
     "previous_status": {"type": ["string", "null"], "enum": ["ENABLED", "DISABLED", null]},
     "customer_service_status": {"enum": ["ENABLED", "DISABLED"]},
     "activation_source": {"enum": ["LEGACY_INITIALIZATION", "OPERATOR"]},

@@ -1,10 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 import SystemStatusView from '../views/SystemStatusView.vue'
-import ImportBatchDetailView from '../views/ImportBatchDetailView.vue'
-import ImportBatchListView from '../views/ImportBatchListView.vue'
-import NewImportView from '../views/NewImportView.vue'
-import TestDataPackagesView from '../views/TestDataPackagesView.vue'
 import AiCapabilityCenterView from '../views/AiCapabilityCenterView.vue'
 import CustomerSuggestionsView from '../views/CustomerSuggestionsView.vue'
 import CustomerExperienceCasesView from '../views/CustomerExperienceCasesView.vue'
@@ -24,6 +20,33 @@ import KnowledgeGapCenterView from '../views/KnowledgeGapCenterView.vue'
 import StoreManagementView from '../views/StoreManagementView.vue'
 import AiIssueCenterView from '../views/AiIssueCenterView.vue'
 
+const testToolsEnabled = import.meta.env.VITE_ENABLE_TEST_TOOLS === 'true'
+const testToolRoutes: RouteRecordRaw[] = testToolsEnabled
+  ? [
+      {
+        path: '/imports',
+        name: 'import-batches',
+        component: () => import('../views/ImportBatchListView.vue'),
+      },
+      {
+        path: '/imports/new',
+        name: 'new-import',
+        component: () => import('../views/NewImportView.vue'),
+      },
+      {
+        path: '/imports/:batchId',
+        name: 'import-batch-detail',
+        component: () => import('../views/ImportBatchDetailView.vue'),
+        props: true,
+      },
+      {
+        path: '/test-data-packages',
+        name: 'test-data-packages',
+        component: () => import('../views/TestDataPackagesView.vue'),
+      },
+    ]
+  : []
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -39,9 +62,9 @@ export const router = createRouter({
     { path: '/ai-capabilities', name: 'ai-capabilities', component: AiCapabilityCenterView },
     {
       path: '/stores', name: 'stores', component: ReadonlyListView,
-      props: { resource: 'stores', title: '店铺', description: '查看店铺业务名称、平台、测试标记与已导入商品数量。', columns: [
+      props: { resource: 'stores', title: '店铺', description: '查看店铺业务名称、平台与已导入商品数量。', columns: [
         { key: 'platform', label: '平台' },
-        { key: 'store_name', label: '店铺名称' }, { key: 'test_data_mode', label: '测试数据' }, { key: 'product_count', label: '商品数' },
+        { key: 'store_name', label: '店铺名称' }, { key: 'product_count', label: '商品数' },
       ] },
     },
     {
@@ -92,26 +115,6 @@ export const router = createRouter({
       name: 'system-status',
       component: SystemStatusView,
     },
-    {
-      path: '/imports',
-      name: 'import-batches',
-      component: ImportBatchListView,
-    },
-    {
-      path: '/imports/new',
-      name: 'new-import',
-      component: NewImportView,
-    },
-    {
-      path: '/imports/:batchId',
-      name: 'import-batch-detail',
-      component: ImportBatchDetailView,
-      props: true,
-    },
-    {
-      path: '/test-data-packages',
-      name: 'test-data-packages',
-      component: TestDataPackagesView,
-    },
+    ...testToolRoutes,
   ],
 })

@@ -134,7 +134,7 @@ export const adaptStoresResponse = (payload: unknown): CatalogStore[] =>
       platform: requiredString(value, 'platform', '店铺'),
       storeCode: requiredString(value, 'store_code', '店铺'),
       name: requiredString(value, 'store_name', '店铺'),
-      dataSource: requiredEnum(value, 'data_source', '店铺', ['TEST', 'PILOT'] as const),
+      dataSource: requiredEnum(value, 'data_source', '店铺', ['TEST', 'INITIAL_IMPORT', 'PILOT'] as const),
       customerServiceStatus: requiredEnum(
         value,
         'customer_service_status',
@@ -157,7 +157,7 @@ export const adaptProductsResponse = (payload: unknown): CatalogProduct[] =>
     ageMax: optionalNumber(value, 'age_max'),
     safetySummary: optionalString(value, 'safety_summary'),
     knowledgeStatus: requiredString(value, 'knowledge_status', '商品'),
-    dataSource: requiredEnum(value, 'data_source', '商品', ['TEST', 'PILOT'] as const),
+    dataSource: requiredEnum(value, 'data_source', '商品', ['TEST', 'INITIAL_IMPORT', 'PILOT'] as const),
     customerServiceStatus: requiredEnum(
       value,
       'customer_service_status',
@@ -177,7 +177,7 @@ export const adaptSkusResponse = (payload: unknown): CatalogSku[] =>
     canonicalSkuId: optionalString(value, 'canonical_sku_id'),
     referenceSkuId: optionalString(value, 'reference_sku_id'),
     componentSkuRefs: stringList(value, 'component_sku_refs'),
-    dataSource: requiredEnum(value, 'data_source', 'SKU', ['TEST', 'PILOT'] as const),
+    dataSource: requiredEnum(value, 'data_source', 'SKU', ['TEST', 'INITIAL_IMPORT', 'PILOT'] as const),
     customerServiceStatus: requiredEnum(
       value,
       'customer_service_status',

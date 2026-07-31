@@ -8,12 +8,17 @@ from app.knowledge_publishing.models import ProductKnowledgePublication
 from tests.test_customer_catalog_api import _seed_product, _seed_scope
 
 
-def _approved_product(session: Session, *, product_id: str = "PRODUCT-PUBLISH"):
+def _approved_product(
+    session: Session,
+    *,
+    product_id: str = "PRODUCT-PUBLISH",
+    data_source: str = "PILOT",
+):
     store = _seed_scope(
         session,
         package_id=f"PKG-{product_id}",
         store_code=f"STORE-{product_id}",
-        data_source="PILOT",
+        data_source=data_source,
         status="ENABLED",
         import_status="MANUAL_CREATED",
         schema_version="c-operation-store.v1",
@@ -79,6 +84,31 @@ def test_publish_is_approved_only_incremental_and_idempotent(
     changed = client.get("/api/v1/admin/product-knowledge/products").json()["items"][0]
     assert changed["ai_knowledge"]["status"] == "NEED_RESYNC"
     assert changed["ai_knowledge"]["indexed_fingerprint"] != changed["ai_knowledge"]["current_fingerprint"]
+
+
+def test_publish_accepts_formalized_initial_import_source(
+    client: TestClient, session: Session, monkeypatch
+) -> None:
+    product = _approved_product(
+        session,
+        product_id="PRODUCT-INITIAL-IMPORT",
+        data_source="INITIAL_IMPORT",
+    )
+    captured: dict = {}
+
+    def publish(self, payload):
+        captured.update(payload)
+        return _publish_result(payload)
+
+    monkeypatch.setattr(AiKnowledgePublicationClient, "publish", publish)
+    response = client.post(
+        f"/api/v1/admin/product-knowledge/products/{product.product_id}/ai-publications",
+        json={"operator": "pytest-operator", "confirmation_note": "人工确认发布"},
+        headers={"Idempotency-Key": "publish-initial-import"},
+    )
+
+    assert response.status_code == 200
+    assert captured["data_source"] == "INITIAL_IMPORT"
 
 
 def test_publish_rejects_unapproved_and_records_sync_failure(

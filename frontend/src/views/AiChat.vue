@@ -10,7 +10,7 @@
         <span class="status-dot" :class="{ ready: systemReady }" />
         <div>
           <strong>{{ systemReady ? '系统已就绪' : '系统正在连接' }}</strong>
-          <p>{{ systemReady ? '可以开始处理测试问题' : '请稍候或刷新连接状态' }}</p>
+          <p>{{ systemReady ? '可以开始处理客户咨询' : '请稍候或刷新连接状态' }}</p>
         </div>
         <el-button link @click="showConnectionDetails = !showConnectionDetails">
           {{ showConnectionDetails ? '收起' : '技术详情' }}
@@ -21,15 +21,15 @@
     <el-alert
       data-testid="safety-notice"
       class="safety-alert"
-      title="当前为测试数据，仅供内部验证，禁止直接用于真实客户。"
-      description="仅供建议，禁止自动发送。发送前必须人工核对商品、回复内容和引用。"
+      title="AI 仅生成客服建议，请在发送前人工核对。"
+      description="系统不会自动发送消息、自动退款、修改订单或执行任何业务动作。"
       type="error"
       :closable="false"
       show-icon
     />
 
     <section class="customer-friendly-notice" data-testid="customer-friendly-notice">
-      <strong>测试环境提示</strong>
+      <strong>客服安全提示</strong>
       <ul>
         <li>AI 辅助客服</li>
         <li>需要人工确认</li>
@@ -124,7 +124,7 @@
           <h2>客户问的是哪件商品？</h2>
           <p>按顺序选择店铺和商品；知道具体款式时再选 SKU。</p>
         </div>
-        <el-tag type="warning" effect="dark">仅测试数据</el-tag>
+        <el-tag type="warning" effect="dark">人工确认后使用</el-tag>
       </div>
 
       <div class="context-grid">
@@ -1138,7 +1138,7 @@ const catalogGuidance = computed(() => {
 
 const platformName = (platform: string) => platformLabels[platform] ?? platform
 const storeOptionLabel = (store: CatalogStore) =>
-  `${platformName(store.platform)} → ${store.name}${store.dataSource === 'TEST' ? '（历史测试）' : ''}`
+  `${platformName(store.platform)} → ${store.name}`
 const productOptionLabel = (product: CatalogProduct) =>
   product.displayName
 const skuOptionLabel = (sku: CatalogSku) =>

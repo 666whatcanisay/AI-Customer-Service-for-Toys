@@ -90,7 +90,7 @@ onMounted(() => { void load() })
     </section>
 
     <template v-else-if="overview">
-      <p class="notice warning">{{ overview.test_data_mode ? '当前为测试环境：仅使用测试或已去标识化资料。' : '当前不是测试数据模式：仍请保持人工审核和确认。' }} {{ overview.production_usable ? '生产可用标记已开启。' : '生产可用标记未开启。' }}</p>
+      <p class="notice warning">内部生产使用仍需保持人工审核和确认。系统不会自动发送消息、自动退款或修改订单。</p>
       <section class="metrics" aria-label="已导入业务资料">
         <article v-for="metric in catalogMetrics" :key="metric.label" class="metric"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong></article>
       </section>

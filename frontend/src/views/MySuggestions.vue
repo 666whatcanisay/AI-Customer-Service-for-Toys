@@ -1,7 +1,7 @@
 <template>
   <div class="mine-page" data-testid="my-suggestions-page">
     <header>
-      <div><p class="eyebrow">意见与建议</p><h1>我的建议</h1><p>这里只显示当前本机测试客服提交的建议摘要。</p></div>
+      <div><p class="eyebrow">意见与建议</p><h1>我的建议</h1><p>这里只显示当前本机客服提交的建议摘要。</p></div>
       <RouterLink to="/suggestions" class="primary-link">提交新建议</RouterLink>
     </header>
 
