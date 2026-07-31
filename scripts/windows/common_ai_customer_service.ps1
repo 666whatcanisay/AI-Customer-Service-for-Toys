@@ -276,8 +276,77 @@ function Get-LanSubnetCidr($Candidate) {
     return "$($network -join '.')/$prefixLength"
 }
 
-function Get-LanIpv4Candidates {
+function Get-Ipv4PrefixLengthFromMask([System.Net.IPAddress]$Mask) {
+    if ($null -eq $Mask) { return 0 }
+    $prefixLength = 0
+    foreach ($byte in $Mask.GetAddressBytes()) {
+        for ($bit = 7; $bit -ge 0; $bit--) {
+            if (($byte -band (1 -shl $bit)) -ne 0) { $prefixLength++ }
+        }
+    }
+    return $prefixLength
+}
+
+function Get-LanIpv4Candidates([switch]$UseLegacyPowerShellDiscovery) {
     $candidates = @()
+    if (-not $UseLegacyPowerShellDiscovery) {
+        try {
+            $interfaces = @([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces())
+        } catch {
+            throw "无法通过.NET读取Windows网络适配器：$($_.Exception.Message)"
+        }
+        foreach ($networkInterface in $interfaces) {
+            if ($networkInterface.OperationalStatus -ne [System.Net.NetworkInformation.OperationalStatus]::Up) { continue }
+            $adapter = [pscustomobject]@{
+                Status = 'Up'
+                Name = [string]$networkInterface.Name
+                InterfaceDescription = [string]$networkInterface.Description
+                HardwareInterface = $networkInterface.NetworkInterfaceType -in @(
+                    [System.Net.NetworkInformation.NetworkInterfaceType]::Ethernet,
+                    [System.Net.NetworkInformation.NetworkInterfaceType]::GigabitEthernet,
+                    [System.Net.NetworkInformation.NetworkInterfaceType]::Wireless80211
+                )
+            }
+            if (-not (Test-LanAdapterEligible $adapter)) { continue }
+            try {
+                $properties = $networkInterface.GetIPProperties()
+                $ipv4Properties = $properties.GetIPv4Properties()
+            } catch { continue }
+            if ($null -eq $ipv4Properties) { continue }
+            $gateways = @($properties.GatewayAddresses | Where-Object {
+                $null -ne $_.Address -and
+                $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.Address)
+            })
+            if ($gateways.Count -eq 0) { continue }
+            foreach ($unicast in @($properties.UnicastAddresses)) {
+                if ($unicast.Address.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { continue }
+                $ip = [string]$unicast.Address
+                if (-not (Test-PrivateLanIpv4 $ip)) { continue }
+                $prefixLength = 0
+                if ($unicast.PSObject.Properties.Name -contains 'PrefixLength') {
+                    $prefixLength = [int]$unicast.PrefixLength
+                }
+                if ($prefixLength -lt 1 -or $prefixLength -gt 30) {
+                    $prefixLength = Get-Ipv4PrefixLengthFromMask $unicast.IPv4Mask
+                }
+                if ($prefixLength -lt 1 -or $prefixLength -gt 30) { continue }
+                $candidates += [pscustomobject]@{
+                    IPAddress = $ip
+                    InterfaceIndex = [int]$ipv4Properties.Index
+                    InterfaceAlias = [string]$networkInterface.Name
+                    InterfaceDescription = [string]$networkInterface.Description
+                    PrefixLength = $prefixLength
+                    SubnetMask = Get-Ipv4SubnetMask $prefixLength
+                    DefaultGateway = [string]$gateways[0].Address
+                }
+            }
+        }
+        return @($candidates | Sort-Object InterfaceIndex, IPAddress -Unique)
+    }
+
+    # Kept only as a deterministic unit-test seam and compatibility diagnostic.
+    # Production start/status paths use the bounded .NET enumeration above.
     try {
         $adapters = @(Get-NetAdapter -ErrorAction Stop)
     } catch {
@@ -309,10 +378,27 @@ function Get-LanIpv4Candidates {
 }
 
 function Get-LanNetworkProfile($Candidate) {
+    $job = $null
     try {
-        $profiles = @(Get-NetConnectionProfile -InterfaceIndex ([int]$Candidate.InterfaceIndex) -ErrorAction Stop)
+        $job = Start-Job -ScriptBlock {
+            param([int]$InterfaceIndex)
+            @(Get-NetConnectionProfile -InterfaceIndex $InterfaceIndex -ErrorAction Stop) |
+                Select-Object -First 1 -Property Name, NetworkCategory
+        } -ArgumentList ([int]$Candidate.InterfaceIndex)
+        if ($null -eq (Wait-Job -Job $job -Timeout 5)) {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            return [pscustomobject]@{
+                InterfaceAlias=[string]$Candidate.InterfaceAlias
+                NetworkName=''
+                NetworkCategory='Unknown'
+                Detail='Windows网络类型查询超过5秒；已跳过，脚本未修改网络或防火墙。'
+            }
+        }
+        $profiles = @(Receive-Job -Job $job -ErrorAction Stop)
     } catch {
         return [pscustomobject]@{ InterfaceAlias=[string]$Candidate.InterfaceAlias; NetworkName=''; NetworkCategory='Unknown'; Detail=$_.Exception.Message }
+    } finally {
+        if ($null -ne $job) { Remove-Job -Job $job -Force -ErrorAction SilentlyContinue }
     }
     $profile = $profiles | Select-Object -First 1
     if ($null -eq $profile) {
