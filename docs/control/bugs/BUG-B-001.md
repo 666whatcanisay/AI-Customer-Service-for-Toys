@@ -2,7 +2,7 @@
 
 - 等级：P1
 - 模块：B 客服 / C 商品目录投影 / R006 兼容边界
-- 状态：OPEN / R006_IMPLEMENTATION_PLAN_READY
+- 状态：FIXED_VERIFIED_CANDIDATE / PRODUCTION_RELEASE_PENDING
 - 发现时间：2026-07-30
 
 ## 问题描述
@@ -35,9 +35,7 @@ B 的 `AiChat.loadStores()` 会查找任何不满足旧测试安全条件的店�
 
 ## 修复方案
 
-本稳定性冲刺禁止修改 R006 边界，因此不能在 B 中增加新的可信度推断，也不能通过修改正式业务数据、删除店铺或篡改状态规避问题。
-
-正确修复入口：在单独授权的 R006 Implementation 中由 C 提供最终客服可用投影，并按冻结规则隔离单条异常；B 仅消费投影。实施前仍需关闭 R006 V1.1 的映射和收据阻塞项。
+已按 R006 冻结边界修复：C 提供最终客服可用投影并逐条隔离异常；B 仅消费 `/api/v1/customer-service/catalog/**`，不再判断旧测试字段。C 运营通过人工启停控制 Store/Product，并由 C 生成 activation receipt。
 
 不得采用的临时修复：
 
@@ -49,4 +47,11 @@ B 的 `AiChat.loadStores()` 会查找任何不满足旧测试安全条件的店�
 
 ## 验证结果
 
-尚未修复。正式 C/A 健康、B 页面和固定代理均 HTTP 200，但商品目录业务 Gate 为 FAIL。修复后必须重新执行 B-001、B-003～B-006，并验证单条异常不会清空其他可用店铺。
+候选分支 `feature/r006-customer-available-catalog-v1` 已验证修复：
+
+- C 后端 `110 passed`，覆盖异常 Store/Product/SKU 隔离、Store阻断、SKU继承、幂等和receipt；
+- B `117 passed`，Admin `58 passed`，typecheck/build通过；
+- 隔离浏览器在一条异常Store、一条异常Product和一条异常SKU同时存在时，仍显示有效TEST目录；PILOT经Admin启用后B可见，Store停用后B隐藏且Product状态不被改写；
+- 修复提交：C `68457e1`、Admin `e858c02`、B `04e4a84`、E2E `8cbd92b`。
+
+正式 `AI-CS@42bafcf/0008` 未切换，Production Verified 需在独立发布任务中完成0010迁移、Runtime部署和正式业务回归。

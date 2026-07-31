@@ -3,15 +3,19 @@
   "project_id": "AI-CS-C",
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
-  "version": "R006 Customer Available Catalog Implementation Plan V1",
-  "current_task": "C customer availability provider planning",
-  "current_stage": "The plan assigns C ownership of data_source, customer_service_status, activation receipts and /customer-service/catalog projection. Provenance mapping, unknown-record quarantine, 0010 migration landing point, state APIs and isolated tests are fixed. No C, R009 or database code has changed.",
-  "current_gate": "R006_IMPLEMENTATION_PLAN_READY / C_PROVIDER_NOT_STARTED",
-  "status": "r006_c_provider_planned",
+  "version": "R006 Customer Available Catalog Implementation V1",
+  "current_task": "C customer availability provider implementation",
+  "current_stage": "C owns data_source, customer_service_status, activation receipts and /customer-service/catalog final projection. Contracts 0.3.0, 0010, Admin control and isolated QA are complete. Formal AI-CS@42bafcf/0008 was not migrated or switched.",
+  "current_gate": "R006_C_PROVIDER_COMPLETE / PRODUCTION_RELEASE_PENDING",
+  "status": "r006_c_provider_complete",
   "contracts": [
-    "contracts/version.json 0.2.0 (unchanged)",
+    "contracts/version.json 0.3.0 additive Customer Available Catalog",
     "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
-    "A, B, RAG and Prompt interfaces are unchanged"
+    "GET /api/v1/customer-service/catalog/stores",
+    "GET /api/v1/customer-service/catalog/products?store_code=",
+    "GET /api/v1/customer-service/catalog/products/{product_id}/skus",
+    "PUT Store/Product customer-service-status and GET activation receipts",
+    "A, RAG and Prompt interfaces are unchanged"
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -30,6 +34,10 @@
     "platform_backend/app/product_knowledge_import/parser.py",
     "platform_backend/app/product_knowledge_import/product_knowledge_mapping.py",
     "platform_backend/migrations/versions/0009_product_knowledge_import_v1.py",
+    "platform_backend/migrations/versions/0010_customer_available_catalog_v1.py",
+    "platform_backend/app/customer_catalog/",
+    "admin_web/src/views/StoreManagementView.vue",
+    "admin_web/src/views/ProductDetailView.vue",
     "admin_web/src/views/KnowledgeMaterialsView.vue",
     "docs/platform/25_AI-CS_Product_Knowledge_Import_V1_Implementation_Report.md"
   ],
@@ -47,12 +55,12 @@
     "APPROVE to field-level formal write or REJECT with zero formal write"
   ],
   "cross_line_compatibility": {
-    "affected_lines": [],
-    "change": "C internal provider, database and Admin UI only. Import Center files and positioning remain unchanged.",
-    "shared_contract_version": "0.2.0 unchanged",
+    "affected_lines": ["B", "C"],
+    "change": "Additive contracts 0.3.0, C final catalog provider/Admin control and B consume-only adaptation. A, R009 and Import Center are unchanged.",
+    "shared_contract_version": "0.3.0 additive; 0.2.0 schemas retained",
     "database_change": true,
-    "migration": "0009_product_knowledge_import_v1",
-    "verified": "RC Backend 101 tests; Admin 25 files/55 tests, typecheck and production build; 0009 graph validation. The acceptance-only SQLite copy is now at 0009 with integrity ok; the formal database remains 0008."
+    "migration": "0010_customer_available_catalog_v1 after unchanged 0009",
+    "verified": "Contracts 4, C 110, B 117 and Admin 58 tests passed; both frontend typechecks/builds and isolated browser E2E passed. The formal database remains 0008."
   },
   "data_boundaries": {
     "formal_data_write_before_review": false,
@@ -78,7 +86,7 @@
     "AI_FEEDBACK": "NOT_OPEN",
     "KNOWLEDGE_GAP": "NOT_OPEN"
   },
-  "last_test_result": "2026-07-30 browser retry: Playwright chromium performed a real UI upload of a byte-identical desktop workbook copy on 5179. All four sheets passed; 19 rows produced 19 new products, ADD=205 and KEEP=4 with zero blockers. Before review the formal-product table stayed at 5; 19 UI approvals produced 19 APPLIED receipts, batch COMPLETED and isolated products 5->24. Knowledge Center shows 19 approved products. Formal 4edf131/0008 and 5173/5174/8000/8011 are unchanged.",
+  "last_test_result": "2026-07-31 R006: C backend 110 passed; Admin 26 files / 58 tests passed; Admin typecheck and build PASS. Isolated 0010 upgrade/downgrade/upgrade and browser E2E verified provenance initialization, malformed-record isolation, Store/Product activation, Store blocking without Product mutation, SKU inheritance and receipt history. Formal AI-CS@42bafcf/0008 is unchanged.",
   "test_commands": [
     "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
     "cd platform_backend; static-only AST and Alembic ScriptDirectory graph validation for 0009 (no database URL, no upgrade/downgrade)",
@@ -89,7 +97,7 @@
     "Internal Admin endpoints still lack formal login, RBAC, retention policy and production security certification.",
     "Automatic redaction is not implemented; operators must remove customer personal information before upload.",
     "Downgrading 0009 does not undo product knowledge already applied by an approved review receipt.",
-    "Formal Runtime deployment and live database migration were not performed in this task.",
+    "Formal Runtime deployment and live database migration were not performed in this task; 0010 remains release-pending.",
     "The acceptance Runtime is local and ephemeral; its database, logs, knowledge copies and PID record are Git-ignored and must not be treated as production assets.",
     "The isolated acceptance database now contains 19 approved test products and must never be copied into the formal database.",
     "This browser dataset produced ADD and KEEP only because no workbook product identity matched the isolated snapshot; UPDATE and NO_CHANGE were not observed in this retry."
@@ -100,17 +108,24 @@
     "A, B, RAG, Prompt or contracts changes",
     "Automatic knowledge publication, customer activation, messaging, refunds, orders or ERP writes"
   ],
-  "blockers": [],
+  "blockers": [
+    "R006 is implemented and candidate-verified but not deployed to formal AI-CS@42bafcf/0008."
+  ],
   "git": {
-    "branch": "control/browser-acceptance-environment-v1",
-    "base": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33",
+    "branch": "feature/r006-customer-available-catalog-v1",
+    "base": "03550b58572abebad9dd64cd1370157d98522be3",
+    "r006_contracts_commit": "673dca6",
+    "r006_platform_commit": "68457e1",
+    "r006_admin_commit": "e858c02",
+    "r006_customer_commit": "04e4a84",
+    "r006_e2e_commit": "8cbd92b",
     "implementation_commit": "871b6290301f8587488bb8b282d4f60034fb37ba",
     "integration_fix_commit": "817198a",
     "feature_head": "4ab8f632b0edfe73433e88c5985f9e402bdd9874",
     "production_integration_merge_commit": "87a040c5806ec61e4e92dfe323aac752b4edef23",
     "r009_source_anchor": "aacdc07adc401c6972aaa279bb6f55c434a976ad",
     "release_candidate_code_merge": "b714b1d6954c14eefff061dc8cd841d89315cce4",
-    "formal_runtime_head": "4edf131cb341993b12a0143b0388d932b29faf84",
+    "formal_runtime_head": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
     "runtime_deployed": false,
     "acceptance_runtime_deployed": true,
     "acceptance_runtime_sha": "8b83a20bf834ed917d2f166dd4aaa42577bf1f33"
@@ -138,6 +153,6 @@
     "database_revision": "0009_product_knowledge_import_v1",
     "formal_runtime_unchanged": true
   },
-  "next_recommended_task": "Run a separately authorized formal R009 release gate: confirm a quiet window and final SHA, back up the formal 0008 database, migrate it to 0009, switch the formal Runtime, and recheck 5174/8011. Do not copy the isolated acceptance database; RAG/B consumption remains out of scope.",
-  "last_updated": "2026-07-30"
+  "next_recommended_task": "Run a separately authorized R006 Production Release and R003 Business Acceptance: select one integration SHA, back up the formal database, migrate through 0009 to 0010, switch the four services, and verify TEST continuity plus PILOT manual activation. Do not copy isolated data or modify A/RAG/Prompt.",
+  "last_updated": "2026-07-31"
 }
