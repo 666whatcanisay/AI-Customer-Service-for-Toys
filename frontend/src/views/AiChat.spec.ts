@@ -95,6 +95,7 @@ const product = {
 }
 
 const secondProduct = { ...product, productId: 'PROD-002', displayName: '测试拼图' }
+const newlyEnabledProduct = { ...product, productId: 'PROD-003', displayName: '新启用积木' }
 const secondStoreProducts = [
   { ...product, storeCode: 'PDD-SM-2' },
   { ...secondProduct, storeCode: 'PDD-SM-2' }
@@ -391,6 +392,52 @@ describe('AiChat B-T04 three-step workbench', () => {
     const selects = wrapper.findAllComponents({ name: 'ElSelect' })
     expect(selects[0]?.props('modelValue')).toBe('TENANT-PDD-SM-TEST::pdd::PDD-SM')
     expect(apiMocks.listProducts).toHaveBeenCalledWith(store, expect.any(AbortSignal))
+  })
+
+  it('refreshes the current catalog on window focus without clearing a valid consultation scope', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await selectAt(wrapper, 1, 'PROD-001')
+    await selectAt(wrapper, 2, 'SKU-RED')
+
+    apiMocks.listProducts.mockImplementation((selectedStore) =>
+      Promise.resolve(selectedStore.storeCode === 'PDD-SM-2'
+        ? secondStoreProducts
+        : [product, secondProduct, newlyEnabledProduct])
+    )
+    const callsBeforeFocus = apiMocks.listProducts.mock.calls.length
+
+    window.dispatchEvent(new Event('focus'))
+    await flushPromises()
+
+    expect(apiMocks.listProducts.mock.calls.length).toBeGreaterThan(callsBeforeFocus)
+    expect(apiMocks.listProducts).toHaveBeenLastCalledWith(store, expect.any(AbortSignal))
+    const selects = wrapper.findAllComponents({ name: 'ElSelect' })
+    expect(selects[1]?.props('modelValue')).toBe('PROD-001')
+    expect(selects[2]?.props('modelValue')).toBe('SKU-RED')
+    expect(selects[1]?.findAllComponents({ name: 'ElOption' }).some(
+      (option) => option.props('value') === 'PROD-003'
+    )).toBe(true)
+  })
+
+  it('runs a low-frequency catalog refresh and stops it when the page is unmounted', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountPage()
+    await flushPromises()
+    const callsBeforeTimer = apiMocks.listProducts.mock.calls.length
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    await flushPromises()
+    expect(apiMocks.listProducts.mock.calls.length).toBeGreaterThan(callsBeforeTimer)
+
+    const wrapperIndex = mountedPages.indexOf(wrapper)
+    if (wrapperIndex >= 0) mountedPages.splice(wrapperIndex, 1)
+    wrapper.unmount()
+    const callsAfterUnmount = apiMocks.listProducts.mock.calls.length
+    await vi.advanceTimersByTimeAsync(120_000)
+    await flushPromises()
+    expect(apiMocks.listProducts).toHaveBeenCalledTimes(callsAfterUnmount)
+    vi.useRealTimers()
   })
 
   it('keeps a no-product catalog state recoverable without allowing a context-free shortcut', async () => {

@@ -785,6 +785,7 @@ import { EXPERIENCE_CASE_STATUS_LABELS } from '@/workspace/experienceCasePresent
 import { useTesterIdentity } from '@/workspace/testerIdentity'
 
 const LAST_STORE_KEY = 'mumu-customer-workbench:last-store'
+const CATALOG_REFRESH_INTERVAL_MS = 60_000
 
 const actionLabels: Record<RagAction, string> = {
   DIRECT_ANSWER: '🟢 可直接参考',
@@ -963,7 +964,10 @@ const showTechnicalDetails = ref(false)
 const showConnectionDetails = ref(false)
 let activeRagController: AbortController | null = null
 let activeCatalogController: AbortController | null = null
+let activeBackgroundCatalogController: AbortController | null = null
 let activeCustomerKnowledgeController: AbortController | null = null
+let catalogRefreshTimer: number | null = null
+let backgroundCatalogRefreshInFlight = false
 const { identity } = useTesterIdentity()
 
 const runtimeDetails = {
@@ -1402,6 +1406,69 @@ const refreshPlatform = async () => {
   await loadStores()
 }
 
+const refreshCatalogPreservingContext = async () => {
+  if (backgroundCatalogRefreshInFlight || document.visibilityState === 'hidden') return
+
+  backgroundCatalogRefreshInFlight = true
+  activeBackgroundCatalogController?.abort()
+  const controller = new AbortController()
+  activeBackgroundCatalogController = controller
+  try {
+    const currentStoreKey = selectedStoreKey.value
+    const nextStores = await platformClient.listStores(controller.signal)
+    stores.value = nextStores
+
+    if (!currentStoreKey) return
+
+    const currentStore = nextStores.find((store) => storeKey(store) === currentStoreKey)
+    if (!currentStore) {
+      selectedStoreKey.value = ''
+      products.value = []
+      skus.value = []
+      selectedProductId.value = ''
+      selectedSkuId.value = ''
+      clearCustomerKnowledgeStatus()
+      clearAnswer()
+      rememberStore('')
+      return
+    }
+
+    const nextProducts = await platformClient.listProducts(currentStore, controller.signal)
+    if (nextProducts.some((product) =>
+      product.platform !== currentStore.platform || product.storeCode !== currentStore.storeCode
+    )) {
+      throw new PlatformClientError('contract', '商品列表与所选店铺不一致，已停止加载')
+    }
+
+    const currentProductId = selectedProductId.value
+    products.value = nextProducts
+    if (currentProductId && !nextProducts.some((product) => product.productId === currentProductId)) {
+      skus.value = []
+      selectedProductId.value = ''
+      selectedSkuId.value = ''
+      clearCustomerKnowledgeStatus()
+      clearAnswer()
+    }
+    platformError.value = ''
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      const catalogError = toPlatformClientError(error)
+      if (catalogError.kind === 'contract' || products.value.length === 0) {
+        platformError.value = catalogError.message
+      }
+    }
+  } finally {
+    if (activeBackgroundCatalogController === controller) {
+      activeBackgroundCatalogController = null
+    }
+    backgroundCatalogRefreshInFlight = false
+  }
+}
+
+const handleWindowFocus = () => {
+  void refreshCatalogPreservingContext()
+}
+
 const handleStoreChange = async () => {
   activeCatalogController?.abort()
   products.value = []
@@ -1763,11 +1830,21 @@ const submitExperienceCase = async () => {
 onMounted(() => {
   void refreshRagHealth()
   void refreshPlatform()
+  window.addEventListener('focus', handleWindowFocus)
+  catalogRefreshTimer = window.setInterval(() => {
+    void refreshCatalogPreservingContext()
+  }, CATALOG_REFRESH_INTERVAL_MS)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('focus', handleWindowFocus)
+  if (catalogRefreshTimer !== null) {
+    window.clearInterval(catalogRefreshTimer)
+    catalogRefreshTimer = null
+  }
   activeRagController?.abort()
   activeCatalogController?.abort()
+  activeBackgroundCatalogController?.abort()
   activeCustomerKnowledgeController?.abort()
 })
 </script>
