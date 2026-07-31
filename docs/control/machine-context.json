@@ -3,10 +3,34 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "product_stabilization_conditional_pass",
-  "current_task": "AI-CS Product Stabilization & Reliability Sprint V1",
-  "current_stage": "R008 physical migration and runtime convergence are complete. The formal runtime is AI-CS@42bafcf on ports 5173/5174/8000/8011 with runtimeMode=standard, networkMode=LAN, database revision 0008, active Chroma collection test_knowledge_v031 with 47 chunks, and real qwen3.5:9b inference. A P1 runtime/model and scoping defects are fixed and verified. C and isolated R009 browser regressions pass. B daily consultation remains blocked because one incompatible C catalog row causes the legacy B consumer to clear the full catalog; the correct remediation is the separately authorized R006 implementation.",
-  "current_gate": "CONDITIONAL PASS / AI_CS_PRODUCT_STABLE_V1_BLOCKED_BY_R006: runtime, A, C and R009 gates pass; BUG-B-001 remains an open P1 and B-001 through B-006 cannot all pass. Do not implement a B-side filter, mutate catalog data, or claim AI_CS_PRODUCT_STABLE_V1_READY. Next business entry is explicit R006 authorization followed by full B browser regression.",
+  "status": "r006_implementation_plan_ready",
+  "current_task": "R006 Customer Available Catalog Implementation Plan V1",
+  "current_stage": "The implementation plan now fixes the C provenance mapping, Customer Available status model, final /customer-service/catalog projection, activation response/idempotency/receipt read-back, B consumer boundary, 0010 migration landing point and isolated QA sequence. Formal AI-CS@42bafcf/0008 remains unchanged and BUG-B-001 is still open because no implementation has started.",
+  "current_gate": "R006_IMPLEMENTATION_PLAN_READY: implement only in the order contracts 0.3.0, C 0010/data/provider, C minimal control, B consumer, QA. Do not change A, RAG, Prompt, R009, formal business data or add B-side business fallback. Production migration and runtime switch require a separate release task.",
+  "r006_implementation_plan": {
+    "date": "2026-07-31",
+    "branch": "control/r006-customer-available-catalog-plan-v1",
+    "base_sha": "1fccb41c0b9d17f193a2924f1cf12d9c2111a53f",
+    "formal_runtime_sha": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "formal_database_revision": "0008_customer_feedback_loop_v1",
+    "interface": "pilot-business-catalog.v1.1",
+    "plan_document": "docs/control/interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md",
+    "provenance_mapping": {
+      "IMPORTED_TEST_ONLY+0.3.1-test": "TEST+ENABLED",
+      "MANUAL_CREATED+c-operation-store.v1": "PILOT+DISABLED",
+      "unknown_or_conflicting": "QUARANTINE"
+    },
+    "implementation_order": [
+      "contracts 0.3.0",
+      "0010 migration and C persistence",
+      "C customer available projection",
+      "C minimal status control",
+      "B consumer adaptation",
+      "isolated QA and browser acceptance"
+    ],
+    "implementation_started": false,
+    "formal_data_changed": false
+  },
   "product_stabilization": {
     "date": "2026-07-30",
     "worktree": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-browser-acceptance-environment-v1",
@@ -35,7 +59,7 @@
   },
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "stabilization/product-stable-v1",
+    "branch": "control/r006-customer-available-catalog-plan-v1",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
@@ -212,15 +236,15 @@
     "R009 Product Knowledge Import V1 implementation and isolated browser acceptance"
   ],
   "next_tasks": {
-    "CONTROL": "Keep the product-stable gate conditional. Obtain explicit R006 implementation authorization before changing the catalog provider/consumer behavior; do not hide BUG-B-001 with data mutation or B-side filtering.",
-    "OPS": "Keep AI-CS@42bafcf on the standard LAN runtime and preserve Recovery as rollback. Use the LAN status entrypoint. R009 production migration remains a separate backed-up release task.",
-    "A": "Preserve fix commit 18a20f7 and its regression tests. BUG-A-004 is P2 and must not trigger prompt changes inside this stabilization scope.",
-    "B_C": "After authorized R006 delivery, rerun B-001 through B-006 and the customer Playwright suite. R009 does not authorize RAG publishing or immediate B consumption.",
-    "QA": "A full tests/e2e PASS, including customer/daily-flow.cjs, is required before changing the gate to AI_CS_PRODUCT_STABLE_V1_READY."
+    "CONTROL": "Create the R006 implementation task from this plan, enforce path ownership and contracts-first commits, and keep Production Release separate.",
+    "OPS": "Keep AI-CS@42bafcf/0008 running and Recovery available. Do not migrate the formal database or switch Runtime during implementation.",
+    "A": "No changes. Preserve A fix commit 18a20f7, Prompt, model and RAG data.",
+    "B_C": "Implement contracts 0.3.0 then C status/projection/control and finally the minimal B consumer switch. Do not modify R009 or add B business fallback.",
+    "QA": "Use isolated SQLite and ports; verify migration round trip, V1.1 cases, BUG-B-001 and B-001 through B-006 before requesting a release task."
   },
   "t02_executed": false,
   "blockers": [
-    "BUG-B-001 / R006: one incompatible store in the legacy C catalog response causes B to clear the entire selectable catalog. Correct closure requires C final customer-service projection and receipt rules under explicit R006 implementation authorization.",
+    "BUG-B-001 remains open until C final projection and the B consumer switch pass isolated browser acceptance. The implementation plan is ready but no code exists yet.",
     "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified on one approved runtime SHA.",
     "R009 is accepted only in an isolated 0009 runtime. Formal production remains at 0008 and no RAG publication or B consumption is implied.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
