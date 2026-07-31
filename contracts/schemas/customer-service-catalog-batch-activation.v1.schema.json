@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-service-catalog-batch-activation.v1.schema.json",
+  "title": "Customer Service Catalog Batch Activation V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_status", "target_status", "items", "changed_count", "unchanged_count", "failed_count", "server_time"],
+  "properties": {
+    "schema_version": {"const": "pilot-business-catalog-batch-activation.v1"},
+    "result_status": {"enum": ["COMPLETE", "PARTIAL", "FAILED"]},
+    "target_status": {"const": "ENABLED"},
+    "items": {"type": "array", "items": {"$ref": "#/$defs/item"}, "minItems": 1, "maxItems": 100},
+    "changed_count": {"type": "integer", "minimum": 0},
+    "unchanged_count": {"type": "integer", "minimum": 0},
+    "failed_count": {"type": "integer", "minimum": 0},
+    "server_time": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product_id", "status", "activation_receipt", "error_code", "message"],
+      "properties": {
+        "product_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": ["CHANGED", "UNCHANGED", "FAILED"]},
+        "activation_receipt": {"oneOf": [{"type": "null"}, {"$ref": "customer-service-catalog-activation-receipt.v1.schema.json"}]},
+        "error_code": {"type": ["string", "null"]},
+        "message": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

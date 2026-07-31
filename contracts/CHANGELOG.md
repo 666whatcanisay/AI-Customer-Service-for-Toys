@@ -1,5 +1,18 @@
 # Contract changelog
 
+## 0.4.0 - 2026-07-31
+
+- Added the C-to-A `ai-product-knowledge-publication.v1` incremental publishing
+  request and immutable publication receipt. A accepts business context from C
+  and does not decide product permissions.
+- Added `ai-product-knowledge-visibility.v1` product-level chunk, embedding,
+  fingerprint, collection and publication-state evidence.
+- Added the C-owned `pilot-business-catalog-batch-activation.v1` response for
+  operator-confirmed batch enablement of approved products. Each changed item
+  retains its existing immutable activation receipt.
+- Additive over 0.3.0: the B catalog projection, R009 import interfaces and all
+  earlier schemas remain unchanged. No full RAG rebuild is introduced.
+
 ## 0.3.0 - 2026-07-31
 
 - Added the C-owned `pilot-business-catalog.v1.1` projection consumed by B at
