@@ -1,6 +1,6 @@
 # AI-CS Product Stable V1 Candidate Release Notes
 
-状态：`CANDIDATE / BLOCKED_BY_R006`
+状态：`CANDIDATE / R006_IMPLEMENTED / PRODUCTION_RELEASE_PENDING`
 
 ## 已完成
 
@@ -15,8 +15,8 @@
 
 - R009 仍未迁移正式数据库；正式 Runtime 保持 0008。
 - R009 导入结果未自动发布 RAG，未验证 B 立即消费。
-- R006 未实施。
+- R006已在Feature候选实现并通过隔离浏览器验收，但尚未部署正式Runtime或迁移正式数据库。
 
 ## 发布阻塞
 
-`BUG-B-001` 使 B 无法选择商品并完成每日咨询。解决必须进入经授权的 R006 C 最终业务投影实现，不能在本版本临时过滤。
+`BUG-B-001` 已在R006候选中修复并验证；正式`AI-CS@42bafcf/0008`仍使用旧实现，须经独立发布Gate后才能标记Production Verified。

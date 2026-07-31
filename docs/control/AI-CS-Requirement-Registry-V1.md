@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`SOURCE_FREEZE_CLOSED / PHYSICAL_MIGRATION_ENTRY_READY`
+> 当前 Gate：`R006_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING`
 
 ## 1. 台账目标
 
@@ -93,15 +93,15 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | --- | --- | --- | --- | --- |
 | R001 | C商品知识运营中心V2 | `DONE` | C | 已由 R004 收敛进入正式 Pilot 基线；不得重做结构。 |
 | R002 | AI客服反馈沉淀闭环 | `DONE` | B、C、contracts | 已由 R004 按所有权收敛；真实 Pilot 效果由 R005 单独验证。 |
-| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006 Implementation Plan已关闭计划层接口空白；代码、迁移和业务验收尚未开始。 |
+| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006候选实现和隔离浏览器验收已通过；等待正式发布与业务验收。 |
 | R004 | AI-CS运行版本统一 | `DONE` | Control、OPS、A/B/C、contracts | Recovery 分支、独立提交、contracts 0.2.0、全量测试和四服务同 SHA 运行均已建立。 |
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
-| R006 | Pilot Business Data Activation V1 | `IN_PROGRESS` | Control / Interface Owner、C、B，A 无变更 | Customer Available Catalog Implementation Plan已就绪；等待按contracts→C→B→QA顺序编码。 |
+| R006 | Pilot Business Data Activation V1 | `DONE` | Control / Interface Owner、C、B，A 无变更 | contracts 0.3.0、C Provider/Admin、B Consumer、0010及隔离浏览器验收已完成；正式发布另立任务。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
 | R008 | AI-CS Project Structure Simplification V1 | `DONE` | Control、OPS、A/B/C、QA | 物理迁移、目标验证与标准端口切换完成；AI-CS为正式目录。 |
 | R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 实现和隔离0009浏览器验收完成；正式发布仍是独立任务。 |
 
-状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
+状态数量：`DONE=6`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`。
 
 ## 6. 需求明细
 
@@ -152,7 +152,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | 负责模块 | Control / Interface Owner：边界和 Gate；C：业务数据所有者与 Provider；B：Consumer；A：在“AI使用”阶段做下游可用性验证。 |
 | 影响范围 | 店铺、商品、SKU从 C 创建到客服可用确认、B 显示和 AI 使用的激活链路；可能影响 C/B接口和运行数据，不授权 Master Data 重构。 |
 | 完成标准 | 目标链路真实成立：`C创建 → 客服可用确认 → B显示 → AI使用`；未确认数据不进入 B；B 不自行猜测 C 数据可信度；失败和未激活状态可被明确识别。 |
-| 验收证据 | 尚无关闭证据。R006 V1.1静态验证得到`PASS=6`、`CONDITIONAL PASS=3`、`FAIL=0`，但发现旧表同时包含`IMPORTED_TEST_ONLY`与`MANUAL_CREATED`且receipt响应/复核仍不完整；没有实现或运行验收。 |
+| 验收证据 | [R006 Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)已在隔离Runtime证明`PILOT DISABLED → C人工启用 → B可见`，并验证异常隔离和receipt；但正式Runtime发布、正式业务数据验收及A下游真实使用尚未执行，因此本需求仍不关闭。 |
 | 关联代码/文档 | [Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)、[Interface Validation Report V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.md)、[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)、[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；关联交付需求R006。 |
 | 防止重复错误规则 | 不得通过修改 UI、增加前端判断或复用测试字段掩盖数据激活缺口；不得把同一问题另开“B读取C商品”重复需求。问题状态由 R003跟踪，解决方案只进入 R006。 |
 
@@ -199,12 +199,12 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | 需求名称 | Pilot Business Data Activation V1 |
 | 用户原始目标 | 解决 C Provider 到 B Consumer 的业务数据激活，使已确认可用的店铺、商品和 SKU 可以被客服使用。 |
 | 业务背景 | R003 已确认 C 创建能力与 B 消费能力之间缺少正式激活语义。原 V1 兼容方案需要自动筛选旧数据，可能误启用或遗漏历史对象；V1.1 改为运营可控兼容模式。该需求是 R003 的交付任务，不是新的 Master Data 项目。 |
-| 当前状态 | `IN_PROGRESS` |
+| 当前状态 | `DONE` |
 | 负责模块 | Control / Interface Owner：冻结所有权、状态、路径和兼容性；C：Provider 与客服可用状态权威；B：Consumer；A：不修改，后续只验证既有请求可以使用同一激活范围。 |
 | 影响范围 | Store/Product客服状态、SKU继承、历史TEST初始化、新PILOT默认值、C运营启停入口、activation receipt、C→B消费和AI下游使用；明确禁止Master Data重构。 |
 | 完成标准 | 历史有效TEST数据默认ENABLED且运营可关闭；新PILOT Store/Product默认DISABLED且运营可开启；SKU只继承Product；B只消费C最终投影；每次实际状态变化有C权威receipt；单个商品关闭不影响其他商品；安全与回滚证据齐全。 |
-| 验收证据 | [Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)为`6 PASS / 3 CONDITIONAL PASS / 0 FAIL`；[Customer Available Catalog Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)进一步冻结来源映射、PUT响应、幂等、receipt回查、错误码和实施顺序。代码、迁移和运行证据仍为零。 |
-| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；稳定性基线`stabilization/product-stable-v1@1fccb41`。 |
+| 验收证据 | [Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)：contracts `4 passed`、C `110 passed`、B `117 passed`、Admin `58 passed`、两端typecheck/build和隔离浏览器E2E通过；异常Store/Product/SKU逐条隔离，PILOT启停、Store阻断不改Product、SKU继承及receipt均有运行证据。 |
+| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；[Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)；实现提交`673dca6`、`68457e1`、`e858c02`、`04e4a84`、`8cbd92b`。 |
 | 防止重复错误规则 | 不得恢复“系统根据旧测试字段自动选择可信数据”的方案；不得把全部旧表记录无差别初始化为TEST；不得扩大成Master Data；不得让B判断C数据可信度；不得为SKU增加独立启停；实现必须遵守Implementation Plan的provenance、receipt和隔离规则。 |
 
 #### R006 增补需求 — Legacy Compatibility Control
@@ -219,7 +219,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 6. 每次Store/Product实际状态变化由C生成并保存activation receipt；同状态幂等重放不生成重复状态变化receipt。
 7. 验收必须证明旧测试数据继续可用、运营关闭后B不可见、再次开启后B可见、单个商品关闭不影响其他商品。
 
-V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANUAL_CREATED/c-operation-store.v1`运营数据。[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)已在计划层固定前者`TEST + ENABLED`、后者`PILOT + DISABLED`、未知来源隔离，并补齐状态PUT response、幂等与receipt只读复核。代码和迁移尚未实现。
+V1.1已按冻结规则实现：旧表混合`IMPORTED_TEST_ONLY`测试包与`MANUAL_CREATED/c-operation-store.v1`运营数据时，前者初始化为`TEST + ENABLED`、后者为`PILOT + DISABLED`、未知来源隔离；状态PUT、幂等、receipt只读复核和单条异常隔离均已通过自动测试与浏览器验收。正式数据库迁移和Runtime发布不属于本次实现任务。
 
 ### R007 — 网络环境导致客服无法访问5173
 
