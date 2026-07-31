@@ -93,7 +93,7 @@ onMounted(load)
       <RouterLink class="button secondary" to="/knowledge-editor">返回商品知识维护</RouterLink>
     </div>
 
-    <p class="notice boundary">审核通过只更新正式商品知识，不会自动发布 RAG、启用客服、修改 Prompt 或执行客户动作。</p>
+    <p class="notice boundary">审核通过只允许资料进入受控质量分析，不会直接写入 R009 正式商品字段，也不会自动发布 RAG、启用客服、修改 Prompt 或执行客户动作。</p>
     <p v-if="error" class="notice error" role="alert">{{ error }}</p>
     <p v-if="receipt" class="notice success" role="status">{{ receipt }}</p>
 

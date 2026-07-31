@@ -31,12 +31,11 @@ R009 为保持“资料上传与审核”三步 Excel 导入定位，替换了�
 - 新增独立 `/knowledge-review` 页面，只负责已有知识资料的列表、详情与人工审核。
 - “商品知识维护”的审核队列入口改指向 `/knowledge-review`。
 - 保持 `/knowledge-materials` 的 R009 Excel 导入定位和实现不变。
-- 审核通过仍只改变正式知识数据；不会自动发布 RAG、启用客服或修改 Prompt。
+- 审核通过仍只允许资料进入受控质量分析；不会直接写入 R009 正式商品字段、发布 RAG、启用客服或修改 Prompt。
 
 ## 验证标准
 
 - 运营可在浏览器中看到 `RECOGNIZED` 资料并执行审核通过/拒绝。
-- 审核通过后商品正式知识更新，已发布商品进入 `NEED_RESYNC`。
+- 审核通过后资料进入 `APPROVED_FOR_ANALYSIS`，正式商品字段保持不变。
 - R009 `/knowledge-materials` 页面、Import Center 和导入逻辑不变。
 - Admin Vitest、typecheck、build 全部通过。
-
