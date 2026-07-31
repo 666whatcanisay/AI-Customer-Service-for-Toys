@@ -3,13 +3,20 @@
   "project_id": "ai-cs-target-a-runtime",
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
-  "version": "AI-CS Product Stabilization & Reliability Sprint V1",
-  "status": "runtime_entry_alignment_complete",
-  "current_task": "Windows Runtime Entry Alignment V1",
-  "current_gate": "A_STABILITY_PASS / RUNTIME_ENTRY_ALIGNMENT_COMPLETE",
-  "current_stage": "The standard Windows launcher and status entry now resolve the formal configuration automatically and preserve LAN mode across stop/start. A code, Prompt, model, contracts and RAG data are unchanged. Formal A remains ready with qwen3.5:9b and test_knowledge_v031=47.",
-  "next_recommended_task": "Keep using the generic standard start/status entries without a mandatory ConfigPath. Preserve the current Prompt/model/RAG data during R003 business acceptance; A must not infer or override customer catalog availability.",
+  "version": "R006.1 Knowledge Activation and AI Publishing V1",
+  "status": "r006_1_a_implementation_complete",
+  "current_task": "A business-context and incremental product publication candidate",
+  "current_gate": "R006_1_A_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING",
+  "current_stage": "A accepts C/B supplied business context without TEST-only literals, remains permission-blind, and incrementally publishes one approved product into the configured active collection. Isolated browser acceptance produced 3 chunks/3 embeddings and a sourced answer; formal A and its 47-chunk collection were unchanged.",
+  "next_recommended_task": "Release only with C 0011 and contracts 0.4.0 on the same SHA. Do not infer customer availability in A, rebuild the full collection, or modify Prompt/model rules.",
   "checked_at": "2026-07-31",
+  "r006_1": {
+    "branch": "feature/r006-1-knowledge-activation-v1",
+    "commit": "4148ca3",
+    "interface": "loopback-only product publication and visibility",
+    "incremental_rule": "upsert and verify the current product version before deleting only that product's old version",
+    "formal_runtime_changed": false
+  },
   "runtime": {
     "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
     "branch": "release/r006-customer-available-catalog-v1",
@@ -57,7 +64,7 @@
     "windows_ops": "6 selected script suites passed: runtime entry alignment, runtime fix 2, LAN mode, target pilot ready, Admin T05 and OPS scripts",
     "runtime": "Formal no-config stop/start/status passed and restored standard/LAN mode; explicit ConfigPath start and Chinese start/status batch shortcuts passed; all four services are RUNNING with verified repository identity."
   },
-  "contracts": ["contracts/version.json 0.3.0 additive Customer Available Catalog; A interfaces unchanged"],
+  "contracts": ["contracts/version.json 0.4.0 additive AI publication/visibility; 0.3.0 catalog schemas retained"],
   "recovery": {
     "repository": "AI-CS-pilot-baseline-recovery-v1",
     "commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",

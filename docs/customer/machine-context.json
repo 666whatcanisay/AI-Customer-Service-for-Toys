@@ -3,11 +3,17 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-  "current_task": "R006 Customer Available Catalog Consumer production release",
-  "current_stage": "B is formally deployed at release b66506a and consumes only the three C-owned /api/v1/customer-service/catalog paths. Production browser smoke shows one projected TEST Store and five Products while the disabled PILOT Store does not clear the catalog.",
-  "current_gate": "R006_B_CONSUMER_PRODUCTION_READY",
-  "status": "r006_b_consumer_production_ready",
+  "current_task": "R006.1 downstream browser acceptance",
+  "current_stage": "B code and business flow are unchanged. In isolated acceptance B consumed C's existing customer-service catalog, immediately selected one newly enabled PILOT product and received an A answer backed by 3 product-specific sources.",
+  "current_gate": "R006_1_B_DOWNSTREAM_ACCEPTANCE_PASS / PRODUCTION_RELEASE_PENDING",
+  "status": "r006_1_b_downstream_acceptance_pass",
   "last_updated": "2026-07-31",
+  "r006_1": {
+    "code_changed": false,
+    "tests": "28 files / 117 tests, typecheck and build PASS",
+    "browser": "PASS: product selectable after C batch activation; answer returned age, material, safety limit and 3 matching sources",
+    "open_p2": "BUG-B-002: legacy reference-readiness banner does not yet reflect R006.1 publication evidence"
+  },
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
     "source_baseline": "origin/develop@32feb610",
@@ -68,7 +74,7 @@
     "GET C /api/v1/customer-service/catalog/products/{product_id}/skus with SKU inheriting Product"
   ],
   "contracts": [
-    "contracts/version.json 0.3.0 additive Customer Available Catalog",
+    "contracts/version.json 0.4.0 additive candidate; B continues consuming retained 0.3.0 Customer Available Catalog",
     "experience-case.v1-draft task-local frozen adapter agreement",
     "ai-feedback.v1-draft task-local frozen adapter agreement"
   ],
@@ -77,7 +83,7 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-31 R006 production: full candidate Vitest 28 files / 117 tests, typecheck and build PASS; formal B proxy and Chrome smoke PASS with 1 projected Store and 5 Products. BUG-B-001 is FIXED_VERIFIED_PRODUCTION_SMOKE.",
+  "last_test_result": "2026-07-31 R006.1 candidate: B remains unchanged; 28 files / 117 tests, typecheck and build PASS. Isolated browser selected the newly enabled PILOT product and received a correct answer with 3 matching sources.",
   "blockers": [],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
