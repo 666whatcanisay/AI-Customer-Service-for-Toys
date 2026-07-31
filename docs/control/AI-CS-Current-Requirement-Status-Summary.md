@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`R006_1_PRODUCTION_RELEASE_COMPLETE / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`R006_2_EXPERIENCE_COMPLETE / PRODUCTION_RELEASE_PENDING / R003_PILOT_ACCEPTANCE_PENDING`
 
 本文件是状态快照，不是第二份需求台账。
 
@@ -28,7 +28,7 @@
 | R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | R006.1已正式发布，指定PILOT商品已在正式Runtime完成人工发布、启用、B选择和A同商品引用回答。 | 执行完整PILOT业务结果验收后决定是否关闭。 |
 | R004 | AI-CS运行版本统一 | `DONE` | 正式目录、Runtime身份和回滚锚点已统一。 | 保持运行基线。 |
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | 尚无真实客服运行后的改善证据。 | R003关闭后开展受控Pilot。 |
-| R006 | Pilot Business Data Activation V1 | `DONE` | R006.1已正式发布：0011、AI知识状态、增量发布、publication receipt、批量启用和B真实状态展示均进入正式Runtime。 | 保持C唯一Owner；不得混入B可信度判断。 |
+| R006 | Pilot Business Data Activation V1 | `DONE` | R006.1已正式发布；R006.2焦点刷新、60秒低频检查、待启用计数和筛选全选已完成隔离验收，但尚未正式发布。 | 保持C唯一Owner；R006.2需走受控Release，不得混入B可信度判断。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | 属公司网络/VLAN/端口策略。 | 网络侧第二终端验收。 |
 | R008 | Project Structure Simplification V1 | `DONE` | `AI-CS/`成为正式运行与后续开发目录；Recovery保留回滚。 | 旧Worktree另行归档。 |
 | R009 | 商品知识采集模板导入 V1 | `DONE` | 实现、浏览器验收及正式0009能力已进入当前0010运行基线。 | 保持Import Center和导入边界。 |
@@ -37,7 +37,7 @@
 
 R006实现与正式发布阻塞均已关闭。C保存并裁决`data_source/customer_service_status`，提供`/customer-service/catalog/**`最终投影；B只消费投影。正式只读API和浏览器Smoke证明PILOT+DISABLED记录不会清空其他目录，TEST数据连续可用。
 
-当前正式Runtime为`release/r006-1-knowledge-activation-v1`，Release代码SHA为`55ca6eb`，数据库为`0011_product_knowledge_publishing_v1`，活动集合为`test_knowledge_v031`、50 chunks。`BUG-B-002`、`BUG-RUNTIME-003`、`BUG-RUNTIME-004`和`BUG-C-001`均已完成正式回归。指定商品在正式浏览器Smoke中达到`APPROVED + ENABLED + PUBLISHED`，B可选且A返回3条同商品来源。
+当前正式Runtime记录仍为`release/r006-1-knowledge-activation-v1@98d62e6`，数据库为`0011_product_knowledge_publishing_v1`，活动集合为`test_knowledge_v031`、当前56 chunks。R006.2分支未切换正式Runtime；隔离验收结束后正式四服务继续运行，正式PILOT投影未被测试写入。
 
 ## 4. 执行顺序
 
@@ -45,6 +45,10 @@ R006实现与正式发布阻塞均已关闭。C保存并裁决`data_source/custo
 R006 Production Release COMPLETE
   ↓
 R006.1 Production Release COMPLETE
+  ↓
+R006.2 Experience Implementation COMPLETE
+  ↓
+R006.2 Production Release PENDING
   ↓
 R003业务结果验收
   ↓

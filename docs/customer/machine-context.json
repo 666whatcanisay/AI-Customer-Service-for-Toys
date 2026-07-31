@@ -3,11 +3,19 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-  "current_task": "R006.1 production customer verification",
-  "current_stage": "B formally consumes C's catalog and product AI-knowledge status. One newly enabled product was selected in the formal browser; B showed PUBLISHED, 3 references and the publication receipt, and A answered with 3 product-specific sources.",
-  "current_gate": "R006_1_B_PRODUCTION_PASS",
-  "status": "r006_1_b_production_pass",
+  "current_task": "R006.2 Customer Experience Polish V1",
+  "current_stage": "B refreshes C's final customer-available catalog on window focus and every 60 seconds while visible, preserving valid consultation context and stopping timers/listeners on unmount. Isolated browser acceptance updated an already-open B page from 2 to 19 products after Admin activation without manual reload.",
+  "current_gate": "R006_2_B_EXPERIENCE_COMPLETE / PRODUCTION_RELEASE_PENDING",
+  "status": "r006_2_b_experience_complete",
   "last_updated": "2026-07-31",
+  "r006_2": {
+    "branch": "feature/r006-2-customer-experience-polish-v1",
+    "implementation_anchor": "a76ba1e13c34",
+    "refresh_policy": "window focus plus 60-second visible-page polling; manual refresh retained; no WebSocket/SSE",
+    "tests": "28 files / 119 tests, typecheck and build PASS",
+    "browser": "ISOLATED PASS: already-open B catalog changed from 2 to 19 products after Admin enabled 17; no manual refresh or reload",
+    "formal_runtime_changed": false
+  },
   "r006_1": {
     "code_changed": true,
     "tests": "28 files / 117 tests, typecheck and build PASS",

@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`R006_1_PRODUCTION_RELEASE_COMPLETE / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`R006_2_EXPERIENCE_COMPLETE / PRODUCTION_RELEASE_PENDING / R003_PILOT_ACCEPTANCE_PENDING`
 
 ## 1. 台账目标
 
@@ -203,8 +203,8 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | 负责模块 | Control / Interface Owner：冻结所有权、状态、路径和兼容性；C：Provider 与客服可用状态权威；B：Consumer；A：不修改，后续只验证既有请求可以使用同一激活范围。 |
 | 影响范围 | Store/Product客服状态、SKU继承、历史TEST初始化、新PILOT默认值、C运营启停入口、activation receipt、C→B消费和AI下游使用；明确禁止Master Data重构。 |
 | 完成标准 | 历史有效TEST数据默认ENABLED且运营可关闭；新PILOT Store/Product默认DISABLED且运营可开启；SKU只继承Product；B只消费C最终投影；每次实际状态变化有C权威receipt；单个商品关闭不影响其他商品；安全与回滚证据齐全。 |
-| 验收证据 | [Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)：contracts、C、B、Admin和隔离E2E通过；[Production Release Report V1](AI-CS-R006-Production-Release-Report-V1.md)：正式0008→0009→0010与Catalog Smoke通过；[R006.1 Production Release Report V1](AI-CS-R006.1-Production-Release-Report-V1.md)：正式0011、50 chunks、发布/启用/B选择/A引用闭环通过。 |
-| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；[Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)；[Production Release Report V1](AI-CS-R006-Production-Release-Report-V1.md)；[R006.1 Production Release Report V1](AI-CS-R006.1-Production-Release-Report-V1.md)；Release代码`55ca6eb`。 |
+| 验收证据 | [Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)：contracts、C、B、Admin和隔离E2E通过；[Production Release Report V1](AI-CS-R006-Production-Release-Report-V1.md)：正式0008→0009→0010与Catalog Smoke通过；[R006.1 Production Release Report V1](AI-CS-R006.1-Production-Release-Report-V1.md)：正式0011、发布/启用/B选择/A引用闭环通过；[R006.2 Experience Report V1](AI-CS-R006.2-Customer-Experience-Polish-Report-V1.md)：隔离浏览器证明已打开B页面自动感知Admin启用。 |
+| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；[Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)；[Production Release Report V1](AI-CS-R006-Production-Release-Report-V1.md)；[R006.1 Production Release Report V1](AI-CS-R006.1-Production-Release-Report-V1.md)；[R006.2 Experience Report V1](AI-CS-R006.2-Customer-Experience-Polish-Report-V1.md)。 |
 | 防止重复错误规则 | 不得恢复“系统根据旧测试字段自动选择可信数据”的方案；不得把全部旧表记录无差别初始化为TEST；不得扩大成Master Data；不得让B判断C数据可信度；不得为SKU增加独立启停；实现必须遵守Implementation Plan的provenance、receipt和隔离规则。 |
 
 #### R006 增补需求 — Legacy Compatibility Control
@@ -233,6 +233,19 @@ R006.1在不改变R006所有权的前提下补齐“商品知识 → 客服可�
 6. 正式Release代码为`55ca6eb`；数据库为0011，活动集合50 chunks。发布Smoke仅证明指定商品闭环，不能替代R003全量PILOT验收。
 
 关联文档：[R006.1 Interface Freeze](interfaces/AI-CS-R006.1-Knowledge-Activation-AI-Publishing-Interface-Freeze-V1.md)、[R006.1 Implementation Report](AI-CS-R006.1-Knowledge-Activation-AI-Publishing-Implementation-Report-V1.md)、[R006.1 Production Release Report](AI-CS-R006.1-Production-Release-Report-V1.md)。
+
+#### R006.2 增补需求 — Customer Experience Polish
+
+R006.2不改变R006业务模型，只补齐已经打开页面对激活变化的感知和运营批量操作说明：
+
+1. B保留手动刷新；窗口重新获得焦点时刷新C最终目录，页面可见期间每60秒低频检查，卸载后停止。
+2. B后台刷新保留仍有效的咨询上下文，仅在Store/Product从C投影消失时清理失效选择；不引入WebSocket、SSE或可信度兜底。
+3. C Admin显示当前待启用数量，支持全选当前筛选结果中的`APPROVED + DISABLED`商品。
+4. 批量启用仍要求操作人、人工点击和确认，成功后提示“客服工作台刷新目录后即可使用”。
+5. 隔离浏览器已证明Admin启用17个商品后，已打开B页面无需手动刷新或重载即可从2个商品更新到19个；正式数据库未修改。
+6. 实现验收锚点为`a76ba1e`；正式Runtime仍在R006.1版本，R006.2正式发布需另走Release Gate。
+
+关联文档：[R006.2 Task Card](product-management/AI-CS-R006.2-Customer-Experience-Polish-Task-Card-V1.md)、[R006.2 Experience Report](AI-CS-R006.2-Customer-Experience-Polish-Report-V1.md)。
 
 ### R007 — 网络环境导致客服无法访问5173
 
@@ -309,6 +322,8 @@ R006 Production Release（DONE，正式0010）
   ↓
 R006.1 Production Release（COMPLETE，正式0011浏览器Smoke通过）
   ↓
+R006.2 Experience Implementation（COMPLETE，正式发布待执行）
+  ↓
 R003 正式业务结果验收（IN_PROGRESS → DONE）
   ↓
 R005 Feedback Loop真实运行验证（TODO）
@@ -316,7 +331,7 @@ R005 Feedback Loop真实运行验证（TODO）
 
 R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处理。
 
-R006与R006.1均已完成受控实现与正式发布。正式Runtime现为R006.1 Release、数据库0011、活动集合50 chunks；指定商品已通过正式浏览器Smoke。下一入口是R003完整PILOT业务结果验收，不能用单商品Smoke直接关闭R003。
+R006与R006.1均已完成受控实现与正式发布。R006.2体验实现和隔离浏览器验收已完成，但尚未部署正式Runtime。正式Runtime仍为R006.1 Release、数据库0011、活动集合当前56 chunks；下一发布入口是R006.2受控Release，R003仍需完整PILOT业务结果验收，不能用单商品Smoke直接关闭。
 
 R008物理迁移和标准端口切换已完成：`AI-CS/`是唯一正式运行与后续开发目录，Recovery仅保留为回滚锚点。旧Worktree是否退役仍须按独立归档计划逐一确认，不能因R008完成而批量删除。R008结果不替代R003/R005业务验收，也不授权R006。
 
