@@ -414,6 +414,64 @@ function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfil
     return $lanConfig
 }
 
+function Resolve-LanStatusRuntimeConfig($Config) {
+    $recordPath = Get-ServiceRecordPath $Config 'customer-web'
+    if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
+        try {
+            $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $recordRoot = [IO.Path]::GetFullPath([string]$record.repository_root)
+            $expectedRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+            $healthUri = [uri][string]$record.healthUrl
+            if (
+                [string]$record.network_mode -eq 'LAN' -and
+                [string]::Equals($recordRoot, $expectedRoot, [StringComparison]::OrdinalIgnoreCase) -and
+                $healthUri.IsAbsoluteUri -and
+                $healthUri.Scheme -in @('http','https') -and
+                $healthUri.Port -eq [int]$Config.CustomerWebPort -and
+                (Test-PrivateLanIpv4 $healthUri.Host)
+            ) {
+                $statusConfig = @{}
+                foreach ($entry in $Config.GetEnumerator()) { $statusConfig[$entry.Key] = $entry.Value }
+                $selection = [pscustomobject]@{
+                    IPAddress = $healthUri.Host
+                    InterfaceIndex = 0
+                    InterfaceAlias = '受管运行记录'
+                    InterfaceDescription = '受管运行记录（状态命令不重新扫描网卡）'
+                    PrefixLength = 0
+                    SubnetMask = '未探测'
+                    DefaultGateway = '未探测'
+                }
+                $statusConfig.EnableLanMode = $true
+                $statusConfig.LanMode = $true
+                $statusConfig.LanAddress = $healthUri.Host
+                $statusConfig.LanAdvertisedHost = $healthUri.Host
+                $statusConfig.BindAddress = '127.0.0.1'
+                $statusConfig.RagBindAddress = '127.0.0.1'
+                $statusConfig.PlatformBindAddress = '127.0.0.1'
+                $statusConfig.CustomerWebBindAddress = $healthUri.Host
+                $statusConfig.CustomerWebUrl = $healthUri.AbsoluteUri
+                $statusConfig.LocalCustomerWebUrl = $healthUri.AbsoluteUri
+                $statusConfig.LanNetworkProfile = [pscustomobject]@{
+                    InterfaceAlias = '受管运行记录'
+                    NetworkName = '未重新探测'
+                    NetworkCategory = 'Unknown'
+                    Detail = '状态命令使用受管运行记录；动态网卡检查请运行诊断脚本。'
+                }
+                $statusConfig.LanSelection = $selection
+                $statusConfig.LanSubnet = '未重新探测'
+                $statusConfig.LanStatusResolutionSource = 'MANAGED_RECORD'
+                return $statusConfig
+            }
+        } catch {
+            # A malformed or stale record must not be trusted. The caller falls
+            # back to the existing dynamic discovery and reports its failure.
+        }
+    }
+    $dynamicConfig = Resolve-LanRuntimeConfig $Config $null $null -SkipPublicNetworkGuard
+    $dynamicConfig.LanStatusResolutionSource = 'DYNAMIC_DISCOVERY'
+    return $dynamicConfig
+}
+
 function Get-LanServiceListenerAddress($Config, [int]$Port) {
     $address = if ($Port -eq [int]$Config.RagPort) { [string]$Config.RagBindAddress } elseif ($Port -eq [int]$Config.PlatformPort) { [string]$Config.PlatformBindAddress } elseif ($Port -eq [int]$Config.CustomerWebPort) { [string]$Config.CustomerWebBindAddress } else { [string]$Config.BindAddress }
     return "${address}:$Port"
@@ -935,6 +993,62 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
 }
 
 function Test-HttpOk([string]$Url) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3; return $r.StatusCode -ge 200 -and $r.StatusCode -lt 400 } catch { return $false } }
+
+function Get-ParallelHttpHealth([object[]]$Endpoints, [int]$TimeoutMilliseconds = 3000) {
+    if ($TimeoutMilliseconds -lt 100 -or $TimeoutMilliseconds -gt 30000) {
+        throw 'HTTP健康检查超时必须在100-30000毫秒之间。'
+    }
+    $pending = @()
+    foreach ($endpoint in @($Endpoints)) {
+        $request = [System.Net.HttpWebRequest]::Create([string]$endpoint.Url)
+        $request.Method = 'GET'
+        $request.Timeout = $TimeoutMilliseconds
+        $request.ReadWriteTimeout = $TimeoutMilliseconds
+        $pending += [pscustomobject]@{
+            Name = [string]$endpoint.Name
+            Url = [string]$endpoint.Url
+            Request = $request
+            Async = $request.BeginGetResponse($null, $null)
+        }
+    }
+
+    $results = @{}
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+    foreach ($probe in $pending) {
+        $response = $null
+        try {
+            $remainingMilliseconds = [Math]::Max(
+                0,
+                [int][Math]::Ceiling(($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+            )
+            if (-not $probe.Async.AsyncWaitHandle.WaitOne($remainingMilliseconds)) {
+                $probe.Request.Abort()
+                throw "${TimeoutMilliseconds}ms超时"
+            }
+            $response = $probe.Request.EndGetResponse($probe.Async)
+            $statusCode = [int]$response.StatusCode
+            $results[$probe.Name] = [pscustomobject]@{
+                Name = $probe.Name
+                Url = $probe.Url
+                Ok = ($statusCode -ge 200 -and $statusCode -lt 400)
+                StatusCode = $statusCode
+                Error = ''
+            }
+        } catch {
+            $results[$probe.Name] = [pscustomobject]@{
+                Name = $probe.Name
+                Url = $probe.Url
+                Ok = $false
+                StatusCode = 0
+                Error = $_.Exception.Message
+            }
+        } finally {
+            if ($null -ne $response) { $response.Dispose() }
+            $probe.Async.AsyncWaitHandle.Dispose()
+        }
+    }
+    return $results
+}
 function Wait-HttpOk([string]$Url, [int]$Seconds, [string]$Label) { for ($i=0; $i -lt $Seconds; $i++) { if (Test-HttpOk $Url) { return }; Start-Sleep -Seconds 1 }; throw "$Label 未在 $Seconds 秒内就绪：$Url。请查看运行日志。" }
 
 function Assert-AdminWebDependencies($Config) {
@@ -1014,7 +1128,7 @@ function Get-PlatformMigrationStatus($Config) {
     return "已迁移（revision $($revision | Select-Object -Last 1)）"
 }
 
-function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl) {
+function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl, $HealthProbe = $null) {
     $record = Test-RecordedProcess $Config $Name
     $runtimeIdentity = if ($record -and $record.Record) { Test-ManagedServiceRuntimeIdentity $Config $record.Record } else { $null }
     $serviceProcessId = if ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'managed_pid')) { [string]$record.Record.managed_pid } elseif ($record -and $record.Process) { [string]$record.Process.Id } else { '-' }
@@ -1022,9 +1136,9 @@ function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUr
     $portOwners = @(Get-PortOwner $Port)
     $ownsPort = $record -and $record.Valid -and (($record.ListenerProcess -and $portOwners.Count -eq 1 -and [int]$portOwners[0] -eq [int]$record.ListenerProcess.Id) -or ($record.Process -and $portOwners.Count -gt 0 -and @($portOwners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $portOwners.Count))
     $serviceState = if ($ownsPort) { '运行中（RUNNING）' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
-    $healthOk = Test-HttpOk $HealthUrl
+    $healthOk = if ($null -eq $HealthProbe) { Test-HttpOk $HealthUrl } else { [bool]$HealthProbe.Ok }
     $portState = if ($portOwners.Count -gt 0) { "监听（LISTENING；PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（LISTENING；health 已确认；未能读取端口 PID）' } else { '未监听' }
-    $healthState = if ($healthOk) { '可用' } else { '不可用' }
+    $healthState = if ($healthOk) { '可用' } elseif ($null -ne $HealthProbe -and -not [string]::IsNullOrWhiteSpace([string]$HealthProbe.Error)) { "不可用（$($HealthProbe.Error)）" } else { '不可用（HTTP健康检查失败）' }
     $runtimeIdentityState = if ($null -eq $runtimeIdentity) { '未登记' } elseif ($runtimeIdentity.Valid) { '已验证' } else { '不一致' }
     $runtimeGitShortSha = if ($runtimeIdentity -and $runtimeIdentity.Current -and $runtimeIdentity.Current.GitSha) { $runtimeIdentity.Current.GitSha.Substring(0, 12) } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_git_sha') -and -not [string]::IsNullOrWhiteSpace([string]$record.Record.repository_git_sha)) { ([string]$record.Record.repository_git_sha).Substring(0, [Math]::Min(12, ([string]$record.Record.repository_git_sha).Length)) } else { '不可用' }
     $runtimeSourceState = if ($runtimeIdentity -and $runtimeIdentity.Current) { [string]$runtimeIdentity.Current.SourceState } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_source_state')) { [string]$record.Record.repository_source_state } else { '不可用' }

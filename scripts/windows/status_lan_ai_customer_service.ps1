@@ -11,8 +11,10 @@ try {
     $config = $null
     $lanResolutionError = $null
     try {
-        # Status never silently starts services, so it reports a Public profile instead of applying the start guard.
-        $config = Resolve-LanRuntimeConfig $baseConfig $null $null -SkipPublicNetworkGuard
+        # Prefer the validated managed runtime record. Dynamic Windows adapter
+        # discovery is retained only as a fallback because some hosts block the
+        # networking cmdlets for minutes while the services remain healthy.
+        $config = Resolve-LanStatusRuntimeConfig $baseConfig
     } catch {
         $lanResolutionError = $_.Exception.Message
         $config = $baseConfig
@@ -24,17 +26,20 @@ try {
     Write-Host "Ollama：$ollamaState"
     Write-Host "Ollama 地址：$($config.OllamaBaseUrl)；模型：$($config.OllamaModel)"
 
-    foreach ($item in @(
+    $serviceDefinitions = @(
         @{Label='C';Name='platform';Port=$config.PlatformPort;Url=(Get-ManagedServiceHealthUrl $config 'platform')},
         @{Label='A';Name='rag';Port=$config.RagPort;Url=(Get-ManagedServiceHealthUrl $config 'rag')},
         @{Label='B';Name='customer-web';Port=$config.CustomerWebPort;Url=(Get-ManagedServiceHealthUrl $config 'customer-web')}
-    )) {
-        $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url
+        @{Label='Admin';Name='admin-web';Port=$config.AdminWebPort;Url=(Get-ManagedServiceHealthUrl $config 'admin-web')}
+    )
+    $healthResults = Get-ParallelHttpHealth $serviceDefinitions 3000
+    foreach ($item in @($serviceDefinitions | Where-Object { $_.Name -ne 'admin-web' })) {
+        $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url $healthResults[$item.Name]
         $listener = if ($lanResolutionError) { '无法确定' } else { Get-LanServiceListenerAddress $config $item.Port }
         Write-Host "$($item.Label)：$($serviceStatus.State)；受管 PID $($serviceStatus.ManagedProcessId)；监听 PID $($serviceStatus.ListenerProcessId)；监听地址：$listener；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
         Write-Host "  运行版本：$($serviceStatus.RuntimeIdentityState)；SHA $($serviceStatus.RuntimeGitShortSha)；源码 $($serviceStatus.RuntimeSourceState)；runtimeMode=$($serviceStatus.RuntimeMode)；networkMode=$($serviceStatus.NetworkMode)；$($serviceStatus.RuntimeIdentityDetail)"
     }
-    $adminStatus = Get-ServiceStatus $config 'admin-web' $config.AdminWebPort (Get-ManagedServiceHealthUrl $config 'admin-web')
+    $adminStatus = Get-ServiceStatus $config 'admin-web' $config.AdminWebPort (Get-ManagedServiceHealthUrl $config 'admin-web') $healthResults['admin-web']
     $adminCheck = Test-RecordedProcess $config 'admin-web'
     $adminRecord = if ($adminCheck) { $adminCheck.Record } else { $null }
     $adminListenerPid = if ($adminRecord -and ($adminRecord.PSObject.Properties.Name -contains 'listener_pid')) { [string]$adminRecord.listener_pid } else { '未记录' }
@@ -86,12 +91,15 @@ try {
     } else {
         $network = $config.LanNetworkProfile
         Write-Host "局域网页面：$($config.CustomerWebUrl)"
-        Write-Host "当前网络配置类型：$($network.NetworkCategory)；适配器：$($network.InterfaceAlias)；网络：$($network.NetworkName)"
+        Write-Host "当前网络配置类型：$($network.NetworkCategory)；适配器：$($network.InterfaceAlias)；网络：$($network.NetworkName)；来源：$($config.LanStatusResolutionSource)"
         Write-Host "选定网卡：$($config.LanSelection.InterfaceAlias)；IPv4：$($config.LanSelection.IPAddress)；子网掩码：$($config.LanSelection.SubnetMask)；默认网关：$($config.LanSelection.DefaultGateway)"
         if ([string]$network.NetworkCategory -eq 'Public' -and -not [bool]$config.AllowPublicNetwork) {
             Write-Host 'Public 网络：启动局域网客服会被阻止。请在 Windows 设置中将当前网络改为 Private 后重试。' -ForegroundColor Yellow
         }
         Write-Host (Get-LanFirewallStatusMessage $network) -ForegroundColor Yellow
+        if ([string]$config.LanStatusResolutionSource -eq 'MANAGED_RECORD') {
+            Write-Host '提示：为避免状态命令被Windows网卡发现阻塞，本次未重新扫描网卡/网关；如需实时网络详情请运行 diagnose_lan_ai_customer_service.ps1。' -ForegroundColor Yellow
+        }
         Write-Host '前端 API：RAG=/rag-api；平台=/platform-api；模式=SAME_ORIGIN_PROXY'
         Write-Host '外部入口：仅 TCP 5173；A/C 仅监听 127.0.0.1。'
     }
