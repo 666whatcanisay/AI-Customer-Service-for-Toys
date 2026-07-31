@@ -418,6 +418,7 @@ function Get-LanPlatformEnvironment($Config) {
         DATABASE_URL = [string]$Config.PlatformDatabaseUrl
         CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
+        AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
     }
 }
 
@@ -458,6 +459,13 @@ function Get-LocalFrontendEnvironment($Config) {
         VITE_START_MODE = 'LOCAL'
         VITE_API_MODE = 'DIRECT'
         VITE_CUSTOMER_ENTRY_URL = [string]$Config.CustomerWebUrl
+    }
+}
+
+function Get-AdminWebEnvironment($Config) {
+    return @{
+        VITE_PLATFORM_API_BASE_URL = "http://127.0.0.1:$($Config.PlatformPort)"
+        VITE_AI_API_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
     }
 }
 
@@ -941,7 +949,7 @@ function Start-AdminWebService($Config) {
     if ([bool]$Config.AdminEnableLanMode) {
         Write-Warning "AdminEnableLanMode=true：管理后台将使用 $($Config.AdminWebUrl)。本轮不会创建或修改任何防火墙规则。"
     }
-    $process = Start-ManagedService $Config 'admin-web' $dependency.PnpmExecutable @('dev','--host',$Config.AdminWebBindAddress,'--port',$Config.AdminWebPort,'--strictPort') $dependency.Directory 'pnpm' ([int]$Config.AdminWebPort)
+    $process = Start-ManagedServiceWithEnvironment $Config 'admin-web' $dependency.PnpmExecutable @('dev','--host',$Config.AdminWebBindAddress,'--port',$Config.AdminWebPort,'--strictPort') $dependency.Directory 'pnpm' ([int]$Config.AdminWebPort) (Get-AdminWebEnvironment $Config)
     Wait-HttpOk ([string]$Config.AdminWebUrl) 45 '管理后台'
     return Update-AdminWebServiceRecord $Config $process
 }
@@ -1618,15 +1626,18 @@ function Wait-RagRuntimeReady($Config, [int]$Seconds) {
 }
 
 function Invoke-RagChatSmoke($Config) {
-    $stores = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort '/api/v1/test-catalog/stores') 'C 店铺列表'
-    $store = @($stores.items | Select-Object -First 1)[0]
-    if ($null -eq $store) { throw 'C 没有可供聊天 smoke 使用的测试店铺。' }
-    $products = Get-Json ((Get-ServiceUrl $Config $Config.PlatformPort '/api/v1/test-catalog/products') + '?store_code=' + [uri]::EscapeDataString([string]$store.store_code)) 'C 商品列表'
-    $product = @($products.items | Select-Object -First 1)[0]
-    if ($null -eq $product) { throw 'C 没有可供聊天 smoke 使用的测试商品。' }
-    $skus = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-catalog/products/$([uri]::EscapeDataString([string]$product.product_id))/skus") 'C SKU 列表'
-    $sku = @($skus.items | Select-Object -First 1)[0]
-    $payload = @{ question='请根据当前商品资料介绍适用年龄和安全注意事项。'; context=@{ tenant_id=[string]$store.tenant_id; platform=[string]$store.platform; store_code=[string]$store.store_code; product_id=[string]$product.product_id; sku_id=if ($sku) { [string]$sku.sku_id } else { $null } } } | ConvertTo-Json -Depth 5
+    # The active collection may coexist with newly imported C products that
+    # have not yet been published. Use the configured package export as the
+    # smoke context so an unrelated unpublished product cannot fail startup.
+    $packageId = [uri]::EscapeDataString([string]$Config.TestKnowledgePackageId)
+    $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C active knowledge package'
+    $catalogStores = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort '/api/v1/test-catalog/stores') 'C 店铺列表'
+    $catalogStore = @($catalogStores.items | Where-Object { [string]$_.store_code -eq [string]$package.store_code } | Select-Object -First 1)[0]
+    if ($null -eq $catalogStore) { throw 'C active knowledge package 没有对应的目录店铺。' }
+    $productItem = @($package.items | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.product_id) } | Select-Object -First 1)[0]
+    if ($null -eq $productItem) { throw 'C active knowledge package 没有可供聊天 smoke 使用的商品。' }
+    $skuItem = @($package.items | Where-Object { [string]$_.product_id -eq [string]$productItem.product_id -and -not [string]::IsNullOrWhiteSpace([string]$_.sku_id) } | Select-Object -First 1)[0]
+    $payload = @{ question='请根据当前商品资料介绍适用年龄和安全注意事项。'; context=@{ tenant_id=[string]$catalogStore.tenant_id; platform=[string]$catalogStore.platform; store_code=[string]$catalogStore.store_code; product_id=[string]$productItem.product_id; sku_id=if ($skuItem) { [string]$skuItem.sku_id } else { $null } } } | ConvertTo-Json -Depth 5
     try { $response = Invoke-RestMethod -UseBasicParsing -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload -Uri (Get-ServiceUrl $Config $Config.RagPort '/api/chat') -TimeoutSec 120 } catch { throw "A 真实聊天 smoke 失败：$($_.Exception.Message)" }
     $data = if ($response.data) { $response.data } else { $response }
     $answer = [string]$data.answer
