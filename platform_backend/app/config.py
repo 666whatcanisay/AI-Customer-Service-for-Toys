@@ -65,6 +65,8 @@ class Settings:
     max_test_package_single_file_bytes: int
     max_knowledge_material_upload_bytes: int
     knowledge_material_storage_dir: str
+    ai_service_base_url: str
+    ai_service_timeout_seconds: float
 
 
 @lru_cache
@@ -95,5 +97,11 @@ def get_settings() -> Settings:
         ),
         knowledge_material_storage_dir=os.getenv(
             "PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR", "./.runtime/knowledge-materials"
+        ),
+        ai_service_base_url=os.getenv(
+            "AI_SERVICE_BASE_URL", "http://127.0.0.1:8000"
+        ).rstrip("/"),
+        ai_service_timeout_seconds=float(
+            os.getenv("AI_SERVICE_TIMEOUT_SECONDS", "120")
         ),
     )

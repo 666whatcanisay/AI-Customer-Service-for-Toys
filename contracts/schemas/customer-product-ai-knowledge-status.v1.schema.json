@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-product-ai-knowledge-status.v1.schema.json",
+  "title": "Customer Product AI Knowledge Status V1",
+  "description": "C-owned product-level publication evidence displayed by B. The product has already passed the customer available catalog boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "product_id",
+    "status",
+    "embedding_status",
+    "publication_receipt_id",
+    "active_collection",
+    "chunk_count",
+    "embedding_count",
+    "indexed_fingerprint",
+    "published_at",
+    "last_checked_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "customer-product-ai-knowledge-status.v1"},
+    "product_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "status": {"enum": ["NOT_GENERATED", "GENERATING", "PUBLISHED", "SYNC_FAILED", "NEED_RESYNC"]},
+    "embedding_status": {"enum": ["NOT_GENERATED", "GENERATING", "COMPLETE", "FAILED"]},
+    "publication_receipt_id": {"type": ["string", "null"], "maxLength": 64},
+    "active_collection": {"type": ["string", "null"], "maxLength": 128},
+    "chunk_count": {"type": "integer", "minimum": 0},
+    "embedding_count": {"type": "integer", "minimum": 0},
+    "indexed_fingerprint": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "published_at": {"type": ["string", "null"], "format": "date-time"},
+    "last_checked_at": {"type": "string", "format": "date-time"}
+  }
+}

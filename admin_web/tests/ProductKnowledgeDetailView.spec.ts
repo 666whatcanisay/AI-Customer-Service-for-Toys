@@ -6,8 +6,11 @@ import { getProductKnowledgeProduct, updateProductBasicInfo, type ProductKnowled
 
 vi.mock('../src/api/client', () => ({
   apiErrorMessage: vi.fn(() => '暂时不可用'),
+  checkProductAiKnowledge: vi.fn(),
   getProductKnowledgeProduct: vi.fn(),
   listCatalogActivationReceipts: vi.fn(),
+  listProductAiKnowledgeReceipts: vi.fn(),
+  publishProductAiKnowledge: vi.fn(),
   setProductCustomerServiceStatus: vi.fn(),
   updateProductBasicInfo: vi.fn(),
 }))
@@ -27,6 +30,7 @@ describe('ProductDetailView', () => {
       sources: [{ source_name: '商品说明书', source_type: 'PRODUCT_MANUAL', review_status: 'APPROVED', technical_details: { ...tech, product_id: null, source_id: 'SRC-1', content_hash: 'hash' } }],
       coverage_percent: 78, ai_usable: true, knowledge_state: 'BASIC_AVAILABLE',
       data_status: 'APPROVED', ai_status: 'PARTIALLY_AVAILABLE',
+      ai_knowledge: { status: 'NOT_GENERATED', embedding_status: 'NOT_GENERATED', current_fingerprint: 'current', indexed_fingerprint: null, active_collection: null, chunk_count: 0, embedding_count: 0, updated_at: null, published_at: null, last_error_code: null },
       topic_coverage: [
         { key: 'product_summary', name: '商品介绍', level: 'A', status: 'SUPPORTED', evidence_summary: '结构化资料' },
         { key: 'age', name: '适用年龄', level: 'A', status: 'MISSING', evidence_summary: null },
@@ -49,6 +53,8 @@ describe('ProductDetailView', () => {
     expect(wrapper.text()).toContain('当前资料未提供年龄信息，建议人工确认。')
     expect(wrapper.text()).toContain('不代表知识已发布到 RAG')
     expect(wrapper.text()).toContain('客服：已禁用')
+    expect(wrapper.text()).toContain('AI知识：未生成')
+    expect(wrapper.text()).toContain('AI 知识发布')
 
     const editButton = wrapper.findAll('button').find((item) => item.text() === '编辑基础信息')
     await editButton!.trigger('click')

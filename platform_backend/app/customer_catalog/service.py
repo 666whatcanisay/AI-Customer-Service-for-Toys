@@ -23,6 +23,7 @@ from app.customer_catalog.schemas import (
     CatalogResultStatus,
     CatalogWarning,
     CustomerCatalogProduct,
+    CustomerProductAiKnowledgeStatus,
     CustomerCatalogSku,
     CustomerCatalogStore,
     CustomerServiceStatus,
@@ -30,8 +31,19 @@ from app.customer_catalog.schemas import (
     ProductCatalogResponse,
     SkuCatalogResponse,
     StoreCatalogResponse,
+    BatchActivationItem,
+    BatchActivationItemStatus,
+    BatchActivationRequest,
+    BatchActivationResponse,
+    BatchActivationResultStatus,
 )
 from app.errors import AppError
+from app.knowledge_publishing.models import (
+    ProductKnowledgePublication,
+    ProductKnowledgePublicationReceipt,
+)
+from app.knowledge_publishing.projection import publication_summary
+from app.knowledge_publishing.schemas import AiKnowledgeStatus, EmbeddingStatus
 from app.test_catalog.models import (
     CatalogActivationIdempotency,
     CatalogActivationReceipt,
@@ -123,6 +135,74 @@ class CustomerAvailableCatalogService:
             items=items,
             total=len(items),
             warnings=warning_items,
+        )
+
+    def get_product_ai_knowledge_status(
+        self, product_id: str
+    ) -> CustomerProductAiKnowledgeStatus:
+        """Return C-owned publication evidence for an available B product."""
+
+        warnings = _Warnings()
+        product = self.session.get(TestProduct, product_id)
+        if product is None:
+            raise AppError(
+                "CUSTOMER_SERVICE_ENTITY_NOT_FOUND",
+                "未找到客服可用商品",
+                status_code=404,
+            )
+        store = self.session.scalar(
+            select(TestStore).where(
+                TestStore.package_id == product.package_id,
+                TestStore.store_code == product.store_code,
+            )
+        )
+        if (
+            store is None
+            or self._project_store(store, warnings) is None
+            or self._project_product(product, DataSource(store.data_source), warnings)
+            is None
+        ):
+            raise AppError(
+                "CUSTOMER_SERVICE_ENTITY_NOT_FOUND",
+                "未找到客服可用商品",
+                status_code=404,
+            )
+
+        summary = publication_summary(self.session, product)
+        ledger = self.session.get(ProductKnowledgePublication, product.product_id)
+        receipt = (
+            self.session.get(
+                ProductKnowledgePublicationReceipt, ledger.publication_receipt_id
+            )
+            if ledger is not None and ledger.publication_receipt_id
+            else None
+        )
+        status = summary.status
+        embedding_status = summary.embedding_status
+        if status == AiKnowledgeStatus.PUBLISHED and (
+            receipt is None
+            or summary.chunk_count < 1
+            or summary.embedding_count != summary.chunk_count
+            or embedding_status != EmbeddingStatus.COMPLETE
+        ):
+            # C owns the final readiness projection. B must never infer a usable
+            # publication from a status string without receipt and chunk proof.
+            status = AiKnowledgeStatus.SYNC_FAILED
+            embedding_status = EmbeddingStatus.FAILED
+
+        return CustomerProductAiKnowledgeStatus(
+            product_id=product.product_id,
+            status=status,
+            embedding_status=embedding_status,
+            publication_receipt_id=(
+                receipt.publication_receipt_id if receipt is not None else None
+            ),
+            active_collection=summary.active_collection,
+            chunk_count=summary.chunk_count,
+            embedding_count=summary.embedding_count,
+            indexed_fingerprint=summary.indexed_fingerprint,
+            published_at=summary.published_at,
+            last_checked_at=summary.updated_at or _now(),
         )
 
     def list_skus(self, product_id: str) -> SkuCatalogResponse:
@@ -394,6 +474,12 @@ class CatalogActivationService:
             )
         source = self._store_source(store)
         if request.customer_service_status == CustomerServiceStatus.ENABLED:
+            if product.review_status != "APPROVED":
+                raise AppError(
+                    "CUSTOMER_SERVICE_PRODUCT_NOT_APPROVED",
+                    "只有已审核通过的商品可以启用客服使用",
+                    status_code=409,
+                )
             if store.customer_service_status != CustomerServiceStatus.ENABLED:
                 raise AppError(
                     "CUSTOMER_SERVICE_STORE_NOT_ENABLED",
@@ -420,6 +506,126 @@ class CatalogActivationService:
             assign=lambda status, at, by: self._assign_product(product, status, at, by),
         )
         self._save_idempotency(key, fingerprint, response)
+        self.session.commit()
+        return response, False
+
+    def enable_products_batch(
+        self,
+        request: BatchActivationRequest,
+        idempotency_key: str | None,
+    ) -> tuple[BatchActivationResponse, bool]:
+        key = self._require_key(idempotency_key)
+        request_payload = request.model_dump(mode="json")
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                request_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        batch_key = "BATCH-" + hashlib.sha256(key.encode("utf-8")).hexdigest()
+        existing = self.session.get(CatalogActivationIdempotency, batch_key)
+        if existing is not None:
+            if existing.request_fingerprint != fingerprint:
+                raise AppError(
+                    "ACTIVATION_IDEMPOTENCY_CONFLICT",
+                    "Idempotency-Key 已用于其他批量启用请求",
+                    status_code=409,
+                )
+            return BatchActivationResponse.model_validate_json(
+                existing.response_json
+            ), True
+
+        items: list[BatchActivationItem] = []
+        for product_id in request.product_ids:
+            product = self.session.get(TestProduct, product_id)
+            if product is None:
+                items.append(
+                    BatchActivationItem(
+                        product_id=product_id,
+                        status=BatchActivationItemStatus.FAILED,
+                        error_code="CUSTOMER_SERVICE_ENTITY_NOT_FOUND",
+                        message="未找到商品",
+                    )
+                )
+                continue
+            if product.review_status != "APPROVED":
+                items.append(
+                    BatchActivationItem(
+                        product_id=product_id,
+                        status=BatchActivationItemStatus.FAILED,
+                        error_code="CUSTOMER_SERVICE_PRODUCT_NOT_APPROVED",
+                        message="只有已审核通过的商品可以启用客服使用",
+                    )
+                )
+                continue
+            item_key = "ITEM-" + hashlib.sha256(
+                f"{key}\n{product_id}".encode("utf-8")
+            ).hexdigest()
+            try:
+                result, _ = self.set_product_status(
+                    product_id,
+                    ActivationRequest(
+                        customer_service_status=CustomerServiceStatus.ENABLED,
+                        confirmed_by=request.confirmed_by,
+                        confirmation_note=request.confirmation_note,
+                    ),
+                    item_key,
+                )
+                items.append(
+                    BatchActivationItem(
+                        product_id=product_id,
+                        status=(
+                            BatchActivationItemStatus.CHANGED
+                            if result.changed
+                            else BatchActivationItemStatus.UNCHANGED
+                        ),
+                        activation_receipt=result.activation_receipt,
+                        message=(
+                            "已启用客服使用"
+                            if result.changed
+                            else "商品已经处于客服启用状态"
+                        ),
+                    )
+                )
+            except AppError as exc:
+                self.session.rollback()
+                items.append(
+                    BatchActivationItem(
+                        product_id=product_id,
+                        status=BatchActivationItemStatus.FAILED,
+                        error_code=exc.code,
+                        message=exc.message,
+                    )
+                )
+
+        changed_count = sum(item.status == BatchActivationItemStatus.CHANGED for item in items)
+        unchanged_count = sum(
+            item.status == BatchActivationItemStatus.UNCHANGED for item in items
+        )
+        failed_count = sum(item.status == BatchActivationItemStatus.FAILED for item in items)
+        response = BatchActivationResponse(
+            result_status=(
+                BatchActivationResultStatus.FAILED
+                if failed_count == len(items)
+                else BatchActivationResultStatus.PARTIAL
+                if failed_count
+                else BatchActivationResultStatus.COMPLETE
+            ),
+            items=items,
+            changed_count=changed_count,
+            unchanged_count=unchanged_count,
+            failed_count=failed_count,
+            server_time=_now(),
+        )
+        self.session.add(
+            CatalogActivationIdempotency(
+                idempotency_key=batch_key,
+                request_fingerprint=fingerprint,
+                response_json=response.model_dump_json(),
+            )
+        )
         self.session.commit()
         return response, False
 

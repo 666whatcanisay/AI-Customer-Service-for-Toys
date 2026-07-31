@@ -207,7 +207,7 @@ export const toAiResponseFeedbackClientError = (error: unknown): AiResponseFeedb
 }
 
 // The customer workbench intentionally never exposes a platform error body,
-// raw material details, or contract diagnostics. All status-query failures are
+// raw publication details, or contract diagnostics. All status-query failures are
 // mapped to a single actionable, non-blocking message.
 export const toCustomerKnowledgeStatusClientError = (
   error: unknown
@@ -216,13 +216,13 @@ export const toCustomerKnowledgeStatusClientError = (
   if (error instanceof CustomerKnowledgeStatusAdapterError) {
     return new CustomerKnowledgeStatusClientError(
       'contract',
-      '无法获取资料状态，可继续咨询。'
+      '无法获取 AI 知识状态，可继续咨询。'
     )
   }
   if (axios.isCancel(error)) {
     return new CustomerKnowledgeStatusClientError(
       'canceled',
-      '无法获取资料状态，可继续咨询。'
+      '无法获取 AI 知识状态，可继续咨询。'
     )
   }
 
@@ -231,26 +231,26 @@ export const toCustomerKnowledgeStatusClientError = (
     if (error.code === 'ECONNABORTED') {
       return new CustomerKnowledgeStatusClientError(
         'timeout',
-        '无法获取资料状态，可继续咨询。',
+        '无法获取 AI 知识状态，可继续咨询。',
         status
       )
     }
     if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
       return new CustomerKnowledgeStatusClientError(
         'unavailable',
-        '无法获取资料状态，可继续咨询。',
+        '无法获取 AI 知识状态，可继续咨询。',
         status
       )
     }
     return new CustomerKnowledgeStatusClientError(
       'unknown',
-      '无法获取资料状态，可继续咨询。',
+      '无法获取 AI 知识状态，可继续咨询。',
       status
     )
   }
 
   return new CustomerKnowledgeStatusClientError(
     'unknown',
-    '无法获取资料状态，可继续咨询。'
+    '无法获取 AI 知识状态，可继续咨询。'
   )
 }

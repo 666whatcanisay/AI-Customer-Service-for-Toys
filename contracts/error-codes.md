@@ -43,3 +43,19 @@
   different activation request.
 - `ACTIVATION_RECEIPT_NOT_FOUND`: the requested immutable activation receipt
   does not exist.
+
+## Knowledge Activation & AI Publishing V1
+
+- `CUSTOMER_SERVICE_PRODUCT_NOT_APPROVED`: only an approved Product may be
+  enabled for customer-service use.
+- `AI_KNOWLEDGE_IDEMPOTENCY_REQUIRED`: publication requires a valid
+  `Idempotency-Key`.
+- `AI_KNOWLEDGE_IDEMPOTENCY_CONFLICT`: a publication key is bound to a
+  different product/version request.
+- `AI_KNOWLEDGE_PRODUCT_NOT_FOUND`: the requested Product does not exist.
+- `AI_KNOWLEDGE_NOT_APPROVED`: only approved Product knowledge may be published.
+- `AI_KNOWLEDGE_SOURCE_UNCONFIRMED`: source provenance is not TEST or PILOT.
+- `AI_KNOWLEDGE_PUBLISH_FAILED`: incremental publication or receipt verification
+  failed; the previous published product version remains intact.
+- `AI_KNOWLEDGE_VISIBILITY_UNAVAILABLE`: product-level RAG evidence could not be
+  checked; the client must not infer a published state.

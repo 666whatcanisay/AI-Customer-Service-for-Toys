@@ -51,6 +51,9 @@ backups/
 *.bin
 *.onnx
 models/
+!backend/app/models/
+!backend/app/models/*.py
+!platform_backend/app/knowledge_publishing/models.py
 logs/*
 !logs/
 !logs/README.md

@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`R006_PRODUCTION_RELEASE_COMPLETE / R003_BUSINESS_ACCEPTANCE_PENDING`
+> 当前 Gate：`R006_1_IMPLEMENTATION_COMPLETE / R006_1_PRODUCTION_RELEASE_PENDING`
 
 ## 1. 台账目标
 
@@ -93,13 +93,13 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | --- | --- | --- | --- | --- |
 | R001 | C商品知识运营中心V2 | `DONE` | C | 已由 R004 收敛进入正式 Pilot 基线；不得重做结构。 |
 | R002 | AI客服反馈沉淀闭环 | `DONE` | B、C、contracts | 已由 R004 按所有权收敛；真实 Pilot 效果由 R005 单独验证。 |
-| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006已正式发布并通过目录Smoke；等待真实PILOT人工启用/禁用业务验收。 |
+| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006已正式发布；R006.1已在隔离Runtime证明新商品可启用、增量发布并被B/A使用，等待正式发布与正式PILOT验收。 |
 | R004 | AI-CS运行版本统一 | `DONE` | Control、OPS、A/B/C、contracts | Recovery 分支、独立提交、contracts 0.2.0、全量测试和四服务同 SHA 运行均已建立。 |
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
-| R006 | Pilot Business Data Activation V1 | `DONE` | Control / Interface Owner、C、B，A 无变更 | contracts 0.3.0、C Provider/Admin、B Consumer、正式0010及Production Smoke已完成。 |
+| R006 | Pilot Business Data Activation V1 | `DONE` | Control / Interface Owner、C、B；R006.1扩展到A发布 | contracts 0.3.0、C Provider/Admin、B Consumer、正式0010已完成；R006.1实现候选已完成但未正式部署。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
 | R008 | AI-CS Project Structure Simplification V1 | `DONE` | Control、OPS、A/B/C、QA | 物理迁移、目标验证与标准端口切换完成；AI-CS为正式目录。 |
-| R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 实现和隔离0009浏览器验收完成；正式发布仍是独立任务。 |
+| R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 商品知识导入实现、浏览器验收和正式0009能力已进入当前0010运行基线。 |
 
 状态数量：`DONE=6`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`。
 
@@ -221,6 +221,19 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 
 V1.1已按冻结规则实现：旧表混合`IMPORTED_TEST_ONLY`测试包与`MANUAL_CREATED/c-operation-store.v1`运营数据时，前者初始化为`TEST + ENABLED`、后者为`PILOT + DISABLED`、未知来源隔离；状态PUT、幂等、receipt只读复核和单条异常隔离均已通过自动测试与浏览器验收。正式数据库迁移和Runtime发布不属于本次实现任务。
 
+#### R006.1 增补需求 — Knowledge Activation & AI Publishing
+
+R006.1在不改变R006所有权的前提下补齐“商品知识 → 客服可用 → AI可用”运营生命周期：
+
+1. A接受C/B提供的业务上下文并按上下文检索，不再限制历史TEST字面量，不判断商品权限。
+2. C保存`NOT_GENERATED / GENERATING / PUBLISHED / SYNC_FAILED / NEED_RESYNC`五种AI知识状态、fingerprint、chunks、embeddings和发布收据。
+3. 只有`APPROVED`商品允许人工增量发布；新版本校验成功后才删除同商品旧版本，禁止全量重建。
+4. C Admin并列展示资料、客服和AI知识状态，支持APPROVED商品批量客服启用和逐商品AI发布/检查。
+5. 隔离浏览器已证明一个PILOT商品从`DISABLED + NOT_GENERATED`变为`ENABLED + PUBLISHED`，B实时可选，A基于3条同商品引用正确回答。
+6. 实现提交为`88887a7`、`4148ca3`、`be89e57`、`74960ee`、`9b42b2e`、`407e8f0`；正式Runtime仍为`b7783f7/0010`，不得把实现完成误报为生产发布。
+
+关联文档：[R006.1 Interface Freeze](interfaces/AI-CS-R006.1-Knowledge-Activation-AI-Publishing-Interface-Freeze-V1.md)、[R006.1 Implementation Report](AI-CS-R006.1-Knowledge-Activation-AI-Publishing-Implementation-Report-V1.md)。
+
 ### R007 — 网络环境导致客服无法访问5173
 
 | 字段 | 内容 |
@@ -268,9 +281,9 @@ V1.1已按冻结规则实现：旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 负责模块 | C：Parser、Merge、审核、Admin 页面和 0009；Control/QA：隔离数据与浏览器验收。A/B/RAG不在范围。 |
 | 影响范围 | `platform_backend/**`、`admin_web/**`、0009隔离迁移、商品知识导入审核；不修改A/B/RAG/Prompt/contracts，不实现其他五模板。 |
 | 完成标准 | 浏览器完成店铺→模板→真实Excel上传→四Sheet解析→Merge预览→人工审核；空模板、缺商品名、错店铺、重复上传和未开放模板均受控；审核前正式数据零写入。 |
-| 验收证据 | RC `8b83a20` 的隔离 0009 Runtime 完成真实浏览器验收：19商品、19条APPLIED审核，重复上传NO_CHANGE，错店铺/空模板PREFLIGHT_FAILED，未开放模板提示正确；正式数据库仍为0008。 |
+| 验收证据 | RC `8b83a20` 的隔离0009 Runtime完成真实浏览器验收；后续R006正式发布执行`0008 → 0009 → 0010`并保留R009数据，当前正式数据库为0010。 |
 | 关联代码/文档 | R009 Interface Freeze、Implementation Report、Browser Acceptance系列报告、[本次稳定性报告](AI-CS-Product-Stabilization-Reliability-Report-V1.md)。 |
-| 防止重复错误规则 | 不得把R009扩展成通用模板理解AI；不得改变Import Center定位；不得自动发布RAG或声称B已消费；正式0009部署必须另行授权、备份和验收。 |
+| 防止重复错误规则 | 不得把R009扩展成通用模板理解AI；不得改变Import Center定位；R009审核通过不等于自动发布RAG或自动进入B，后续必须走R006/R006.1人工状态。 |
 
 ## 7. 历史错误防复发规则
 
@@ -292,20 +305,18 @@ V1.1已按冻结规则实现：旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 ## 8. 当前主阻塞链与下一入口
 
 ```text
-R004 统一运行版本（DONE）
-  ↓ 已完成 Baseline Recovery
-R006 Implementation Plan（READY，需求为 IN_PROGRESS）
-  ↓ contracts 0.3.0 → C data/provider → C控制入口 → B consumer → QA
-R006 Implementation（尚未编码）
-  ↓ 隔离迁移与跨服务浏览器验收
-R003 C数据进入B的业务结果验收（IN_PROGRESS → DONE）
-  ↓ 统一基线与真实业务数据可用
+R006 Production Release（DONE，正式0010）
+  ↓
+R006.1 Implementation（COMPLETE，隔离0011浏览器闭环通过）
+  ↓ 独立Production Release：备份 → 0011 → 同SHA部署 → Smoke
+R003 正式业务结果验收（IN_PROGRESS → DONE）
+  ↓
 R005 Feedback Loop真实运行验证（TODO）
 ```
 
 R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处理。
 
-R006已完成受控实现与正式发布：additive contracts 0.3.0、C状态持久化/投影/控制、B Consumer、0010迁移和正式Smoke均已通过。下一入口是R003真实PILOT人工启用/禁用业务结果验收，不是继续修改R006。
+R006已完成受控实现与正式发布。R006.1实现候选进一步完成A新业务上下文、商品级增量发布、AI知识可见性和批量启用，并通过隔离浏览器闭环；正式Runtime仍保持`b7783f7/0010`。下一入口是独立R006.1 Production Release，发布后再关闭R003正式业务结果验收。
 
 R008物理迁移和标准端口切换已完成：`AI-CS/`是唯一正式运行与后续开发目录，Recovery仅保留为回滚锚点。旧Worktree是否退役仍须按独立归档计划逐一确认，不能因R008完成而批量删除。R008结果不替代R003/R005业务验收，也不授权R006。
 
