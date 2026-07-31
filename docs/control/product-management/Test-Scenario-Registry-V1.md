@@ -1,5 +1,19 @@
 # AI-CS Test Scenario Registry V1
 
+## AI-CS V1.0.0 Production Finalization
+
+| ID | 场景 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| PF-001 | 全量自动化回归 | PASS | A 109 passed/3 skipped；B 120；C全量通过并追加contracts 5；Admin 64；B/Admin typecheck与build通过 |
+| PF-002 | 数据库0012与数据保护 | PASS | `integrity_check=ok`；INITIAL_IMPORT ENABLED=1、PILOT ENABLED=1；Product、receipt、publication与迁移历史保留 |
+| PF-003 | RAG与模型连续性 | PASS | 内部集合`test_knowledge_v031=56 chunks`；`qwen3.5:9b` ready；未全量重建、未删除chunks/embeddings |
+| PF-004 | 四服务正式版本 | PASS | standard/LAN；B 5173、Admin 5174、A 8000、C 8011健康且同一tag SHA |
+| PF-005 | Admin正式体验 | PASS | 正式页面文案、商品知识状态与六类模板入口可见；开发测试入口默认隐藏 |
+| PF-006 | B客服与安全边界 | PASS | 已发布商品显示3 chunks/3 citations；人工确认、不自动发送、不自动退款、不修改订单提示有效 |
+| PF-007 | 备份与回滚证据 | PASS | 在线/离线SQLite与0011重建快照完整；RAG离线manifest为`bbdcbcded050991cbfda91d90dd3887acc93f77a5ae840a65469549230da1` |
+
+以上是V1.0.0正式化回归，不替代R003完整业务验收、R005真实Feedback Loop验证或R007第二终端网络验收。
+
 ## Runtime
 
 | ID | 场景 | 结果 | 证据 |
@@ -7,7 +21,7 @@
 | RT-001 | stop/start/status 连续三轮 | PASS | 每轮四端口同 SHA、standard/LAN、health 200 |
 | RT-002 | A 服务异常 | PASS | B 显示 AI 待连接和安全降级提示；恢复后健康 |
 | RT-003 | C API 异常 | PASS | B 显示平台待连接和数据服务不可用；恢复后健康 |
-| RT-004 | 数据保护 | PASS | 正式0008离线备份完整；迁移至0010后既有表行数不变，R009正式导入数据仍为0 |
+| RT-004 | 数据保护 | PASS | 0008/0010历史备份保留；0012在线、离线及重建0011快照完整，Product、receipt、publication和RAG数据未删除 |
 
 ## B 客服
 

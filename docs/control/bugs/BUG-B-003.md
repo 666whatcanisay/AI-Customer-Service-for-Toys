@@ -31,4 +31,3 @@ AI-CS V1.0.0 浏览器正式化验收时，B 客服工作台左下角仍显示�
 - B typecheck：通过。
 - B production build：通过。
 - Playwright 页面回归：旧文案不可见，人工确认、不自动发送、不自动退款和不修改订单边界仍可见。
-
