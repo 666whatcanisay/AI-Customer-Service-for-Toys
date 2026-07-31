@@ -50,7 +50,7 @@ describe('workspace module registry', () => {
     ])
     expect(MODULE_STATUS_LABELS).toEqual({
       AVAILABLE: '可用',
-      TESTING: '测试中',
+      TESTING: '验证中',
       DEVELOPING: '开发中',
       PLANNED: '规划中',
       PAUSED: '已暂停'

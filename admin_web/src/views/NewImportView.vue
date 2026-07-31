@@ -101,7 +101,7 @@ async function submit(): Promise<void> {
           <li>年龄、材质、包装内容等只填写已核实事实；不确定的内容留空并在资料来源中补充，不要让 AI 猜测。</li>
           <li>点击“先预检”，逐项处理缺失列、格式错误、重复行和冲突行；只有预检通过后才允许正式导入。</li>
         </ol>
-        <p class="guide-note">FAQ、安全规则和来源证据需通过受控测试数据包或后续审核流程维护；本 Excel 入口不接受 Word、PDF、截图或任意资料包。</p>
+        <p class="guide-note">FAQ、安全规则和来源证据需通过受控资料包或后续审核流程维护；本 Excel 入口不接受 Word、PDF、截图或任意资料包。</p>
       </section>
       <a class="button secondary" :href="productSkuTemplateUrl()" download>下载标准 Excel 模板</a>
       <label>

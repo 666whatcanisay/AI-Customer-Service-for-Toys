@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -40,10 +40,17 @@ class ProductKnowledgePublication(Base):
 
 class ProductKnowledgePublicationReceipt(Base):
     __tablename__ = "product_knowledge_publication_receipts"
+    __table_args__ = (
+        Index(
+            "ix_product_knowledge_publication_receipts_product_time",
+            "product_id",
+            "created_at",
+        ),
+    )
 
     publication_receipt_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     product_id: Mapped[str] = mapped_column(
-        ForeignKey("test_catalog_products.product_id", ondelete="CASCADE"), index=True
+        ForeignKey("test_catalog_products.product_id", ondelete="CASCADE")
     )
     knowledge_fingerprint: Mapped[str] = mapped_column(String(64))
     active_collection: Mapped[str] = mapped_column(String(128))

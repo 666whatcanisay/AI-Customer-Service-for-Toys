@@ -111,14 +111,14 @@ describe('AiIssueCenterView', () => {
     expect(mockedUpdateProblem).toHaveBeenCalledWith('AIP-001', expect.objectContaining({
       status: 'CONFIRMED',
       issue_type: 'KNOWLEDGE_MISSING',
-      operator: '运营测试员',
+      operator: '运营人员',
     }))
     await wrapper.get('[data-testid="missing-topic"]').setValue('适用年龄与低龄限制')
     await wrapper.get('[data-testid="create-knowledge-task"]').trigger('click')
     await flushPromises()
     expect(mockedCreateTask).toHaveBeenCalledWith('AIP-001', expect.objectContaining({
       missing_topic: '适用年龄与低龄限制',
-      operator: '运营测试员',
+      operator: '运营人员',
     }))
     expect(wrapper.text()).toContain('待补充')
     expect(wrapper.text()).toContain('不自动生成知识')
@@ -157,7 +157,7 @@ describe('AiIssueCenterView', () => {
 
     expect(mockedVerify).toHaveBeenCalledWith('KOT-001', {
       result: 'IMPROVED',
-      operator: '运营测试员',
+      operator: '运营人员',
       note: '重新提问后已包含低龄限制。',
     })
     expect(wrapper.text()).toContain('客服问题 → AI 问题 → 知识补充 → AI 改善')

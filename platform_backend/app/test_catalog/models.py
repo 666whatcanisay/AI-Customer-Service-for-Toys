@@ -2,7 +2,16 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -38,6 +47,12 @@ class TestStore(Base):
     __tablename__ = "test_catalog_stores"
     __table_args__ = (
         UniqueConstraint("package_id", "store_code", name="uq_test_store_package_code"),
+        Index(
+            "ix_catalog_stores_customer_service_projection",
+            "customer_service_status",
+            "data_source",
+            "store_code",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -69,6 +84,14 @@ class TestStore(Base):
 
 class TestProduct(Base):
     __tablename__ = "test_catalog_products"
+    __table_args__ = (
+        Index(
+            "ix_catalog_products_customer_service_projection",
+            "store_code",
+            "customer_service_status",
+            "product_id",
+        ),
+    )
 
     product_id: Mapped[str] = mapped_column(String(96), primary_key=True)
     package_id: Mapped[str] = mapped_column(
@@ -100,10 +123,18 @@ class TestProduct(Base):
 
 class CatalogActivationReceipt(Base):
     __tablename__ = "catalog_activation_receipts"
+    __table_args__ = (
+        Index(
+            "ix_catalog_activation_receipts_entity_time",
+            "entity_type",
+            "entity_ref",
+            "confirmed_at",
+        ),
+    )
 
     activation_receipt_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    entity_type: Mapped[str] = mapped_column(String(16), index=True)
-    entity_ref: Mapped[str] = mapped_column(String(128), index=True)
+    entity_type: Mapped[str] = mapped_column(String(16))
+    entity_ref: Mapped[str] = mapped_column(String(128))
     data_source: Mapped[str] = mapped_column(String(16))
     previous_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     customer_service_status: Mapped[str] = mapped_column(String(16))
@@ -129,6 +160,21 @@ class CatalogActivationInitialization(Base):
     source_baseline: Mapped[str] = mapped_column(String(64))
     manifest_json: Mapped[str] = mapped_column(Text)
     initialized_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class CatalogSourceFormalization(Base):
+    """Immutable source-label audit for the internal-production transition."""
+
+    __tablename__ = "catalog_source_formalizations"
+
+    store_ref: Mapped[int] = mapped_column(Integer, primary_key=True)
+    package_id: Mapped[str] = mapped_column(String(96), index=True)
+    original_data_source: Mapped[str] = mapped_column(String(16))
+    formal_data_source: Mapped[str] = mapped_column(String(16))
+    original_import_status: Mapped[str] = mapped_column(String(40))
+    original_schema_version: Mapped[str] = mapped_column(String(32))
+    migration_version: Mapped[str] = mapped_column(String(96))
+    formalized_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class TestSku(Base):

@@ -72,7 +72,7 @@ describe('StoreManagementView', () => {
     expect(wrapper.text()).not.toContain('store_code')
     expect(wrapper.text()).not.toContain('external_id')
     expect(wrapper.text()).toContain('客服状态')
-    expect(wrapper.text()).toContain('试运行')
+    expect(wrapper.text()).toContain('运营创建')
   })
 
   it('requires an operator and uses the C activation action', async () => {

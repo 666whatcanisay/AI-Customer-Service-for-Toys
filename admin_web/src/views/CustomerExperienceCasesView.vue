@@ -108,9 +108,9 @@ onMounted(load)
           <div><dt>审核记录</dt><dd>{{ displayStatus(selected.review_status) }} / {{ selected.reviewed_by || '尚未审核' }}<br>{{ selected.reviewed_at || '尚未记录时间' }}</dd></div>
         </dl>
         <template v-if="selected.review_status === 'NEW' || selected.review_status === 'REVIEWING'">
-          <label>试运行操作人标识<input v-model.trim="reviewedBy" aria-label="试运行操作人标识" /></label>
+          <label>操作人标识<input v-model.trim="reviewedBy" aria-label="操作人标识" /></label>
           <label>审核说明<textarea v-model="reviewNote" maxlength="4000" /></label>
-          <p class="subtle">当前环境仅记录试运行操作人标识，尚未启用正式身份认证。</p>
+          <p class="subtle">当前记录操作人标识，尚未启用正式身份认证。</p>
           <p v-if="actionError" class="notice error" role="alert">{{ actionError }}</p>
           <div class="actions">
             <button v-if="selected.review_status === 'NEW'" class="button secondary" :disabled="!canReview" @click="transition('REVIEWING')">开始审核</button>

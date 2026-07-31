@@ -12,7 +12,7 @@ def _load(name: str) -> dict:
 
 def test_contract_version_and_all_customer_catalog_schemas_are_json() -> None:
     version = json.loads((ROOT / "contracts" / "version.json").read_text(encoding="utf-8"))
-    assert version["contract_version"] == "0.4.0"
+    assert version["contract_version"] == "0.5.0"
     for name in (
         "customer-service-catalog.v1.schema.json",
         "customer-service-catalog-activation-request.v1.schema.json",
@@ -40,6 +40,11 @@ def test_customer_ai_knowledge_status_freezes_receipt_and_chunk_evidence() -> No
         "publication_receipt_id", "chunk_count", "embedding_count"
     }.issubset(schema["required"])
 
+    publication = _load("ai-product-knowledge-publication.v1.schema.json")
+    assert publication["$defs"]["request"]["properties"]["data_source"]["enum"] == [
+        "TEST", "INITIAL_IMPORT", "PILOT"
+    ]
+
 
 def test_catalog_schema_requires_final_projection_envelope_and_enabled_items() -> None:
     schema = _load("customer-service-catalog.v1.schema.json")
@@ -50,7 +55,9 @@ def test_catalog_schema_requires_final_projection_envelope_and_enabled_items() -
         "pilot-business-catalog.v1.1"
     )
     assert schema["$defs"]["enabledStatus"] == {"const": "ENABLED"}
-    assert schema["$defs"]["dataSource"]["enum"] == ["TEST", "PILOT"]
+    assert schema["$defs"]["dataSource"]["enum"] == [
+        "TEST", "INITIAL_IMPORT", "PILOT"
+    ]
     for entity in ("store", "product", "sku"):
         properties = schema["$defs"][entity]["properties"]
         assert "customer_service_status" in properties
@@ -73,6 +80,12 @@ def test_activation_contract_freezes_manual_control_and_receipt_boundaries() -> 
     assert receipt["properties"]["entity_type"]["enum"] == ["STORE", "PRODUCT"]
     assert receipt["properties"]["activation_source"]["enum"] == [
         "LEGACY_INITIALIZATION", "OPERATOR"
+    ]
+    assert receipt["properties"]["data_source"]["enum"] == [
+        "TEST", "INITIAL_IMPORT", "PILOT"
+    ]
+    assert response["$defs"]["entity"]["properties"]["data_source"]["enum"] == [
+        "TEST", "INITIAL_IMPORT", "PILOT"
     ]
     assert "SKU" not in receipt["properties"]["entity_type"]["enum"]
     assert "activation_receipt" in response["required"]

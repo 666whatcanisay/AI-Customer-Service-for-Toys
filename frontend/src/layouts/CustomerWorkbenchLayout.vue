@@ -77,7 +77,7 @@
 
         <div class="tester-summary" data-testid="tester-summary">
           <div>
-            <small>当前测试客服</small>
+            <small>当前客服</small>
             <strong>{{ identity.reporterName || '尚未填写姓名' }}</strong>
           </div>
           <div>
@@ -98,12 +98,13 @@
       </header>
 
       <div class="test-banner" data-testid="global-test-banner">
-        <strong>测试环境</strong>
-        <span>仅供内部验证，禁止填写真实客户隐私；所有业务动作都需要人工确认。</span>
+        <strong>AI客服工作台</strong>
+        <span>AI 生成建议须由客服确认后发送；系统不会自动发送消息、自动退款或修改订单。</span>
       </div>
 
       <section v-if="showProductDetails" class="product-technical-panel" data-testid="product-technical-details">
         <div><span>产品版本</span><code>{{ runtimeDetails.frontendVersion }}</code></div>
+        <div><span>运行状态</span><code>{{ runtimeDetails.releaseStatus }}</code></div>
         <div><span>Git Commit</span><code>{{ runtimeDetails.gitCommit }}</code></div>
         <div><span>启动模式</span><code>{{ runtimeDetails.startMode }}</code></div>
         <div><span>API 模式</span><code>{{ runtimeDetails.apiMode }}</code></div>
@@ -118,7 +119,7 @@
 
     <el-dialog
       v-model="identityDialogOpen"
-      title="设置测试客服身份"
+      title="设置客服工作台身份"
       width="min(520px, calc(100vw - 32px))"
       :close-on-click-modal="Boolean(identity.reporterName)"
       :close-on-press-escape="Boolean(identity.reporterName)"
@@ -126,7 +127,7 @@
       data-testid="identity-dialog"
     >
       <div class="identity-notice">
-        这只是本机测试标识，不是登录或权限认证。请勿填写密码、电话、客户姓名或订单信息。
+        这是本机工作台标识，不是登录或权限认证。请勿填写密码、电话、客户姓名或订单信息。
       </div>
       <label class="identity-field">
         <span>显示姓名 <em>必填</em></span>
@@ -134,7 +135,7 @@
           v-model="identityDraft.reporterName"
           data-testid="identity-name"
           maxlength="40"
-          placeholder="例如：测试客服小木"
+          placeholder="例如：客服小木"
         />
       </label>
       <label class="identity-field">
@@ -152,14 +153,14 @@
       <template #footer>
         <el-button v-if="identity.reporterName" @click="identityDialogOpen = false">取消</el-button>
         <el-button type="primary" data-testid="identity-save" @click="saveIdentity">
-          保存测试身份
+          保存工作台身份
         </el-button>
       </template>
     </el-dialog>
 
     <el-dialog
       v-model="pilotGuideOpen"
-      title="AI客服助手（测试版）"
+      title="AI客服助手"
       width="min(560px, calc(100vw - 32px))"
       data-testid="pilot-guide-dialog"
       @close="dismissPilotGuide"
@@ -219,6 +220,7 @@ const PILOT_GUIDE_STORAGE_KEY = 'mumu-customer-workspace:pilot-guide-seen'
 
 const runtimeDetails = {
   frontendVersion: import.meta.env.VITE_FRONTEND_VERSION ?? 'unavailable',
+  releaseStatus: 'INTERNAL_PRODUCTION_READY',
   gitCommit: import.meta.env.VITE_GIT_SHORT_SHA ?? 'unavailable',
   startMode: import.meta.env.VITE_START_MODE ?? 'LOCAL',
   apiMode: import.meta.env.VITE_API_MODE ?? 'SAME_ORIGIN_PROXY',
@@ -257,7 +259,7 @@ const openIdentityEditor = () => {
 
 const saveIdentity = () => {
   if (!identityDraft.reporterName.trim()) {
-    identityError.value = '请填写一个用于内部测试的显示姓名。'
+    identityError.value = '请填写用于工作台显示的姓名。'
     return
   }
   identityStore.save(identityDraft.reporterName, identityDraft.defaultStoreCode)

@@ -149,3 +149,110 @@ def test_0010_upgrade_downgrade_upgrade_uses_isolated_sqlite(tmp_path: Path) -> 
 
     command.upgrade(config, "0010_customer_available_catalog_v1")
     _assert_0010(database_path)
+
+
+def _assert_0012(database_path: Path) -> None:
+    engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+    with engine.connect() as connection:
+        stores = {
+            row.store_code: (row.data_source, row.customer_service_status)
+            for row in connection.execute(
+                text(
+                    "SELECT store_code, data_source, customer_service_status "
+                    "FROM test_catalog_stores"
+                )
+            )
+        }
+        assert stores == {
+            "TEST": ("INITIAL_IMPORT", "ENABLED"),
+            "PILOT": ("PILOT", "DISABLED"),
+            "UNKNOWN": (None, "DISABLED"),
+        }
+        audit = connection.execute(
+            text(
+                "SELECT package_id, original_data_source, formal_data_source, "
+                "original_import_status, original_schema_version, migration_version "
+                "FROM catalog_source_formalizations"
+            )
+        ).one()
+        assert tuple(audit) == (
+            "PKG-TEST",
+            "TEST",
+            "INITIAL_IMPORT",
+            "IMPORTED_TEST_ONLY",
+            "0.3.1-test",
+            "internal-production-finalization-v1",
+        )
+        assert connection.scalar(
+            text(
+                "SELECT count(*) FROM catalog_activation_receipts "
+                "WHERE data_source = 'TEST'"
+            )
+        ) == 2
+        assert connection.scalar(text("SELECT count(*) FROM test_catalog_products")) == 3
+        publication = connection.execute(
+            text(
+                "SELECT status, active_collection, chunk_count, embedding_count, "
+                "indexed_fingerprint FROM product_knowledge_publications "
+                "WHERE product_id = 'PRODUCT-TEST'"
+            )
+        ).one()
+        assert tuple(publication) == (
+            "PUBLISHED",
+            "test_knowledge_v031",
+            3,
+            3,
+            "a" * 64,
+        )
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+            "0012_internal_production_finalization_v1"
+        )
+    engine.dispose()
+
+
+def test_0012_formalizes_only_eligible_initial_data_and_is_reversible(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "production-finalization.sqlite3"
+    config = _config(database_path)
+    command.upgrade(config, "0009_product_knowledge_import_v1")
+    _seed_0009(database_path)
+    command.upgrade(config, "0011_product_knowledge_publishing_v1")
+    engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """INSERT INTO product_knowledge_publications (
+                product_id, status, current_fingerprint, indexed_fingerprint,
+                active_collection, chunk_count, embedding_count, last_error_code,
+                publication_receipt_id, published_at, checked_at, updated_at
+                ) VALUES (
+                'PRODUCT-TEST', 'PUBLISHED', :fingerprint, :fingerprint,
+                'test_knowledge_v031', 3, 3, NULL, 'RAG-TEST', :now, :now, :now
+                )"""
+            ),
+            {"fingerprint": "a" * 64, "now": "2026-07-31 00:00:00"},
+        )
+    engine.dispose()
+
+    command.upgrade(config, "0012_internal_production_finalization_v1")
+    _assert_0012(database_path)
+
+    command.downgrade(config, "0011_product_knowledge_publishing_v1")
+    engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+    inspector = inspect(engine)
+    assert "catalog_source_formalizations" not in inspector.get_table_names()
+    with engine.connect() as connection:
+        assert connection.scalar(
+            text("SELECT data_source FROM test_catalog_stores WHERE store_code = 'TEST'")
+        ) == "TEST"
+        assert connection.scalar(
+            text("SELECT count(*) FROM catalog_activation_receipts WHERE data_source = 'TEST'")
+        ) == 2
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+            "0011_product_knowledge_publishing_v1"
+        )
+    engine.dispose()
+
+    command.upgrade(config, "0012_internal_production_finalization_v1")
+    _assert_0012(database_path)

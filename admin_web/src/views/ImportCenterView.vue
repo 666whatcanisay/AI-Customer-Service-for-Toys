@@ -12,6 +12,8 @@ const templates = [
   { title: 'AI知识缺口管理模板', description: '整理缺失主题、出现次数、影响程度和处理优先级。', href: '/templates/AI知识缺口管理模板V1.xlsx' },
 ]
 
+const testToolsEnabled = import.meta.env.VITE_ENABLE_TEST_TOOLS === 'true'
+
 const stores = ref<StoreOperationItem[]>([])
 const selectedStoreRef = ref('')
 const storeLoading = ref(true)
@@ -105,7 +107,7 @@ onMounted(loadStores)
       </RouterLink>
     </section>
 
-    <details class="card legacy-entry">
+    <details v-if="testToolsEnabled" class="card legacy-entry">
       <summary>旧版试点数据入口（兼容保留）</summary>
       <p>下列入口继续用于既有试点数据验证，不是日常商品知识维护流程，也不会自动迁移历史测试数据。</p>
       <div class="legacy-links">

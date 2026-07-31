@@ -56,8 +56,8 @@ function topicStatusLabel(topic: TopicCoverage): string {
   }[topic.status]
 }
 
-function dataSourceLabel(value: 'TEST' | 'PILOT' | 'UNKNOWN'): string {
-  return { TEST: '历史测试', PILOT: '试运行', UNKNOWN: '待确认' }[value]
+function dataSourceLabel(value: 'INITIAL_IMPORT' | 'TEST' | 'PILOT' | 'UNKNOWN'): string {
+  return { INITIAL_IMPORT: '初始化导入', TEST: '历史导入', PILOT: '运营创建', UNKNOWN: '待确认' }[value]
 }
 
 function aiKnowledgeLabel(status: AiKnowledgePublicationStatus): string {

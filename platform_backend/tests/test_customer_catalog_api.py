@@ -186,6 +186,26 @@ def test_single_bad_store_is_partial_and_does_not_empty_valid_catalog(
     ]
 
 
+def test_initial_import_store_is_a_supported_customer_catalog_source(
+    client: TestClient, session: Session
+) -> None:
+    _seed_scope(
+        session,
+        package_id="PKG-INITIAL-IMPORT",
+        store_code="INITIAL-IMPORT",
+        data_source="INITIAL_IMPORT",
+        status="ENABLED",
+    )
+
+    response = client.get("/api/v1/customer-service/catalog/stores")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["result_status"] == "COMPLETE"
+    assert body["total"] == 1
+    assert body["items"][0]["data_source"] == "INITIAL_IMPORT"
+
+
 def test_real_empty_catalog_is_complete(client: TestClient, session: Session) -> None:
     _seed_scope(
         session,

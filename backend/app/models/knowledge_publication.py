@@ -35,7 +35,7 @@ class ProductKnowledgePublishRequest(ProductKnowledgeScope):
     schema_version: Literal["ai-product-knowledge-publication.v1"]
     idempotency_key: str = Field(min_length=1, max_length=255)
     product_name: str = Field(min_length=1, max_length=255)
-    data_source: Literal["TEST", "PILOT"]
+    data_source: Literal["TEST", "INITIAL_IMPORT", "PILOT"]
     knowledge_fingerprint: str = Field(pattern="^[0-9a-f]{64}$")
     document: str = Field(min_length=1, max_length=200_000)
     source_ids: list[str] = Field(min_length=1, max_length=100)

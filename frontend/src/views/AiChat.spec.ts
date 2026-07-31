@@ -254,7 +254,7 @@ describe('AiChat B-T04 three-step workbench', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="safety-notice"]').text()).toContain(
-      '当前为测试数据，仅供内部验证，禁止直接用于真实客户。'
+      'AI 仅生成客服建议，请在发送前人工核对。'
     )
     expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('AI 辅助客服')
     expect(wrapper.get('[data-testid="customer-friendly-notice"]').text()).toContain('需要人工确认')

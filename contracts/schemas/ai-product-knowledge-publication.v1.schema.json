@@ -29,7 +29,7 @@
         "store_code": {"type": "string", "minLength": 1, "maxLength": 96},
         "product_id": {"type": "string", "minLength": 1, "maxLength": 128},
         "product_name": {"type": "string", "minLength": 1, "maxLength": 255},
-        "data_source": {"enum": ["TEST", "PILOT"]},
+        "data_source": {"enum": ["TEST", "INITIAL_IMPORT", "PILOT"]},
         "knowledge_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
         "document": {"type": "string", "minLength": 1},
         "source_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},

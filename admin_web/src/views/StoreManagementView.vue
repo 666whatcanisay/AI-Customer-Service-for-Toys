@@ -79,7 +79,7 @@ function formatOptionalDate(value: string | null): string {
 }
 
 function dataSourceLabel(value: StoreOperationItem['data_source']): string {
-  return { TEST: '历史测试', PILOT: '试运行', UNKNOWN: '待确认' }[value]
+  return { INITIAL_IMPORT: '初始化导入', TEST: '历史导入', PILOT: '运营创建', UNKNOWN: '待确认' }[value]
 }
 
 async function load(): Promise<void> {
@@ -331,7 +331,7 @@ onMounted(load)
         <label class="wide">备注<textarea v-model.trim="form.remarks" maxlength="1000" placeholder="可填写店铺知识运营范围或注意事项"></textarea></label>
       </div>
       <p v-if="editingRef !== null" class="notice boundary">客服状态变化必须填写操作人并生成 activation receipt。“启用”只允许该店铺进入 B 客服选择范围，不会改变商品客服状态，也不会自动发送消息、发布知识、退款或修改订单。</p>
-      <p v-else class="notice boundary">创建店铺不会自动创建商品、发布知识或触发任何客户与业务动作；新试运行店铺默认禁止客服使用。</p>
+      <p v-else class="notice boundary">创建店铺不会自动创建商品、发布知识或触发任何客户与业务动作；新建店铺默认禁止客服使用。</p>
       <button class="button" type="submit" :disabled="saving">{{ saving ? '正在保存…' : editingRef === null ? '保存店铺' : '保存店铺与客服状态' }}</button>
     </form>
 
