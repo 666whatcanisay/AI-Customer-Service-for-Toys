@@ -1,5 +1,11 @@
 # AI-CS Bug Registry V1
 
+## AI-CS V1.0.0 正式化新增记录
+
+| Bug | 等级 | 模块 | 状态 | 结论 |
+| --- | --- | --- | --- | --- |
+| [BUG-B-003](../bugs/BUG-B-003.md) | P2 | B 客服工作台文案 | FIXED_VERIFIED | 移除残留“测试工作台”身份文案，安全边界保持不变；B 全量测试、类型检查、构建和浏览器回归通过。 |
+
 | Bug | 等级 | 模块 | 状态 | 结论 |
 | --- | --- | --- | --- | --- |
 | [BUG-A-001](../bugs/BUG-A-001.md) | P1 | A/Runtime | FIXED_VERIFIED | loopback Ollama 绕过环境代理，正式推理通过 |

@@ -31,8 +31,8 @@
       </div>
 
       <div class="sidebar-boundary">
-        <strong>测试工作台</strong>
-        <p>不是正式登录系统，不执行退款、补发或自动发送。</p>
+        <strong>AI客服工作台</strong>
+        <p>AI 生成建议需人工确认；不自动发送、退款、补发或修改订单。</p>
       </div>
     </aside>
 
