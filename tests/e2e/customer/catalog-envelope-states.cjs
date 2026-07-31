@@ -46,8 +46,18 @@ function envelope(items, resultStatus = 'COMPLETE', warnings = []) {
 
 function safeCustomerUrl() {
   const url = new URL(process.env.R006_B_URL || 'http://127.0.0.1:15183')
-  assert.equal(url.hostname, '127.0.0.1', 'R006 Envelope E2E 只允许本机隔离环境')
-  assert.notEqual(url.port, '5173', 'R006 Envelope E2E 禁止使用正式B端口5173')
+  const formalLanHost = process.env.AI_CS_FORMAL_LAN_HOST || ''
+  assert.ok(
+    url.hostname === '127.0.0.1' || (formalLanHost && url.hostname === formalLanHost),
+    'R006 Envelope E2E 只允许本机隔离环境或显式正式LAN主机',
+  )
+  if (url.port === '5173') {
+    assert.equal(
+      process.env.R006_ALLOW_FORMAL_B_SMOKE,
+      'true',
+      '正式B端口5173仅允许显式只读Smoke；所有Catalog响应仍必须由浏览器拦截',
+    )
+  }
   return url.origin
 }
 
@@ -111,6 +121,12 @@ async function visibleProductEmptyState(page) {
 
 async function runCatalogEnvelopeStates(browser) {
   const results = []
+  results.push(await runScenario(browser, 'COMPLETE_WITH_ITEMS', envelope([product]), async (page) => {
+    await page.getByTestId('product-select').click()
+    await page.locator('.el-select-dropdown__item:visible').filter({
+      hasText: 'R006 Envelope Test Product'
+    }).last().waitFor()
+  }))
   results.push(await runScenario(browser, 'COMPLETE_ZERO', envelope([]), async (page) => {
     const guidance = page.getByTestId('catalog-guidance')
     assert.match(await guidance.innerText(), /该店铺暂无可用于 AI 建议的商品/)
