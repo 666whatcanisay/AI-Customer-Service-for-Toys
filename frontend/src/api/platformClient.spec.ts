@@ -19,12 +19,9 @@ const store: CatalogStore = {
   platform: 'pdd',
   storeCode: 'PDD-SM',
   name: '汕明',
-  trialEnabled: true,
-  knowledgeScope: 'STORE_PRODUCT_SKU',
-  responseMode: 'SUGGESTION_ONLY',
+  dataSource: 'TEST',
+  customerServiceStatus: 'ENABLED',
   allowAutoSend: false,
-  testDataMode: true,
-  productionUsable: false
 }
 
 const product: CatalogProduct = {
@@ -37,14 +34,21 @@ const product: CatalogProduct = {
   ageMin: 6,
   ageMax: 12,
   safetySummary: '仅用于测试。',
-  reviewStatus: 'APPROVED',
-  publishable: true
+  knowledgeStatus: 'APPROVED',
+  dataSource: 'TEST',
+  customerServiceStatus: 'ENABLED'
 }
 
 describe('platformClient frozen paths', () => {
   beforeEach(() => {
     httpGet.mockReset()
-    httpGet.mockResolvedValue({ data: { items: [], total: 0 } })
+    httpGet.mockResolvedValue({ data: {
+      schema_version: 'pilot-business-catalog.v1.1',
+      result_status: 'COMPLETE',
+      items: [],
+      total: 0,
+      warnings: []
+    } })
   })
 
   it('uses the same-origin platform proxy unless a direct URL is configured', () => {
@@ -53,18 +57,18 @@ describe('platformClient frozen paths', () => {
     }))
   })
 
-  it('calls only the three frozen test-catalog routes', async () => {
+  it('calls only the three C-owned customer-service catalog routes', async () => {
     await platformClient.listStores()
     await platformClient.listProducts(store)
     await platformClient.listSkus(store, product)
 
     expect(httpGet.mock.calls).toEqual([
-      ['/api/v1/test-catalog/stores', { signal: undefined }],
+      ['/api/v1/customer-service/catalog/stores', { signal: undefined }],
       [
-        '/api/v1/test-catalog/products',
+        '/api/v1/customer-service/catalog/products',
         { signal: undefined, params: { store_code: 'PDD-SM' } }
       ],
-      ['/api/v1/test-catalog/products/PROD%2F001/skus', { signal: undefined }]
+      ['/api/v1/customer-service/catalog/products/PROD%2F001/skus', { signal: undefined }]
     ])
   })
 })

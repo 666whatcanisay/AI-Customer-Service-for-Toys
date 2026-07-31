@@ -72,12 +72,9 @@ const store = {
   platform: 'pdd',
   storeCode: 'PDD-SM',
   name: '汕明',
-  trialEnabled: true,
-  knowledgeScope: 'STORE_PRODUCT_SKU',
-  responseMode: 'SUGGESTION_ONLY',
+  dataSource: 'TEST' as const,
+  customerServiceStatus: 'ENABLED' as const,
   allowAutoSend: false,
-  testDataMode: true,
-  productionUsable: false
 }
 
 const secondStore = { ...store, storeCode: 'PDD-SM-2', name: '汕明二店' }
@@ -92,8 +89,9 @@ const product = {
   ageMin: 6,
   ageMax: 12,
   safetySummary: '仅用于测试。',
-  reviewStatus: 'APPROVED',
-  publishable: true
+  knowledgeStatus: 'APPROVED',
+  dataSource: 'TEST' as const,
+  customerServiceStatus: 'ENABLED' as const
 }
 
 const secondProduct = { ...product, productId: 'PROD-002', displayName: '测试拼图' }
@@ -112,7 +110,8 @@ const sku = {
   canonicalSkuId: null,
   referenceSkuId: null,
   componentSkuRefs: [],
-  publishable: true
+  dataSource: 'TEST' as const,
+  customerServiceStatus: 'ENABLED' as const
 }
 
 const resultFor = (action: RagAction = 'DIRECT_ANSWER', withSku = true): RagChatResult => ({
