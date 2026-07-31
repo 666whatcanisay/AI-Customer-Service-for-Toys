@@ -78,6 +78,18 @@ try {
         throw 'Legacy config did not receive the required optional defaults.'
     }
 
+    $platformEnvironment = Get-LocalPlatformEnvironment $config
+    if ($platformEnvironment.AI_SERVICE_BASE_URL -ne 'http://127.0.0.1:18000') {
+        throw 'C runtime did not receive the active A runtime address.'
+    }
+    $adminEnvironment = Get-AdminWebEnvironment $config
+    if (
+        $adminEnvironment.VITE_AI_API_BASE_URL -ne 'http://127.0.0.1:18000' -or
+        $adminEnvironment.VITE_PLATFORM_API_BASE_URL -ne 'http://127.0.0.1:18011'
+    ) {
+        throw 'Admin runtime did not receive the configured A/C target ports.'
+    }
+
     New-Item -ItemType Directory -Force -Path $config.RuntimeDirectory | Out-Null
     [ordered]@{
         packageId = $config.TestKnowledgePackageId

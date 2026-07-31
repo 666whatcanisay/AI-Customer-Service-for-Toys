@@ -422,6 +422,15 @@ function Get-LanPlatformEnvironment($Config) {
     }
 }
 
+function Get-LocalPlatformEnvironment($Config) {
+    return @{
+        DATABASE_URL = [string]$Config.PlatformDatabaseUrl
+        CORS_ALLOWED_ORIGINS = (@($Config.CorsAllowedOrigins) -join ',')
+        PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
+        AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
+    }
+}
+
 function Get-RagRuntimeEnvironment($Config, [string]$CorsAllowedOrigins) {
     return @{
         CORS_ALLOWED_ORIGINS = $CorsAllowedOrigins
