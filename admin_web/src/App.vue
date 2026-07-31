@@ -34,6 +34,7 @@ const navGroups: Array<{ label: string; items: Array<{ label: string; to?: strin
       { label: '店铺管理', to: '/store-management' },
       { label: '商品知识中心', to: '/knowledge-center' },
       { label: '商品知识维护', to: '/knowledge-editor' },
+      { label: '知识审核队列', to: '/knowledge-review' },
       { label: '知识缺口', to: '/knowledge-gaps' },
       { label: '知识资料', to: '/knowledge-materials' },
       { label: 'FAQ管理', to: '/faqs' },

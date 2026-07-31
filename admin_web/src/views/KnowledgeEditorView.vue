@@ -155,7 +155,7 @@ onMounted(async () => {
   <main class="page">
     <div class="page-header">
       <div><p class="eyebrow">商品知识补充</p><h1>中文知识维护</h1><p>按业务名称选择范围，只填写已核实事实；提交后进入人工审核，不会自动发布。</p></div>
-      <RouterLink class="button secondary" to="/knowledge-materials">查看审核队列</RouterLink>
+      <RouterLink class="button secondary" :to="{ path: '/knowledge-review', query: { store: scope.store_code, product: scope.product_id } }">查看审核队列</RouterLink>
     </div>
 
     <p v-if="loading" class="notice" role="status">正在读取店铺和商品…</p>
