@@ -3,19 +3,29 @@
   "project_id": "AI-CS-C",
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
-  "version": "R006 Customer Available Catalog Production Release V1",
-  "current_task": "C customer availability provider production operation",
-  "current_stage": "C is formally deployed at release b66506a and database revision 0010. It owns data_source, customer_service_status, activation receipts and the final /customer-service/catalog projection. Formal smoke shows one TEST Store enabled, one PILOT Store disabled and five TEST Products visible.",
-  "current_gate": "R006_C_PROVIDER_PRODUCTION_READY",
-  "status": "r006_c_provider_production_ready",
+  "version": "R006.1 Knowledge Activation and AI Publishing V1",
+  "current_task": "C product knowledge publication lifecycle candidate",
+  "current_stage": "C owns approved-product canonical documents, AI knowledge status, publication receipts, product-level RAG visibility and approved-product batch customer activation. The candidate passed isolated 0011 browser acceptance; formal C remains b7783f7/0010 until a separately authorized release.",
+  "current_gate": "R006_1_C_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING",
+  "status": "r006_1_c_implementation_complete",
+  "r006_1": {
+    "branch": "feature/r006-1-knowledge-activation-v1",
+    "platform_commit": "be89e57",
+    "admin_commit": "74960ee",
+    "migration": "0011_product_knowledge_publishing_v1",
+    "isolated_acceptance": "PUBLISHED 3 chunks/3 embeddings; batch activation 1 success; publication and activation receipts present",
+    "formal_data_changed": false
+  },
   "contracts": [
-    "contracts/version.json 0.3.0 additive Customer Available Catalog",
+    "contracts/version.json 0.4.0 additive Knowledge Activation and AI Publishing; 0.3.0 retained",
     "R009 Interface Freeze is implemented as C-owned internal Admin endpoints",
     "GET /api/v1/customer-service/catalog/stores",
     "GET /api/v1/customer-service/catalog/products?store_code=",
     "GET /api/v1/customer-service/catalog/products/{product_id}/skus",
     "PUT Store/Product customer-service-status and GET activation receipts",
-    "A, RAG and Prompt interfaces are unchanged"
+    "POST product ai-publications, ai-publication-checks and GET publication receipts",
+    "POST approved-product customer-service-status:batch",
+    "Prompt and R009 import interfaces are unchanged"
   ],
   "owned_paths": [
     "platform_backend/**",
@@ -56,11 +66,11 @@
   ],
   "cross_line_compatibility": {
     "affected_lines": ["B", "C"],
-    "change": "Additive contracts 0.3.0, C final catalog provider/Admin control and B consume-only adaptation. A, R009 and Import Center are unchanged.",
-    "shared_contract_version": "0.3.0 additive; 0.2.0 schemas retained",
+    "change": "Contracts 0.4.0 add AI publication, visibility and approved-product batch activation while retaining 0.3.0 Customer Available Catalog. R009 and Import Center are unchanged.",
+    "shared_contract_version": "0.4.0 additive; 0.2.0 and 0.3.0 schemas retained",
     "database_change": true,
-    "migration": "0010_customer_available_catalog_v1 after unchanged 0009",
-    "verified": "Contracts 4, C 110, B 117 and Admin 58 tests passed; both frontend typechecks/builds and isolated browser E2E passed. Formal database migration 0008->0009->0010 and production API/browser smoke passed."
+    "migration": "0011_product_knowledge_publishing_v1 after unchanged 0010",
+    "verified": "Contracts 4, C 115, B 117 and Admin 62 tests passed; both frontend typechecks/builds and isolated 0011 browser E2E passed. Formal database remains 0010."
   },
   "data_boundaries": {
     "formal_data_write_before_review": false,
@@ -86,7 +96,7 @@
     "AI_FEEDBACK": "NOT_OPEN",
     "KNOWLEDGE_GAP": "NOT_OPEN"
   },
-  "last_test_result": "2026-07-31 R006 production: C backend 110 and Admin 58 tests passed; migration 0008->0009->0010, integrity and row-count preservation passed. Formal catalog API and Admin browser smoke passed without activation writes.",
+  "last_test_result": "2026-07-31 R006.1 candidate: C backend 115 and Admin 62 tests passed; 0011 upgrade/downgrade/upgrade and isolated browser publish/activate/visibility passed. Formal database remains 0010.",
   "test_commands": [
     "cd platform_backend; <Python-3.12-venv>/python.exe -m pytest -q",
     "cd platform_backend; static-only AST and Alembic ScriptDirectory graph validation for 0009 (no database URL, no upgrade/downgrade)",
@@ -153,6 +163,6 @@
     "database_revision": "0009_product_knowledge_import_v1",
     "formal_runtime_unchanged": true
   },
-  "next_recommended_task": "Run the separately scoped R003 Business Acceptance: manually activate one PILOT Store/Product, verify activation receipts and B visibility, then disable and verify rollback. Do not modify A/RAG/Prompt/R009 or copy isolated data.",
+  "next_recommended_task": "Assemble a separately authorized R006.1 production release, back up formal 0010, migrate to 0011, deploy all four services on one SHA and run publish/activation smoke. Do not copy isolated data or change R009/Import Center/Prompt.",
   "last_updated": "2026-07-31"
 }
