@@ -19,6 +19,7 @@
 - 生产路径改用.NET `NetworkInterface.GetAllNetworkInterfaces()`枚举Up状态的物理Ethernet/WLAN、IPv4、前缀和默认网关。
 - 保留虚拟网卡、VPN、无默认网关、非私有IPv4和多网卡歧义拒绝规则。
 - Windows网络类型查询放入隔离Job并设置5秒上限；超时时明确返回Unknown且不修改网络或防火墙。
+- VPN风险枚举改用同一.NET来源；防火墙状态读取放入隔离Job并设置5秒上限。
 - 原PowerShell cmdlet发现仅作为确定性单测兼容入口保留，不再用于标准启动与状态流程。
 
 ## 验证结果

@@ -16,7 +16,7 @@ try {
     $network = $config.LanNetworkProfile
 
     $selection = $config.LanSelection
-    $vpnRisk = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { ("$($_.Name) $($_.InterfaceDescription)") -match '(?i)(vpn|tun|tap|wireguard|tailscale|zerotier)' })
+    $vpnRisk = @(Get-LanVpnRiskAdapters)
     Write-Host "选择网卡：$($selection.InterfaceAlias)（$($selection.InterfaceDescription)）" -ForegroundColor Cyan
     Write-Host "IPv4：$($selection.IPAddress)；子网掩码：$($selection.SubnetMask)；默认网关：$($selection.DefaultGateway)；网段：$($config.LanSubnet)"
     Write-Host "网络配置类型：$($network.NetworkCategory)；检测到 VPN：$(if ($vpnRisk.Count -gt 0) { '是（' + (($vpnRisk | ForEach-Object { $_.Name }) -join '、') + '）' } else { '否' })"

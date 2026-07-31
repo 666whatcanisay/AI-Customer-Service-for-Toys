@@ -287,6 +287,18 @@ function Get-Ipv4PrefixLengthFromMask([System.Net.IPAddress]$Mask) {
     return $prefixLength
 }
 
+function Get-LanVpnRiskAdapters {
+    try {
+        return @([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object {
+            ("$($_.Name) $($_.Description)") -match '(?i)(vpn|tun|tap|wireguard|tailscale|zerotier)'
+        } | ForEach-Object {
+            [pscustomobject]@{ Name=[string]$_.Name; InterfaceDescription=[string]$_.Description }
+        })
+    } catch {
+        return @()
+    }
+}
+
 function Get-LanIpv4Candidates([switch]$UseLegacyPowerShellDiscovery) {
     $candidates = @()
     if (-not $UseLegacyPowerShellDiscovery) {
@@ -664,12 +676,24 @@ function Get-LanFirewallStatusMessage($NetworkProfile) {
     if ([string]::IsNullOrWhiteSpace($profileName)) {
         return 'Windows 防火墙状态：无法按当前网络类型确认；它仍可能阻断来自笔记本的访问。脚本未修改任何规则。'
     }
+    $job = $null
     try {
-        $profile = Get-NetFirewallProfile -Profile $profileName -ErrorAction Stop
+        $job = Start-Job -ScriptBlock {
+            param([string]$ProfileName)
+            Get-NetFirewallProfile -Profile $ProfileName -ErrorAction Stop |
+                Select-Object -First 1 -Property Name, Enabled
+        } -ArgumentList $profileName
+        if ($null -eq (Wait-Job -Job $job -Timeout 5)) {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            return "Windows 防火墙状态：读取 $profileName 配置超过5秒；它仍可能阻断入站TCP 5173。脚本未修改任何规则。"
+        }
+        $profile = Receive-Job -Job $job -ErrorAction Stop
         if (-not [bool]$profile.Enabled) { return "Windows 防火墙状态：$profileName 配置文件已关闭（脚本未作任何修改）。" }
         return "Windows firewall: $profileName profile is enabled and may block inbound TCP 5173. A/C are loopback-only; do not open 8000 or 8011. Use the dedicated firewall tool only on a trusted network."
     } catch {
         return "Windows 防火墙状态：无法读取 $profileName 配置文件（$($_.Exception.Message)）；它仍可能阻断笔记本访问。脚本未修改任何规则。"
+    } finally {
+        if ($null -ne $job) { Remove-Job -Job $job -Force -ErrorAction SilentlyContinue }
     }
 }
 
