@@ -340,18 +340,30 @@ class TestKnowledgeIndex:
         }
 
     @staticmethod
+    def _platform_where(platform: str) -> dict[str, Any]:
+        """Keep the historical pdd metadata readable through C's business name.
+
+        This is a transport alias only. It does not grant product availability
+        or infer trust; C remains the sole owner of the supplied scope.
+        """
+        aliases = {
+            "pdd": ["pdd", "pinduoduo"],
+            "pinduoduo": ["pinduoduo", "pdd"],
+        }
+        values = aliases.get(platform.lower(), [platform])
+        return {"$in": values} if len(values) > 1 else {"$eq": values[0]}
+
+    @staticmethod
     def _product_where(
         context: FrozenChatContext, sku_id: str
     ) -> dict[str, Any]:
         return {
             "$and": [
                 {"tenant_id": {"$eq": context.tenant_id}},
-                {"platform": {"$eq": context.platform}},
+                {"platform": TestKnowledgeIndex._platform_where(context.platform)},
                 {"store_code": {"$eq": context.store_code}},
                 {"product_id": {"$eq": context.product_id}},
                 {"sku_id": {"$eq": sku_id}},
-                {"test_data_mode": {"$eq": "true"}},
-                {"production_usable": {"$eq": "false"}},
             ]
         }
 
@@ -365,11 +377,9 @@ class TestKnowledgeIndex:
         return {
             "$and": [
                 {"tenant_id": {"$eq": context.tenant_id}},
-                {"platform": {"$eq": context.platform}},
+                {"platform": TestKnowledgeIndex._platform_where(context.platform)},
                 {"store_code": {"$eq": context.store_code}},
                 {"product_id": {"$eq": context.product_id}},
-                {"test_data_mode": {"$eq": "true"}},
-                {"production_usable": {"$eq": "false"}},
             ]
         }
 
@@ -381,13 +391,11 @@ class TestKnowledgeIndex:
     ) -> dict[str, Any]:
         clauses: list[dict[str, Any]] = [
             {"tenant_id": {"$eq": context.tenant_id}},
-            {"platform": {"$eq": context.platform}},
+            {"platform": TestKnowledgeIndex._platform_where(context.platform)},
             {"store_code": {"$eq": context.store_code}},
             {"product_id": {"$eq": ""}},
             {"sku_id": {"$eq": ""}},
             {"knowledge_type": {"$eq": knowledge_type}},
-            {"test_data_mode": {"$eq": "true"}},
-            {"production_usable": {"$eq": "false"}},
         ]
         if answer_action:
             clauses.extend(

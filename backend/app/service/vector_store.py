@@ -200,6 +200,23 @@ class VectorStore:
             )
         return len(documents)
 
+    def get_records(
+        self,
+        where: dict[str, Any],
+        *,
+        include_embeddings: bool = False,
+    ) -> dict[str, Any]:
+        include = ["metadatas"]
+        if include_embeddings:
+            include.append("embeddings")
+        return self.collection.get(where=where, include=include)
+
+    def delete_records(self, ids: list[str]) -> int:
+        if not ids:
+            return 0
+        self.collection.delete(ids=ids)
+        return len(ids)
+
     def search(
         self,
         query: str,
