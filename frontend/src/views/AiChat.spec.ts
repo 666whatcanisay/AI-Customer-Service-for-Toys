@@ -220,9 +220,16 @@ describe('AiChat B-T04 three-step workbench', () => {
     )
     apiMocks.listSkus.mockResolvedValue([sku])
     apiMocks.getCustomerKnowledgeStatus.mockResolvedValue({
-      status: 'NEEDS_REVIEW',
-      summary: '该商品资料仍有待补全项，回复前请人工核对。',
-      lastCheckedAt: '2026-07-28T10:00:00Z'
+      productId: 'PROD-001',
+      status: 'PUBLISHED',
+      embeddingStatus: 'COMPLETE',
+      publicationReceiptId: 'PUB-001',
+      activeCollection: 'test_knowledge_v031',
+      chunkCount: 3,
+      embeddingCount: 3,
+      indexedFingerprint: 'a'.repeat(64),
+      publishedAt: '2026-07-31T10:00:00Z',
+      lastCheckedAt: '2026-07-31T10:00:00Z'
     })
     apiMocks.chat.mockResolvedValue(resultFor())
     apiMocks.submitExperienceCase.mockResolvedValue({ caseId: 'CEC-001', reviewStatus: 'NEW' })
@@ -274,8 +281,11 @@ describe('AiChat B-T04 three-step workbench', () => {
       skuId: 'SKU-RED'
     }, expect.any(AbortSignal))
     const status = wrapper.get('[data-testid="customer-knowledge-status"]')
-    expect(status.text()).toContain('回复前需要人工核对')
-    expect(status.text()).toContain('该商品资料仍有待补全项')
+    expect(status.text()).toContain('AI 知识状态')
+    expect(status.text()).toContain('已发布')
+    expect(status.text()).toContain('当前商品有 3 条可检索引用')
+    expect(status.text()).toContain('引用数量：3')
+    expect(status.text()).toContain('发布收据：已生成')
     expect(status.text()).not.toContain('analysis_text')
     expect(status.text()).not.toContain('content_hash')
   })
@@ -300,27 +310,35 @@ describe('AiChat B-T04 three-step workbench', () => {
     expect(journey.text()).toContain('收藏优秀案例或反馈问题')
   })
 
-  it('distinguishes no approved material from a status-service failure without blocking consultation', async () => {
+  it('distinguishes unpublished AI knowledge from a status-service failure without blocking consultation', async () => {
     apiMocks.getCustomerKnowledgeStatus.mockResolvedValue({
-      status: 'NO_APPROVED_MATERIAL',
-      summary: '该商品暂无已审核资料，请人工核对。',
-      lastCheckedAt: '2026-07-28T10:00:00Z'
+      productId: 'PROD-001',
+      status: 'NOT_GENERATED',
+      embeddingStatus: 'NOT_GENERATED',
+      publicationReceiptId: null,
+      activeCollection: null,
+      chunkCount: 0,
+      embeddingCount: 0,
+      indexedFingerprint: null,
+      publishedAt: null,
+      lastCheckedAt: '2026-07-31T10:00:00Z'
     })
     const wrapper = mountPage()
     await flushPromises()
     await selectContext(wrapper)
 
     const noMaterialStatus = wrapper.get('[data-testid="customer-knowledge-status"]')
-    expect(noMaterialStatus.text()).toContain('暂无已审核资料')
-    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('资料不足时不要直接采用')
+    expect(noMaterialStatus.text()).toContain('未发布')
+    expect(noMaterialStatus.text()).toContain('引用数量：0')
+    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('不得假设已有商品知识')
 
     apiMocks.getCustomerKnowledgeStatus.mockRejectedValueOnce(new Error('platform request failed'))
     await wrapper.get('[data-testid="customer-knowledge-refresh"]').trigger('click')
     await flushPromises()
 
     const unavailableStatus = wrapper.get('[data-testid="customer-knowledge-status"]')
-    expect(unavailableStatus.text()).toContain('资料状态暂时无法获取')
-    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('资料状态接口暂时无法连接')
+    expect(unavailableStatus.text()).toContain('AI 知识状态暂时无法获取')
+    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('AI 知识状态接口暂时无法连接')
     await wrapper.get('[data-testid="question-input"]').setValue('这个款式适合几岁儿童？')
     expect(wrapper.get('[data-testid="submit-button"]').attributes('disabled')).toBeUndefined()
   })
@@ -332,9 +350,9 @@ describe('AiChat B-T04 three-step workbench', () => {
     await selectContext(wrapper)
 
     const status = wrapper.get('[data-testid="customer-knowledge-status"]')
-    expect(status.text()).toContain('无法获取资料状态，可继续咨询')
+    expect(status.text()).toContain('无法获取 AI 知识状态，可继续咨询')
     expect(status.text()).not.toContain('暂无数据')
-    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('资料状态接口暂时无法连接')
+    expect(wrapper.get('[data-testid="customer-knowledge-action"]').text()).toContain('AI 知识状态接口暂时无法连接')
 
     await wrapper.get('[data-testid="question-input"]').setValue('这个款式适合几岁儿童？')
     expect(wrapper.get('[data-testid="submit-button"]').attributes('disabled')).toBeUndefined()

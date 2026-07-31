@@ -10,4 +10,6 @@ availability from legacy test or publication fields.
 
 R006.1 adds C-to-A incremental product-knowledge publication and visibility
 evidence, plus C-owned batch customer-service activation. Publication and
-customer-service activation remain independent, explicit operator actions.
+customer-service activation remain independent, explicit operator actions. B
+reads the additive C-owned product AI knowledge status projection solely for
+display; it does not use publication evidence to decide catalog eligibility.

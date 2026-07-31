@@ -23,6 +23,7 @@ from app.customer_catalog.schemas import (
     CatalogResultStatus,
     CatalogWarning,
     CustomerCatalogProduct,
+    CustomerProductAiKnowledgeStatus,
     CustomerCatalogSku,
     CustomerCatalogStore,
     CustomerServiceStatus,
@@ -37,6 +38,12 @@ from app.customer_catalog.schemas import (
     BatchActivationResultStatus,
 )
 from app.errors import AppError
+from app.knowledge_publishing.models import (
+    ProductKnowledgePublication,
+    ProductKnowledgePublicationReceipt,
+)
+from app.knowledge_publishing.projection import publication_summary
+from app.knowledge_publishing.schemas import AiKnowledgeStatus, EmbeddingStatus
 from app.test_catalog.models import (
     CatalogActivationIdempotency,
     CatalogActivationReceipt,
@@ -128,6 +135,74 @@ class CustomerAvailableCatalogService:
             items=items,
             total=len(items),
             warnings=warning_items,
+        )
+
+    def get_product_ai_knowledge_status(
+        self, product_id: str
+    ) -> CustomerProductAiKnowledgeStatus:
+        """Return C-owned publication evidence for an available B product."""
+
+        warnings = _Warnings()
+        product = self.session.get(TestProduct, product_id)
+        if product is None:
+            raise AppError(
+                "CUSTOMER_SERVICE_ENTITY_NOT_FOUND",
+                "未找到客服可用商品",
+                status_code=404,
+            )
+        store = self.session.scalar(
+            select(TestStore).where(
+                TestStore.package_id == product.package_id,
+                TestStore.store_code == product.store_code,
+            )
+        )
+        if (
+            store is None
+            or self._project_store(store, warnings) is None
+            or self._project_product(product, DataSource(store.data_source), warnings)
+            is None
+        ):
+            raise AppError(
+                "CUSTOMER_SERVICE_ENTITY_NOT_FOUND",
+                "未找到客服可用商品",
+                status_code=404,
+            )
+
+        summary = publication_summary(self.session, product)
+        ledger = self.session.get(ProductKnowledgePublication, product.product_id)
+        receipt = (
+            self.session.get(
+                ProductKnowledgePublicationReceipt, ledger.publication_receipt_id
+            )
+            if ledger is not None and ledger.publication_receipt_id
+            else None
+        )
+        status = summary.status
+        embedding_status = summary.embedding_status
+        if status == AiKnowledgeStatus.PUBLISHED and (
+            receipt is None
+            or summary.chunk_count < 1
+            or summary.embedding_count != summary.chunk_count
+            or embedding_status != EmbeddingStatus.COMPLETE
+        ):
+            # C owns the final readiness projection. B must never infer a usable
+            # publication from a status string without receipt and chunk proof.
+            status = AiKnowledgeStatus.SYNC_FAILED
+            embedding_status = EmbeddingStatus.FAILED
+
+        return CustomerProductAiKnowledgeStatus(
+            product_id=product.product_id,
+            status=status,
+            embedding_status=embedding_status,
+            publication_receipt_id=(
+                receipt.publication_receipt_id if receipt is not None else None
+            ),
+            active_collection=summary.active_collection,
+            chunk_count=summary.chunk_count,
+            embedding_count=summary.embedding_count,
+            indexed_fingerprint=summary.indexed_fingerprint,
+            published_at=summary.published_at,
+            last_checked_at=summary.updated_at or _now(),
         )
 
     def list_skus(self, product_id: str) -> SkuCatalogResponse:

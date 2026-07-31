@@ -2,7 +2,7 @@
 
 - 等级：P2
 - 模块：Windows OPS自动测试
-- 状态：OPEN_SCOPE_DEFERRED
+- 状态：FIXED_TESTED_RELEASE_PENDING
 - 发现时间：2026-07-31
 
 ## 问题描述
@@ -21,3 +21,10 @@
 ## 后续处理
 
 在独立OPS测试治理任务中，使“过期PID”和“缺少runtime目录”两个预期降级场景以不会被父Shell提前提升的方式捕获stdout/stderr和exit code。不得为让测试变绿而削弱状态脚本的错误输出、PID身份校验或安全停止规则。
+
+## 修复与验证
+
+- 新增夹具级`Invoke-StatusFixture`，仅在捕获子PowerShell预期错误流时临时使用`ErrorActionPreference=Continue`，断言后恢复父Shell设置。
+- 过期PID夹具补齐当前Runtime身份记录要求的`repository_root`和`network_mode`；未修改正式状态脚本的身份校验。
+- “仅C”夹具改为5秒上限的端口就绪轮询，消除固定300ms造成的偶发误报。
+- `Test-OpsT04Fix1.ps1`已通过：无服务、仅C、过期PID、`$PID`冲突、缺少`.runtime`、缺少A venv和脚本语法均完成验证。

@@ -4,32 +4,51 @@ import {
   CustomerKnowledgeStatusAdapterError
 } from './customerKnowledgeStatusAdapter'
 
-describe('customerKnowledgeStatusAdapter knowledge-quality-loop.v1', () => {
-  it('adapts only the frozen customer-safe status fields', () => {
+const publishedPayload = () => ({
+  schema_version: 'customer-product-ai-knowledge-status.v1',
+  product_id: 'PROD-001',
+  status: 'PUBLISHED',
+  embedding_status: 'COMPLETE',
+  publication_receipt_id: 'PUB-001',
+  active_collection: 'test_knowledge_v031',
+  chunk_count: 3,
+  embedding_count: 3,
+  indexed_fingerprint: 'a'.repeat(64),
+  published_at: '2026-07-31T10:00:00Z',
+  last_checked_at: '2026-07-31T10:00:00Z'
+})
+
+describe('customerKnowledgeStatusAdapter customer-product-ai-knowledge-status.v1', () => {
+  it('adapts only the frozen C-owned publication evidence', () => {
     expect(adaptCustomerKnowledgeStatus({
-      status: 'NEEDS_REVIEW',
-      summary: '该商品资料仍有待补全项，回复前请人工核对。',
-      last_checked_at: '2026-07-28T10:00:00Z',
-      analysis_text: 'must never be rendered by the customer client',
-      content_hash: 'sha256:not-used'
+      ...publishedPayload(),
+      raw_document: 'must never be rendered by the customer client'
     })).toEqual({
-      status: 'NEEDS_REVIEW',
-      summary: '该商品资料仍有待补全项，回复前请人工核对。',
-      lastCheckedAt: '2026-07-28T10:00:00Z'
+      productId: 'PROD-001',
+      status: 'PUBLISHED',
+      embeddingStatus: 'COMPLETE',
+      publicationReceiptId: 'PUB-001',
+      activeCollection: 'test_knowledge_v031',
+      chunkCount: 3,
+      embeddingCount: 3,
+      indexedFingerprint: 'a'.repeat(64),
+      publishedAt: '2026-07-31T10:00:00Z',
+      lastCheckedAt: '2026-07-31T10:00:00Z'
     })
   })
 
-  it('rejects unknown statuses and malformed frozen fields', () => {
+  it('rejects incompatible schemas, unknown statuses, and malformed evidence', () => {
     expect(() => adaptCustomerKnowledgeStatus({
-      status: 'PUBLISHED_TO_RAG',
-      summary: '未知状态',
-      last_checked_at: '2026-07-28T10:00:00Z'
+      ...publishedPayload(),
+      schema_version: 'legacy-status.v1'
     })).toThrow(CustomerKnowledgeStatusAdapterError)
-
     expect(() => adaptCustomerKnowledgeStatus({
-      status: 'READY',
-      summary: '',
-      last_checked_at: 'not-a-time'
+      ...publishedPayload(),
+      status: 'READY'
+    })).toThrow(CustomerKnowledgeStatusAdapterError)
+    expect(() => adaptCustomerKnowledgeStatus({
+      ...publishedPayload(),
+      chunk_count: -1
     })).toThrow(CustomerKnowledgeStatusAdapterError)
   })
 })

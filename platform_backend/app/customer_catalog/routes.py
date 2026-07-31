@@ -10,6 +10,7 @@ from app.customer_catalog.schemas import (
     ActivationResponse,
     ActivatableEntityType,
     ProductCatalogResponse,
+    CustomerProductAiKnowledgeStatus,
     SkuCatalogResponse,
     StoreCatalogResponse,
     BatchActivationRequest,
@@ -43,6 +44,19 @@ def list_customer_service_products(
     session: Session = Depends(get_db),
 ) -> ProductCatalogResponse:
     return CustomerAvailableCatalogService(session).list_products(store_code.strip())
+
+
+@customer_router.get(
+    "/products/{product_id}/ai-knowledge",
+    response_model=CustomerProductAiKnowledgeStatus,
+)
+def get_customer_service_product_ai_knowledge(
+    product_id: str,
+    session: Session = Depends(get_db),
+) -> CustomerProductAiKnowledgeStatus:
+    return CustomerAvailableCatalogService(session).get_product_ai_knowledge_status(
+        product_id
+    )
 
 
 @customer_router.get(
