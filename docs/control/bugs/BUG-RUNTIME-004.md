@@ -2,7 +2,7 @@
 
 - 等级：P1（发布阻塞）
 - 模块：Windows OPS / Admin与C、A浏览器连接
-- 状态：FIXED_TESTED_RELEASE_PENDING
+- 状态：FIXED_VERIFIED_PRODUCTION
 - 发现时间：2026-07-31
 
 ## 问题描述
@@ -29,4 +29,4 @@ R006.1正式浏览器Smoke中，`5174`页面可打开，C `8011`与A `8000`均�
 
 - `Test-OpsLanMode.ps1`：PASS，明确验证B的LAN Origin、本机Admin两个Origin及5174未暴露到LAN地址。
 - `Test-OpsRuntimeFix2.ps1`：PASS，标准启动、active collection检查和失败清理边界未回归。
-- 正式浏览器复核将在新Release SHA重启后完成。
+- 正式Release重启后，`http://127.0.0.1:5174/knowledge-center`可读取C/A并完成发布、启用和状态刷新；LAN地址的5174仍未被加入允许Origin。

@@ -3,16 +3,16 @@
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-  "current_task": "R006.1 downstream browser acceptance",
-  "current_stage": "B code and business flow are unchanged. In isolated acceptance B consumed C's existing customer-service catalog, immediately selected one newly enabled PILOT product and received an A answer backed by 3 product-specific sources.",
-  "current_gate": "R006_1_B_DOWNSTREAM_ACCEPTANCE_PASS / PRODUCTION_RELEASE_PENDING",
-  "status": "r006_1_b_downstream_acceptance_pass",
+  "current_task": "R006.1 production customer verification",
+  "current_stage": "B formally consumes C's catalog and product AI-knowledge status. One newly enabled product was selected in the formal browser; B showed PUBLISHED, 3 references and the publication receipt, and A answered with 3 product-specific sources.",
+  "current_gate": "R006_1_B_PRODUCTION_PASS",
+  "status": "r006_1_b_production_pass",
   "last_updated": "2026-07-31",
   "r006_1": {
-    "code_changed": false,
+    "code_changed": true,
     "tests": "28 files / 117 tests, typecheck and build PASS",
-    "browser": "PASS: product selectable after C batch activation; answer returned age, material, safety limit and 3 matching sources",
-    "open_p2": "BUG-B-002: legacy reference-readiness banner does not yet reflect R006.1 publication evidence"
+    "browser": "FORMAL PASS: product selectable after C batch activation; B showed PUBLISHED, 3 references and receipt; answer returned age, material, safety limit and 3 matching sources",
+    "bug_b_002": "FIXED_VERIFIED_PRODUCTION"
   },
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
@@ -30,8 +30,8 @@
     "task_commit": "04e4a84",
     "e2e_commit": "8cbd92b",
     "runtime_deployed": true,
-    "formal_release_branch": "release/r006-customer-available-catalog-v1",
-    "formal_release_sha": "b66506ab7706113df5207182d326f1cf03b40726"
+    "formal_release_branch": "release/r006-1-knowledge-activation-v1",
+    "formal_release_sha": "55ca6eb4ee451dd667d0fbacc8c4d07db3d7fd39"
   },
   "owned_paths": [
     "frontend/**",

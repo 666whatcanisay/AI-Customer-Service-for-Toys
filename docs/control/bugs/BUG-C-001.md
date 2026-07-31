@@ -2,7 +2,7 @@
 
 - 等级：P1
 - 模块：C Admin / 商品知识生命周期
-- 状态：FIX_IN_PROGRESS
+- 状态：FIXED_VERIFIED_PRODUCTION
 - 发现时间：2026-07-31
 - 发现阶段：R006.1 Production Release V1 / Case 5
 
@@ -39,3 +39,10 @@ R009 为保持“资料上传与审核”三步 Excel 导入定位，替换了�
 - 审核通过后资料进入 `APPROVED_FOR_ANALYSIS`，正式商品字段保持不变。
 - R009 `/knowledge-materials` 页面、Import Center 和导入逻辑不变。
 - Admin Vitest、typecheck、build 全部通过。
+
+## 验证结果
+
+- 正式Admin浏览器从“商品知识维护”进入独立`/knowledge-review`，可查看、展开并审核`RECOGNIZED`资料。
+- 审核通过后资料状态为`APPROVED_FOR_ANALYSIS`，R009正式商品字段没有被该通用资料审核写入。
+- R009 `/knowledge-materials`三步Excel导入页面与Import Center保持不变。
+- Admin全量`27 files / 63 tests`、typecheck和build通过。
