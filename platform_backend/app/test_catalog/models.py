@@ -54,6 +54,16 @@ class TestStore(Base):
     allow_auto_send: Mapped[bool] = mapped_column(Boolean)
     test_data_mode: Mapped[bool] = mapped_column(Boolean, default=True)
     production_usable: Mapped[bool] = mapped_column(Boolean, default=False)
+    data_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    customer_service_status: Mapped[str] = mapped_column(
+        String(16), default="DISABLED", server_default="DISABLED"
+    )
+    customer_service_status_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    customer_service_status_updated_by: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
     raw_data_json: Mapped[str] = mapped_column(Text)
 
 
@@ -75,8 +85,50 @@ class TestProduct(Base):
     safety_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     review_status: Mapped[str] = mapped_column(String(40))
     publishable: Mapped[bool] = mapped_column(Boolean)
+    customer_service_status: Mapped[str] = mapped_column(
+        String(16), default="DISABLED", server_default="DISABLED"
+    )
+    customer_service_status_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    customer_service_status_updated_by: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
     source_ids_json: Mapped[str] = mapped_column(Text)
     raw_data_json: Mapped[str] = mapped_column(Text)
+
+
+class CatalogActivationReceipt(Base):
+    __tablename__ = "catalog_activation_receipts"
+
+    activation_receipt_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(16), index=True)
+    entity_ref: Mapped[str] = mapped_column(String(128), index=True)
+    data_source: Mapped[str] = mapped_column(String(16))
+    previous_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    customer_service_status: Mapped[str] = mapped_column(String(16))
+    activation_source: Mapped[str] = mapped_column(String(32))
+    confirmed_by: Mapped[str] = mapped_column(String(128))
+    confirmation_note: Mapped[str] = mapped_column(String(500))
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class CatalogActivationIdempotency(Base):
+    __tablename__ = "catalog_activation_idempotency"
+
+    idempotency_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    request_fingerprint: Mapped[str] = mapped_column(String(64))
+    response_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class CatalogActivationInitialization(Base):
+    __tablename__ = "catalog_activation_initializations"
+
+    policy_version: Mapped[str] = mapped_column(String(96), primary_key=True)
+    source_baseline: Mapped[str] = mapped_column(String(64))
+    manifest_json: Mapped[str] = mapped_column(Text)
+    initialized_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class TestSku(Base):
