@@ -4,6 +4,18 @@
 
 正式引用：`ai-cs-v1.0.0`
 
+## 发布亮点
+
+- AI-CS 正式内部生产版。
+- R008 Runtime 稳定化与单一运行基线。
+- R009 商品知识 Excel 导入、Merge 预览与人工审核闭环。
+- R006 Customer Available Catalog 客服可用目录。
+- R006.1 AI 知识增量发布、Publication Receipt 与 RAG 可见性。
+- R006.2 客服目录自动刷新与运营启用体验优化。
+- 本地 `Qwen3.5:9B` 模型支持，保持人工确认与禁止自动发送边界。
+- RAG 商品知识检索、来源引用与商品级增量同步。
+- 商品从知识审核、AI 发布、客服启用到客服使用的生命周期管理。
+
 ## 发布范围
 
 - 收敛 R006 Customer Available Catalog、R006.1 AI Knowledge Publishing、R006.2 Customer Experience Polish 与既有 R009 商品知识导入闭环。

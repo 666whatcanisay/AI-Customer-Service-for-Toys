@@ -28,6 +28,16 @@ npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Browser automation and visual acceptance artifacts
+/docs/platform/evidence/
+**/browser-evidence/
+**/screenshots/
+**/playwright-report/
+**/test-results/
+*.har
+*.webm
+*.trace.zip
+
 # Private data and databases
 backend/vector_db/*
 !backend/vector_db/
@@ -36,6 +46,8 @@ vector_db/
 backend/knowledge_base/*
 !backend/knowledge_base/README.md
 !backend/knowledge_base/.gitkeep
+chroma/
+chroma_db/
 data/raw/
 data/private/
 data/uploads/
@@ -44,12 +56,17 @@ backups/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-*
+*.db-journal
 
 # Models, logs, IDE, OS
 *.gguf
 *.safetensors
 *.bin
 *.onnx
+*.pt
+*.pth
+*.ckpt
 models/
 !backend/app/models/
 !backend/app/models/*.py
