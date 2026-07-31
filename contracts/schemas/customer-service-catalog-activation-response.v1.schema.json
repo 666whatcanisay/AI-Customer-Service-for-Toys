@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-service-catalog-activation-response.v1.schema.json",
+  "title": "Customer Available Catalog Activation Response V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "changed", "entity", "activation_receipt", "server_time"],
+  "properties": {
+    "schema_version": {"const": "pilot-business-catalog-activation-response.v1"},
+    "changed": {"type": "boolean"},
+    "entity": {"$ref": "#/$defs/entity"},
+    "activation_receipt": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "customer-service-catalog-activation-receipt.v1.schema.json"}
+      ]
+    },
+    "server_time": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_type", "entity_ref", "data_source", "customer_service_status", "customer_service_status_updated_at", "customer_service_status_updated_by"],
+      "properties": {
+        "entity_type": {"enum": ["STORE", "PRODUCT"]},
+        "entity_ref": {"type": "string", "minLength": 1, "maxLength": 128},
+        "data_source": {"enum": ["TEST", "PILOT"]},
+        "customer_service_status": {"enum": ["ENABLED", "DISABLED"]},
+        "customer_service_status_updated_at": {"type": ["string", "null"], "format": "date-time"},
+        "customer_service_status_updated_by": {"type": ["string", "null"], "maxLength": 128}
+      }
+    }
+  }
+}

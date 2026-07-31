@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-service-catalog.v1.schema.json",
+  "title": "Customer Available Catalog V1.1",
+  "description": "C-owned final Store/Product/SKU projection consumed by B. Returned items are already customer-service enabled; consumers must not infer availability from legacy fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_status", "items", "total", "warnings"],
+  "properties": {
+    "schema_version": {"const": "pilot-business-catalog.v1.1"},
+    "result_status": {"enum": ["COMPLETE", "PARTIAL"]},
+    "items": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/store"},
+          {"$ref": "#/$defs/product"},
+          {"$ref": "#/$defs/sku"}
+        ]
+      }
+    },
+    "total": {"type": "integer", "minimum": 0},
+    "warnings": {"type": "array", "items": {"$ref": "#/$defs/warning"}}
+  },
+  "$defs": {
+    "dataSource": {"enum": ["TEST", "PILOT"]},
+    "enabledStatus": {"const": "ENABLED"},
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_type", "tenant_id", "platform", "store_code", "store_name", "data_source", "customer_service_status", "allow_auto_send"],
+      "properties": {
+        "entity_type": {"const": "STORE"},
+        "tenant_id": {"type": "string", "minLength": 1, "maxLength": 96},
+        "platform": {"type": "string", "minLength": 1, "maxLength": 32},
+        "store_code": {"type": "string", "minLength": 1, "maxLength": 96},
+        "store_name": {"type": "string", "minLength": 1, "maxLength": 255},
+        "data_source": {"$ref": "#/$defs/dataSource"},
+        "customer_service_status": {"$ref": "#/$defs/enabledStatus"},
+        "allow_auto_send": {"const": false}
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_type", "product_id", "platform", "store_code", "product_name_official", "product_name_display", "sales_status", "knowledge_status", "data_source", "customer_service_status"],
+      "properties": {
+        "entity_type": {"const": "PRODUCT"},
+        "product_id": {"type": "string", "minLength": 1, "maxLength": 96},
+        "platform": {"type": "string", "minLength": 1, "maxLength": 32},
+        "store_code": {"type": "string", "minLength": 1, "maxLength": 96},
+        "product_name_official": {"type": "string", "minLength": 1, "maxLength": 255},
+        "product_name_display": {"type": "string", "minLength": 1, "maxLength": 255},
+        "sales_status": {"type": "string", "minLength": 1, "maxLength": 32},
+        "knowledge_status": {"type": "string", "minLength": 1, "maxLength": 40},
+        "age_min": {"type": ["integer", "null"], "minimum": 0},
+        "age_max": {"type": ["integer", "null"], "minimum": 0},
+        "safety_summary": {"type": ["string", "null"]},
+        "data_source": {"$ref": "#/$defs/dataSource"},
+        "customer_service_status": {"$ref": "#/$defs/enabledStatus"}
+      }
+    },
+    "sku": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_type", "sku_id", "product_id", "sku_code", "sku_name_official", "sku_name_display", "relation_type", "canonical_sku_id", "reference_sku_id", "component_sku_refs", "data_source", "customer_service_status"],
+      "properties": {
+        "entity_type": {"const": "SKU"},
+        "sku_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "product_id": {"type": "string", "minLength": 1, "maxLength": 96},
+        "sku_code": {"type": "string", "minLength": 1, "maxLength": 128},
+        "sku_name_official": {"type": "string", "minLength": 1, "maxLength": 255},
+        "sku_name_display": {"type": "string", "minLength": 1, "maxLength": 255},
+        "relation_type": {"type": "string", "minLength": 1, "maxLength": 32},
+        "canonical_sku_id": {"type": ["string", "null"], "maxLength": 128},
+        "reference_sku_id": {"type": ["string", "null"], "maxLength": 128},
+        "component_sku_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "data_source": {"$ref": "#/$defs/dataSource"},
+        "customer_service_status": {"$ref": "#/$defs/enabledStatus"}
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "entity_type", "count", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1, "maxLength": 96},
+        "entity_type": {"enum": ["STORE", "PRODUCT", "SKU"]},
+        "count": {"type": "integer", "minimum": 1},
+        "message": {"type": "string", "minLength": 1, "maxLength": 300}
+      }
+    }
+  }
+}
