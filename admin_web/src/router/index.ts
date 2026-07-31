@@ -19,6 +19,7 @@ import KnowledgeCenterView from '../views/KnowledgeCenterView.vue'
 import ImportCenterView from '../views/ImportCenterView.vue'
 import CustomerOperationsView from '../views/CustomerOperationsView.vue'
 import KnowledgeEditorView from '../views/KnowledgeEditorView.vue'
+import KnowledgeReviewView from '../views/KnowledgeReviewView.vue'
 import KnowledgeGapCenterView from '../views/KnowledgeGapCenterView.vue'
 import StoreManagementView from '../views/StoreManagementView.vue'
 import AiIssueCenterView from '../views/AiIssueCenterView.vue'
@@ -30,6 +31,7 @@ export const router = createRouter({
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
     { path: '/knowledge-center', name: 'knowledge-center', component: KnowledgeCenterView },
     { path: '/knowledge-editor', name: 'knowledge-editor', component: KnowledgeEditorView },
+    { path: '/knowledge-review', name: 'knowledge-review', component: KnowledgeReviewView },
     { path: '/knowledge-gaps', name: 'knowledge-gaps', component: KnowledgeGapCenterView },
     { path: '/import-center', name: 'import-center', component: ImportCenterView },
     { path: '/store-management', name: 'store-management', component: StoreManagementView },
