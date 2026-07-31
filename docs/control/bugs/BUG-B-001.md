@@ -2,7 +2,7 @@
 
 - 等级：P1
 - 模块：B 客服 / C 商品目录投影 / R006 兼容边界
-- 状态：BLOCKED_BY_R006_IMPLEMENTATION
+- 状态：OPEN / R006_IMPLEMENTATION_PLAN_READY
 - 发现时间：2026-07-30
 
 ## 问题描述
