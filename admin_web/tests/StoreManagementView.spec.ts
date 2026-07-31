@@ -114,6 +114,80 @@ describe('StoreManagementView', () => {
     expect(wrapper.text()).toContain('店铺已创建，可在导入中心选择')
   })
 
+  it('edits the customer status with an operator and activation receipt', async () => {
+    const wrapper = mount(StoreManagementView)
+    await flushPromises()
+
+    const editButton = wrapper.findAll('button').find((button) => button.text() === '编辑')
+    expect(editButton).toBeDefined()
+    await editButton!.trigger('click')
+
+    const storeForm = wrapper.get('.store-form')
+    expect(storeForm.text()).toContain('客服使用状态')
+    expect(storeForm.text()).toContain('客服状态操作人')
+    expect(storeForm.get('[data-testid="store-edit-customer-service-status"]').element).toHaveProperty('value', 'DISABLED')
+
+    await storeForm.get('[data-testid="store-edit-customer-service-status"]').setValue('ENABLED')
+    await storeForm.trigger('submit')
+    expect(wrapper.text()).toContain('修改客服使用状态前，请填写客服状态操作人')
+    expect(apiMocks.updateOperationStore).not.toHaveBeenCalled()
+    expect(apiMocks.setStoreCustomerServiceStatus).not.toHaveBeenCalled()
+
+    await storeForm.get('[data-testid="store-edit-activation-operator"]').setValue('运营乙')
+    await storeForm.trigger('submit')
+    await flushPromises()
+
+    expect(apiMocks.updateOperationStore).toHaveBeenCalledWith(8, {
+      store_name: store.store_name,
+      platform: 'pinduoduo',
+      remarks: store.remarks,
+      status: 'ACTIVE',
+    })
+    expect(apiMocks.setStoreCustomerServiceStatus).toHaveBeenCalledWith(
+      8,
+      'ENABLED',
+      '运营乙',
+      expect.stringMatching(/^store-8-ENABLED-/),
+    )
+    expect(wrapper.text()).toContain('ACT-STORE-1')
+  })
+
+  it('does not create an activation receipt when edit keeps the customer status', async () => {
+    const wrapper = mount(StoreManagementView)
+    await flushPromises()
+
+    const editButton = wrapper.findAll('button').find((button) => button.text() === '编辑')
+    expect(editButton).toBeDefined()
+    await editButton!.trigger('click')
+    await wrapper.get('.store-form').trigger('submit')
+    await flushPromises()
+
+    expect(apiMocks.updateOperationStore).toHaveBeenCalledOnce()
+    expect(apiMocks.setStoreCustomerServiceStatus).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('店铺信息已更新')
+  })
+
+  it('reports partial failure without claiming the customer status changed', async () => {
+    apiMocks.setStoreCustomerServiceStatus.mockRejectedValueOnce(new Error('activation failed'))
+    const wrapper = mount(StoreManagementView)
+    await flushPromises()
+
+    const editButton = wrapper.findAll('button').find((button) => button.text() === '编辑')
+    expect(editButton).toBeDefined()
+    await editButton!.trigger('click')
+    const storeForm = wrapper.get('.store-form')
+    await storeForm.get('[data-testid="store-edit-customer-service-status"]').setValue('ENABLED')
+    await storeForm.get('[data-testid="store-edit-activation-operator"]').setValue('运营丙')
+    await storeForm.trigger('submit')
+    await flushPromises()
+
+    expect(apiMocks.updateOperationStore).toHaveBeenCalledOnce()
+    expect(apiMocks.setStoreCustomerServiceStatus).toHaveBeenCalledOnce()
+    expect(wrapper.text()).toContain('店铺信息已更新，但客服使用状态未修改')
+    expect(wrapper.text()).toContain('暂时不可用')
+    expect(wrapper.find('.store-form').exists()).toBe(true)
+  })
+
   it('creates a pending-review product under an active store and refreshes counts', async () => {
     const wrapper = mount(StoreManagementView)
     await flushPromises()
