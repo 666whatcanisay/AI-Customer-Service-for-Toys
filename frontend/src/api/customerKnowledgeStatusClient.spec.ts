@@ -13,16 +13,24 @@ vi.mock('axios', () => ({
 
 import { customerKnowledgeStatusClient } from './customerKnowledgeStatusClient'
 
-describe('customerKnowledgeStatusClient knowledge-quality-loop.v1', () => {
+const responsePayload = () => ({
+  schema_version: 'customer-product-ai-knowledge-status.v1',
+  product_id: 'PROD/001',
+  status: 'PUBLISHED',
+  embedding_status: 'COMPLETE',
+  publication_receipt_id: 'PUB-001',
+  active_collection: 'test_knowledge_v031',
+  chunk_count: 3,
+  embedding_count: 3,
+  indexed_fingerprint: 'a'.repeat(64),
+  published_at: '2026-07-31T10:00:00Z',
+  last_checked_at: '2026-07-31T10:00:00Z'
+})
+
+describe('customerKnowledgeStatusClient customer-product-ai-knowledge-status.v1', () => {
   beforeEach(() => {
     httpGet.mockReset()
-    httpGet.mockResolvedValue({
-      data: {
-        status: 'READY',
-        summary: '资料已完成审核，可作为人工核对参考。',
-        last_checked_at: '2026-07-28T10:00:00Z'
-      }
-    })
+    httpGet.mockResolvedValue({ data: responsePayload() })
   })
 
   it('uses the same-origin platform proxy unless direct debug mode is configured', () => {
@@ -31,56 +39,28 @@ describe('customerKnowledgeStatusClient knowledge-quality-loop.v1', () => {
     }))
   })
 
-  it('calls only the frozen customer-safe status path and scope fields', async () => {
+  it('calls the C-owned product publication status path', async () => {
     await customerKnowledgeStatusClient.getStatus({
       storeCode: 'PDD-SM',
-      productId: 'PROD-001',
+      productId: 'PROD/001',
       skuId: 'SKU-RED'
     })
-    await customerKnowledgeStatusClient.getStatus({
-      storeCode: 'PDD-SM',
-      productId: 'PROD-001',
-      skuId: null
-    })
 
-    expect(httpGet.mock.calls).toEqual([
-      [
-        '/api/v1/customer-knowledge-status',
-        {
-          signal: undefined,
-          params: {
-            store_code: 'PDD-SM',
-            product_id: 'PROD-001',
-            sku_id: 'SKU-RED'
-          }
-        }
-      ],
-      [
-        '/api/v1/customer-knowledge-status',
-        {
-          signal: undefined,
-          params: {
-            store_code: 'PDD-SM',
-            product_id: 'PROD-001'
-          }
-        }
-      ]
-    ])
+    expect(httpGet).toHaveBeenCalledWith(
+      '/api/v1/customer-service/catalog/products/PROD%2F001/ai-knowledge',
+      { signal: undefined }
+    )
   })
 
-  it('maps a malformed status response to the nontechnical customer-safe failure', async () => {
+  it('maps a malformed response to the customer-safe failure', async () => {
     httpGet.mockResolvedValueOnce({
-      data: {
-        status: 'NOT_FROZEN',
-        summary: 'raw upstream detail must not reach the page',
-        last_checked_at: '2026-07-28T10:00:00Z'
-      }
+      data: { ...responsePayload(), status: 'NOT_FROZEN' }
     })
 
     await expect(customerKnowledgeStatusClient.getStatus({
       storeCode: 'PDD-SM',
-      productId: 'PROD-001',
+      productId: 'PROD/001',
       skuId: null
-    })).rejects.toThrow('无法获取资料状态，可继续咨询。')
+    })).rejects.toThrow('无法获取 AI 知识状态，可继续咨询。')
   })
 })

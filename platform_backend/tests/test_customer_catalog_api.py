@@ -4,6 +4,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.knowledge_publishing.canonical import build_canonical_product_knowledge
+from app.knowledge_publishing.models import (
+    ProductKnowledgePublication,
+    ProductKnowledgePublicationReceipt,
+)
 from app.test_catalog.models import (
     CatalogActivationReceipt,
     TestKnowledgePackage as KnowledgePackageModel,
@@ -232,6 +237,101 @@ def test_product_and_sku_visibility_ignore_publishable_and_knowledge_gaps(
     assert skus.json()["result_status"] == "PARTIAL"
     assert [item["sku_id"] for item in skus.json()["items"]] == ["SKU-GOOD"]
     assert skus.json()["items"][0]["customer_service_status"] == "ENABLED"
+
+
+def test_customer_product_ai_knowledge_projects_receipt_and_chunk_evidence(
+    client: TestClient, session: Session
+) -> None:
+    store = _seed_scope(
+        session,
+        package_id="PKG-AI-KNOWLEDGE",
+        store_code="AI-KNOWLEDGE",
+        data_source="PILOT",
+        status="ENABLED",
+        import_status="MANUAL_CREATED",
+        schema_version="c-operation-store.v1",
+    )
+    product = _seed_product(
+        session, store, product_id="PRODUCT-AI-KNOWLEDGE", status="ENABLED"
+    )
+    path = (
+        "/api/v1/customer-service/catalog/products/"
+        "PRODUCT-AI-KNOWLEDGE/ai-knowledge"
+    )
+
+    not_generated = client.get(path)
+    assert not_generated.status_code == 200
+    assert not_generated.json()["schema_version"] == (
+        "customer-product-ai-knowledge-status.v1"
+    )
+    assert not_generated.json()["status"] == "NOT_GENERATED"
+    assert not_generated.json()["publication_receipt_id"] is None
+    assert not_generated.json()["chunk_count"] == 0
+
+    fingerprint = build_canonical_product_knowledge(session, product).fingerprint
+    now = datetime.now(timezone.utc)
+    receipt = ProductKnowledgePublicationReceipt(
+        publication_receipt_id="PUB-CUSTOMER-001",
+        product_id=product.product_id,
+        knowledge_fingerprint=fingerprint,
+        active_collection="test_knowledge_v031",
+        chunk_count=3,
+        embedding_count=3,
+        status="PUBLISHED",
+        operator="pytest-operator",
+        created_at=now,
+    )
+    ledger = ProductKnowledgePublication(
+        product_id=product.product_id,
+        status="PUBLISHED",
+        current_fingerprint=fingerprint,
+        indexed_fingerprint=fingerprint,
+        active_collection="test_knowledge_v031",
+        chunk_count=3,
+        embedding_count=3,
+        publication_receipt_id=receipt.publication_receipt_id,
+        published_at=now,
+        checked_at=now,
+    )
+    session.add_all([receipt, ledger])
+    session.commit()
+
+    published = client.get(path)
+    assert published.status_code == 200
+    assert published.json()["status"] == "PUBLISHED"
+    assert published.json()["embedding_status"] == "COMPLETE"
+    assert published.json()["publication_receipt_id"] == "PUB-CUSTOMER-001"
+    assert published.json()["chunk_count"] == 3
+    assert published.json()["embedding_count"] == 3
+
+    session.delete(receipt)
+    session.commit()
+    missing_receipt = client.get(path)
+    assert missing_receipt.status_code == 200
+    assert missing_receipt.json()["status"] == "SYNC_FAILED"
+    assert missing_receipt.json()["embedding_status"] == "FAILED"
+
+
+def test_customer_product_ai_knowledge_does_not_expose_disabled_products(
+    client: TestClient, session: Session
+) -> None:
+    store = _seed_scope(
+        session,
+        package_id="PKG-AI-KNOWLEDGE-OFF",
+        store_code="AI-KNOWLEDGE-OFF",
+        data_source="PILOT",
+        status="ENABLED",
+    )
+    product = _seed_product(
+        session, store, product_id="PRODUCT-AI-KNOWLEDGE-OFF", status="DISABLED"
+    )
+
+    response = client.get(
+        f"/api/v1/customer-service/catalog/products/{product.product_id}/ai-knowledge"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CUSTOMER_SERVICE_ENTITY_NOT_FOUND"
 
 
 def test_operator_activation_receipts_idempotency_and_parent_blocking(

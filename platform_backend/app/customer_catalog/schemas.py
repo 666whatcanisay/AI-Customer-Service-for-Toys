@@ -5,8 +5,11 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.knowledge_publishing.schemas import AiKnowledgeStatus, EmbeddingStatus
+
 
 CATALOG_SCHEMA_VERSION = "pilot-business-catalog.v1.1"
+CUSTOMER_AI_KNOWLEDGE_SCHEMA_VERSION = "customer-product-ai-knowledge-status.v1"
 ACTIVATION_RESPONSE_SCHEMA_VERSION = "pilot-business-catalog-activation-response.v1"
 ACTIVATION_RECEIPT_SCHEMA_VERSION = "pilot-business-catalog-activation-receipt.v1"
 
@@ -74,6 +77,20 @@ class CustomerCatalogProduct(BaseModel):
     safety_summary: str | None = None
     data_source: DataSource
     customer_service_status: CustomerServiceStatus = CustomerServiceStatus.ENABLED
+
+
+class CustomerProductAiKnowledgeStatus(BaseModel):
+    schema_version: str = CUSTOMER_AI_KNOWLEDGE_SCHEMA_VERSION
+    product_id: str
+    status: AiKnowledgeStatus
+    embedding_status: EmbeddingStatus
+    publication_receipt_id: str | None = None
+    active_collection: str | None = None
+    chunk_count: int = Field(ge=0)
+    embedding_count: int = Field(ge=0)
+    indexed_fingerprint: str | None = None
+    published_at: datetime | None = None
+    last_checked_at: datetime
 
 
 class CustomerCatalogSku(BaseModel):

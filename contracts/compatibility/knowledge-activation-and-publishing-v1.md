@@ -9,7 +9,11 @@ Contract version: `0.4.0` (additive over `0.3.0`).
 - A accepts the explicit tenant/platform/store/product context from C, produces
   chunks and embeddings in the configured active collection, and returns
   product-level evidence. A does not decide whether a product may enter B.
-- B remains unchanged and consumes only C's final customer-service catalog.
+- B continues to consume only C's final customer-service catalog. For an
+  already projected product, B may read
+  `/api/v1/customer-service/catalog/products/{product_id}/ai-knowledge` and
+  display C's final publication status, receipt presence and chunk evidence.
+  B does not infer catalog eligibility from that evidence.
 
 ## Independent state machines
 
@@ -30,7 +34,8 @@ Only approved products may be enabled or published.
 
 ## Compatibility, deployment and rollback
 
-- No 0.3.0 schema, R009 import contract, B endpoint or Prompt contract changes.
+- No 0.3.0 schema, R009 import contract or Prompt contract changes. The new B
+  read endpoint is additive and old clients may ignore it.
 - Deploy A publication endpoints, then C migration/provider, then Admin. Roll
   back Admin, then C, then A. Database downgrade requires a backup and discards
   only the additive publication ledger; it never deletes Chroma data.

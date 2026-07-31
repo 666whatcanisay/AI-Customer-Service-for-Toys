@@ -20,19 +20,13 @@ const http = axios.create({
   }
 })
 
-const requestParameters = (scope: CustomerKnowledgeStatusScope) => ({
-  store_code: scope.storeCode,
-  product_id: scope.productId,
-  ...(scope.skuId ? { sku_id: scope.skuId } : {})
-})
-
 export const customerKnowledgeStatusClient: CustomerKnowledgeStatusClient = {
   async getStatus(scope, signal) {
     try {
-      const response = await http.get('/api/v1/customer-knowledge-status', {
-        signal,
-        params: requestParameters(scope)
-      })
+      const response = await http.get(
+        `/api/v1/customer-service/catalog/products/${encodeURIComponent(scope.productId)}/ai-knowledge`,
+        { signal }
+      )
       return adaptCustomerKnowledgeStatus(response.data)
     } catch (error) {
       throw toCustomerKnowledgeStatusClientError(error)
