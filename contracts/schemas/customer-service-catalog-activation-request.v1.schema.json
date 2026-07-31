@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-service-catalog-activation-request.v1.schema.json",
+  "title": "Customer Available Catalog Activation Request V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["customer_service_status", "confirmed_by", "confirmation_note"],
+  "properties": {
+    "customer_service_status": {"enum": ["ENABLED", "DISABLED"]},
+    "confirmed_by": {"type": "string", "minLength": 1, "maxLength": 128},
+    "confirmation_note": {"type": "string", "minLength": 1, "maxLength": 500}
+  }
+}

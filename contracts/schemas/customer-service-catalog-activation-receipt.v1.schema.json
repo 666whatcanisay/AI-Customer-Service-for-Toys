@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customer-service-catalog-activation-receipt.v1.schema.json",
+  "title": "Customer Available Catalog Activation Receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "activation_receipt_id", "entity_type", "entity_ref", "data_source", "previous_status", "customer_service_status", "activation_source", "confirmed_by", "confirmation_note", "confirmed_at"],
+  "properties": {
+    "schema_version": {"const": "pilot-business-catalog-activation-receipt.v1"},
+    "activation_receipt_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "entity_type": {"enum": ["STORE", "PRODUCT"]},
+    "entity_ref": {"type": "string", "minLength": 1, "maxLength": 128},
+    "data_source": {"enum": ["TEST", "PILOT"]},
+    "previous_status": {"type": ["string", "null"], "enum": ["ENABLED", "DISABLED", null]},
+    "customer_service_status": {"enum": ["ENABLED", "DISABLED"]},
+    "activation_source": {"enum": ["LEGACY_INITIALIZATION", "OPERATOR"]},
+    "confirmed_by": {"type": "string", "minLength": 1, "maxLength": 128},
+    "confirmation_note": {"type": "string", "minLength": 1, "maxLength": 500},
+    "confirmed_at": {"type": "string", "format": "date-time"}
+  }
+}
