@@ -34,7 +34,7 @@ try {
     }
     if ($alreadyRunning.Count -gt 0) { throw "仅部分服务处于可信健康运行状态：$($alreadyRunning.Name -join ', ')。请先使用状态脚本核对，避免混合启动。" }
     foreach ($pair in $services) { Assert-PortAvailable $config $pair.Name $pair.Port }
-    $platformEnvironment = @{ CORS_ALLOWED_ORIGINS = (@($config.CorsAllowedOrigins) -join ','); DATABASE_URL = [string]$config.PlatformDatabaseUrl; PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$config.PlatformKnowledgeMaterialStorageDirectory }
+    $platformEnvironment = @{ CORS_ALLOWED_ORIGINS = (@($config.CorsAllowedOrigins) -join ','); DATABASE_URL = [string]$config.PlatformDatabaseUrl; PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$config.PlatformKnowledgeMaterialStorageDirectory; AI_SERVICE_BASE_URL = "http://127.0.0.1:$($config.RagPort)" }
     Invoke-WithProcessEnvironment $platformEnvironment { Invoke-PlatformMigration $config } | Out-Null
 
     $startedServices += 'platform'
