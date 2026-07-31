@@ -12,6 +12,8 @@ from app.customer_catalog.schemas import (
     ProductCatalogResponse,
     SkuCatalogResponse,
     StoreCatalogResponse,
+    BatchActivationRequest,
+    BatchActivationResponse,
 )
 from app.customer_catalog.service import (
     CatalogActivationService,
@@ -66,6 +68,24 @@ def set_store_customer_service_status(
 ) -> ActivationResponse:
     result, replayed = CatalogActivationService(session).set_store_status(
         store_ref, request, idempotency_key
+    )
+    if replayed:
+        response.headers["Idempotency-Replayed"] = "true"
+    return result
+
+
+@admin_router.post(
+    "/products/customer-service-status:batch",
+    response_model=BatchActivationResponse,
+)
+def enable_products_for_customer_service(
+    request: BatchActivationRequest,
+    response: Response,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    session: Session = Depends(get_db),
+) -> BatchActivationResponse:
+    result, replayed = CatalogActivationService(session).enable_products_batch(
+        request, idempotency_key
     )
     if replayed:
         response.headers["Idempotency-Replayed"] = "true"

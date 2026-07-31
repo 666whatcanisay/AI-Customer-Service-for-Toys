@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.ingestion.models import ImportBatch
 from app.knowledge_materials.models import KnowledgeMaterial, KnowledgeQualityAssessment
+from app.knowledge_publishing.projection import publication_summary
 from app.product_knowledge.schemas import (
     FaqSummary,
     KnowledgeGap,
@@ -45,7 +46,10 @@ from app.test_catalog.models import (
 )
 
 
-BOUNDARY_NOTE = "此处展示资料可回答能力，不代表知识已发布到 RAG。"
+BOUNDARY_NOTE = (
+    "资料覆盖度与AI知识发布状态分别展示；只有“已发布”才代表知识已进入RAG，"
+    "其他资料状态不代表知识已发布到 RAG。"
+)
 APPROVED_MATERIAL_STATUSES = {"APPROVED_FOR_ANALYSIS", "ANALYZING", "ANALYZED"}
 PENDING_MATERIAL_STATUSES = {"RECEIVED", "RECOGNIZED", "REVIEWING"}
 
@@ -564,6 +568,7 @@ class ProductKnowledgeService:
             knowledge_state=projection.knowledge_state,
             data_status=projection.data_status,
             ai_status=projection.ai_status,
+            ai_knowledge=projection.ai_knowledge,
             topic_coverage=topics,
             answerable_topics=projection.answerable_topics,
             missing_topics=projection.missing_topics,
@@ -670,6 +675,7 @@ class ProductKnowledgeService:
             customer_service_status=product.customer_service_status,
             customer_service_status_updated_at=product.customer_service_status_updated_at,
             customer_service_status_updated_by=product.customer_service_status_updated_by,
+            ai_knowledge=publication_summary(self.session, product),
             technical_details=TechnicalDetails(
                 store_code=product.store_code,
                 platform=product.platform,
