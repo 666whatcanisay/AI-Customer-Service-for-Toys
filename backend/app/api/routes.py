@@ -17,6 +17,12 @@ from app.models.chat import (
     SearchRequest,
 )
 from app.models.ai_control_product import AiControlCenterProductResponse
+from app.models.knowledge_publication import (
+    ProductKnowledgePublishReceipt,
+    ProductKnowledgePublishRequest,
+    ProductKnowledgeVisibilityBatchRequest,
+    ProductKnowledgeVisibilityBatchResponse,
+)
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
     ExperienceEvaluationService,
@@ -340,6 +346,35 @@ def sync_test_knowledge(request: Request, package_id: str) -> dict[str, Any]:
             detail=f"invalid V0.3.1 test package: {exc}",
         ) from exc
     return envelope(result, message="V0.3.1 test knowledge synchronized")
+
+
+@router.post(
+    "/admin/ai/knowledge-publications/products",
+    tags=["knowledge-publishing"],
+    response_model=ProductKnowledgePublishReceipt,
+)
+def publish_product_knowledge(
+    request: Request, publication: ProductKnowledgePublishRequest
+) -> ProductKnowledgePublishReceipt:
+    require_loopback_client(request)
+    return get_rag(request).publish_product_knowledge(publication)
+
+
+@router.post(
+    "/admin/ai/knowledge-publications/visibility",
+    tags=["knowledge-publishing"],
+    response_model=ProductKnowledgeVisibilityBatchResponse,
+)
+def get_product_knowledge_visibility(
+    request: Request, query: ProductKnowledgeVisibilityBatchRequest
+) -> ProductKnowledgeVisibilityBatchResponse:
+    require_loopback_client(request)
+    rag = get_rag(request)
+    items = [rag.product_knowledge_visibility(item) for item in query.items]
+    return ProductKnowledgeVisibilityBatchResponse(
+        active_collection=rag.settings.active_collection_name,
+        items=items,
+    )
 
 
 @router.get("/admin/ai/modules", tags=["ai-admin"])
