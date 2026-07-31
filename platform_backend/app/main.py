@@ -33,6 +33,10 @@ from app.customer_feedback_loop.routes import (
     customer_router as customer_feedback_loop_customer_router,
 )
 from app.product_knowledge_import.routes import router as product_knowledge_import_router
+from app.customer_catalog.routes import (
+    admin_router as customer_catalog_admin_router,
+    customer_router as customer_catalog_customer_router,
+)
 from app.errors import (
     AppError,
     app_exception_handler,
@@ -55,7 +59,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=list(settings.cors_allowed_origins),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH"],
+        allow_methods=["GET", "POST", "PATCH", "PUT"],
         # B submits the frozen feedback v1 Idempotency-Key header from the
         # browser. Keep the CORS policy explicit; do not widen it to a
         # wildcard just to accommodate this preflight.
@@ -84,6 +88,8 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(product_knowledge_router)
     application.include_router(product_knowledge_import_router)
     application.include_router(operation_management_router)
+    application.include_router(customer_catalog_customer_router)
+    application.include_router(customer_catalog_admin_router)
     application.include_router(customer_feedback_loop_admin_router)
     application.include_router(admin_router)
 

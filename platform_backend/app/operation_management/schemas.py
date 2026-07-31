@@ -53,6 +53,10 @@ class StoreOperationItem(BaseModel):
     product_count: int
     created_at: datetime
     remarks: str
+    data_source: str
+    customer_service_status: str
+    customer_service_status_updated_at: datetime | None = None
+    customer_service_status_updated_by: str | None = None
 
 
 class StoreOperationListResponse(BaseModel):
@@ -82,6 +86,8 @@ class ProductOperationItem(BaseModel):
     data_status_name: str
     sku_count: int
     created_at: datetime
+    data_source: str
+    customer_service_status: str
 
 
 class ProductBasicInfoUpdateRequest(BaseModel):

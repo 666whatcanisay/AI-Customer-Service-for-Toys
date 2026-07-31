@@ -105,6 +105,8 @@ class TestCatalogRepository:
                     allow_auto_send=False,
                     test_data_mode=True,
                     production_usable=False,
+                    data_source="TEST",
+                    customer_service_status="DISABLED",
                     raw_data_json=_json(store),
                 )
             )
@@ -124,6 +126,7 @@ class TestCatalogRepository:
                         safety_summary=_optional_text(row.get("safety_summary")),
                         review_status=str(row["review_status"]),
                         publishable=bool(row["publishable"]),
+                        customer_service_status="DISABLED",
                         source_ids_json=_json(split_array(row.get("source_ids"))),
                         raw_data_json=_json(row),
                     )

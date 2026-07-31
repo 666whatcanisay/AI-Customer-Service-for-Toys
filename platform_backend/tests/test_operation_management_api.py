@@ -35,6 +35,8 @@ def test_store_can_be_created_listed_viewed_and_edited_without_client_technical_
     assert payload["platform_name"] == "拼多多"
     assert payload["status_name"] == "正常"
     assert payload["product_count"] == 0
+    assert payload["data_source"] == "PILOT"
+    assert payload["customer_service_status"] == "DISABLED"
     assert "tenant_id" not in created.text
     assert "store_code" not in created.text
     assert "external_id" not in created.text
@@ -43,6 +45,8 @@ def test_store_can_be_created_listed_viewed_and_edited_without_client_technical_
     assert store is not None
     assert store.tenant_id.startswith("c-tenant-")
     assert store.store_code.startswith("c-store-")
+    assert store.data_source == "PILOT"
+    assert store.customer_service_status == "DISABLED"
     package = session.get(CatalogPackage, store.package_id)
     assert package is not None
     assert package.production_usable is False
@@ -120,6 +124,8 @@ def test_product_can_be_created_under_store_and_is_visible_without_becoming_publ
     assert payload["product_summary"] == "可拼装消防局场景的机械积木套装。"
     assert payload["data_status"] == "PENDING_REVIEW"
     assert payload["sku_count"] == 0
+    assert payload["data_source"] == "PILOT"
+    assert payload["customer_service_status"] == "DISABLED"
     assert "tenant_id" not in created.text
     assert "store_code" not in created.text
     assert "external_id" not in created.text
@@ -130,6 +136,7 @@ def test_product_can_be_created_under_store_and_is_visible_without_becoming_publ
     assert persisted.review_status == "REVIEWING"
     assert persisted.sales_status == "OFF_SALE"
     assert persisted.publishable is False
+    assert persisted.customer_service_status == "DISABLED"
     assert persisted.source_ids_json == "[]"
     assert "PRODUCT_CREATED" in persisted.raw_data_json
     assert session.scalars(select(CatalogSku)).all() == []
