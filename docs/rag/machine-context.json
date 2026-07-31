@@ -4,16 +4,16 @@
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
   "version": "AI-CS Product Stabilization & Reliability Sprint V1",
-  "status": "a_stability_pass",
-  "current_task": "A runtime and answer reliability stabilization",
-  "current_gate": "A_STABILITY_PASS",
-  "current_stage": "A code, Prompt, model and RAG data are unchanged by R006. Formal release b66506a passed ready/model-configured checks, active collection test_knowledge_v031=47 and the real qwen3.5:9b startup chat smoke. Catalog ownership remains in C/B.",
-  "next_recommended_task": "Preserve fix commit 18a20f7 and the current Prompt/model/RAG data during R003 business acceptance. A must not infer or override customer catalog availability.",
+  "status": "runtime_entry_alignment_complete",
+  "current_task": "Windows Runtime Entry Alignment V1",
+  "current_gate": "A_STABILITY_PASS / RUNTIME_ENTRY_ALIGNMENT_COMPLETE",
+  "current_stage": "The standard Windows launcher and status entry now resolve the formal configuration automatically and preserve LAN mode across stop/start. A code, Prompt, model, contracts and RAG data are unchanged. Formal A remains ready with qwen3.5:9b and test_knowledge_v031=47.",
+  "next_recommended_task": "Keep using the generic standard start/status entries without a mandatory ConfigPath. Preserve the current Prompt/model/RAG data during R003 business acceptance; A must not infer or override customer catalog availability.",
   "checked_at": "2026-07-31",
   "runtime": {
     "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
     "branch": "release/r006-customer-available-catalog-v1",
-    "head": "b66506ab7706113df5207182d326f1cf03b40726",
+    "head": "0eab157d7e53192ff5eae46d68d66b0ec25f8bae",
     "stability_fix_commit": "18a20f70ec5cd4c4da7baef0179cc30db0dbff5a",
     "implementation_commits": [
       "acfdc1a92da652a7ea795b5e497eba5d997f5891",
@@ -22,7 +22,7 @@
     "identity_logic_commit": "38b233410fc75c95a476e8775f7821fb80aab7ff",
     "identity_unicode_guard_commit": "2e9e93a6b98950c073badc40f9e84741a3b8fdaa",
     "previous_business_baseline": "dd379278837a4f816dfb626292a26b0c54cce0cc",
-    "head_resolution": "Use git rev-parse HEAD. The final docs-only HEAD is re-attested after commit; protected business directories remain identical to dd379278.",
+    "head_resolution": "0eab157 is the runtime-entry implementation code SHA. Use git rev-parse HEAD for the final docs-only release SHA; the running service records are re-attested after that documentation commit.",
     "config": ".runtime/phase-e/config/green-standard.local.ps1",
     "runtime_mode": "standard",
     "network_mode": "LAN",
@@ -54,8 +54,8 @@
   },
   "tests": {
     "backend": "105 passed, 3 opt-in real E2E skipped",
-    "windows_ops": "8 script suites passed",
-    "runtime": "No-stop identity alignment passed; four original listener PIDs remained unchanged; LAN status reports RUNNING, healthy, runtimeMode=standard, networkMode=LAN and verified repository identity."
+    "windows_ops": "6 selected script suites passed: runtime entry alignment, runtime fix 2, LAN mode, target pilot ready, Admin T05 and OPS scripts",
+    "runtime": "Formal no-config stop/start/status passed and restored standard/LAN mode; explicit ConfigPath start and Chinese start/status batch shortcuts passed; all four services are RUNNING with verified repository identity."
   },
   "contracts": ["contracts/version.json 0.3.0 additive Customer Available Catalog; A interfaces unchanged"],
   "recovery": {
@@ -73,6 +73,10 @@
     "vector data deletion"
   ],
   "completed_tasks": [
+    "Windows Runtime Entry Alignment V1",
+    "Automatic formal config resolution",
+    "Persistent standard runtime network-mode preference",
+    "Chinese batch shortcut alignment",
     "No-stop formal Runtime Identity Alignment V1",
     "Explicit active collection configuration",
     "Active and available collection status projection",
