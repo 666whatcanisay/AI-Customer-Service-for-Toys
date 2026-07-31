@@ -764,6 +764,10 @@ export interface ProductKnowledgeListItem {
   answerable_topics: string[]
   missing_topics: string[]
   gap_count: number
+  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  customer_service_status: CustomerServiceStatus
+  customer_service_status_updated_at: string | null
+  customer_service_status_updated_by: string | null
   technical_details: ProductKnowledgeTechnicalDetails
 }
 
@@ -795,6 +799,10 @@ export interface ProductKnowledgeDetail {
     material: string | null
     package_contents: string | null
     usage_instructions: string | null
+    data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+    customer_service_status: CustomerServiceStatus
+    customer_service_status_updated_at: string | null
+    customer_service_status_updated_by: string | null
     technical_details: ProductKnowledgeTechnicalDetails
   }
   skus: Array<{
@@ -879,6 +887,7 @@ export async function getProductKnowledgeProduct(productId: string): Promise<Pro
 }
 
 export type StoreOperationStatus = 'ACTIVE' | 'INACTIVE'
+export type CustomerServiceStatus = 'ENABLED' | 'DISABLED'
 
 export interface StoreOperationItem {
   store_ref: number
@@ -889,6 +898,10 @@ export interface StoreOperationItem {
   product_count: number
   created_at: string
   remarks: string
+  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  customer_service_status: CustomerServiceStatus
+  customer_service_status_updated_at: string | null
+  customer_service_status_updated_by: string | null
 }
 
 export interface StoreOperationInput {
@@ -912,6 +925,44 @@ export interface ProductOperationItem {
   data_status_name: string
   sku_count: number
   created_at: string
+  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  customer_service_status: CustomerServiceStatus
+}
+
+export interface CatalogActivationReceipt {
+  schema_version: 'pilot-business-catalog-activation-receipt.v1'
+  activation_receipt_id: string
+  entity_type: 'STORE' | 'PRODUCT'
+  entity_ref: string
+  data_source: 'TEST' | 'PILOT'
+  previous_status: CustomerServiceStatus | null
+  customer_service_status: CustomerServiceStatus
+  activation_source: 'LEGACY_INITIALIZATION' | 'OPERATOR'
+  confirmed_by: string
+  confirmation_note: string
+  confirmed_at: string
+}
+
+export interface CatalogActivationResponse {
+  schema_version: 'pilot-business-catalog-activation-response.v1'
+  changed: boolean
+  entity: {
+    entity_type: 'STORE' | 'PRODUCT'
+    entity_ref: string
+    data_source: 'TEST' | 'PILOT'
+    customer_service_status: CustomerServiceStatus
+    customer_service_status_updated_at: string | null
+    customer_service_status_updated_by: string | null
+  }
+  activation_receipt: CatalogActivationReceipt | null
+  server_time: string
+}
+
+export interface CatalogActivationReceiptList {
+  items: CatalogActivationReceipt[]
+  total: number
+  page: number
+  size: number
 }
 
 export async function listOperationStores(): Promise<ItemList<StoreOperationItem>> {
@@ -956,6 +1007,57 @@ export async function createOperationProduct(
   const response = await apiClient.post<ProductOperationItem>(
     `/api/v1/admin/operations/stores/${storeRef}/products`,
     input,
+  )
+  return response.data
+}
+
+export async function setStoreCustomerServiceStatus(
+  storeRef: number,
+  status: CustomerServiceStatus,
+  confirmedBy: string,
+  idempotencyKey: string,
+): Promise<CatalogActivationResponse> {
+  const response = await apiClient.put<CatalogActivationResponse>(
+    `/api/v1/admin/operations/stores/${storeRef}/customer-service-status`,
+    {
+      customer_service_status: status,
+      confirmed_by: confirmedBy,
+      confirmation_note: status === 'ENABLED'
+        ? '运营已确认该店铺可供客服人工选择使用'
+        : '运营已关闭该店铺的客服人工选择入口',
+    },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function setProductCustomerServiceStatus(
+  productId: string,
+  status: CustomerServiceStatus,
+  confirmedBy: string,
+  idempotencyKey: string,
+): Promise<CatalogActivationResponse> {
+  const response = await apiClient.put<CatalogActivationResponse>(
+    `/api/v1/admin/operations/products/${encodeURIComponent(productId)}/customer-service-status`,
+    {
+      customer_service_status: status,
+      confirmed_by: confirmedBy,
+      confirmation_note: status === 'ENABLED'
+        ? '运营已确认该商品可供客服人工选择使用'
+        : '运营已关闭该商品的客服人工选择入口',
+    },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function listCatalogActivationReceipts(
+  entityType: 'STORE' | 'PRODUCT',
+  entityRef: string,
+): Promise<CatalogActivationReceiptList> {
+  const response = await apiClient.get<CatalogActivationReceiptList>(
+    '/api/v1/admin/operations/activation-receipts',
+    { params: { entity_type: entityType, entity_ref: entityRef, page: 1, size: 20 } },
   )
   return response.data
 }
