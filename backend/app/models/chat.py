@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -13,17 +11,21 @@ from pydantic import (
 
 
 class FrozenChatContext(BaseModel):
-    """Frozen V0.3.1 test scope supplied by the caller."""
+    """Caller-supplied business scope from the C-owned customer catalog.
+
+    A validates only that the identifiers are safe and complete.  Product
+    permission and catalog availability remain C responsibilities.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    tenant_id: Literal["TENANT-PDD-SM-TEST"]
-    platform: Literal["pdd"]
-    store_code: Literal["PDD-SM"]
+    tenant_id: str = Field(..., min_length=1, max_length=100)
+    platform: str = Field(..., min_length=1, max_length=40)
+    store_code: str = Field(..., min_length=1, max_length=100)
     product_id: str = Field(..., min_length=1, max_length=100)
     sku_id: str | None = Field(default=None, max_length=100)
 
-    @field_validator("platform", "store_code", "product_id")
+    @field_validator("tenant_id", "platform", "store_code", "product_id")
     @classmethod
     def required_scope_must_be_safe(cls, value: str) -> str:
         value = value.strip()

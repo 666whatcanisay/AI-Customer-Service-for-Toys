@@ -250,9 +250,13 @@
         aria-live="polite"
       >
         <div>
-          <small>AI 参考准备度</small>
+          <small>AI 知识状态</small>
           <strong>{{ customerKnowledgeTitle }}</strong>
           <p>{{ customerKnowledgeDescription }}</p>
+          <p class="knowledge-evidence" data-testid="customer-knowledge-evidence">
+            引用数量：{{ customerKnowledgeStatus?.chunkCount ?? 0 }} ·
+            发布收据：{{ customerKnowledgeStatus?.publicationReceiptId ? '已生成' : '未生成' }}
+          </p>
           <p class="knowledge-action" data-testid="customer-knowledge-action">
             <b>本次操作：</b>{{ customerKnowledgeAction }}
           </p>
@@ -266,7 +270,7 @@
           data-testid="customer-knowledge-refresh"
           @click="loadCustomerKnowledgeStatus"
         >
-          刷新资料状态
+          刷新 AI 知识状态
         </el-button>
       </section>
       <div v-if="showTechnicalDetails && selectedStore && selectedProduct" class="technical-box" data-testid="context-technical-details">
@@ -830,17 +834,19 @@ const platformLabels: Record<string, string> = {
 }
 
 const customerKnowledgeLabels: Record<CustomerKnowledgeStatusValue, string> = {
-  READY: '资料可供人工参考',
-  NEEDS_REVIEW: '回复前需要人工核对',
-  NO_APPROVED_MATERIAL: '暂无已审核资料',
-  UNAVAILABLE: '资料状态暂不可用'
+  NOT_GENERATED: '未发布',
+  GENERATING: '发布中',
+  PUBLISHED: '已发布',
+  SYNC_FAILED: '同步失败',
+  NEED_RESYNC: '需要重新同步'
 }
 
 const customerKnowledgeTones: Record<CustomerKnowledgeStatusValue, string> = {
-  READY: 'ready',
-  NEEDS_REVIEW: 'warning',
-  NO_APPROVED_MATERIAL: 'warning',
-  UNAVAILABLE: 'error'
+  NOT_GENERATED: 'warning',
+  GENERATING: 'warning',
+  PUBLISHED: 'ready',
+  SYNC_FAILED: 'error',
+  NEED_RESYNC: 'warning'
 }
 
 const requiredFieldLabels: Record<string, string> = {
@@ -982,36 +988,50 @@ const selectedSku = computed(() =>
 )
 
 const customerKnowledgeTitle = computed(() => {
-  if (customerKnowledgeLoading.value) return '正在检查资料状态'
-  if (customerKnowledgeError.value) return '资料状态暂时无法获取'
+  if (customerKnowledgeLoading.value) return '正在检查 AI 知识状态'
+  if (customerKnowledgeError.value) return 'AI 知识状态暂时无法获取'
   if (customerKnowledgeStatus.value) return customerKnowledgeLabels[customerKnowledgeStatus.value.status]
-  return '等待选择商品后检查'
+  return '等待选择商品后检查 AI 知识'
 })
 
 const customerKnowledgeDescription = computed(() => {
-  if (customerKnowledgeLoading.value) return '正在读取与当前商品范围匹配的资料状态。'
-  if (customerKnowledgeError.value) return '无法获取资料状态，可继续咨询；生成回复前请人工核对商品信息。'
-  if (customerKnowledgeStatus.value) return customerKnowledgeStatus.value.summary
-  return '选择商品后会显示资料是否已完成审核；该提示不会阻断 AI 咨询。'
+  if (customerKnowledgeLoading.value) return '正在读取当前商品的发布收据和 RAG 引用证据。'
+  if (customerKnowledgeError.value) return '无法获取 AI 知识状态，可继续咨询；生成回复前请人工核对商品信息。'
+  switch (customerKnowledgeStatus.value?.status) {
+    case 'PUBLISHED':
+      return `发布收据有效，当前商品有 ${customerKnowledgeStatus.value.chunkCount} 条可检索引用。`
+    case 'NEED_RESYNC':
+      return `商品知识已变化；当前 ${customerKnowledgeStatus.value.chunkCount} 条引用属于上次发布，需要重新同步。`
+    case 'GENERATING':
+      return '商品知识正在增量生成、切片和向量化，请稍后刷新。'
+    case 'SYNC_FAILED':
+      return '最近一次同步未形成完整的发布收据或引用证据。'
+    case 'NOT_GENERATED':
+      return '该商品尚未生成可供 AI 检索的知识。'
+    default:
+      return '选择商品后会显示真实的 AI 知识发布和引用状态。'
+  }
 })
 
 const customerKnowledgeAction = computed(() => {
   if (customerKnowledgeLoading.value) return '请稍候，资料状态不会阻断当前咨询。'
   if (customerKnowledgeError.value) {
-    return '资料状态接口暂时无法连接；可继续生成建议，但发送前请按人工客服流程核对商品信息。'
+    return 'AI 知识状态接口暂时无法连接；可继续生成建议，但发送前请按人工客服流程核对商品信息。'
   }
 
   switch (customerKnowledgeStatus.value?.status) {
-    case 'READY':
+    case 'PUBLISHED':
       return '可继续提问；生成后仍须核对商品、款式和至少一条回答依据。'
-    case 'NEEDS_REVIEW':
-      return '可继续提问；发送前请核对当前商品信息和回答依据，不作超出资料范围的承诺。'
-    case 'NO_APPROVED_MATERIAL':
-      return '可继续提问；资料不足时不要直接采用，必要时转人工处理。'
-    case 'UNAVAILABLE':
-      return '可继续提问；请先按人工客服流程核对商品信息，避免作出承诺。'
+    case 'NEED_RESYNC':
+      return '可继续提问；新内容完成同步前，请核对回答是否仍引用旧版本知识。'
+    case 'GENERATING':
+      return '建议等待发布完成后再依赖 AI 回答；紧急咨询请按人工客服流程处理。'
+    case 'SYNC_FAILED':
+      return '不要依赖当前 AI 知识状态；请人工核对商品资料并联系运营重新同步。'
+    case 'NOT_GENERATED':
+      return '可继续提问，但不得假设已有商品知识；资料不足时转人工处理。'
     default:
-      return '选择商品后会显示资料准备情况；该提示不会阻断 AI 咨询。'
+      return '选择商品后会显示 AI 知识发布情况；该提示不会阻断 AI 咨询。'
   }
 })
 
@@ -1319,7 +1339,7 @@ const loadCustomerKnowledgeStatus = async () => {
   } catch {
     if (!controller.signal.aborted) {
       customerKnowledgeStatus.value = null
-      customerKnowledgeError.value = '无法获取资料状态，可继续咨询。'
+      customerKnowledgeError.value = '无法获取 AI 知识状态，可继续咨询。'
     }
   } finally {
     if (activeCustomerKnowledgeController === controller) {

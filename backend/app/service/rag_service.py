@@ -15,6 +15,12 @@ from openai import OpenAI
 
 from app.config.settings import Settings
 from app.models.chat import FrozenChatContext
+from app.models.knowledge_publication import (
+    ProductKnowledgePublishReceipt,
+    ProductKnowledgePublishRequest,
+    ProductKnowledgeVisibility,
+    ProductKnowledgeVisibilityRequest,
+)
 from app.service.ai_capability import (
     PROMPT_SYSTEM_MESSAGE,
     RuntimeMetrics,
@@ -25,10 +31,14 @@ from app.service.test_knowledge import (
     TestKnowledgeIndex,
 )
 from app.service.vector_store import VectorStore
+from app.service.product_knowledge_publisher import ProductKnowledgePublisher
 
 
 logger = logging.getLogger(__name__)
 REFUSAL_MESSAGE = "知识库中未找到足够可靠的相关内容，无法回答该问题。"
+KNOWLEDGE_NOT_PUBLISHED_MESSAGE = (
+    "该商品已进入客服目录，但AI知识尚未同步，请人工核对商品资料。"
+)
 MODEL_NOT_CONFIGURED_MESSAGE = (
     "大模型尚未配置，当前已完成知识库检索，但暂时无法生成完整回答。"
 )
@@ -182,6 +192,22 @@ class RAGService:
     def sync_test_knowledge(self, package_id: str) -> dict[str, Any]:
         package = self.platform_client.fetch_package(package_id)
         return self.test_knowledge_index.sync(package)
+
+    def publish_product_knowledge(
+        self, request: ProductKnowledgePublishRequest
+    ) -> ProductKnowledgePublishReceipt:
+        active_store = self.active_vector_store()
+        if active_store is None:
+            raise RuntimeError("活动知识集合不可用")
+        return ProductKnowledgePublisher(active_store).publish(request)
+
+    def product_knowledge_visibility(
+        self, request: ProductKnowledgeVisibilityRequest
+    ) -> ProductKnowledgeVisibility:
+        active_store = self.active_vector_store()
+        if active_store is None:
+            raise RuntimeError("活动知识集合不可用")
+        return ProductKnowledgePublisher(active_store).visibility(request)
 
     @classmethod
     def _answer_topics(cls, question: str) -> tuple[str, ...]:
@@ -548,7 +574,13 @@ class RAGService:
         if context is None:
             results = self.vector_store.search(question, top_k=limit)
         else:
-            results = self.test_knowledge_index.search(question, context, limit)
+            active_store = self.active_vector_store()
+            if active_store is None:
+                results = []
+            else:
+                results = TestKnowledgeIndex(active_store).search(
+                    question, context, limit
+                )
         age_question = "age" in self._answer_topics(question)
         accepted_results = [
             result
@@ -1033,15 +1065,24 @@ class RAGService:
             or missing_product_scope
             or requested_topics_missing
         ):
+            knowledge_not_published = bool(context and missing_product_scope)
             return {
-                "answer": REFUSAL_MESSAGE,
+                "answer": (
+                    KNOWLEDGE_NOT_PUBLISHED_MESSAGE
+                    if knowledge_not_published
+                    else REFUSAL_MESSAGE
+                ),
                 "action": "REFUSE",
                 "sources": [],
                 "model": self.settings.llm_model,
                 "latency_ms": round((time.perf_counter() - start) * 1000, 1),
                 "request_id": request_id,
                 "risk_level": "HIGH" if context else None,
-                "warnings": ["NO_SCOPED_KNOWLEDGE"] if context else [],
+                "warnings": (
+                    ["KNOWLEDGE_NOT_PUBLISHED"]
+                    if knowledge_not_published
+                    else ["NO_SCOPED_KNOWLEDGE"] if context else []
+                ),
                 "required_fields": [],
                 "context": context.model_dump() if context else None,
             }

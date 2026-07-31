@@ -10,8 +10,11 @@ from app.customer_catalog.schemas import (
     ActivationResponse,
     ActivatableEntityType,
     ProductCatalogResponse,
+    CustomerProductAiKnowledgeStatus,
     SkuCatalogResponse,
     StoreCatalogResponse,
+    BatchActivationRequest,
+    BatchActivationResponse,
 )
 from app.customer_catalog.service import (
     CatalogActivationService,
@@ -44,6 +47,19 @@ def list_customer_service_products(
 
 
 @customer_router.get(
+    "/products/{product_id}/ai-knowledge",
+    response_model=CustomerProductAiKnowledgeStatus,
+)
+def get_customer_service_product_ai_knowledge(
+    product_id: str,
+    session: Session = Depends(get_db),
+) -> CustomerProductAiKnowledgeStatus:
+    return CustomerAvailableCatalogService(session).get_product_ai_knowledge_status(
+        product_id
+    )
+
+
+@customer_router.get(
     "/products/{product_id}/skus", response_model=SkuCatalogResponse
 )
 def list_customer_service_skus(
@@ -66,6 +82,24 @@ def set_store_customer_service_status(
 ) -> ActivationResponse:
     result, replayed = CatalogActivationService(session).set_store_status(
         store_ref, request, idempotency_key
+    )
+    if replayed:
+        response.headers["Idempotency-Replayed"] = "true"
+    return result
+
+
+@admin_router.post(
+    "/products/customer-service-status:batch",
+    response_model=BatchActivationResponse,
+)
+def enable_products_for_customer_service(
+    request: BatchActivationRequest,
+    response: Response,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    session: Session = Depends(get_db),
+) -> BatchActivationResponse:
+    result, replayed = CatalogActivationService(session).enable_products_batch(
+        request, idempotency_key
     )
     if replayed:
         response.headers["Idempotency-Replayed"] = "true"

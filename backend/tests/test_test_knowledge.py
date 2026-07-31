@@ -226,6 +226,24 @@ def test_sync_is_idempotent_and_metadata_is_complete(scoped_service):
     } <= metadata.keys()
 
 
+def test_pinduoduo_business_context_reads_historical_pdd_metadata(scoped_service):
+    service, _ = scoped_service
+    business_context = FrozenChatContext(
+        tenant_id="TENANT-PDD-SM-TEST",
+        platform="pinduoduo",
+        store_code="PDD-SM",
+        product_id="P-Q80",
+        sku_id=None,
+    )
+
+    results = service.test_knowledge_index.search(
+        "这个商品适合多大年龄？", business_context, top_k=3
+    )
+
+    assert results
+    assert all(result["platform"] == "pdd" for result in results)
+
+
 def test_product_and_sku_scope_filtering_prevents_cross_product(scoped_service):
     service, _ = scoped_service
     product_results = service.test_knowledge_index.search(
@@ -595,7 +613,7 @@ def test_unknown_product_refuses_even_when_store_guard_matches(
 
     assert result["action"] == "REFUSE"
     assert result["sources"] == []
-    assert result["warnings"] == ["NO_SCOPED_KNOWLEDGE"]
+    assert result["warnings"] == ["KNOWLEDGE_NOT_PUBLISHED"]
 
 
 def test_local_ollama_bypasses_environment_proxy(scoped_service, monkeypatch):
@@ -778,7 +796,7 @@ def test_chat_and_retrieval_smoke_use_frozen_context(scoped_service):
         assert retrieval.json()["data"]["accepted"] is True
 
 
-def test_invalid_store_context_and_unconfigured_live_sync_are_blocked(api_client):
+def test_catalog_store_context_is_accepted_and_unsafe_context_is_blocked(api_client):
     client, _ = api_client
     invalid = client.post(
         "/api/chat",
@@ -793,18 +811,28 @@ def test_invalid_store_context_and_unconfigured_live_sync_are_blocked(api_client
             },
         },
     )
-    assert invalid.status_code == 422
+    assert invalid.status_code == 200
+    assert invalid.json()["warnings"] == ["KNOWLEDGE_NOT_PUBLISHED"]
     missing_context = client.post("/api/chat", json={"question": "test"})
     assert missing_context.status_code == 422
     sync = client.post(f"/api/test-knowledge/sync/{PACKAGE_ID}")
     assert sync.status_code == 503
     assert "ENV_BLOCKED" in sync.text
 
+    accepted = FrozenChatContext(
+        tenant_id="TENANT-PILOT",
+        platform="pinduoduo",
+        store_code="OTHER",
+        product_id="P-Q80",
+        sku_id=None,
+    )
+    assert accepted.store_code == "OTHER"
+
     with pytest.raises(ValidationError):
         FrozenChatContext(
             tenant_id="TENANT-PDD-SM-TEST",
             platform="pdd",
-            store_code="OTHER",
+            store_code="OTHER\nSTORE",
             product_id="P-Q80",
             sku_id=None,
         )

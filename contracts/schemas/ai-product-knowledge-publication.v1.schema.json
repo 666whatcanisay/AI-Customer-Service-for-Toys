@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai-product-knowledge-publication.v1.schema.json",
+  "title": "AI Product Knowledge Incremental Publication V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "publication_receipt_id", "status", "product_id", "knowledge_fingerprint", "active_collection", "chunk_count", "embedding_count", "published_at"],
+  "properties": {
+    "schema_version": {"const": "ai-product-knowledge-publication.v1"},
+    "publication_receipt_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "status": {"const": "PUBLISHED"},
+    "product_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "knowledge_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "active_collection": {"type": "string", "minLength": 1, "maxLength": 128},
+    "chunk_count": {"type": "integer", "minimum": 1},
+    "embedding_count": {"type": "integer", "minimum": 1},
+    "published_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "idempotency_key", "tenant_id", "platform", "store_code", "product_id", "product_name", "data_source", "knowledge_fingerprint", "document", "source_ids", "operator"],
+      "properties": {
+        "schema_version": {"const": "ai-product-knowledge-publication.v1"},
+        "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 255},
+        "tenant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "platform": {"type": "string", "minLength": 1, "maxLength": 64},
+        "store_code": {"type": "string", "minLength": 1, "maxLength": 96},
+        "product_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "product_name": {"type": "string", "minLength": 1, "maxLength": 255},
+        "data_source": {"enum": ["TEST", "PILOT"]},
+        "knowledge_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "document": {"type": "string", "minLength": 1},
+        "source_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "operator": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    }
+  }
+}

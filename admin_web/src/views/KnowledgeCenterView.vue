@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import {
   apiErrorMessage,
+  enableProductsForCustomerService,
   getProductKnowledgeOverview,
   listProductKnowledgeProducts,
+  publishProductAiKnowledge,
+  type AiKnowledgePublicationStatus,
   type ProductKnowledgeListItem,
   type ProductKnowledgeOverview,
 } from '../api/client'
@@ -16,6 +19,37 @@ const activeStoreCode = ref('')
 const loading = ref(true)
 const productLoading = ref(false)
 const error = ref('')
+const operator = ref('')
+const selectedProductIds = ref<string[]>([])
+const pendingOnly = ref(false)
+const actionBusy = ref(false)
+const actionMessage = ref('')
+const actionError = ref('')
+
+const visibleProducts = computed(() => pendingOnly.value
+  ? products.value.filter((product) => product.data_status === 'APPROVED' && product.customer_service_status === 'DISABLED')
+  : products.value)
+
+function productId(product: ProductKnowledgeListItem): string {
+  return product.technical_details.product_id || ''
+}
+
+function aiKnowledgeLabel(status: AiKnowledgePublicationStatus): string {
+  return {
+    NOT_GENERATED: '未生成',
+    GENERATING: '生成中',
+    PUBLISHED: '已发布',
+    SYNC_FAILED: '同步失败',
+    NEED_RESYNC: '待重新同步',
+  }[status]
+}
+
+function canPublish(product: ProductKnowledgeListItem): boolean {
+  return product.data_status === 'APPROVED'
+    && product.data_source !== 'UNKNOWN'
+    && product.ai_knowledge.status !== 'GENERATING'
+    && product.ai_knowledge.status !== 'PUBLISHED'
+}
 
 const metrics = [
   { key: 'store_count', label: '店铺数量' },
@@ -33,6 +67,7 @@ function metricValue(key: typeof metrics[number]['key']): string {
 async function selectStore(storeCode: string): Promise<void> {
   if (productLoading.value) return
   activeStoreCode.value = storeCode
+  selectedProductIds.value = []
   productLoading.value = true
   error.value = ''
   try {
@@ -42,6 +77,61 @@ async function selectStore(storeCode: string): Promise<void> {
     error.value = apiErrorMessage(reason)
   } finally {
     productLoading.value = false
+  }
+}
+
+async function batchEnable(): Promise<void> {
+  if (actionBusy.value) return
+  if (!operator.value.trim()) {
+    actionError.value = '请先填写本次操作人。'
+    return
+  }
+  if (!selectedProductIds.value.length) {
+    actionError.value = '请先选择至少一个“已审核、客服未启用”的商品。'
+    return
+  }
+  actionBusy.value = true
+  actionError.value = ''
+  actionMessage.value = ''
+  try {
+    const result = await enableProductsForCustomerService(
+      selectedProductIds.value,
+      operator.value.trim(),
+      `batch-enable-${crypto.randomUUID()}`,
+    )
+    actionMessage.value = `批量启用完成：成功 ${result.changed_count}，已是目标状态 ${result.unchanged_count}，失败 ${result.failed_count}。每个成功变化均已生成 activation receipt。`
+    await selectStore(activeStoreCode.value)
+  } catch (reason: unknown) {
+    actionError.value = apiErrorMessage(reason)
+  } finally {
+    actionBusy.value = false
+  }
+}
+
+async function publishKnowledge(product: ProductKnowledgeListItem): Promise<void> {
+  const id = productId(product)
+  if (!id || actionBusy.value) return
+  if (!operator.value.trim()) {
+    actionError.value = '请先填写本次操作人。'
+    return
+  }
+  actionBusy.value = true
+  actionError.value = ''
+  actionMessage.value = ''
+  try {
+    const result = await publishProductAiKnowledge(
+      id,
+      operator.value.trim(),
+      `publish-${id}-${crypto.randomUUID()}`,
+    )
+    actionMessage.value = result.publication_receipt
+      ? `AI 知识已增量发布，收据：${result.publication_receipt.publication_receipt_id}`
+      : '当前审核版本已发布，无需重复生成向量。'
+    await selectStore(activeStoreCode.value)
+  } catch (reason: unknown) {
+    actionError.value = apiErrorMessage(reason)
+  } finally {
+    actionBusy.value = false
   }
 }
 
@@ -115,6 +205,21 @@ onMounted(load)
           </div>
         </section>
 
+        <section class="card activation-toolbar" aria-label="商品上线操作">
+          <div>
+            <p class="eyebrow">商品上线</p>
+            <h2>资料审核 → 客服可用 → AI 可用</h2>
+            <p>三个状态相互独立。启用客服不会自动发布 AI 知识；发布 AI 知识也不会自动启用客服。</p>
+          </div>
+          <label>本次操作人<input v-model.trim="operator" maxlength="128" placeholder="填写姓名或运营账号" data-testid="knowledge-activation-operator"></label>
+          <div class="toolbar-actions">
+            <label class="check-label"><input v-model="pendingOnly" type="checkbox">只看待客服启用</label>
+            <button class="button" type="button" :disabled="actionBusy || selectedProductIds.length === 0" data-testid="batch-enable-products" @click="batchEnable">批量启用客服（{{ selectedProductIds.length }}）</button>
+          </div>
+          <p v-if="actionMessage" class="notice success" role="status">{{ actionMessage }}</p>
+          <p v-if="actionError" class="notice error" role="alert">{{ actionError }}</p>
+        </section>
+
         <section class="catalog-section">
           <div class="section-heading">
             <div>
@@ -125,18 +230,23 @@ onMounted(load)
           </div>
           <p v-if="productLoading" class="notice" role="status">正在读取该店铺商品…</p>
           <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
-          <p v-else-if="products.length === 0" class="notice">该店铺暂无已导入商品。</p>
+          <p v-else-if="visibleProducts.length === 0" class="notice">{{ pendingOnly ? '该店铺暂无待客服启用的已审核商品。' : '该店铺暂无已导入商品。' }}</p>
           <div v-else class="product-grid">
-            <article v-for="product in products" :key="product.technical_details.product_id || product.product_name" class="product-card">
+            <article v-for="product in visibleProducts" :key="product.technical_details.product_id || product.product_name" class="product-card">
               <div class="product-heading">
                 <div>
+                  <label v-if="product.data_status === 'APPROVED' && product.customer_service_status === 'DISABLED' && productId(product)" class="select-product">
+                    <input v-model="selectedProductIds" type="checkbox" :value="productId(product)" :data-testid="`select-product-${productId(product)}`">
+                    选择批量启用
+                  </label>
                   <small>{{ product.store_name }} → 商品</small>
                   <h3>{{ product.product_name }}</h3>
                 </div>
                 <div class="status-pair">
                   <span class="state-pill data">资料：{{ displayStatus(product.data_status) }}</span>
-                  <span :class="['state-pill', product.ai_status.toLowerCase()]">AI：{{ displayStatus(product.ai_status) }}</span>
+                  <span :class="['state-pill', product.ai_status.toLowerCase()]">资料覆盖：{{ displayStatus(product.ai_status) }}</span>
                   <span class="state-pill data">客服：{{ product.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span>
+                  <span :class="['state-pill', `publication-${product.ai_knowledge.status.toLowerCase()}`]">AI知识：{{ aiKnowledgeLabel(product.ai_knowledge.status) }}</span>
                 </div>
               </div>
               <p class="summary">{{ product.product_summary || '当前资料未提供商品简介。' }}</p>
@@ -167,6 +277,12 @@ onMounted(load)
               <div class="knowledge-summary">
                 <span>可回答 {{ product.answerable_topics.length }} 项</span>
                 <span class="warning">缺失 {{ product.missing_topics.length }} 项</span>
+                <span>RAG chunks {{ product.ai_knowledge.chunk_count }}</span>
+              </div>
+              <div class="card-actions">
+                <button v-if="canPublish(product)" class="button" type="button" :disabled="actionBusy" :data-testid="`publish-product-${productId(product)}`" @click="publishKnowledge(product)">{{ product.ai_knowledge.status === 'NEED_RESYNC' ? '重新同步AI知识' : '同步AI知识' }}</button>
+                <span v-else-if="product.ai_knowledge.status === 'PUBLISHED'" class="published-note">AI 知识已发布</span>
+                <span v-else-if="product.data_status !== 'APPROVED'" class="pending-note">资料审核通过后才能发布 AI 知识</span>
               </div>
               <RouterLink
                 v-if="product.technical_details.product_id"
@@ -190,11 +306,12 @@ onMounted(load)
 .metric-card span { color: #617087; font-size: 13px; }.metric-card strong { color: #172554; font-size: 27px; }.metric-card strong.empty { font-size: 16px; color: #8090a5; }
 .empty-state { text-align: center; }.empty-state h2 { color: #172554; }.empty-state p { color: #617087; }
 .navigator { margin-bottom: 22px; }.section-heading, .product-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }.section-heading h2, .product-heading h3 { margin: 0; color: #172554; }.section-heading > span { color: #718096; font-size: 13px; }
+.activation-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px auto; gap: 16px; align-items: end; margin-bottom: 22px; }.activation-toolbar h2 { margin: 0; color: #172554; }.activation-toolbar p { margin-bottom: 0; color: #617087; }.activation-toolbar label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.activation-toolbar input { min-height: 39px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.toolbar-actions { display: grid; gap: 8px; }.toolbar-actions .check-label { display: flex; align-items: center; gap: 7px; }.toolbar-actions .check-label input, .select-product input { min-height: auto; }.activation-toolbar .notice { grid-column: 1 / -1; margin: 0; }
 .store-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }.store-tab { display: grid; gap: 5px; min-width: 240px; padding: 13px 15px; border: 1px solid #d7e1ee; border-radius: 10px; color: #25466f; background: #fff; text-align: left; cursor: pointer; }.store-tab.active { border-color: #3973c4; box-shadow: inset 0 0 0 1px #3973c4; background: #f4f8ff; }.store-tab small { color: #617087; }
 .catalog-section { margin-top: 8px; }.product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }.product-card { display: grid; gap: 15px; padding: 20px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }.product-heading small { color: #617087; }.product-heading h3 { margin-top: 5px; font-size: 18px; }.state-pill { padding: 5px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: #e7f5ec; color: #217447; }.state-pill.basic_available { background: #eaf2ff; color: #285493; }.state-pill.needs_completion { background: #fff1df; color: #9a5c0d; }
-.summary { margin: 0; color: #526279; line-height: 1.65; }.label { display: block; margin-bottom: 8px; color: #334965; font-size: 13px; }.tag-row, .sku-row { display: flex; flex-wrap: wrap; gap: 7px; }.tag, .sku-row span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.missing-text { margin: 0; color: #a56a1e; font-size: 13px; }.status-pair { display: grid; justify-items: end; gap: 6px; }.state-pill.data { color: #365174; background: #edf2f8; }.state-pill.partially_available { color: #285493; background: #eaf2ff; }.state-pill.missing_knowledge, .state-pill.unconfirmed { color: #9a5c0d; background: #fff1df; }.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }.fact-grid div { padding: 10px; border-radius: 8px; background: #f7f9fc; }.fact-grid dt { color: #617087; font-size: 11px; }.fact-grid dd { margin: 4px 0 0; color: #334965; font-size: 13px; line-height: 1.45; }
+.summary { margin: 0; color: #526279; line-height: 1.65; }.label { display: block; margin-bottom: 8px; color: #334965; font-size: 13px; }.tag-row, .sku-row { display: flex; flex-wrap: wrap; gap: 7px; }.tag, .sku-row span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.missing-text { margin: 0; color: #a56a1e; font-size: 13px; }.status-pair { display: grid; justify-items: end; gap: 6px; }.select-product { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #285493; font-size: 12px; }.state-pill.data { color: #365174; background: #edf2f8; }.state-pill.partially_available { color: #285493; background: #eaf2ff; }.state-pill.missing_knowledge, .state-pill.unconfirmed, .state-pill.publication-not_generated, .state-pill.publication-need_resync { color: #9a5c0d; background: #fff1df; }.state-pill.publication-published { color: #217447; background: #e7f5ec; }.state-pill.publication-sync_failed { color: #a23d3d; background: #fff0f0; }.state-pill.publication-generating { color: #285493; background: #eaf2ff; }.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }.fact-grid div { padding: 10px; border-radius: 8px; background: #f7f9fc; }.fact-grid dt { color: #617087; font-size: 11px; }.fact-grid dd { margin: 4px 0 0; color: #334965; font-size: 13px; line-height: 1.45; }.card-actions { display: flex; align-items: center; gap: 10px; }.published-note { color: #217447; font-size: 13px; }.pending-note { color: #9a5c0d; font-size: 13px; }
 .coverage-row { display: grid; gap: 8px; }.coverage-row > div:first-child { display: flex; justify-content: space-between; align-items: baseline; }.coverage-row strong { color: #285493; font-size: 22px; }.coverage-row span { color: #617087; font-size: 13px; }.progress { height: 7px; overflow: hidden; border-radius: 999px; background: #e7edf5; }.progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3269b3, #42a67a); }
 .knowledge-summary { display: flex; gap: 16px; color: #28704c; font-size: 13px; }.knowledge-summary .warning { color: #a56618; }.boundary { margin-top: 20px; color: #75570a; background: #fff8df; line-height: 1.6; }
 @media (max-width: 1050px) { .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .product-grid { grid-template-columns: 1fr; }.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.section-heading { display: block; }.section-heading > span { display: block; margin-top: 6px; } }
+@media (max-width: 760px) { .product-grid { grid-template-columns: 1fr; }.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.section-heading { display: block; }.section-heading > span { display: block; margin-top: 6px; }.activation-toolbar { grid-template-columns: 1fr; } }
 </style>

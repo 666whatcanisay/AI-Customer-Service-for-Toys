@@ -37,6 +37,7 @@ from app.customer_catalog.routes import (
     admin_router as customer_catalog_admin_router,
     customer_router as customer_catalog_customer_router,
 )
+from app.knowledge_publishing.routes import router as knowledge_publishing_router
 from app.errors import (
     AppError,
     app_exception_handler,
@@ -86,6 +87,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(knowledge_quality_router)
     application.include_router(customer_knowledge_status_router)
     application.include_router(product_knowledge_router)
+    application.include_router(knowledge_publishing_router)
     application.include_router(product_knowledge_import_router)
     application.include_router(operation_management_router)
     application.include_router(customer_catalog_customer_router)

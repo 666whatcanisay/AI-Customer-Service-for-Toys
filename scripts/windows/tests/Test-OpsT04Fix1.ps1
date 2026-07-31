@@ -10,6 +10,23 @@ $shellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
 $platformProbePath = (Get-Command where.exe -ErrorAction Stop).Source
 $fakeProcess = $null
 
+function Invoke-StatusFixture {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell can surface a child process' stderr as a
+        # NativeCommandError. The degraded-state fixtures intentionally emit
+        # diagnostics, so capture them for assertions instead of terminating.
+        $ErrorActionPreference = 'Continue'
+        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $Path 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    return [pscustomobject]@{ Output = @($output); ExitCode = $exitCode }
+}
+
 try {
     New-Item -ItemType Directory -Force -Path @($testRoot, (Join-Path $testRoot 'backend'), (Join-Path $testRoot 'frontend'), (Join-Path $testRoot 'platform_backend')) | Out-Null
     @"
@@ -38,8 +55,9 @@ try {
     $pidAssignments = rg -n --glob '*.ps1' '(?i)\$pid\s*=' (Join-Path $PSScriptRoot '..')
     if ($LASTEXITCODE -eq 0 -or $pidAssignments) { throw '仍存在 $pid 赋值，可能与内置 $PID 冲突。' }
 
-    $statusOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
-    if ($LASTEXITCODE -ne 0) { throw '全部服务未运行时状态脚本不应失败。' }
+    $statusResult = Invoke-StatusFixture $configPath
+    $statusOutput = $statusResult.Output
+    if ($statusResult.ExitCode -ne 0) { throw '全部服务未运行时状态脚本不应失败。' }
     foreach ($expected in @('C：未运行','A：未运行','B：未运行','未监听','health：不可用')) {
         if (($statusOutput -join "`n") -notmatch [regex]::Escape($expected)) { throw "缺少状态输出：$expected" }
     }
@@ -48,20 +66,32 @@ try {
     $config = Get-LocalConfig $configPath
     $listenerCommand = '$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 65403); $listener.Start(); Start-Sleep -Seconds 90'
     $fakeProcess = Start-Process -FilePath $shellPath -ArgumentList @('-NoProfile','-Command',$listenerCommand) -WindowStyle Hidden -PassThru
-    Start-Sleep -Milliseconds 300
+    $listenerDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $listenerReady = @(Get-TcpListeningConnection 65403).Count -gt 0
+        if (-not $listenerReady) { Start-Sleep -Milliseconds 100 }
+    } until ($listenerReady -or [DateTime]::UtcNow -ge $listenerDeadline)
+    if (-not $listenerReady) { throw 'C 测试监听器未在 5 秒内就绪。' }
     Save-ServiceRecord $config 'platform' $fakeProcess $shellPath $testRoot 'test C listener' 'TcpListener' 65403
-    $onlyCOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($onlyCOutput -join "`n") -notmatch 'C：运行中' -or ($onlyCOutput -join "`n") -notmatch '端口 65403：监听') { throw '只有 C 运行时未正确展示。' }
+    $onlyCResult = Invoke-StatusFixture $configPath
+    $onlyCOutput = $onlyCResult.Output
+    if ($onlyCResult.ExitCode -ne 0 -or ($onlyCOutput -join "`n") -notmatch 'C：运行中' -or ($onlyCOutput -join "`n") -notmatch '端口 65403：监听') {
+        throw "只有 C 运行时未正确展示。实际输出：`n$($onlyCOutput -join "`n")"
+    }
     if (Get-Process -Id $fakeProcess.Id -ErrorAction SilentlyContinue) { Stop-Process -Id $fakeProcess.Id -Force }
     $fakeProcess = $null
 
-    @{ name='platform'; pid=999999; executablePath=$shellPath; workingDirectory=$testRoot; startedUtc='2000-01-01T00:00:00.0000000Z'; commandFeature='never'; port=65403 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $config.RuntimeDirectory 'platform.json') -Encoding UTF8
-    $staleOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($staleOutput -join "`n") -notmatch 'C：未运行') { throw '过期 PID 未被安全地展示为未运行。' }
+    @{ name='platform'; pid=999999; executablePath=$shellPath; workingDirectory=$testRoot; startedUtc='2000-01-01T00:00:00.0000000Z'; commandFeature='never'; port=65403; repository_root=$testRoot; network_mode='LOCAL' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $config.RuntimeDirectory 'platform.json') -Encoding UTF8
+    $staleResult = Invoke-StatusFixture $configPath
+    $staleOutput = $staleResult.Output
+    if ($staleResult.ExitCode -ne 0 -or ($staleOutput -join "`n") -notmatch 'C：未运行') {
+        throw "过期 PID 未被安全地展示为未运行。exit=$($staleResult.ExitCode)；实际输出：`n$($staleOutput -join "`n")"
+    }
 
     Remove-Item -LiteralPath $config.RuntimeDirectory -Recurse -Force
-    $runtimeMissingOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $statusScript -ConfigPath $configPath 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($runtimeMissingOutput -join "`n") -notmatch 'C：未运行') { throw '缺少 .runtime 时状态脚本不应失败。' }
+    $runtimeMissingResult = Invoke-StatusFixture $configPath
+    $runtimeMissingOutput = $runtimeMissingResult.Output
+    if ($runtimeMissingResult.ExitCode -ne 0 -or ($runtimeMissingOutput -join "`n") -notmatch 'C：未运行') { throw '缺少 .runtime 时状态脚本不应失败。' }
 
     $previousErrorActionPreference = $ErrorActionPreference
     try {
