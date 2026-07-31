@@ -12,12 +12,15 @@ def _load(name: str) -> dict:
 
 def test_contract_version_and_all_customer_catalog_schemas_are_json() -> None:
     version = json.loads((ROOT / "contracts" / "version.json").read_text(encoding="utf-8"))
-    assert version["contract_version"] == "0.3.0"
+    assert version["contract_version"] == "0.4.0"
     for name in (
         "customer-service-catalog.v1.schema.json",
         "customer-service-catalog-activation-request.v1.schema.json",
         "customer-service-catalog-activation-response.v1.schema.json",
         "customer-service-catalog-activation-receipt.v1.schema.json",
+        "customer-service-catalog-batch-activation.v1.schema.json",
+        "ai-product-knowledge-publication.v1.schema.json",
+        "ai-product-knowledge-visibility.v1.schema.json",
     ):
         schema = _load(name)
         assert schema["$schema"].endswith("2020-12/schema")
