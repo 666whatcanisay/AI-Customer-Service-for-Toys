@@ -34,15 +34,24 @@ const activationOperator = ref('')
 const activationBusyRef = ref<number | null>(null)
 const activationReceipts = ref<CatalogActivationReceipt[]>([])
 const receiptEntityRef = ref('')
-const form = reactive<StoreOperationInput & { status: StoreOperationStatus }>({
+const originalCustomerServiceStatus = ref<CustomerServiceStatus>('DISABLED')
+const form = reactive<StoreOperationInput & {
+  status: StoreOperationStatus
+  customer_service_status: CustomerServiceStatus
+}>({
   store_name: '',
   platform: 'pinduoduo',
   remarks: '',
   status: 'ACTIVE',
+  customer_service_status: 'DISABLED',
 })
 
 const formTitle = computed(() => editingRef.value === null ? '新增店铺' : '编辑店铺')
 const activeStores = computed(() => stores.value.filter((item) => item.status === 'ACTIVE'))
+const customerServiceStatusChanged = computed(() => (
+  editingRef.value !== null
+  && form.customer_service_status !== originalCustomerServiceStatus.value
+))
 const productForm = reactive<ProductOperationInput & { store_ref: number | null }>({
   store_ref: null,
   product_name: '',
@@ -88,7 +97,14 @@ async function load(): Promise<void> {
 
 function beginCreate(): void {
   editingRef.value = null
-  Object.assign(form, { store_name: '', platform: 'pinduoduo', remarks: '', status: 'ACTIVE' })
+  originalCustomerServiceStatus.value = 'DISABLED'
+  Object.assign(form, {
+    store_name: '',
+    platform: 'pinduoduo',
+    remarks: '',
+    status: 'ACTIVE',
+    customer_service_status: 'DISABLED',
+  })
   receipt.value = ''
   createdProduct.value = null
   error.value = ''
@@ -116,12 +132,14 @@ function beginCreateProduct(item?: StoreOperationItem): void {
 
 function beginEdit(item: StoreOperationItem): void {
   editingRef.value = item.store_ref
+  originalCustomerServiceStatus.value = item.customer_service_status
   const platform = platforms.find((candidate) => candidate.label === item.platform_name)?.value || 'offline'
   Object.assign(form, {
     store_name: item.store_name,
     platform,
     remarks: item.remarks,
     status: item.status,
+    customer_service_status: item.customer_service_status,
   })
   receipt.value = ''
   createdProduct.value = null
@@ -186,6 +204,13 @@ async function viewReceipts(item: StoreOperationItem): Promise<void> {
 
 async function submit(): Promise<void> {
   if (saving.value) return
+  const storeRef = editingRef.value
+  const statusChangeRequested = customerServiceStatusChanged.value
+  const operator = activationOperator.value.trim()
+  if (statusChangeRequested && !operator) {
+    error.value = '修改客服使用状态前，请填写客服状态操作人。'
+    return
+  }
   saving.value = true
   error.value = ''
   receipt.value = ''
@@ -195,13 +220,51 @@ async function submit(): Promise<void> {
       platform: form.platform,
       remarks: form.remarks,
     }
-    const result = editingRef.value === null
+    const result = storeRef === null
       ? await createOperationStore(payload)
-      : await updateOperationStore(editingRef.value, { ...payload, status: form.status })
-    receipt.value = editingRef.value === null ? '店铺已创建，可在导入中心选择。' : '店铺信息已更新。'
-    selected.value = result
+      : await updateOperationStore(storeRef, { ...payload, status: form.status })
+
+    let activationReceiptId = ''
+    if (storeRef !== null && statusChangeRequested) {
+      activationBusyRef.value = storeRef
+      try {
+        const activationResult = await setStoreCustomerServiceStatus(
+          storeRef,
+          form.customer_service_status,
+          operator,
+          `store-${storeRef}-${form.customer_service_status}-${crypto.randomUUID()}`,
+        )
+        activationReceiptId = activationResult.changed && activationResult.activation_receipt
+          ? activationResult.activation_receipt.activation_receipt_id
+          : ''
+        originalCustomerServiceStatus.value = form.customer_service_status
+      } catch (reason: unknown) {
+        const activationError = apiErrorMessage(reason)
+        receipt.value = '店铺信息已更新，但客服使用状态未修改。请核对后重试。'
+        selected.value = result
+        await load()
+        error.value = activationError
+        return
+      } finally {
+        activationBusyRef.value = null
+      }
+    }
+
+    receipt.value = storeRef === null
+      ? '店铺已创建，可在导入中心选择。'
+      : activationReceiptId
+        ? `店铺信息与客服状态已更新，收据：${activationReceiptId}`
+        : statusChangeRequested
+          ? '店铺信息已更新；客服状态已经是目标状态，没有重复生成收据。'
+          : '店铺信息已更新。'
     formVisible.value = false
     await load()
+    selected.value = storeRef === null
+      ? result
+      : stores.value.find((item) => item.store_ref === storeRef) || result
+    if (storeRef !== null && statusChangeRequested) {
+      await viewReceipts(selected.value)
+    }
   } catch (reason: unknown) {
     error.value = apiErrorMessage(reason)
   } finally {
@@ -263,10 +326,13 @@ onMounted(load)
         <label>店铺名称<input v-model.trim="form.store_name" required minlength="2" maxlength="255" placeholder="例如：木木小栈拼多多旗舰店"></label>
         <label>平台<select v-model="form.platform"><option v-for="item in platforms" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
         <label v-if="editingRef !== null">状态<select v-model="form.status"><option value="ACTIVE">正常</option><option value="INACTIVE">停用</option></select></label>
+        <label v-if="editingRef !== null">客服使用状态<select v-model="form.customer_service_status" data-testid="store-edit-customer-service-status"><option value="DISABLED">已禁用</option><option value="ENABLED">已启用</option></select></label>
+        <label v-if="editingRef !== null">客服状态操作人<input v-model.trim="activationOperator" data-testid="store-edit-activation-operator" maxlength="128" :required="customerServiceStatusChanged" placeholder="状态变化时填写姓名或运营账号"></label>
         <label class="wide">备注<textarea v-model.trim="form.remarks" maxlength="1000" placeholder="可填写店铺知识运营范围或注意事项"></textarea></label>
       </div>
-      <p class="notice boundary">创建店铺不会自动创建商品、发布知识或触发任何客户与业务动作。</p>
-      <button class="button" type="submit" :disabled="saving">{{ saving ? '正在保存…' : '保存店铺' }}</button>
+      <p v-if="editingRef !== null" class="notice boundary">客服状态变化必须填写操作人并生成 activation receipt。“启用”只允许该店铺进入 B 客服选择范围，不会改变商品客服状态，也不会自动发送消息、发布知识、退款或修改订单。</p>
+      <p v-else class="notice boundary">创建店铺不会自动创建商品、发布知识或触发任何客户与业务动作；新试运行店铺默认禁止客服使用。</p>
+      <button class="button" type="submit" :disabled="saving">{{ saving ? '正在保存…' : editingRef === null ? '保存店铺' : '保存店铺与客服状态' }}</button>
     </form>
 
     <form v-if="productFormVisible" class="card product-form" @submit.prevent="submitProduct">
