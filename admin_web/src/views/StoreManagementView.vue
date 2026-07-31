@@ -6,8 +6,12 @@ import {
   createOperationProduct,
   createOperationStore,
   getOperationStore,
+  listCatalogActivationReceipts,
   listOperationStores,
+  setStoreCustomerServiceStatus,
   updateOperationStore,
+  type CatalogActivationReceipt,
+  type CustomerServiceStatus,
   type ProductOperationInput,
   type ProductOperationItem,
   type StoreOperationInput,
@@ -26,6 +30,10 @@ const receipt = ref('')
 const formVisible = ref(false)
 const productFormVisible = ref(false)
 const createdProduct = ref<ProductOperationItem | null>(null)
+const activationOperator = ref('')
+const activationBusyRef = ref<number | null>(null)
+const activationReceipts = ref<CatalogActivationReceipt[]>([])
+const receiptEntityRef = ref('')
 const form = reactive<StoreOperationInput & { status: StoreOperationStatus }>({
   store_name: '',
   platform: 'pinduoduo',
@@ -55,6 +63,14 @@ function formatDate(value: string): string {
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(value))
+}
+
+function formatOptionalDate(value: string | null): string {
+  return value ? formatDate(value) : '尚未人工变更'
+}
+
+function dataSourceLabel(value: StoreOperationItem['data_source']): string {
+  return { TEST: '历史测试', PILOT: '试运行', UNKNOWN: '待确认' }[value]
 }
 
 async function load(): Promise<void> {
@@ -120,6 +136,50 @@ async function viewStore(item: StoreOperationItem): Promise<void> {
     selected.value = await getOperationStore(item.store_ref)
   } catch (reason: unknown) {
     selected.value = null
+    error.value = apiErrorMessage(reason)
+  }
+}
+
+async function changeCustomerServiceStatus(
+  item: StoreOperationItem,
+  status: CustomerServiceStatus,
+): Promise<void> {
+  const operator = activationOperator.value.trim()
+  if (!operator) {
+    error.value = '请先填写本次操作人，再变更客服使用状态。'
+    return
+  }
+  activationBusyRef.value = item.store_ref
+  error.value = ''
+  receipt.value = ''
+  try {
+    const result = await setStoreCustomerServiceStatus(
+      item.store_ref,
+      status,
+      operator,
+      `store-${item.store_ref}-${status}-${crypto.randomUUID()}`,
+    )
+    receipt.value = result.changed && result.activation_receipt
+      ? `客服状态已更新，收据：${result.activation_receipt.activation_receipt_id}`
+      : '店铺已经是目标客服状态，没有重复生成收据。'
+    await load()
+    await viewReceipts(item)
+  } catch (reason: unknown) {
+    error.value = apiErrorMessage(reason)
+  } finally {
+    activationBusyRef.value = null
+  }
+}
+
+async function viewReceipts(item: StoreOperationItem): Promise<void> {
+  error.value = ''
+  try {
+    const result = await listCatalogActivationReceipts('STORE', String(item.store_ref))
+    activationReceipts.value = result.items
+    receiptEntityRef.value = String(item.store_ref)
+  } catch (reason: unknown) {
+    activationReceipts.value = []
+    receiptEntityRef.value = ''
     error.value = apiErrorMessage(reason)
   }
 }
@@ -224,20 +284,35 @@ onMounted(load)
     </form>
 
     <section class="card list-card">
-      <div class="section-heading"><div><h2>店铺列表</h2><p>共 {{ stores.length }} 家店铺</p></div><button class="button secondary" type="button" @click="load">刷新</button></div>
+      <div class="section-heading"><div><h2>店铺列表</h2><p>共 {{ stores.length }} 家店铺；客服状态由运营人工确认。</p></div><button class="button secondary" type="button" @click="load">刷新</button></div>
+      <label class="operator-field">本次操作人<input v-model.trim="activationOperator" maxlength="128" placeholder="填写姓名或运营账号"></label>
+      <p class="notice boundary">“启用”只允许客服在 B 工作台人工选择；不会自动发送消息、发布知识、退款或执行订单动作。</p>
       <p v-if="loading" class="notice" role="status">正在读取店铺…</p>
       <p v-else-if="stores.length === 0" class="notice">当前暂无店铺。请先创建店铺，再进入导入中心。</p>
       <div v-else class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>店铺名称</th><th>平台</th><th>状态</th><th>商品数量</th><th>创建时间</th><th>操作</th></tr></thead>
-          <tbody><tr v-for="item in stores" :key="item.store_ref"><td><strong>{{ item.store_name }}</strong></td><td>{{ item.platform_name }}</td><td><span class="badge">{{ item.status_name }}</span></td><td>{{ item.product_count }}</td><td>{{ formatDate(item.created_at) }}</td><td><div class="row-actions"><button class="text-button" type="button" @click="viewStore(item)">查看</button><button class="text-button" type="button" @click="beginEdit(item)">编辑</button><button class="text-button" type="button" :disabled="item.status !== 'ACTIVE'" @click="beginCreateProduct(item)">新增商品</button></div></td></tr></tbody>
+          <thead><tr><th>店铺名称</th><th>平台</th><th>数据来源</th><th>客服状态</th><th>商品数量</th><th>创建时间</th><th>最后变更</th><th>操作</th></tr></thead>
+          <tbody><tr v-for="item in stores" :key="item.store_ref"><td><strong>{{ item.store_name }}</strong><small>{{ item.status_name }}</small></td><td>{{ item.platform_name }}</td><td>{{ dataSourceLabel(item.data_source) }}</td><td><span class="badge">{{ item.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span></td><td>{{ item.product_count }}</td><td>{{ formatDate(item.created_at) }}</td><td>{{ formatOptionalDate(item.customer_service_status_updated_at) }}<small>{{ item.customer_service_status_updated_by || '—' }}</small></td><td><div class="row-actions"><button class="text-button" type="button" @click="viewStore(item)">查看</button><button class="text-button" type="button" @click="beginEdit(item)">编辑</button><button class="text-button" type="button" :disabled="item.status !== 'ACTIVE'" @click="beginCreateProduct(item)">新增商品</button><button class="text-button" type="button" :disabled="activationBusyRef === item.store_ref || item.data_source === 'UNKNOWN'" @click="changeCustomerServiceStatus(item, item.customer_service_status === 'ENABLED' ? 'DISABLED' : 'ENABLED')">{{ item.customer_service_status === 'ENABLED' ? '关闭客服使用' : '启用客服使用' }}</button><button class="text-button" type="button" @click="viewReceipts(item)">查看收据</button></div></td></tr></tbody>
         </table>
       </div>
     </section>
 
     <section v-if="selected" class="card detail-card">
       <div class="section-heading"><div><p class="eyebrow">店铺详情</p><h2>{{ selected.store_name }}</h2></div><button class="button secondary" type="button" @click="beginEdit(selected)">编辑</button></div>
-      <dl><div><dt>平台</dt><dd>{{ selected.platform_name }}</dd></div><div><dt>状态</dt><dd>{{ selected.status_name }}</dd></div><div><dt>商品数量</dt><dd>{{ selected.product_count }}</dd></div><div><dt>创建时间</dt><dd>{{ formatDate(selected.created_at) }}</dd></div><div class="wide"><dt>备注</dt><dd>{{ selected.remarks || '暂无备注' }}</dd></div></dl>
+      <dl><div><dt>平台</dt><dd>{{ selected.platform_name }}</dd></div><div><dt>业务状态</dt><dd>{{ selected.status_name }}</dd></div><div><dt>数据来源</dt><dd>{{ dataSourceLabel(selected.data_source) }}</dd></div><div><dt>客服状态</dt><dd>{{ selected.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</dd></div><div><dt>商品数量</dt><dd>{{ selected.product_count }}</dd></div><div><dt>创建时间</dt><dd>{{ formatDate(selected.created_at) }}</dd></div><div class="wide"><dt>备注</dt><dd>{{ selected.remarks || '暂无备注' }}</dd></div></dl>
+    </section>
+
+    <section v-if="receiptEntityRef" class="card detail-card">
+      <div class="section-heading"><div><p class="eyebrow">客服状态审计</p><h2>Activation receipts</h2></div><span>{{ activationReceipts.length }} 条</span></div>
+      <p v-if="activationReceipts.length === 0" class="notice">该店铺尚无客服状态变更收据。</p>
+      <div v-else class="receipt-list">
+        <article v-for="item in activationReceipts" :key="item.activation_receipt_id">
+          <strong>{{ item.customer_service_status === 'ENABLED' ? '启用客服使用' : '关闭客服使用' }}</strong>
+          <span>{{ formatDate(item.confirmed_at) }} · {{ item.confirmed_by }}</span>
+          <code>{{ item.activation_receipt_id }}</code>
+          <p>{{ item.confirmation_note }}</p>
+        </article>
+      </div>
     </section>
   </main>
 </template>
@@ -250,5 +325,6 @@ onMounted(load)
 .section-heading h2 { margin: 0; color: #172554; }.section-heading p { margin: 5px 0 0; color: #617087; }
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }.form-grid label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.form-grid input, .form-grid select, .form-grid textarea { min-height: 41px; padding: 9px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.form-grid textarea { min-height: 90px; resize: vertical; }.form-grid .wide { grid-column: span 3; }.form-grid .wide-two { grid-column: span 2; }
 .text-button { padding: 0; border: 0; color: #285493; background: transparent; font: inherit; cursor: pointer; }.text-button:disabled { color: #94a3b8; cursor: not-allowed; }.row-actions { display: flex; gap: 12px; flex-wrap: wrap; }.boundary { color: #75570a; background: #fff8df; }.success a { margin-left: 10px; color: #1e5aa8; font-weight: 700; }.list-card { margin-top: 20px; }.list-card .table-wrap { margin-top: 14px; }.detail-card { margin-top: 20px; }.detail-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }.detail-card dl div { padding: 13px; border-radius: 9px; background: #f7f9fc; }.detail-card dt { color: #617087; font-size: 12px; }.detail-card dd { margin: 5px 0 0; color: #2f4259; }.detail-card .wide { grid-column: 1 / -1; }
+.operator-field { display: grid; gap: 6px; max-width: 360px; margin: 15px 0; color: #526279; font-size: 13px; }.operator-field input { min-height: 41px; padding: 9px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.data-table td small { display: block; margin-top: 4px; color: #718096; }.receipt-list { display: grid; gap: 10px; margin-top: 14px; }.receipt-list article { display: grid; gap: 5px; padding: 13px; border-radius: 9px; background: #f7f9fc; }.receipt-list span, .receipt-list code { color: #617087; font-size: 12px; }.receipt-list p { margin: 0; color: #425b78; }
 @media (max-width: 760px) { .form-grid, .detail-card dl { grid-template-columns: 1fr; }.form-grid .wide, .form-grid .wide-two { grid-column: span 1; } }
 </style>

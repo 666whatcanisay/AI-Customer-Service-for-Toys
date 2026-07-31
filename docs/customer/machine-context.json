@@ -2,12 +2,12 @@
   "project_id": "mumu-B",
   "project_name": "B: customer user client and browser assistant",
   "line": "B",
-  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-user-client",
-  "current_task": "LONG RUN TARGET MODE V5 / AI-CS PRODUCTIZATION V2 B customer usability",
-  "current_stage": "Draft PR #75 adds a visible consultation scope, non-blocking AI reference readiness guidance, and a human review-to-copy path using only the frozen customer knowledge-status response. It awaits cross-service browser QA against the matching C Provider candidate.",
-  "current_gate": "LOCAL_TEST_PASS: customer knowledge-status adapter/client and AiChat regression coverage passed; full typecheck, 26-file/109-test Vitest run, and production build passed. No READY state is fabricated and no raw material, analysis, model, or technical detail is shown to customers.",
-  "status": "ai_control_center_v2_customer_ready_for_cross_service_qa",
-  "last_updated": "2026-07-28",
+  "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS-browser-acceptance-environment-v1",
+  "current_task": "R006 Customer Available Catalog Consumer implementation",
+  "current_stage": "B consumes only the three /api/v1/customer-service/catalog paths and pilot-business-catalog.v1.1 final items. Old trial/test/publishable business checks are removed without adding a local fallback. Unit, type, build and isolated browser tests pass; formal deployment is pending.",
+  "current_gate": "R006_B_CONSUMER_COMPLETE / PRODUCTION_RELEASE_PENDING",
+  "status": "r006_b_consumer_complete",
+  "last_updated": "2026-07-31",
   "runtime_version_audit": {
     "audited_at": "2026-07-27",
     "source_baseline": "origin/develop@32feb610",
@@ -16,12 +16,14 @@
     "owner": "OPS for safe current-baseline restart; B added route regression coverage only."
   },
   "git": {
-    "branch": "codex/ai-control-center-v2-customer",
-    "base_commit": "8abb67d",
+    "branch": "feature/r006-customer-available-catalog-v1",
+    "base_commit": "03550b58572abebad9dd64cd1370157d98522be3",
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
     "delivery": "DRAFT_PR_75_STACKED_ON_DATA_INTELLIGENCE_CUSTOMER",
     "clean": true,
-    "task_commit": "1f30a01"
+    "task_commit": "04e4a84",
+    "e2e_commit": "8cbd92b",
+    "runtime_deployed": false
   },
   "owned_paths": [
     "frontend/**",
@@ -58,10 +60,13 @@
     "GET C /api/v1/customer-experience-cases?created_by=&review_status=&page=&size= is frozen; this B repair does not add remote list UI",
     "POST C /api/v1/ai-response-feedback with ai-feedback.v1-draft fields, an Idempotency-Key header, and top-level feedback_id/status=NEW receipt",
     "GET C /api/v1/ai-response-feedback?created_by=&feedback_type=&status=&page=&size= with items and total",
-    "GET C /api/v1/customer-knowledge-status?store_code=&product_id=&sku_id= with only status, summary and last_checked_at from knowledge-quality-loop.v1"
+    "GET C /api/v1/customer-knowledge-status?store_code=&product_id=&sku_id= with only status, summary and last_checked_at from knowledge-quality-loop.v1",
+    "GET C /api/v1/customer-service/catalog/stores using pilot-business-catalog.v1.1 final projection",
+    "GET C /api/v1/customer-service/catalog/products?store_code= using C-owned availability",
+    "GET C /api/v1/customer-service/catalog/products/{product_id}/skus with SKU inheriting Product"
   ],
   "contracts": [
-    "contracts/version.json 0.1.0 (unchanged)",
+    "contracts/version.json 0.3.0 additive Customer Available Catalog",
     "experience-case.v1-draft task-local frozen adapter agreement",
     "ai-feedback.v1-draft task-local frozen adapter agreement"
   ],
@@ -70,9 +75,9 @@
     "npm run test",
     "npm run build"
   ],
-  "last_test_result": "2026-07-28 TARGET MODE V5: focused customer knowledge-status/AiChat tests 3 files / 40 tests PASS; vue-tsc --noEmit PASS; full Vitest 26 files / 109 tests PASS; vite build PASS. Existing Vite CJS API deprecation, VueUse PURE annotation and large chunk warnings remain. Cross-service browser QA is owned by the QA thread and has not been claimed here.",
+  "last_test_result": "2026-07-31 R006: full Vitest 28 files / 117 tests PASS; vue-tsc --noEmit PASS; vite build PASS. Isolated browser E2E verified valid TEST data survives malformed Store/Product/SKU records and manually activated PILOT Store/Product become visible. Formal AI-CS@42bafcf was not switched.",
   "blockers": [
-    "Cross-service browser verification of this additive V5 presentation against the matching C Provider candidate is pending QA; this is not substituted by a frontend Mock."
+    "The verified R006 consumer is not yet deployed to formal AI-CS@42bafcf; Production verification requires a separate authorized release."
   ],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
@@ -100,7 +105,8 @@
     "PILOT-HARDENING-B daily customer-service workbench hardening (Draft PR #49; local quality and browser fallback verification PASS; full live success path BLOCKED by unavailable A/RAG)",
     "V10 B runtime-version audit: source /feedback route and frozen feedback client verified; running 5173 reported SHA 3b9f3e6 and lacked that route; route regression coverage added",
     "TARGET MODE V2 customer knowledge-status consumer: strict same-origin client, compact Chinese status indicator and non-blocking fallback implemented against knowledge-quality-loop.v1",
-    "TARGET MODE V5 customer usability: visible consultation scope, AI reference readiness actions, and human review-to-copy path implemented without adding API consumption"
+    "TARGET MODE V5 customer usability: visible consultation scope, AI reference readiness actions, and human review-to-copy path implemented without adding API consumption",
+    "R006 Customer Available Catalog consume-only adaptation and isolated browser verification"
   ],
   "out_of_scope": [
     "Automatic customer message sending",

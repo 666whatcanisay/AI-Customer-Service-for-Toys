@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`SOURCE_FREEZE_CLOSED / PHYSICAL_MIGRATION_ENTRY_READY`
+> 当前 Gate：`R006_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING`
 
 ## 1. 台账目标
 
@@ -93,14 +93,15 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | --- | --- | --- | --- | --- |
 | R001 | C商品知识运营中心V2 | `DONE` | C | 已由 R004 收敛进入正式 Pilot 基线；不得重做结构。 |
 | R002 | AI客服反馈沉淀闭环 | `DONE` | B、C、contracts | 已由 R004 按所有权收敛；真实 Pilot 效果由 R005 单独验证。 |
-| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006 V1.1验证已完成但仍有两个P0接口空白；Implementation和业务验收尚未开始。 |
+| R003 | C新增店铺/商品无法进入B客服 | `IN_PROGRESS` | Control、C、B，A 下游验证 | R006候选实现和隔离浏览器验收已通过；等待正式发布与业务验收。 |
 | R004 | AI-CS运行版本统一 | `DONE` | Control、OPS、A/B/C、contracts | Recovery 分支、独立提交、contracts 0.2.0、全量测试和四服务同 SHA 运行均已建立。 |
 | R005 | Customer Feedback Loop真实运行验证 | `TODO` | Control、OPS、QA、B/C/A | 等待统一基线与真实客服运行样本。 |
-| R006 | Pilot Business Data Activation V1 | `TODO` | Control / Interface Owner、C、B，A 无变更 | V1.1验证为`CONDITIONAL PASS`；混合来源迁移映射与receipt响应/复核契约关闭前禁止Implementation。 |
+| R006 | Pilot Business Data Activation V1 | `DONE` | Control / Interface Owner、C、B，A 无变更 | contracts 0.3.0、C Provider/Admin、B Consumer、0010及隔离浏览器验收已完成；正式发布另立任务。 |
 | R007 | 网络环境导致客服无法访问5173 | `BLOCKED` | OPS、公司网络管理 | 当前判断是 VLAN / 端口 / 网络隔离，不是 AI-CS 代码问题。 |
-| R008 | AI-CS Project Structure Simplification V1 | `IN_PROGRESS` | Control、OPS、A/B/C、QA | Source Freeze覆盖层已形成独立Control提交，源码/运行双保护引用成立；可在另行明确授权后进入Physical Migration。 |
+| R008 | AI-CS Project Structure Simplification V1 | `DONE` | Control、OPS、A/B/C、QA | 物理迁移、目标验证与标准端口切换完成；AI-CS为正式目录。 |
+| R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 实现和隔离0009浏览器验收完成；正式发布仍是独立任务。 |
 
-状态数量：`DONE=3`、`IN_PROGRESS=2`、`TODO=2`、`BLOCKED=1`、`DEPRECATED=0`。
+状态数量：`DONE=6`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`。
 
 ## 6. 需求明细
 
@@ -151,7 +152,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | 负责模块 | Control / Interface Owner：边界和 Gate；C：业务数据所有者与 Provider；B：Consumer；A：在“AI使用”阶段做下游可用性验证。 |
 | 影响范围 | 店铺、商品、SKU从 C 创建到客服可用确认、B 显示和 AI 使用的激活链路；可能影响 C/B接口和运行数据，不授权 Master Data 重构。 |
 | 完成标准 | 目标链路真实成立：`C创建 → 客服可用确认 → B显示 → AI使用`；未确认数据不进入 B；B 不自行猜测 C 数据可信度；失败和未激活状态可被明确识别。 |
-| 验收证据 | 尚无关闭证据。R006 V1.1静态验证得到`PASS=6`、`CONDITIONAL PASS=3`、`FAIL=0`，但发现旧表同时包含`IMPORTED_TEST_ONLY`与`MANUAL_CREATED`且receipt响应/复核仍不完整；没有实现或运行验收。 |
+| 验收证据 | [R006 Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)已在隔离Runtime证明`PILOT DISABLED → C人工启用 → B可见`，并验证异常隔离和receipt；但正式Runtime发布、正式业务数据验收及A下游真实使用尚未执行，因此本需求仍不关闭。 |
 | 关联代码/文档 | [Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)、[Interface Validation Report V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.md)、[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)、[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；关联交付需求R006。 |
 | 防止重复错误规则 | 不得通过修改 UI、增加前端判断或复用测试字段掩盖数据激活缺口；不得把同一问题另开“B读取C商品”重复需求。问题状态由 R003跟踪，解决方案只进入 R006。 |
 
@@ -198,13 +199,13 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | 需求名称 | Pilot Business Data Activation V1 |
 | 用户原始目标 | 解决 C Provider 到 B Consumer 的业务数据激活，使已确认可用的店铺、商品和 SKU 可以被客服使用。 |
 | 业务背景 | R003 已确认 C 创建能力与 B 消费能力之间缺少正式激活语义。原 V1 兼容方案需要自动筛选旧数据，可能误启用或遗漏历史对象；V1.1 改为运营可控兼容模式。该需求是 R003 的交付任务，不是新的 Master Data 项目。 |
-| 当前状态 | `TODO` |
+| 当前状态 | `DONE` |
 | 负责模块 | Control / Interface Owner：冻结所有权、状态、路径和兼容性；C：Provider 与客服可用状态权威；B：Consumer；A：不修改，后续只验证既有请求可以使用同一激活范围。 |
 | 影响范围 | Store/Product客服状态、SKU继承、历史TEST初始化、新PILOT默认值、C运营启停入口、activation receipt、C→B消费和AI下游使用；明确禁止Master Data重构。 |
 | 完成标准 | 历史有效TEST数据默认ENABLED且运营可关闭；新PILOT Store/Product默认DISABLED且运营可开启；SKU只继承Product；B只消费C最终投影；每次实际状态变化有C权威receipt；单个商品关闭不影响其他商品；安全与回滚证据齐全。 |
-| 验收证据 | [Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)已对9个Case完成代码映射，结果为`6 PASS / 3 CONDITIONAL PASS / 0 FAIL`，总体`CONDITIONAL PASS / R006_IMPLEMENTATION_BLOCKED`。这不是接口、迁移或运行完成证据。 |
-| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Validation Report V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；基线`ai-cs-pilot-baseline-v1@cbc77ed883cb99e2eff76ccb8eb3193bbddaba38`。 |
-| 防止重复错误规则 | 不得恢复“系统根据旧测试字段自动选择可信数据”的方案；不得把全部旧表记录无差别初始化为TEST；不得扩大成Master Data；不得让B判断C数据可信度；不得为SKU增加独立启停；IV11-B01/B02关闭前不得写实现代码。 |
+| 验收证据 | [Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)：contracts `4 passed`、C `110 passed`、B `117 passed`、Admin `58 passed`、两端typecheck/build和隔离浏览器E2E通过；异常Store/Product/SKU逐条隔离，PILOT启停、Store阻断不改Product、SKU继承及receipt均有运行证据。 |
+| 关联代码/文档 | R003；[Pilot Business Catalog Interface Freeze Plan V1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.md)；[Interface Freeze Plan V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Freeze-Plan-V1.1.md)；[Interface Validation Report V1.1](interfaces/AI-CS-Pilot-Business-Catalog-Interface-Validation-Report-V1.1.md)；[Implementation Plan V1](interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md)；[Implementation Report V1](AI-CS-R006-Customer-Available-Catalog-Implementation-Report-V1.md)；实现提交`673dca6`、`68457e1`、`e858c02`、`04e4a84`、`8cbd92b`。 |
+| 防止重复错误规则 | 不得恢复“系统根据旧测试字段自动选择可信数据”的方案；不得把全部旧表记录无差别初始化为TEST；不得扩大成Master Data；不得让B判断C数据可信度；不得为SKU增加独立启停；实现必须遵守Implementation Plan的provenance、receipt和隔离规则。 |
 
 #### R006 增补需求 — Legacy Compatibility Control
 
@@ -218,7 +219,7 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 6. 每次Store/Product实际状态变化由C生成并保存activation receipt；同状态幂等重放不生成重复状态变化receipt。
 7. 验收必须证明旧测试数据继续可用、运营关闭后B不可见、再次开启后B可见、单个商品关闭不影响其他商品。
 
-V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANUAL_CREATED/c-operation-store.v1`运营数据。前者应初始化为`TEST + ENABLED`，后者应初始化为`PILOT + DISABLED`；未知来源必须隔离。该迁移映射以及状态PUT完整response/持久化receipt复核契约尚未冻结，分别登记为IV11-B01、IV11-B02。
+V1.1已按冻结规则实现：旧表混合`IMPORTED_TEST_ONLY`测试包与`MANUAL_CREATED/c-operation-store.v1`运营数据时，前者初始化为`TEST + ENABLED`、后者为`PILOT + DISABLED`、未知来源隔离；状态PUT、幂等、receipt只读复核和单条异常隔离均已通过自动测试与浏览器验收。正式数据库迁移和Runtime发布不属于本次实现任务。
 
 ### R007 — 网络环境导致客服无法访问5173
 
@@ -246,13 +247,30 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 | 需求名称 | AI-CS Project Structure Simplification V1 / AI-CS Monorepo Consolidation V1 |
 | 用户原始目标 | 将当前多Worktree、多目录、多版本开发模式收敛为一个长期维护的AI-CS Monorepo，历史资产可追溯，未来按大版本发布。 |
 | 业务背景 | 目前同一Git仓库登记69个Worktree，其中8个dirty、4个detached；A/B/C和Control长期目录、旧运行路径及多份machine-context造成版本、职责和阻塞事实漂移。 |
-| 当前状态 | `IN_PROGRESS` |
+| 当前状态 | `DONE` |
 | 负责模块 | Control：迁移Gate、需求和版本事实；A/B/C：能力与路径归属；OPS：脚本、运行身份和切换；QA：结构、回归和运行等价验收；contracts：迁移期间保持兼容。 |
 | 影响范围 | 仓库目录、文档架构、machine-context、Worktree、分支/发布策略、脚本路径、测试与运行来源；不授权业务功能、UI、接口、数据库、RAG、Prompt或模型变更。 |
-| 完成标准 | 最终只保留`AI-CS/`一个长期目录；应用按`apps/`与`services/`归位；只保留一个活动machine-context；R001–R006成果和Pilot基线不丢失；四服务从同一release SHA运行；旧Worktree只在功能归属、commit、Tag、clean和运行不占用确认后退役。 |
-| 验收证据 | [AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)冻结`19cc826...`九个目录tree、R001–R006功能入口、数据禁止边界和`cbc77ed...`运行/回滚锚点；[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)确认9项Control资产独立提交边界，并以`ai-cs-monorepo-source-freeze-v1`建立迁移源码保护引用。四服务仍从clean Recovery目录运行且health 200；尚无物理迁移证据。 |
+| 完成标准 | `AI-CS/`成为唯一正式运行和后续开发目录；保持冻结核心目录名；R001–R006成果和Pilot基线不丢失；四服务从同一 SHA 运行；Recovery仅作为回滚锚点，旧Worktree后续按独立归档任务处理。 |
+| 验收证据 | 源冻结、独立仓库创建、源码物化、依赖复现、全量测试、影子运行和标准端口切换均已完成；当前正式目录为`AI-CS`。本次稳定性冲刺在`AI-CS@42bafcf`完成三轮启停，5173/5174/8000/8011同SHA且health 200；Recovery未删除，仅保留为回滚锚点。 |
 | 关联代码/文档 | [AI-CS Monorepo Migration Plan V1](AI-CS-Monorepo-Migration-Plan-V1.md)、[AI-CS Monorepo Source Freeze Report V1](AI-CS-Monorepo-Source-Freeze-Report-V1.md)、[AI-CS Source Freeze Closure Report V1](AI-CS-Source-Freeze-Closure-Report-V1.md)、[Pilot Baseline Inventory Report](AI-CS-Pilot-Baseline-Inventory-Report-V1.md)、[Pilot Baseline Recovery Execution Report](AI-CS-Pilot-Baseline-Recovery-Execution-Report-V1.md)、R001–R006。 |
-| 防止重复错误规则 | 不得把`SOURCE_FREEZE_CLOSED`解释为已经迁移或已切换Pilot；不得处理当前运行中的Recovery目录；不得把“只保留一个长期目录”解释为立即批量删除；不得复制整仓到`archive/`；不得把dirty、运行或敏感资产带入Git；不得借目录迁移实施R006。 |
+| 防止重复错误规则 | 不得继续把旧Worktree当正式开发源；不得删除Recovery回滚锚点或未经归属确认批量清理旧目录；不得把dirty、运行或敏感资产带入Git；不得借目录迁移实施R006。 |
+
+### R009 — 商品知识采集模板导入 V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R009 |
+| 提出时间 | 2026-07-30 |
+| 需求名称 | 商品知识采集模板导入 V1 |
+| 用户原始目标 | 在 C Admin 资料上传与审核页面，以固定规则解析《商品知识采集模板V1.xlsx》，完成店铺校验、字段级 Merge、待审核和人工写入闭环。 |
+| 业务背景 | 原资料上传偏单条补充，无法支持运营批量维护；Import Center 的六模板下载定位保持不变，本需求只实现第一个商品知识模板。 |
+| 当前状态 | `DONE` |
+| 负责模块 | C：Parser、Merge、审核、Admin 页面和 0009；Control/QA：隔离数据与浏览器验收。A/B/RAG不在范围。 |
+| 影响范围 | `platform_backend/**`、`admin_web/**`、0009隔离迁移、商品知识导入审核；不修改A/B/RAG/Prompt/contracts，不实现其他五模板。 |
+| 完成标准 | 浏览器完成店铺→模板→真实Excel上传→四Sheet解析→Merge预览→人工审核；空模板、缺商品名、错店铺、重复上传和未开放模板均受控；审核前正式数据零写入。 |
+| 验收证据 | RC `8b83a20` 的隔离 0009 Runtime 完成真实浏览器验收：19商品、19条APPLIED审核，重复上传NO_CHANGE，错店铺/空模板PREFLIGHT_FAILED，未开放模板提示正确；正式数据库仍为0008。 |
+| 关联代码/文档 | R009 Interface Freeze、Implementation Report、Browser Acceptance系列报告、[本次稳定性报告](AI-CS-Product-Stabilization-Reliability-Report-V1.md)。 |
+| 防止重复错误规则 | 不得把R009扩展成通用模板理解AI；不得改变Import Center定位；不得自动发布RAG或声称B已消费；正式0009部署必须另行授权、备份和验收。 |
 
 ## 7. 历史错误防复发规则
 
@@ -276,10 +294,10 @@ V1.1验证补充结论：当前旧表混合`IMPORTED_TEST_ONLY`测试包与`MANU
 ```text
 R004 统一运行版本（DONE）
   ↓ 已完成 Baseline Recovery
-R006 Interface Validation V1.1（CONDITIONAL PASS，需求仍为 TODO）
-  ↓ 仅关闭 IV11-B01 混合来源映射、IV11-B02 receipt响应/复核
-R006 Implementation（两项关闭并明确授权前 BLOCKED）
-  ↓ 获得明确授权后才可开发和联调
+R006 Implementation Plan（READY，需求为 IN_PROGRESS）
+  ↓ contracts 0.3.0 → C data/provider → C控制入口 → B consumer → QA
+R006 Implementation（尚未编码）
+  ↓ 隔离迁移与跨服务浏览器验收
 R003 C数据进入B的业务结果验收（IN_PROGRESS → DONE）
   ↓ 统一基线与真实业务数据可用
 R005 Feedback Loop真实运行验证（TODO）
@@ -287,8 +305,8 @@ R005 Feedback Loop真实运行验证（TODO）
 
 R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处理。
 
-R006交付链的唯一下一入口仍是`AI-CS Pilot Business Catalog Interface Freeze V1.1 Remediation`，只关闭IV11-B01和IV11-B02。不得修改代码、UI、contracts、数据库或运行服务；两项关闭并复核前不得进入Business Data Activation。
+R006当前下一入口为受控编码实施：先提交additive contracts 0.3.0，再完成C状态持久化/投影和最小控制入口，最后切换B Consumer并由QA执行隔离验收。正式数据库迁移、Runtime切换和业务数据变更不包含在Implementation阶段，必须另立发布任务。
 
-R008是与R006并行的项目治理任务。Source Freeze Closure已关闭SF-B01/SF-B02：`ai-cs-monorepo-source-freeze-v1`是未来物理迁移源码入口，`ai-cs-pilot-baseline-v1@cbc77ed...`仍是当前实际运行与回滚锚点。下一入口只能在用户另行明确授权后执行Physical Migration；仍不得删除Worktree、处理Recovery运行根或切换Pilot。R008不得绕过R006的Interface Gate，也不得把结构迁移结果作为R003/R005业务验收。
+R008物理迁移和标准端口切换已完成：`AI-CS/`是唯一正式运行与后续开发目录，Recovery仅保留为回滚锚点。旧Worktree是否退役仍须按独立归档计划逐一确认，不能因R008完成而批量删除。R008结果不替代R003/R005业务验收，也不授权R006。
 
-最终状态：`SOURCE_FREEZE_CLOSED`
+当前稳定性 Gate：Runtime、A、C、R009回归通过；`BUG-B-001`仍受R006 Implementation阻塞。只有R006实施并重新通过B-001至B-006后，才可声明`AI_CS_PRODUCT_STABLE_V1_READY`。

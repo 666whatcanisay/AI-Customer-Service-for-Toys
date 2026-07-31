@@ -428,6 +428,14 @@ def test_import_persists_exact_test_counts_without_formal_ingestion(
     assert count(session, ImportBatch) == 0
     assert count(session, ImportRow) == 0
     assert count(session, StagedProductSku) == 0
+    store = session.scalars(select(StoreModel)).first()
+    assert store is not None
+    assert store.data_source == "TEST"
+    assert store.customer_service_status == "DISABLED"
+    assert {
+        product.customer_service_status
+        for product in session.scalars(select(ProductModel)).all()
+    } == {"DISABLED"}
     evidence = session.scalars(select(SourceEvidenceModel)).first()
     assert evidence is not None
     assert evidence.relative_path.startswith("attachments/")

@@ -30,6 +30,7 @@ describe('KnowledgeCenterView', () => {
         applicable_age: '8—14 岁', material_safety: 'ABS，含小零件', package_contents: '积木、说明书', faq_count: 2,
         coverage_percent: 80, ai_usable: true, knowledge_state: 'BASIC_AVAILABLE',
         data_status: 'APPROVED', ai_status: 'PARTIALLY_AVAILABLE',
+        data_source: 'TEST', customer_service_status: 'ENABLED', customer_service_status_updated_at: null, customer_service_status_updated_by: null,
         answerable_topics: ['商品介绍', '年龄咨询', '材质说明'], missing_topics: ['安装说明', '常见问题'], gap_count: 2,
         technical_details: technicalDetails,
       }], total: 1,
@@ -46,6 +47,7 @@ describe('KnowledgeCenterView', () => {
     expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装')
     expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装 → 豪华版')
     expect(wrapper.text()).toContain('80%AI 核心知识覆盖度')
+    expect(wrapper.text()).toContain('客服：已启用')
     expect(wrapper.text()).not.toContain('tenant_id')
   })
 

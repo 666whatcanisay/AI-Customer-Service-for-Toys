@@ -1,240 +1,238 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import {
   apiErrorMessage,
-  getKnowledgeMaterial,
-  getProductKnowledgeOverview,
-  getProductKnowledgeProduct,
-  listKnowledgeMaterials,
+  getProductKnowledgeImportMergePreview,
+  getProductKnowledgeImportPreflight,
   listOperationStores,
-  listProductKnowledgeProducts,
-  reviewKnowledgeMaterial,
-  uploadKnowledgeMaterial,
-  type KnowledgeMaterial,
-  type KnowledgeMaterialDetail,
-  type KnowledgeMaterialStatus,
-  type KnowledgeMaterialType,
-  type KnowledgeTemplateType,
-  type ProductKnowledgeDetail,
-  type ProductKnowledgeListItem,
-  type StoreKnowledgeSummary,
+  reviewProductKnowledgeImport,
+  uploadProductKnowledgeImport,
+  type ProductKnowledgeImportChangeType,
+  type ProductKnowledgeImportMergePreview,
+  type ProductKnowledgeImportPreflight,
+  type ProductKnowledgeImportPreviewItem,
+  type ProductKnowledgeImportTemplateType,
+  type StoreOperationItem,
 } from '../api/client'
-import { displayStatus } from '../presentation'
 
 const route = useRoute()
-const stores = ref<StoreKnowledgeSummary[]>([])
-const products = ref<ProductKnowledgeListItem[]>([])
-const productDetail = ref<ProductKnowledgeDetail | null>(null)
-const materials = ref<KnowledgeMaterial[]>([])
-const selected = ref<KnowledgeMaterialDetail | null>(null)
-const revisionSource = ref<KnowledgeMaterial | null>(null)
-const loading = ref(false)
-const catalogLoading = ref(false)
-const submitting = ref(false)
-const reviewing = ref(false)
-const listError = ref('')
-const formError = ref('')
-const receipt = ref('')
+const stores = ref<StoreOperationItem[]>([])
+const selectedStoreRef = ref('')
+const templateType = ref<ProductKnowledgeImportTemplateType>('PRODUCT_KNOWLEDGE')
+const operator = ref('')
 const file = ref<File | null>(null)
-const filters = reactive({ store_code: '', product_id: '', material_status: '' as KnowledgeMaterialStatus | '' })
-const form = reactive({
-  store_code: '', product_id: '', sku_id: '', material_type: 'PRODUCT_SPEC' as KnowledgeMaterialType,
-  template_type: 'PRODUCT_KNOWLEDGE' as KnowledgeTemplateType,
-  display_name: '', submitted_by: '', material_id: '',
-})
-const review = reactive({ reviewed_by: '', review_note: '' })
-const templateTypes: Array<{ value: KnowledgeTemplateType; materialType: KnowledgeMaterialType }> = [
-  { value: 'PRODUCT_KNOWLEDGE', materialType: 'PRODUCT_SPEC' },
-  { value: 'SKU_DIFFERENCE', materialType: 'PRODUCT_SPEC' },
-  { value: 'FAQ', materialType: 'FAQ_SOURCE' },
-  { value: 'SAFETY_RULE', materialType: 'SAFETY_INSTRUCTION' },
-  { value: 'AI_FEEDBACK', materialType: 'OTHER' },
-  { value: 'KNOWLEDGE_GAP', materialType: 'OTHER' },
+const loadingStores = ref(true)
+const submitting = ref(false)
+const reviewingChangeSet = ref('')
+const errorMessage = ref('')
+const successMessage = ref('')
+const batchId = ref('')
+const preflight = ref<ProductKnowledgeImportPreflight | null>(null)
+const preview = ref<ProductKnowledgeImportMergePreview | null>(null)
+const uploadIdempotencyKey = ref('')
+const reviewNotes = reactive<Record<string, string>>({})
+const reviewKeys = reactive<Record<string, string>>({})
+
+const templates: Array<{
+  value: ProductKnowledgeImportTemplateType
+  label: string
+  supported: boolean
+}> = [
+  { value: 'PRODUCT_KNOWLEDGE', label: '商品知识采集模板', supported: true },
+  { value: 'SKU_DIFFERENCE', label: 'SKU差异知识采集模板', supported: false },
+  { value: 'FAQ', label: '客服FAQ知识采集模板', supported: false },
+  { value: 'SAFETY_RULE', label: '商品安全规则采集模板', supported: false },
+  { value: 'AI_FEEDBACK', label: '客服AI问题反馈模板', supported: false },
+  { value: 'KNOWLEDGE_GAP', label: 'AI知识缺口管理模板', supported: false },
 ]
-const statuses: KnowledgeMaterialStatus[] = ['RECEIVED', 'RECOGNIZED', 'REVIEWING', 'APPROVED_FOR_ANALYSIS', 'ANALYZING', 'ANALYZED', 'ANALYSIS_FAILED', 'REJECTED']
 
-const formProducts = computed(() => products.value.filter((item) => item.technical_details.store_code === form.store_code))
-const filterProducts = computed(() => products.value.filter((item) => !filters.store_code || item.technical_details.store_code === filters.store_code))
+const selectedStore = computed(() => stores.value.find(
+  (item) => String(item.store_ref) === selectedStoreRef.value,
+))
+const selectedTemplate = computed(() => templates.find((item) => item.value === templateType.value))
+const reviewableItems = computed(() => preview.value?.items.filter(
+  (item) => item.product.status === 'IDENTIFIED_PENDING_REVIEW',
+) || [])
 
-function storeName(storeCode: string): string {
-  return stores.value.find((item) => item.technical_details.store_code === storeCode)?.store_name || '未找到店铺名称'
+function newIdempotencyKey(prefix: string): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function productName(productId: string): string {
-  return products.value.find((item) => item.technical_details.product_id === productId)?.product_name || '未找到商品名称'
+function resetUploadKey(): void {
+  uploadIdempotencyKey.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
 }
 
-function skuName(skuId: string | null): string {
-  if (!skuId) return '全部 SKU'
-  return productDetail.value?.skus.find((item) => item.technical_details.sku_id === skuId)?.sku_name || '指定 SKU'
-}
-
-function materialStatusLabel(item: KnowledgeMaterial): string {
-  if (item.material_status === 'APPROVED_FOR_ANALYSIS'
-    && (item.recognition_summary.template_type === 'AI_FEEDBACK' || item.recognition_summary.template_type === 'KNOWLEDGE_GAP')) {
-    return '审核通过'
+function onTemplateChange(): void {
+  resetUploadKey()
+  if (!selectedTemplate.value?.supported) {
+    window.alert('该模板导入功能暂未开放')
   }
-  return displayStatus(item.material_status)
-}
-
-async function loadCatalog(): Promise<void> {
-  catalogLoading.value = true
-  try {
-    const [overview, productPage, operationStores] = await Promise.all([
-      getProductKnowledgeOverview(),
-      listProductKnowledgeProducts(),
-      listOperationStores(),
-    ])
-    stores.value = overview.stores
-    products.value = productPage.items
-    const requestedStore = typeof route.query.store === 'string' ? route.query.store : ''
-    const requestedStoreRef = typeof route.query.store_ref === 'string' ? route.query.store_ref : ''
-    const requestedProduct = typeof route.query.product === 'string' ? route.query.product : ''
-    const operationStore = operationStores.items.find((item) => String(item.store_ref) === requestedStoreRef)
-    const selectedStoreCode = requestedStore || stores.value.find(
-      (item) => operationStore
-        && item.store_name === operationStore.store_name
-        && item.platform_name === operationStore.platform_name,
-    )?.technical_details.store_code || ''
-    if (selectedStoreCode && stores.value.some((item) => item.technical_details.store_code === selectedStoreCode)) {
-      form.store_code = selectedStoreCode
-      filters.store_code = selectedStoreCode
-    }
-    if (requestedProduct && products.value.some((item) => item.technical_details.product_id === requestedProduct)) {
-      form.product_id = requestedProduct
-      filters.product_id = requestedProduct
-      await loadProductDetail(requestedProduct)
-    }
-  } catch (reason: unknown) {
-    listError.value = `商品目录读取失败：${apiErrorMessage(reason)}`
-  } finally {
-    catalogLoading.value = false
-  }
-}
-
-async function loadProductDetail(productId: string): Promise<void> {
-  productDetail.value = productId ? await getProductKnowledgeProduct(productId) : null
-}
-
-async function onFormStoreChange(): Promise<void> {
-  form.product_id = ''
-  form.sku_id = ''
-  productDetail.value = null
-}
-
-async function onFormProductChange(): Promise<void> {
-  form.sku_id = ''
-  formError.value = ''
-  try {
-    await loadProductDetail(form.product_id)
-  } catch (reason: unknown) {
-    productDetail.value = null
-    formError.value = apiErrorMessage(reason)
-  }
-}
-
-function onFilterStoreChange(): void {
-  filters.product_id = ''
-}
-
-async function load(): Promise<void> {
-  loading.value = true
-  listError.value = ''
-  try {
-    const result = await listKnowledgeMaterials(filters)
-    materials.value = result.items
-    if (selected.value && !result.items.some((item) => item.material_id === selected.value?.material_id)) selected.value = null
-  } catch (reason: unknown) {
-    materials.value = []
-    selected.value = null
-    listError.value = apiErrorMessage(reason)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function choose(item: KnowledgeMaterial): Promise<void> {
-  listError.value = ''
-  try {
-    selected.value = await getKnowledgeMaterial(item.material_id)
-  } catch (reason: unknown) {
-    selected.value = null
-    listError.value = apiErrorMessage(reason)
-  }
-}
-
-async function prepareRevision(item: KnowledgeMaterial): Promise<void> {
-  revisionSource.value = item
-  form.material_id = item.material_id
-  form.store_code = item.store_code
-  form.product_id = item.product_id
-  form.sku_id = item.sku_id || ''
-  form.display_name = item.display_name
-  form.material_type = item.material_type
-  form.template_type = item.recognition_summary.template_type || 'PRODUCT_KNOWLEDGE'
-  onTemplateTypeChange()
-  await onFormProductChange()
-  form.sku_id = item.sku_id || ''
-}
-
-function cancelRevision(): void {
-  revisionSource.value = null
-  form.material_id = ''
 }
 
 function onFileChange(event: Event): void {
   file.value = (event.target as HTMLInputElement).files?.[0] ?? null
-  formError.value = ''
-  receipt.value = ''
+  resetUploadKey()
 }
 
-function onTemplateTypeChange(): void {
-  form.material_type = templateTypes.find((item) => item.value === form.template_type)?.materialType || 'OTHER'
+async function loadStores(): Promise<void> {
+  loadingStores.value = true
+  try {
+    stores.value = (await listOperationStores()).items.filter((item) => item.status === 'ACTIVE')
+    const requested = typeof route.query.store_ref === 'string' ? route.query.store_ref : ''
+    const remembered = sessionStorage.getItem('c-operation-import-store-ref') || ''
+    const candidate = requested || remembered
+    if (stores.value.some((item) => String(item.store_ref) === candidate)) {
+      selectedStoreRef.value = candidate
+    }
+  } catch (reason: unknown) {
+    stores.value = []
+    errorMessage.value = `店铺读取失败：${apiErrorMessage(reason)}`
+  } finally {
+    loadingStores.value = false
+  }
+}
+
+async function loadBatch(id: string): Promise<void> {
+  try {
+    const [preflightResult, previewResult] = await Promise.all([
+      getProductKnowledgeImportPreflight(id),
+      getProductKnowledgeImportMergePreview(id),
+    ])
+    batchId.value = id
+    preflight.value = preflightResult
+    preview.value = previewResult
+    sessionStorage.setItem('r009-product-knowledge-import-batch-id', id)
+  } catch (reason: unknown) {
+    sessionStorage.removeItem('r009-product-knowledge-import-batch-id')
+    errorMessage.value = `导入批次读取失败：${apiErrorMessage(reason)}`
+  }
 }
 
 async function submit(): Promise<void> {
-  if (!file.value || submitting.value) return
+  if (!file.value || !selectedStore.value || submitting.value) return
+  if (!selectedTemplate.value?.supported) {
+    window.alert('该模板导入功能暂未开放')
+    return
+  }
+  if (!operator.value.trim()) {
+    errorMessage.value = '请填写操作人。'
+    return
+  }
   submitting.value = true
-  formError.value = ''
-  receipt.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
+  uploadIdempotencyKey.value ||= newIdempotencyKey('product-knowledge-upload')
   try {
-    const result = await uploadKnowledgeMaterial(file.value, form)
-    receipt.value = `资料已识别并进入人工审核流程，共识别 ${result.recognition_summary.record_count || 1} 条记录。`
-    file.value = null
-    cancelRevision()
-    await load()
+    const result = await uploadProductKnowledgeImport(
+      file.value,
+      {
+        store_ref: selectedStore.value.store_ref,
+        template_type: templateType.value,
+        operator: operator.value.trim(),
+      },
+      uploadIdempotencyKey.value,
+    )
+    await loadBatch(result.batch_id)
+    successMessage.value = result.status === 'PREFLIGHT_FAILED'
+      ? '文件已完成预检，但存在阻塞问题，请按提示修正后重新上传。'
+      : result.status === 'NO_CHANGE'
+        ? '文件已完成 Merge 对比，没有需要审核的变化。'
+        : '文件已识别，所有新增和修改均处于“已识别待审核”，尚未写入正式商品。'
+    uploadIdempotencyKey.value = ''
   } catch (reason: unknown) {
-    formError.value = apiErrorMessage(reason)
+    errorMessage.value = apiErrorMessage(reason)
   } finally {
     submitting.value = false
   }
 }
 
-async function reviewSelected(decision: 'APPROVE_FOR_ANALYSIS' | 'REJECT'): Promise<void> {
-  if (!selected.value || reviewing.value) return
-  reviewing.value = true
-  formError.value = ''
+async function reviewItem(
+  item: ProductKnowledgeImportPreviewItem,
+  decision: 'APPROVE' | 'REJECT',
+): Promise<void> {
+  if (!batchId.value || reviewingChangeSet.value) return
+  const note = (reviewNotes[item.product.change_set_id] || '').trim()
+  if (!operator.value.trim()) {
+    errorMessage.value = '请填写操作人后再审核。'
+    return
+  }
+  if (decision === 'REJECT' && !note) {
+    errorMessage.value = '驳回时必须填写审核备注。'
+    return
+  }
+  const keyName = `${item.product.change_set_id}:${decision}`
+  reviewKeys[keyName] ||= newIdempotencyKey(`product-knowledge-${decision.toLowerCase()}`)
+  reviewingChangeSet.value = item.product.change_set_id
+  errorMessage.value = ''
+  successMessage.value = ''
   try {
-    await reviewKnowledgeMaterial(selected.value.material_id, {
-      revision: selected.value.revision,
-      decision,
-      reviewed_by: review.reviewed_by,
-      review_note: review.review_note,
-    })
-    await load()
-    selected.value = await getKnowledgeMaterial(selected.value.material_id)
+    const receipt = await reviewProductKnowledgeImport(
+      batchId.value,
+      item.product.change_set_id,
+      {
+        decision,
+        operator: operator.value.trim(),
+        review_note: note || null,
+        expected_base_snapshot_hash: item.product.base_snapshot_hash,
+        expected_change_set_version: item.product.version,
+      },
+      reviewKeys[keyName],
+    )
+    delete reviewKeys[keyName]
+    successMessage.value = receipt.outcome === 'APPLIED'
+      ? `“${item.product.product_name}”已审核通过并完成字段级 Merge。`
+      : receipt.outcome === 'REJECTED'
+        ? `“${item.product.product_name}”已驳回，正式商品未修改。`
+        : '正式商品已变化，本次审核未写入，请重新上传并核对。'
+    await loadBatch(batchId.value)
   } catch (reason: unknown) {
-    formError.value = apiErrorMessage(reason)
+    errorMessage.value = apiErrorMessage(reason)
   } finally {
-    reviewing.value = false
+    reviewingChangeSet.value = ''
   }
 }
 
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (typeof value === 'object') return JSON.stringify(value, null, 2)
+  return String(value)
+}
+
+const changeTypeLabels: Record<ProductKnowledgeImportChangeType, string> = {
+  ADD: '新增',
+  UPDATE: '更新',
+  KEEP: '保留原值',
+  NO_CHANGE: '无变化',
+}
+
+const statusLabels: Record<string, string> = {
+  IDENTIFIED_PENDING_REVIEW: '已识别待审核',
+  NO_CHANGE: '无变化',
+  APPROVED_APPLIED: '已通过并写入',
+  REJECTED: '已驳回',
+  STALE_REVIEW_REQUIRED: '数据已变化，需重新审核',
+  APPLY_FAILED: '写入失败',
+  PREFLIGHT_FAILED: '预检未通过',
+  PARTIALLY_REVIEWED: '部分已审核',
+  COMPLETED: '审核完成',
+}
+
+watch(selectedStoreRef, (value) => {
+  if (value) sessionStorage.setItem('c-operation-import-store-ref', value)
+  else sessionStorage.removeItem('c-operation-import-store-ref')
+  resetUploadKey()
+})
+
 onMounted(async () => {
-  await loadCatalog()
-  await load()
+  await loadStores()
+  const rememberedBatch = sessionStorage.getItem('r009-product-knowledge-import-batch-id')
+  if (rememberedBatch) await loadBatch(rememberedBatch)
 })
 </script>
 
@@ -242,92 +240,165 @@ onMounted(async () => {
   <main class="page">
     <div class="page-header">
       <div>
-        <p class="eyebrow">商品知识补充</p>
+        <p class="eyebrow">R009 · 商品知识批量维护</p>
         <h1>资料上传与审核</h1>
-        <p>先选择业务店铺、商品和 SKU，再上传已核实资料。审核通过只允许进入 AI 质量分析，不会自动发布知识。</p>
+        <p>选择店铺与固定模板，上传 Excel 生成字段级 Merge 预览；只有人工审核通过的商品才写入正式业务数据。</p>
       </div>
-      <RouterLink class="button secondary" to="/import-center">下载中文资料模板</RouterLink>
+      <RouterLink class="button secondary" to="/import-center">下载六类 Excel 模板</RouterLink>
     </div>
 
-    <section class="card guide">
-      <h2>三步完成资料补充</h2>
-      <ol>
-        <li>从完整中文名称中选择店铺、商品和 SKU，不需要填写技术编号。</li>
-        <li>上传只含商品事实的资料；不要包含客户姓名、电话、地址、订单或支付信息。</li>
-        <li>核对识别摘要并人工审核。审核通过不等于激活或发布到 RAG。</li>
+    <section class="card boundary-card">
+      <strong>安全边界</strong>
+      <p>Excel 不覆盖数据库、不删除原字段。审核前正式数据零写入；审核通过也不会自动发布 RAG、修改 Prompt、激活客服或执行任何业务动作。</p>
+    </section>
+
+    <form class="card import-form" @submit.prevent="submit">
+      <ol class="step-list">
+        <li :class="{ active: !selectedStoreRef, done: !!selectedStoreRef }"><span>1</span><strong>选择店铺</strong></li>
+        <li :class="{ active: !!selectedStoreRef && !templateType, done: !!templateType }"><span>2</span><strong>选择模板</strong></li>
+        <li :class="{ active: !!selectedStoreRef && !!templateType, done: !!batchId }"><span>3</span><strong>上传并审核</strong></li>
       </ol>
-    </section>
 
-    <p v-if="catalogLoading" class="notice" role="status">正在读取店铺和商品目录…</p>
-
-    <section class="work-grid">
-      <form class="card upload-form" @submit.prevent="submit">
-        <h2>{{ revisionSource ? '创建资料修订版本' : '上传新资料' }}</h2>
-        <p v-if="revisionSource" class="notice">正在为“{{ revisionSource.display_name }}”补充新的修订资料。<button class="text-button" type="button" @click="cancelRevision">取消修订</button></p>
-        <label>店铺
-          <select v-model="form.store_code" required @change="onFormStoreChange">
+      <div class="form-grid">
+        <label>Step 1 · 目标业务店铺
+          <select v-model="selectedStoreRef" required :disabled="loadingStores">
             <option value="">请选择店铺</option>
-            <option v-for="store in stores" :key="store.technical_details.store_code || store.store_name" :value="store.technical_details.store_code || ''">{{ store.store_name }}</option>
+            <option v-for="store in stores" :key="store.store_ref" :value="String(store.store_ref)">
+              {{ store.store_name }} · {{ store.platform_name }}
+            </option>
           </select>
+          <small v-if="selectedStore">Excel 中每行店铺名称必须与“{{ selectedStore.store_name }}”一致。</small>
         </label>
-        <label>商品
-          <select v-model="form.product_id" required :disabled="!form.store_code" @change="onFormProductChange">
-            <option value="">请选择商品</option>
-            <option v-for="product in formProducts" :key="product.technical_details.product_id || product.product_name" :value="product.technical_details.product_id || ''">{{ product.product_name }}</option>
-          </select>
-        </label>
-        <label>SKU（可选）
-          <select v-model="form.sku_id" :disabled="!form.product_id">
-            <option value="">适用于全部 SKU</option>
-            <option v-for="sku in productDetail?.skus || []" :key="sku.technical_details.sku_id || sku.sku_name" :value="sku.technical_details.sku_id || ''">{{ sku.sku_name }}{{ sku.specification_difference ? ` · ${sku.specification_difference}` : '' }}</option>
-          </select>
-        </label>
-        <label>模板类型<select v-model="form.template_type" @change="onTemplateTypeChange"><option v-for="type in templateTypes" :key="type.value" :value="type.value">{{ displayStatus(type.value) }}</option></select></label>
-        <label>资料名称<input v-model.trim="form.display_name" required maxlength="256" placeholder="例如：Q66 消防局积木拼装说明"></label>
-        <label>提交人<input v-model.trim="form.submitted_by" required maxlength="128" placeholder="填写运营人员姓名或账号"></label>
-        <label>资料文件<input type="file" accept=".xlsx,.json" required @change="onFileChange"><small>上传对应中文 Excel 模板；结构化快速补充会使用受控 JSON，单个文件最大 5 MB。</small></label>
-        <p class="notice boundary">系统只保存在受控运行目录；不会自动脱敏、发布知识、训练模型、修改 Prompt 或向客户发送消息。</p>
-        <p v-if="formError" class="notice error" role="alert">{{ formError }}</p>
-        <p v-if="receipt" class="notice success" role="status">{{ receipt }}</p>
-        <button class="button" :disabled="submitting || !file || !form.store_code || !form.product_id" type="submit">{{ submitting ? '正在识别资料…' : revisionSource ? '上传修订并识别' : '上传并识别' }}</button>
-      </form>
 
-      <section class="card materials">
-        <div class="section-heading"><div><h2>资料记录</h2><p>只展示运营需要的业务名称、模板类型、识别结果和审核状态。</p></div><button class="button secondary" type="button" @click="load">刷新</button></div>
-        <form class="filters" @submit.prevent="load">
-          <label>店铺<select v-model="filters.store_code" @change="onFilterStoreChange"><option value="">全部店铺</option><option v-for="store in stores" :key="`filter-${store.store_name}`" :value="store.technical_details.store_code || ''">{{ store.store_name }}</option></select></label>
-          <label>商品<select v-model="filters.product_id"><option value="">全部商品</option><option v-for="product in filterProducts" :key="`filter-${product.product_name}`" :value="product.technical_details.product_id || ''">{{ product.product_name }}</option></select></label>
-          <label>状态<select v-model="filters.material_status"><option value="">全部状态</option><option v-for="status in statuses" :key="status" :value="status">{{ displayStatus(status) }}</option></select></label>
-          <button class="button secondary" type="submit">筛选</button>
-        </form>
-        <p v-if="loading" class="notice" role="status">正在读取资料记录…</p>
-        <p v-else-if="listError" class="notice error" role="alert">{{ listError }}</p>
-        <p v-else-if="materials.length === 0" class="notice">当前没有符合条件的资料记录。</p>
-        <div v-else class="material-list">
-          <article v-for="item in materials" :key="`${item.material_id}-${item.revision}`" class="material-card">
-            <div class="material-heading"><button class="link-button" type="button" @click="choose(item)">{{ item.display_name }}</button><span class="badge">{{ materialStatusLabel(item) }}</span></div>
-            <strong>{{ storeName(item.store_code) }} → {{ productName(item.product_id) }} → {{ skuName(item.sku_id) }}</strong>
-            <p>模板：{{ item.recognition_summary.template_name || displayStatus(item.material_type) }} · {{ item.recognition_summary.record_count || 1 }} 条记录</p>
-            <p>已识别：{{ item.recognition_summary.detected_fields.join('、') || '尚未识别到字段' }}</p>
-            <p v-if="item.recognition_summary.missing_expected_fields.length" class="warning">待补充：{{ item.recognition_summary.missing_expected_fields.join('、') }}</p>
-            <div class="material-actions"><button class="text-button" type="button" @click="choose(item)">查看并审核</button><button class="text-button" type="button" @click="prepareRevision(item)">以此资料创建修订版本</button></div>
-          </article>
-        </div>
-      </section>
+        <label>Step 2 · 导入模板类型
+          <select v-model="templateType" required @change="onTemplateChange">
+            <option v-for="template in templates" :key="template.value" :value="template.value">
+              {{ template.label }} · {{ template.supported ? '已支持' : '开发中' }}
+            </option>
+          </select>
+          <small v-if="!selectedTemplate?.supported" class="warning">该模板导入功能暂未开放</small>
+        </label>
+
+        <label>操作人
+          <input v-model.trim="operator" required maxlength="128" placeholder="填写运营人员姓名或账号">
+          <small>用于生成上传与审核收据，不代替登录鉴权。</small>
+        </label>
+
+        <label>Step 3 · 商品知识 Excel
+          <input type="file" accept=".xlsx" required @change="onFileChange">
+          <small>仅解析“商品知识采集模板 V1.xlsx”的四个固定工作表，不调用 AI。</small>
+        </label>
+      </div>
+
+      <p v-if="loadingStores" class="notice" role="status">正在读取可用店铺…</p>
+      <p v-if="errorMessage" class="notice error" role="alert">{{ errorMessage }}</p>
+      <p v-if="successMessage" class="notice success" role="status">{{ successMessage }}</p>
+      <button
+        class="button"
+        type="submit"
+        :disabled="submitting || !file || !selectedStore || !selectedTemplate?.supported || !operator"
+      >
+        {{ submitting ? '正在解析并生成 Merge 预览…' : '上传 Excel 并生成待审核结果' }}
+      </button>
+    </form>
+
+    <section v-if="preflight" class="card preflight-card">
+      <div class="section-heading">
+        <div><p class="eyebrow">Batch {{ preflight.batch_id }}</p><h2>文件预检结果</h2></div>
+        <span class="badge">{{ statusLabels[preflight.status] || preflight.status }}</span>
+      </div>
+      <div class="summary-grid">
+        <div><strong>{{ preflight.field_validation_result.data_row_count || 0 }}</strong><span>数据行</span></div>
+        <div><strong>{{ preflight.product_identification_result.new_count || 0 }}</strong><span>新增商品</span></div>
+        <div><strong>{{ preflight.product_identification_result.existing_count || 0 }}</strong><span>已有商品</span></div>
+        <div><strong>{{ preflight.field_validation_result.blocking_issue_count || 0 }}</strong><span>阻塞问题</span></div>
+      </div>
+      <div class="sheet-grid">
+        <span v-for="sheet in preflight.sheet_results" :key="sheet.sheet_name" :class="['sheet-chip', { invalid: !sheet.valid }]">
+          {{ sheet.sheet_name }} · {{ sheet.valid ? '通过' : '异常' }}
+        </span>
+      </div>
+      <ul v-if="preflight.field_validation_result.issues?.length" class="issue-list">
+        <li v-for="(issue, index) in preflight.field_validation_result.issues" :key="`${issue.code}-${index}`">
+          {{ issue.message }}
+        </li>
+      </ul>
     </section>
 
-    <section v-if="selected" class="card review-panel">
-      <div class="section-heading"><div><h2>人工核对：{{ selected.display_name }}</h2><p>{{ storeName(selected.store_code) }} → {{ productName(selected.product_id) }} → {{ skuName(selected.sku_id) }}</p></div><span class="badge">{{ materialStatusLabel(selected) }}</span></div>
-      <div class="review-grid">
-        <div><h3>识别摘要</h3><p><strong>已识别：</strong>{{ selected.recognition_summary.detected_fields.join('、') || '尚未识别到字段' }}</p><p><strong>待补充：</strong>{{ selected.recognition_summary.missing_expected_fields.join('、') || '暂无明显缺口' }}</p><p class="notice boundary">{{ selected.recognition_summary.privacy_reminder }}</p><h3>核对摘要</h3><pre>{{ selected.analysis_text_preview }}</pre></div>
-        <div v-if="selected.material_status === 'RECOGNIZED'" class="review-form"><h3>审核决定</h3><label>审核人<input v-model.trim="review.reviewed_by" maxlength="128" placeholder="填写运营人员姓名或账号"></label><label>审核备注<textarea v-model.trim="review.review_note" maxlength="4000" placeholder="说明已核对的来源、缺口或拒绝原因"></textarea></label><p v-if="selected.recognition_summary.warnings.length" class="notice boundary">{{ selected.recognition_summary.warnings.join('；') }}</p><button class="button" type="button" :disabled="reviewing || !review.reviewed_by || !review.review_note" @click="reviewSelected('APPROVE_FOR_ANALYSIS')">{{ reviewing ? '提交中…' : '审核通过' }}</button><button class="button secondary" type="button" :disabled="reviewing || !review.reviewed_by || !review.review_note" @click="reviewSelected('REJECT')">拒绝本次资料</button></div>
-        <div v-else><h3>审核记录</h3><p>{{ selected.review_note || '该资料尚未记录审核备注。' }}</p><p>资料来源文件：{{ selected.original_filename }}</p><p class="notice boundary">审核通过只表示运营已核对资料，不等于发布到 RAG，也不触发模型训练。</p></div>
+    <section v-if="preview" class="review-area">
+      <div class="section-heading review-heading">
+        <div><p class="eyebrow">字段级增量合并</p><h2>Merge 审核结果</h2><p>旧值用于核对，Excel 空值只会保留原值，不会清空数据库。</p></div>
+        <span class="badge">待审核 {{ reviewableItems.length }} 个商品</span>
       </div>
+
+      <p v-if="preview.items.length === 0" class="card notice">当前批次没有可展示的商品变更。</p>
+      <article v-for="item in preview.items" :key="item.product.change_set_id" class="card change-card">
+        <div class="change-heading">
+          <div><h3>{{ item.product.product_name }}</h3><p>{{ item.product.operation === 'CREATE' ? '新增商品候选' : item.product.operation === 'UPDATE' ? '已有商品字段更新候选' : '商品数据无变化' }}</p></div>
+          <span class="badge">{{ statusLabels[item.product.status] || item.product.status }}</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>字段</th><th>旧值</th><th>Excel 值</th><th>合并后值</th><th>变化类型</th></tr></thead>
+            <tbody>
+              <tr v-for="field in item.fields" :key="field.field_key">
+                <td><strong>{{ field.field_label }}</strong></td>
+                <td>{{ formatValue(field.old_value) }}</td>
+                <td>{{ formatValue(field.incoming_value) }}</td>
+                <td>{{ formatValue(field.merged_value) }}</td>
+                <td><span :class="['change-badge', field.change_type.toLowerCase()]">{{ changeTypeLabels[field.change_type] }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="item.product.status === 'IDENTIFIED_PENDING_REVIEW'" class="review-actions">
+          <label>审核备注
+            <textarea v-model.trim="reviewNotes[item.product.change_set_id]" maxlength="4000" placeholder="通过时可记录核对依据；驳回时必须说明原因。"></textarea>
+          </label>
+          <div>
+            <button class="button" type="button" :disabled="!!reviewingChangeSet" @click="reviewItem(item, 'APPROVE')">
+              {{ reviewingChangeSet === item.product.change_set_id ? '提交中…' : '通过并 Merge' }}
+            </button>
+            <button class="button secondary" type="button" :disabled="!!reviewingChangeSet" @click="reviewItem(item, 'REJECT')">驳回</button>
+          </div>
+        </div>
+      </article>
     </section>
   </main>
 </template>
 
 <style scoped>
-.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }.guide { margin-bottom: 20px; background: #f8fbff; }.guide h2, .upload-form h2, .materials h2, .review-panel h2 { margin-top: 0; color: #172554; }.guide li { margin: 8px 0; line-height: 1.6; }.work-grid, .review-grid { display: grid; grid-template-columns: minmax(290px, .8fr) minmax(0, 1.45fr); gap: 20px; }.upload-form, .review-form { display: grid; align-content: start; gap: 12px; }.upload-form label, .filters label, .review-form label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.upload-form input, .upload-form select, .review-form input, .review-form textarea, .filters select { min-height: 40px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 7px; font: inherit; }.review-form textarea { min-height: 108px; resize: vertical; }.upload-form small { display: block; margin-top: 4px; color: #64748b; }.boundary { color: #75570a; background: #fff8df; line-height: 1.55; }.section-heading, .material-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }.section-heading p { margin: 5px 0 0; color: #617087; }.filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 18px 0; }.filters label { min-width: 160px; }.material-list { display: grid; gap: 10px; }.material-card { padding: 14px; border: 1px solid #dbe4ef; border-radius: 10px; }.material-card > strong { display: block; margin-top: 8px; color: #334965; font-size: 13px; }.material-card p { margin: 7px 0 0; color: #617087; font-size: 13px; }.material-card .warning { color: #a56618; }.material-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }.link-button, .text-button { padding: 0; border: 0; color: #285493; background: transparent; font: inherit; text-align: left; cursor: pointer; }.link-button { font-weight: 700; }.text-button { font-size: 13px; }.review-panel { margin-top: 20px; }.review-grid { grid-template-columns: minmax(0, 1.35fr) minmax(260px, .75fr); }.review-grid h3 { margin-top: 0; color: #25466f; }.review-grid p, pre { line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }pre { max-height: 330px; margin: 0; padding: 12px; overflow: auto; border-radius: 8px; background: #f4f7fb; font-size: 13px; }
-@media (max-width: 980px) { .work-grid, .review-grid { grid-template-columns: 1fr; } }
+.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.boundary-card { margin-bottom: 18px; border-left: 4px solid #d59b2c; background: #fffaf0; }
+.boundary-card p { margin-bottom: 0; color: #526279; line-height: 1.65; }
+.import-form { margin-bottom: 20px; }
+.step-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 24px; padding: 0; list-style: none; }
+.step-list li { display: flex; gap: 9px; align-items: center; padding: 12px; border: 1px solid #dbe4ef; border-radius: 10px; color: #718096; background: #f8fafc; }
+.step-list span { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: #e2e8f0; font-size: 12px; }
+.step-list li.active { border-color: #8cb2e8; color: #244d83; background: #f3f8ff; }
+.step-list li.done { color: #217447; }
+.step-list li.done span { color: #fff; background: #369367; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.form-grid label, .review-actions label { display: grid; gap: 7px; color: #43566f; font-size: 13px; font-weight: 700; }
+.form-grid input, .form-grid select, .review-actions textarea { min-height: 42px; padding: 9px 10px; border: 1px solid #cbd7e6; border-radius: 8px; background: #fff; font: inherit; }
+.form-grid small { color: #6b7a90; font-weight: 400; line-height: 1.5; }
+.form-grid small.warning { color: #a4610c; font-weight: 700; }
+.import-form > .button { margin-top: 18px; }
+.section-heading, .change-heading { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
+.section-heading h2, .change-heading h3 { margin: 0; color: #172554; }
+.section-heading p, .change-heading p { color: #617087; }
+.badge { display: inline-flex; padding: 5px 9px; border-radius: 999px; color: #285282; background: #eaf2ff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
+.summary-grid div { display: grid; gap: 4px; padding: 14px; border-radius: 10px; background: #f5f8fc; }
+.summary-grid strong { color: #173f72; font-size: 24px; }.summary-grid span { color: #617087; font-size: 12px; }
+.sheet-grid { display: flex; flex-wrap: wrap; gap: 8px; }.sheet-chip { padding: 6px 9px; border-radius: 7px; color: #217447; background: #ecf9f1; font-size: 12px; font-weight: 700; }.sheet-chip.invalid { color: #a33a2b; background: #fff0ed; }
+.issue-list { color: #9b3d2e; line-height: 1.7; }
+.review-area { margin-top: 24px; }.review-heading { margin-bottom: 14px; }.change-card { margin-bottom: 16px; }
+.table-wrap { overflow-x: auto; margin-top: 14px; }table { width: 100%; border-collapse: collapse; font-size: 13px; }th, td { min-width: 145px; padding: 11px; border-bottom: 1px solid #e5ebf2; text-align: left; vertical-align: top; white-space: pre-wrap; }th { color: #425672; background: #f7f9fc; }td:first-child { min-width: 120px; color: #243b5a; }
+.change-badge { display: inline-flex; padding: 4px 7px; border-radius: 6px; font-size: 12px; font-weight: 800; }.change-badge.add { color: #17633a; background: #e8f7ee; }.change-badge.update { color: #8a4d00; background: #fff2da; }.change-badge.keep { color: #4d5d73; background: #edf1f5; }.change-badge.no_change { color: #526279; background: #f3f5f7; }
+.review-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: end; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5ebf2; }.review-actions textarea { min-height: 78px; resize: vertical; }.review-actions > div { display: flex; gap: 9px; }
+@media (max-width: 800px) { .form-grid, .summary-grid { grid-template-columns: 1fr 1fr; }.review-actions { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .step-list, .form-grid, .summary-grid { grid-template-columns: 1fr; }.section-heading, .change-heading { display: grid; } }
 </style>

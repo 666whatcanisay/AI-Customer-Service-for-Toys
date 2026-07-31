@@ -77,6 +77,12 @@ async def validation_exception_handler(
             "/api/v1/admin/ai-feedback-loop",
         )
     )
+    customer_catalog_activation_path = request.url.path.startswith(
+        (
+            "/api/v1/admin/operations/stores/",
+            "/api/v1/admin/operations/products/",
+        )
+    ) and request.url.path.endswith("/customer-service-status")
     knowledge_material_path = request.url.path.startswith(
         (
             "/api/v1/admin/knowledge-materials",
@@ -113,6 +119,8 @@ async def validation_exception_handler(
                 if ai_feedback_path
                 else "AI_INTERACTION_EVENT_VALIDATION_FAILED"
                 if feedback_loop_path
+                else "CUSTOMER_SERVICE_STATUS_INVALID"
+                if customer_catalog_activation_path
                 else "KNOWLEDGE_MATERIAL_VALIDATION_FAILED"
                 if knowledge_material_path or knowledge_quality_path
                 else "EXPERIENCE_CASE_VALIDATION_FAILED"

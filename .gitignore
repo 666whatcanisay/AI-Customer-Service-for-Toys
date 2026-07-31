@@ -65,3 +65,4 @@ desktop.ini
 
 # Local Windows OPS runtime state, logs, databases, and generated config
 /.runtime/
+/tests/e2e/test-results/

@@ -545,6 +545,14 @@ class ProductKnowledgeService:
                 usage_instructions=_text(
                     _first(raw, "assembly_summary", "play_method", "usage_instructions")
                 ),
+                data_source=store.data_source if store and store.data_source else "UNKNOWN",
+                customer_service_status=product.customer_service_status,
+                customer_service_status_updated_at=(
+                    product.customer_service_status_updated_at
+                ),
+                customer_service_status_updated_by=(
+                    product.customer_service_status_updated_by
+                ),
                 technical_details=projection.technical_details,
             ),
             skus=[self._sku_summary(sku) for sku in skus],
@@ -658,6 +666,10 @@ class ProductKnowledgeService:
                 topic.name for topic in topics if topic.status == KnowledgeTopicStatus.MISSING
             ],
             gap_count=len(gaps),
+            data_source=store.data_source if store and store.data_source else "UNKNOWN",
+            customer_service_status=product.customer_service_status,
+            customer_service_status_updated_at=product.customer_service_status_updated_at,
+            customer_service_status_updated_by=product.customer_service_status_updated_by,
             technical_details=TechnicalDetails(
                 store_code=product.store_code,
                 platform=product.platform,
