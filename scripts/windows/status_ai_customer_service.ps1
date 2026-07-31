@@ -1,12 +1,22 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$ConfigPath
+    [string]$ConfigPath,
+    [ValidateSet('Auto','Local','Lan')]
+    [string]$Mode = 'Auto'
 )
 
 $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'common_ai_customer_service.ps1')
 try {
-    $config = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $config = Get-LocalConfig $resolvedConfigPath
+    $effectiveNetworkMode = Resolve-StandardRuntimeNetworkMode $config $Mode
+    if ($effectiveNetworkMode -eq 'LAN') {
+        Write-Host '通用状态入口已选择当前受管 LAN Runtime。' -ForegroundColor Cyan
+        & (Join-Path $PSScriptRoot 'status_lan_ai_customer_service.ps1') -ConfigPath $resolvedConfigPath
+        if (-not $?) { throw 'LAN Runtime 状态入口执行失败。' }
+        return
+    }
     $env:DATABASE_URL = $config.PlatformDatabaseUrl
     $ollamaState = '不可用'
     try { Assert-OllamaReady $config | Out-Null; $ollamaState = '可用' } catch { $ollamaState = "不可用（$($_.Exception.Message)）" }

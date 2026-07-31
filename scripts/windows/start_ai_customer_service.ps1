@@ -1,7 +1,9 @@
 ﻿[CmdletBinding()]
 param(
     [string]$ConfigPath,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [ValidateSet('Auto','Local','Lan')]
+    [string]$Mode = 'Auto'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +11,15 @@ $ErrorActionPreference = 'Stop'
 $config = $null
 $startedServices = @()
 try {
-    $config = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $config = Get-LocalConfig $resolvedConfigPath
+    $effectiveNetworkMode = Resolve-StandardRuntimeNetworkMode $config $Mode
+    if ($effectiveNetworkMode -eq 'LAN') {
+        Write-Host '通用启动入口已选择 LAN Runtime；A/C/Admin 保持本机回环，B 使用当前受控局域网地址。' -ForegroundColor Cyan
+        & (Join-Path $PSScriptRoot 'start_lan_ai_customer_service.ps1') -ConfigPath $resolvedConfigPath -NoBrowser:$NoBrowser
+        if (-not $?) { throw 'LAN Runtime 启动入口执行失败。' }
+        return
+    }
     Assert-RagVirtualEnvironment $config
     Assert-Dependencies $config
     Assert-AdminWebDependencies $config | Out-Null

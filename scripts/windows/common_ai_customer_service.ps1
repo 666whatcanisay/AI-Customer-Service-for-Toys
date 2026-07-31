@@ -1,10 +1,20 @@
 ﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Resolve-AiCustomerServiceConfigPath([string]$ConfigPath, [string]$ScriptRoot = $PSScriptRoot) {
+    if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) { return $ConfigPath }
+    $legacyConfigPath = Join-Path $ScriptRoot 'config.local.ps1'
+    if (Test-Path -LiteralPath $legacyConfigPath -PathType Leaf) { return $legacyConfigPath }
+    $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $ScriptRoot '..\..'))
+    $standardRuntimeConfigPath = Join-Path $repositoryRoot '.runtime\phase-e\config\green-standard.local.ps1'
+    if (Test-Path -LiteralPath $standardRuntimeConfigPath -PathType Leaf) { return $standardRuntimeConfigPath }
+    return $legacyConfigPath
+}
+
 function Get-LocalConfig([string]$ConfigPath) {
-    $configPath = if ([string]::IsNullOrWhiteSpace($ConfigPath)) { Join-Path $PSScriptRoot 'config.local.ps1' } else { $ConfigPath }
+    $configPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
     if (-not (Test-Path -LiteralPath $configPath)) {
-        throw "缺少本地配置：$configPath。请将 config.local.ps1.example 复制为 config.local.ps1 后填写。"
+        throw "缺少本地配置：$configPath。可显式传入 -ConfigPath，或为正式 AI-CS 准备 .runtime\phase-e\config\green-standard.local.ps1。"
     }
     $config = & $configPath
     if ($null -eq $config -or -not ($config -is [hashtable])) { throw 'config.local.ps1 必须返回一个 hashtable（请以示例文件为准）。' }
@@ -131,6 +141,48 @@ function Get-ConfiguredRuntimeMode($Config) {
 function Get-ConfiguredNetworkMode($Config) {
     if ($Config.ContainsKey('LanMode') -and [bool]$Config.LanMode) { return 'LAN' }
     return 'LOCAL'
+}
+
+function Get-RecordedRuntimeNetworkMode($Config) {
+    $modes = @()
+    $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+    foreach ($name in @('platform','rag','customer-web','admin-web')) {
+        $recordPath = Get-ServiceRecordPath $Config $name
+        if (-not (Test-Path -LiteralPath $recordPath -PathType Leaf)) { continue }
+        try {
+            $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch {
+            throw "无法解析 $name 运行记录，拒绝自动选择 LOCAL/LAN：$recordPath"
+        }
+        if (-not ($record.PSObject.Properties.Name -contains 'repository_root') -or [string]::IsNullOrWhiteSpace([string]$record.repository_root)) {
+            throw "$name 运行记录缺少 repository_root，拒绝自动选择 LOCAL/LAN。"
+        }
+        $recordRoot = [IO.Path]::GetFullPath([string]$record.repository_root)
+        if (-not [string]::Equals($recordRoot, $repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "$name 运行记录指向其他仓库，拒绝自动选择 LOCAL/LAN：$recordRoot"
+        }
+        if (-not ($record.PSObject.Properties.Name -contains 'network_mode')) { continue }
+        $networkMode = ([string]$record.network_mode).Trim().ToUpperInvariant()
+        if ($networkMode -notin @('LOCAL','LAN')) {
+            throw "$name 运行记录包含非法 network_mode：$networkMode"
+        }
+        $modes += $networkMode
+    }
+    $uniqueModes = @($modes | Select-Object -Unique)
+    if ($uniqueModes.Count -gt 1) {
+        throw "受管运行记录的 network_mode 不一致：$($uniqueModes -join '、')。请先使用状态脚本核对，禁止混合启动。"
+    }
+    if ($uniqueModes.Count -eq 1) { return [string]$uniqueModes[0] }
+    return $null
+}
+
+function Resolve-StandardRuntimeNetworkMode($Config, [string]$Mode = 'Auto') {
+    $requestedMode = if ([string]::IsNullOrWhiteSpace($Mode)) { 'AUTO' } else { $Mode.Trim().ToUpperInvariant() }
+    if ($requestedMode -notin @('AUTO','LOCAL','LAN')) { throw 'Mode 只允许 Auto、Local 或 Lan。' }
+    if ($requestedMode -ne 'AUTO') { return $requestedMode }
+    $recordedMode = Get-RecordedRuntimeNetworkMode $Config
+    if (-not [string]::IsNullOrWhiteSpace([string]$recordedMode)) { return $recordedMode }
+    return Get-ConfiguredNetworkMode $Config
 }
 function Get-ServiceUrl($Config, [int]$Port, [string]$Path = '/') {
     $serviceHost = [string]$Config.BindAddress
