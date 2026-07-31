@@ -3,13 +3,73 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "source_freeze_closed",
-  "current_task": "R008 Phase 1.5 Source Clean & Protection Reference Closure",
-  "current_stage": "The formal R008 Control overlay is closed as one docs/control-only commit whose parent is 19cc826, and annotated tag ai-cs-monorepo-source-freeze-v1 is the sole future Physical Migration source reference. The active Pilot remains protected at clean ai-cs-pilot-baseline-v1@cbc77ed in AI-CS-pilot-baseline-recovery-v1; ports 5173, 5174, 8000 and 8011 remain healthy and unchanged. No target AI-CS directory, physical migration, runtime switch, worktree retirement, implementation, contract, database or business-data change occurred.",
-  "current_gate": "PASS / SOURCE_FREEZE_CLOSED / PHYSICAL_MIGRATION_ENTRY_READY: Phase 2 may begin only after separate explicit authorization and only from ai-cs-monorepo-source-freeze-v1. Runtime switch, Recovery-root changes and worktree deletion remain unauthorized.",
+  "status": "r006_implementation_complete_release_pending",
+  "current_task": "R006 Customer Available Catalog Implementation V1",
+  "current_stage": "Contracts 0.3.0, C 0010/provider/Admin control, B final-projection consumer and isolated browser E2E are complete. BUG-B-001 is FIXED_VERIFIED_CANDIDATE. Formal AI-CS@42bafcf/0008 remains unchanged; production migration and business acceptance require a separate authorized release task.",
+  "current_gate": "R006_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING: back up the formal database, migrate 0010 and deploy one approved SHA only in a separately authorized quiet window. Do not change A, RAG, Prompt, R009 or Import Center.",
+  "r006_implementation_plan": {
+    "date": "2026-07-31",
+    "branch": "feature/r006-customer-available-catalog-v1",
+    "base_sha": "03550b58572abebad9dd64cd1370157d98522be3",
+    "formal_runtime_sha": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "formal_database_revision": "0008_customer_feedback_loop_v1",
+    "interface": "pilot-business-catalog.v1.1",
+    "plan_document": "docs/control/interfaces/AI-CS-R006-Customer-Available-Catalog-Implementation-Plan-V1.md",
+    "provenance_mapping": {
+      "IMPORTED_TEST_ONLY+0.3.1-test": "TEST+ENABLED",
+      "MANUAL_CREATED+c-operation-store.v1": "PILOT+DISABLED",
+      "unknown_or_conflicting": "QUARANTINE"
+    },
+    "implementation_order": [
+      "contracts 0.3.0",
+      "0010 migration and C persistence",
+      "C customer available projection",
+      "C minimal status control",
+      "B consumer adaptation",
+      "isolated QA and browser acceptance"
+    ],
+    "implementation_started": true,
+    "implementation_complete": true,
+    "candidate_head": "8cbd92b",
+    "commits": {
+      "contracts": "673dca6",
+      "platform": "68457e1",
+      "admin": "e858c02",
+      "customer": "04e4a84",
+      "e2e": "8cbd92b"
+    },
+    "verification": "contracts 4 passed; C 110 passed; B 117 passed; Admin 58 passed; B/Admin typecheck and build PASS; isolated browser E2E PASS",
+    "formal_data_changed": false
+  },
+  "product_stabilization": {
+    "date": "2026-07-30",
+    "worktree": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-browser-acceptance-environment-v1",
+    "branch": "stabilization/product-stable-v1",
+    "a_fix_commit": "18a20f70ec5cd4c4da7baef0179cc30db0dbff5a",
+    "formal_runtime_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "formal_runtime_branch": "stabilization/product-stable-runtime-v1",
+    "formal_runtime_sha": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "runtime_mode": "standard",
+    "network_mode": "LAN",
+    "database_revision": "0008_customer_feedback_loop_v1",
+    "active_collection": "test_knowledge_v031",
+    "active_chunks": 47,
+    "model": "qwen3.5:9b",
+    "tests": {
+      "A": "105 passed, 3 skipped",
+      "C_backend": "full suite PASS; R009 targeted 8 passed",
+      "B": "115 Vitest passed in stabilization; R006 candidate later passed 117 tests and isolated browser E2E",
+      "C_admin": "55 Vitest passed; typecheck and build PASS; browser operations PASS",
+      "R009": "isolated 0009 browser upload, merge, 19 approvals, idempotency and negative cases PASS",
+      "runtime": "three stop/start/status cycles plus A and C fault recovery PASS"
+    },
+    "open_p1": [
+      "BUG-B-001 candidate fix requires formal Production release verification"
+    ]
+  },
   "git": {
     "repository": "https://github.com/666whatcanisay/AI-Customer-Service-for-Toys.git",
-    "branch": "control/r006-interface-validation-v1-1",
+    "branch": "feature/r006-customer-available-catalog-v1",
     "productization_v2_release_commit": "e9b30c49c878f39e70bcaff8543af6e2ba3ed8d3",
     "admin_ui_hotfix_source_commits": [
       "8c8a9a8776159604551e992cf3f32dd28b7fa7bd",
@@ -44,7 +104,12 @@
     "pilot_baseline_tag": "ai-cs-pilot-baseline-v1",
     "interface_freeze_branch": "control/r006-interface-freeze-v1",
     "interface_freeze_base": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
-    "contracts_version": "0.2.0",
+    "contracts_version": "0.3.0",
+    "r006_contracts_commit": "673dca6",
+    "r006_platform_commit": "68457e1",
+    "r006_admin_commit": "e858c02",
+    "r006_customer_commit": "04e4a84",
+    "r006_e2e_commit": "8cbd92b",
     "interface_freeze_commit": "f9257c214eba4d5cb77d4d7c290a9677bfcb88f2",
     "interface_validation_branch": "control/r006-interface-validation-v1",
     "interface_validation_base": "f9257c214eba4d5cb77d4d7c290a9677bfcb88f2",
@@ -57,7 +122,7 @@
     "monorepo_plan_base": "19cc82682074dc0f11096d4191ad8d19a9f0cc0b",
     "monorepo_candidate_physical_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS-r006-interface-validation-v1",
     "monorepo_target_physical_path": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
-    "monorepo_target_exists": false,
+    "monorepo_target_exists": true,
     "monorepo_source_freeze_head": "19cc82682074dc0f11096d4191ad8d19a9f0cc0b",
     "monorepo_source_protection_ref": "ai-cs-monorepo-source-freeze-v1",
     "monorepo_source_protection_ref_rule": "Resolve the annotated tag to obtain the closure commit; its direct parent must be 19cc82682074dc0f11096d4191ad8d19a9f0cc0b and its changed paths must be limited to docs/control/**.",
@@ -136,7 +201,9 @@
     "OPS_TARGET_PILOT_READY": "The daily pilot wrapper starts C/A/B/Admin and then probes trusted service state, TCP 5173, the customer page, /rag-api/api/health, and /platform-api/health. A real Private-network host closure passed twice across explicit safe stop and recovery: migrations, test-package idempotency, 47-item sync, real Ollama smoke, all four health checks, customer entry, fixed proxies, and loopback-only Admin passed. Runtime evidence is sanitised; a second customer computer remains a manual acceptance gate.",
     "OPS_PILOT_HARDENING_V1": "The hardening pass introduced a read-only gate for one enabled Private/current-subnet/TCP-5173 firewall rule, a second-computer client check, sanitised JSONL operation events, and a local SQLite online backup entrypoint. The real host completed A, C, and B stop-to-full-recovery rehearsals; after each, all four services, the customer page, and both fixed proxies recovered. The server-side client emulation passed. No scoped firewall rule exists and the current session is non-administrator, so second-computer reachability remains unverified.",
     "CONTROL_PILOT_BASELINE_MERGE": "After merging PR #49 and #51, an isolated SQLite verification completed Alembic, original-test-package import, 47-item sync, real qwen3.5:9b chat, 5173 /rag-api and /platform-api HTTP 200, one de-identified experience case NEW->REVIEWING->APPROVED, one de-identified feedback NEW->ANALYZING->ANALYZED, Admin HTTP 200, and managed stop with all four ports released. The readiness state correctly remained FIREWALL_CONFIGURATION_REQUIRED because no current-subnet Private TCP 5173 rule exists.",
-    "CONTROL_BASELINE_MERGE_V2": "Reviewed candidates were squash merged in the frozen order Interface #58, C #55, B #57, A 2ac537f and OPS #56 to develop@d1d2ba2. Backend 77 passed/3 skipped, C Admin 33 Vitest passed, B 100 Vitest passed and selected OPS lifecycle suites exited 0. Official scripts in an isolated worktree verified migration 0006, package import, 47/47 sync, four verified runtime records, fixed proxy health, sourced real qwen3.5:9b answer, case approval/evaluation, feedback analysis and Admin visibility. External firewall and second-computer gates remain."
+    "CONTROL_BASELINE_MERGE_V2": "Reviewed candidates were squash merged in the frozen order Interface #58, C #55, B #57, A 2ac537f and OPS #56 to develop@d1d2ba2. Backend 77 passed/3 skipped, C Admin 33 Vitest passed, B 100 Vitest passed and selected OPS lifecycle suites exited 0. Official scripts in an isolated worktree verified migration 0006, package import, 47/47 sync, four verified runtime records, fixed proxy health, sourced real qwen3.5:9b answer, case approval/evaluation, feedback analysis and Admin visibility. External firewall and second-computer gates remain.",
+    "PRODUCT_STABILIZATION_V1": "Formal AI-CS@42bafcf passed three LAN lifecycle cycles, A/C failure recovery, database and vector protection, and real qwen3.5:9b chat. A 105 passed/3 skipped; C full suite and R009 targeted 8 passed; B 115 and Admin 55 Vitest passed with typecheck/build. Isolated R009 browser acceptance uploaded the real workbook, parsed four sheets, approved 19 products, and passed idempotency and negative cases. B browser daily flow remains blocked on the unchanged formal Runtime until the verified R006 candidate is released.",
+    "R006_CUSTOMER_AVAILABLE_CATALOG": "Contracts 0.3.0, 0010, C provider/Admin, B consumer and isolated E2E completed. Contracts 4, C 110, B 117 and Admin 58 tests passed; both frontend typechecks/builds passed. Bad Store/Product/SKU records were isolated without clearing valid TEST data; PILOT activation and receipt history passed. Formal AI-CS@42bafcf/0008 was not changed."
   },
   "agent_worktrees": {
     "A": {
@@ -179,25 +246,25 @@
     "R006 Pilot Business Catalog Interface Validation V1.1 static case review",
     "R008 AI-CS Monorepo Consolidation V1 documentation-only migration plan",
     "R008 Phase 1 Monorepo Source Freeze report and runtime identity reconciliation",
-    "R008 Phase 1.5 Source Clean and Protection Reference Closure"
+    "R008 Phase 1.5 Source Clean and Protection Reference Closure",
+    "R008 physical migration, target validation and standard-port runtime cutover",
+    "Runtime Identity Alignment and Runtime Startup Alignment",
+    "R009 Product Knowledge Import V1 implementation and isolated browser acceptance",
+    "R006 Customer Available Catalog implementation and isolated browser acceptance"
   ],
   "next_tasks": {
-    "CONTROL": "Wait for separate explicit authorization before Phase 2 Physical Migration. Resolve ai-cs-monorepo-source-freeze-v1, verify its parent and docs/control-only closure scope, then apply the approved source-to-target map. Do not combine migration with runtime switch or worktree retirement.",
-    "OPS": "Preserve the current Recovery runtime root, ai-cs-pilot-baseline-v1 reference and records. Do not stop, restart, rename or retire it. Re-run full runtime identity only when a later controlled switch is separately authorized.",
-    "A_B_C": "Keep implementation paths frozen. Review the eight pre-existing dirty worktrees separately before any retirement; do not auto-commit, discard, move, delete or copy runtime data.",
-    "CONTRACTS": "Remain unchanged at 0.2.0 throughout structural migration planning. R006 IV11-B01 and IV11-B02 remain separate blockers before any 0.3.0 implementation.",
-    "QA": "Use the frozen tree objects and R004 results as the later parity baseline. No migration test was executed in Source Freeze and no PASS may be claimed for the future layout."
+    "CONTROL": "Prepare a separate R006 Production Release and R003 Business Acceptance task; do not treat implementation completion as formal deployment.",
+    "OPS": "Keep AI-CS@42bafcf/0008 running until an authorized quiet window. Back up before 0010, deploy one approved R006 SHA, and preserve rollback.",
+    "A": "No changes. Preserve A fix commit 18a20f7, Prompt, model and RAG data.",
+    "B_C": "No further implementation changes before release review. Preserve C ownership and the B consume-only boundary.",
+    "QA": "During the separate release, verify 0010 revision, TEST continuity, PILOT manual activation, B visibility, receipts and formal BUG-B-001 closure."
   },
   "t02_executed": false,
   "blockers": [
-    "SF-R01: ai-cs-monorepo-source-freeze-v1 is currently a local annotated tag. A remote or controlled offline copy is required before retiring the source directory, but this does not block a separately authorized isolated Physical Migration.",
-    "SF-R02: eight pre-existing dirty worktrees and four detached worktrees remain quarantined or pending classification. No worktree may be removed or force-cleaned; this blocks their retirement, not the new target migration entry.",
-    "The active Pilot uses AI-CS-pilot-baseline-recovery-v1@cbc77ed, not the migration-source root. The Recovery directory, runtime records, SQLite and vector assets must remain in place until a later controlled switch and rollback rehearsal pass.",
-    "IV11-B01: the current catalog tables mix IMPORTED_TEST_ONLY records with MANUAL_CREATED/c-operation-store.v1 records, but V1.1 does not yet freeze the exact one-time provenance mapping and quarantine rule; bulk TEST plus ENABLED initialization is unsafe.",
-    "IV11-B02: V1.1 does not yet freeze the exact Store/Product status-write success response, changed=false idempotency behavior, or a receipt persistence verification/read-back mechanism.",
-    "No contracts 0.3.0 schema, C status persistence, migration, Admin control or B consumer implementation exists; this static validation is not runtime evidence.",
-    "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified on one approved runtime SHA.",
-    "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through R006 business code."
+    "BUG-B-001 is FIXED_VERIFIED_CANDIDATE but remains unverified on the unchanged formal AI-CS@42bafcf/0008 Runtime.",
+    "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified after deploying one approved runtime SHA.",
+    "R009 is accepted only in an isolated 0009 runtime. Formal production remains at 0008 and no RAG publication or B consumption is implied.",
+    "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
   ],
-  "last_updated": "2026-07-30"
+  "last_updated": "2026-07-31"
 }

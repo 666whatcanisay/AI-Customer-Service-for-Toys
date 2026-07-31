@@ -125,6 +125,10 @@ class ProductKnowledgeListItem(BaseModel):
     answerable_topics: list[str]
     missing_topics: list[str]
     gap_count: int
+    data_source: str
+    customer_service_status: str
+    customer_service_status_updated_at: datetime | None = None
+    customer_service_status_updated_by: str | None = None
     technical_details: TechnicalDetails
 
 
@@ -164,6 +168,10 @@ class ProductOverviewDetail(BaseModel):
     material: str | None
     package_contents: str | None
     usage_instructions: str | None
+    data_source: str
+    customer_service_status: str
+    customer_service_status_updated_at: datetime | None = None
+    customer_service_status_updated_by: str | None = None
     technical_details: TechnicalDetails
 
 

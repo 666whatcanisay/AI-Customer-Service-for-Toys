@@ -26,3 +26,20 @@
   lifecycle transition is out of order.
 - `KNOWLEDGE_OPTIMIZATION_TASK_NOT_READY_FOR_VERIFICATION`: the task is not
   complete.
+
+## Customer Available Catalog V1
+
+- `CUSTOMER_SERVICE_STATUS_INVALID`: the requested status, operator or request
+  format is invalid.
+- `CUSTOMER_SERVICE_ENTITY_NOT_FOUND`: the requested Store or Product does not
+  exist.
+- `CUSTOMER_SERVICE_ENTITY_QUARANTINED`: source provenance is unknown or
+  conflicting, so the entity cannot be enabled.
+- `CUSTOMER_SERVICE_STORE_NOT_ENABLED`: a Product cannot be enabled while its
+  parent Store is not enabled.
+- `CUSTOMER_SERVICE_ENTITY_INVALID`: required identity, name, platform or
+  parent-scope data is invalid.
+- `ACTIVATION_IDEMPOTENCY_CONFLICT`: an `Idempotency-Key` is already bound to a
+  different activation request.
+- `ACTIVATION_RECEIPT_NOT_FOUND`: the requested immutable activation receipt
+  does not exist.

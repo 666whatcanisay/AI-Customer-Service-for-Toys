@@ -149,6 +149,8 @@ class OperationManagementService:
             allow_auto_send=False,
             test_data_mode=True,
             production_usable=False,
+            data_source="PILOT",
+            customer_service_status="DISABLED",
             raw_data_json=_dump(raw),
         )
         self.session.add_all([package, store])
@@ -224,6 +226,7 @@ class OperationManagementService:
             safety_summary=None,
             review_status="REVIEWING",
             publishable=False,
+            customer_service_status="DISABLED",
             source_ids_json="[]",
             raw_data_json=_dump(raw),
         )
@@ -250,6 +253,8 @@ class OperationManagementService:
             data_status_name="待审核",
             sku_count=0,
             created_at=created_at,
+            data_source=store.data_source or "UNKNOWN",
+            customer_service_status=product.customer_service_status,
         )
 
     def update_product_basic_info(
@@ -324,6 +329,10 @@ class OperationManagementService:
             product_count=product_count,
             created_at=created_at,
             remarks=str(raw.get("remarks") or ""),
+            data_source=store.data_source or "UNKNOWN",
+            customer_service_status=store.customer_service_status,
+            customer_service_status_updated_at=store.customer_service_status_updated_at,
+            customer_service_status_updated_by=store.customer_service_status_updated_by,
         )
 
     def _ensure_name_available(

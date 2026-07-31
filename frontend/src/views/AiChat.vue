@@ -165,7 +165,6 @@
               :key="product.productId"
               :label="productOptionLabel(product)"
               :value="product.productId"
-              :disabled="!product.publishable"
             />
           </el-select>
           <small>{{ selectedStore ? '请选择客户正在咨询的商品' : '请先选择上方店铺' }}</small>
@@ -188,7 +187,6 @@
               :key="sku.skuId"
               :label="skuOptionLabel(sku)"
               :value="sku.skuId"
-              :disabled="!sku.publishable"
             />
           </el-select>
           <small>不知道款式时不要猜，AI 会提示追问</small>
@@ -1116,11 +1114,11 @@ const catalogGuidance = computed(() => {
 
 const platformName = (platform: string) => platformLabels[platform] ?? platform
 const storeOptionLabel = (store: CatalogStore) =>
-  `${platformName(store.platform)} → ${store.name}${store.testDataMode ? '（测试数据）' : ''}`
+  `${platformName(store.platform)} → ${store.name}${store.dataSource === 'TEST' ? '（历史测试）' : ''}`
 const productOptionLabel = (product: CatalogProduct) =>
-  `${product.displayName}${product.publishable ? '' : '（待发布）'}`
+  product.displayName
 const skuOptionLabel = (sku: CatalogSku) =>
-  `${sku.displayName}${sku.publishable ? '' : '（待发布）'}`
+  sku.displayName
 
 const ragHealthStatusText = computed(() => {
   if (ragHealthLoading.value) return '正在检查'
@@ -1340,19 +1338,6 @@ const loadStores = async () => {
   let storeKeyToLoad = ''
   try {
     const nextStores = await platformClient.listStores(controller.signal)
-    const unsafeStore = nextStores.find((store) =>
-      !store.trialEnabled ||
-      !store.testDataMode ||
-      store.productionUsable ||
-      store.responseMode !== 'SUGGESTION_ONLY' ||
-      store.allowAutoSend
-    )
-    if (unsafeStore) {
-      throw new PlatformClientError(
-        'contract',
-        `店铺 ${unsafeStore.storeCode} 不符合测试数据、仅供建议、禁止自动发送的安全边界`
-      )
-    }
     stores.value = nextStores
     const currentStoreKey = selectedStoreKey.value
     const rememberedStoreKey = readRememberedStore()

@@ -3,16 +3,18 @@
   "project_id": "ai-cs-target-a-runtime",
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
-  "version": "AI-CS Runtime Identity Alignment V1",
-  "status": "runtime_identity_aligned_ready",
-  "current_task": "AI-CS Runtime Identity Alignment V1",
-  "current_gate": "RUNTIME_IDENTITY_ALIGNED_READY",
-  "current_stage": "The four formal services were re-attested without restart. Deployment role is runtimeMode=standard; the independent network profile is networkMode=LAN. Repository, PID, listener, command, port and health evidence all pass.",
-  "next_recommended_task": "Resume R009 Production Integration only after the separate controllable-browser Gate is available. Use the LAN status entry for the current Pilot and never use identity re-attestation to mask business-code changes.",
+  "version": "AI-CS Product Stabilization & Reliability Sprint V1",
+  "status": "a_stability_pass",
+  "current_task": "A runtime and answer reliability stabilization",
+  "current_gate": "A_STABILITY_PASS",
+  "current_stage": "A loopback Ollama calls now bypass inherited proxy settings, unknown products cannot fall back to other product knowledge, and structured age/material evidence gates prevent unsupported generation. Formal AI-CS@42bafcf passed real qwen3.5:9b chat, scoped product/SKU checks, five-turn regression, high-risk transfer and three runtime lifecycle cycles.",
+  "next_recommended_task": "Preserve fix commit 18a20f7 and the current Prompt/model/RAG data. Do not use A changes to bypass BUG-B-001; the next product gate is explicitly authorized R006 implementation followed by B browser regression.",
   "checked_at": "2026-07-30",
   "runtime": {
     "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-    "branch": "control/runtime-identity-alignment-v1",
+    "branch": "stabilization/product-stable-runtime-v1",
+    "head": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "stability_fix_commit": "18a20f70ec5cd4c4da7baef0179cc30db0dbff5a",
     "implementation_commits": [
       "acfdc1a92da652a7ea795b5e497eba5d997f5891",
       "6070ad1a7124346ca8b859c7b655ea8737b89545"
@@ -51,7 +53,7 @@
     }
   },
   "tests": {
-    "backend": "101 passed, 3 opt-in real E2E skipped",
+    "backend": "105 passed, 3 opt-in real E2E skipped",
     "windows_ops": "8 script suites passed",
     "runtime": "No-stop identity alignment passed; four original listener PIDs remained unchanged; LAN status reports RUNNING, healthy, runtimeMode=standard, networkMode=LAN and verified repository identity."
   },

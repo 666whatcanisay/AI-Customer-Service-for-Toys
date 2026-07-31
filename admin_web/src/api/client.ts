@@ -581,6 +581,98 @@ export interface KnowledgeMaterialList {
   size: number
 }
 
+export type ProductKnowledgeImportTemplateType = KnowledgeTemplateType
+export type ProductKnowledgeImportChangeType = 'ADD' | 'UPDATE' | 'KEEP' | 'NO_CHANGE'
+export type ProductKnowledgeImportChangeSetStatus =
+  | 'IDENTIFIED_PENDING_REVIEW'
+  | 'NO_CHANGE'
+  | 'CONFLICT'
+  | 'APPROVED_APPLIED'
+  | 'REJECTED'
+  | 'STALE_REVIEW_REQUIRED'
+  | 'APPLY_FAILED'
+
+export interface ProductKnowledgeImportAccepted {
+  batch_id: string
+  status: string
+}
+
+export interface ProductKnowledgeImportPreflight {
+  batch_id: string
+  status: string
+  can_review: boolean
+  file_result: {
+    filename?: string
+    file_size_bytes?: number
+    file_sha256?: string
+    valid?: boolean
+  }
+  sheet_results: Array<{
+    sheet_name: string
+    present: boolean
+    visible: boolean
+    valid: boolean
+    errors: string[]
+  }>
+  field_validation_result: {
+    valid?: boolean
+    data_row_count?: number
+    blocking_issue_count?: number
+    issues?: Array<{ code: string; message: string; row?: number | null; field?: string | null }>
+  }
+  product_identification_result: {
+    total_products?: number
+    new_count?: number
+    existing_count?: number
+    conflict_count?: number
+  }
+}
+
+export interface ProductKnowledgeImportFieldPreview {
+  field_key: string
+  field_label: string
+  old_value: unknown
+  incoming_value: unknown
+  merged_value: unknown
+  change_type: ProductKnowledgeImportChangeType
+}
+
+export interface ProductKnowledgeImportPreviewItem {
+  product: {
+    change_set_id: string
+    product_name: string
+    target_product_id: string | null
+    operation: 'CREATE' | 'UPDATE' | 'NO_CHANGE' | 'CONFLICT'
+    status: ProductKnowledgeImportChangeSetStatus
+    base_snapshot_hash: string
+    version: number
+  }
+  fields: ProductKnowledgeImportFieldPreview[]
+}
+
+export interface ProductKnowledgeImportMergePreview {
+  batch_id: string
+  status: string
+  items: ProductKnowledgeImportPreviewItem[]
+  page: number
+  page_size: number
+  total: number
+}
+
+export interface ProductKnowledgeImportReviewReceipt {
+  receipt_id: string
+  batch_id: string
+  change_set_id: string
+  decision: 'APPROVE' | 'REJECT'
+  outcome: 'APPLIED' | 'REJECTED' | 'STALE_REVIEW_REQUIRED' | 'APPLY_FAILED'
+  reviewed_by: string
+  reviewed_at: string
+  applied_product_id: string | null
+  applied_field_count: number
+  before_snapshot_hash: string | null
+  after_snapshot_hash: string | null
+}
+
 export interface KnowledgeQualityGap {
   gap_id: string
   gap_code: string
@@ -672,6 +764,10 @@ export interface ProductKnowledgeListItem {
   answerable_topics: string[]
   missing_topics: string[]
   gap_count: number
+  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  customer_service_status: CustomerServiceStatus
+  customer_service_status_updated_at: string | null
+  customer_service_status_updated_by: string | null
   technical_details: ProductKnowledgeTechnicalDetails
 }
 
@@ -703,6 +799,10 @@ export interface ProductKnowledgeDetail {
     material: string | null
     package_contents: string | null
     usage_instructions: string | null
+    data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+    customer_service_status: CustomerServiceStatus
+    customer_service_status_updated_at: string | null
+    customer_service_status_updated_by: string | null
     technical_details: ProductKnowledgeTechnicalDetails
   }
   skus: Array<{
@@ -787,6 +887,7 @@ export async function getProductKnowledgeProduct(productId: string): Promise<Pro
 }
 
 export type StoreOperationStatus = 'ACTIVE' | 'INACTIVE'
+export type CustomerServiceStatus = 'ENABLED' | 'DISABLED'
 
 export interface StoreOperationItem {
   store_ref: number
@@ -797,6 +898,10 @@ export interface StoreOperationItem {
   product_count: number
   created_at: string
   remarks: string
+  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  customer_service_status: CustomerServiceStatus
+  customer_service_status_updated_at: string | null
+  customer_service_status_updated_by: string | null
 }
 
 export interface StoreOperationInput {
@@ -820,6 +925,44 @@ export interface ProductOperationItem {
   data_status_name: string
   sku_count: number
   created_at: string
+  data_source: 'TEST' | 'PILOT' | 'UNKNOWN'
+  customer_service_status: CustomerServiceStatus
+}
+
+export interface CatalogActivationReceipt {
+  schema_version: 'pilot-business-catalog-activation-receipt.v1'
+  activation_receipt_id: string
+  entity_type: 'STORE' | 'PRODUCT'
+  entity_ref: string
+  data_source: 'TEST' | 'PILOT'
+  previous_status: CustomerServiceStatus | null
+  customer_service_status: CustomerServiceStatus
+  activation_source: 'LEGACY_INITIALIZATION' | 'OPERATOR'
+  confirmed_by: string
+  confirmation_note: string
+  confirmed_at: string
+}
+
+export interface CatalogActivationResponse {
+  schema_version: 'pilot-business-catalog-activation-response.v1'
+  changed: boolean
+  entity: {
+    entity_type: 'STORE' | 'PRODUCT'
+    entity_ref: string
+    data_source: 'TEST' | 'PILOT'
+    customer_service_status: CustomerServiceStatus
+    customer_service_status_updated_at: string | null
+    customer_service_status_updated_by: string | null
+  }
+  activation_receipt: CatalogActivationReceipt | null
+  server_time: string
+}
+
+export interface CatalogActivationReceiptList {
+  items: CatalogActivationReceipt[]
+  total: number
+  page: number
+  size: number
 }
 
 export async function listOperationStores(): Promise<ItemList<StoreOperationItem>> {
@@ -864,6 +1007,57 @@ export async function createOperationProduct(
   const response = await apiClient.post<ProductOperationItem>(
     `/api/v1/admin/operations/stores/${storeRef}/products`,
     input,
+  )
+  return response.data
+}
+
+export async function setStoreCustomerServiceStatus(
+  storeRef: number,
+  status: CustomerServiceStatus,
+  confirmedBy: string,
+  idempotencyKey: string,
+): Promise<CatalogActivationResponse> {
+  const response = await apiClient.put<CatalogActivationResponse>(
+    `/api/v1/admin/operations/stores/${storeRef}/customer-service-status`,
+    {
+      customer_service_status: status,
+      confirmed_by: confirmedBy,
+      confirmation_note: status === 'ENABLED'
+        ? '运营已确认该店铺可供客服人工选择使用'
+        : '运营已关闭该店铺的客服人工选择入口',
+    },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function setProductCustomerServiceStatus(
+  productId: string,
+  status: CustomerServiceStatus,
+  confirmedBy: string,
+  idempotencyKey: string,
+): Promise<CatalogActivationResponse> {
+  const response = await apiClient.put<CatalogActivationResponse>(
+    `/api/v1/admin/operations/products/${encodeURIComponent(productId)}/customer-service-status`,
+    {
+      customer_service_status: status,
+      confirmed_by: confirmedBy,
+      confirmation_note: status === 'ENABLED'
+        ? '运营已确认该商品可供客服人工选择使用'
+        : '运营已关闭该商品的客服人工选择入口',
+    },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function listCatalogActivationReceipts(
+  entityType: 'STORE' | 'PRODUCT',
+  entityRef: string,
+): Promise<CatalogActivationReceiptList> {
+  const response = await apiClient.get<CatalogActivationReceiptList>(
+    '/api/v1/admin/operations/activation-receipts',
+    { params: { entity_type: entityType, entity_ref: entityRef, page: 1, size: 20 } },
   )
   return response.data
 }
@@ -1066,6 +1260,67 @@ export async function reviewKnowledgeMaterial(
     `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}/review`, payload,
   )
   return response.data
+}
+
+export async function uploadProductKnowledgeImport(
+  file: File,
+  fields: {
+    store_ref: number
+    template_type: ProductKnowledgeImportTemplateType
+    operator: string
+  },
+  idempotencyKey: string,
+): Promise<ProductKnowledgeImportAccepted> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('store_ref', String(fields.store_ref))
+  form.append('template_type', fields.template_type)
+  form.append('operator', fields.operator)
+  const response = await apiClient.post<ProductKnowledgeImportAccepted>(
+    '/api/v1/admin/product-knowledge-imports',
+    form,
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function getProductKnowledgeImportPreflight(
+  batchId: string,
+): Promise<ProductKnowledgeImportPreflight> {
+  const response = await apiClient.get<ProductKnowledgeImportPreflight>(
+    `/api/v1/admin/product-knowledge-imports/${encodeURIComponent(batchId)}/preflight`,
+  )
+  return response.data
+}
+
+export async function getProductKnowledgeImportMergePreview(
+  batchId: string,
+): Promise<ProductKnowledgeImportMergePreview> {
+  const response = await apiClient.get<ProductKnowledgeImportMergePreview>(
+    `/api/v1/admin/product-knowledge-imports/${encodeURIComponent(batchId)}/merge-preview`,
+    { params: { page: 1, page_size: 200 } },
+  )
+  return response.data
+}
+
+export async function reviewProductKnowledgeImport(
+  batchId: string,
+  changeSetId: string,
+  payload: {
+    decision: 'APPROVE' | 'REJECT'
+    operator: string
+    review_note?: string | null
+    expected_base_snapshot_hash: string
+    expected_change_set_version: number
+  },
+  idempotencyKey: string,
+): Promise<ProductKnowledgeImportReviewReceipt> {
+  const response = await apiClient.post<{ review_receipt: ProductKnowledgeImportReviewReceipt }>(
+    `/api/v1/admin/product-knowledge-imports/${encodeURIComponent(batchId)}/change-sets/${encodeURIComponent(changeSetId)}/reviews`,
+    payload,
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data.review_receipt
 }
 
 export async function listKnowledgeQualityAssessments(): Promise<KnowledgeQualityAssessmentList> {

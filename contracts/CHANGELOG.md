@@ -1,5 +1,18 @@
 # Contract changelog
 
+## 0.3.0 - 2026-07-31
+
+- Added the C-owned `pilot-business-catalog.v1.1` projection consumed by B at
+  `/api/v1/customer-service/catalog/**`.
+- Added the operator-controlled Store/Product activation request, response and
+  immutable receipt schemas. SKU availability is inherited from Product and
+  has no independent activation command.
+- Removed no existing schema or endpoint. Contract 0.2.0 payloads and the
+  compatibility-period `/api/v1/test-catalog/**` routes remain unchanged.
+- C is the only business-data owner and projector. B consumes final projected
+  items and must not infer availability from `test_data_mode`,
+  `production_usable`, or `publishable`. A is unaffected.
+
 ## 0.2.0 - 2026-07-29
 
 - Added the B-to-C `ai-interaction-event.v1` create and receipt schemas for

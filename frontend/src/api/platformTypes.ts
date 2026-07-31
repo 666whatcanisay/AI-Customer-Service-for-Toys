@@ -8,12 +8,9 @@ export interface CatalogStore {
   platform: string
   storeCode: string
   name: string
-  trialEnabled: boolean
-  knowledgeScope: string
-  responseMode: string
+  dataSource: 'TEST' | 'PILOT'
+  customerServiceStatus: 'ENABLED'
   allowAutoSend: boolean
-  testDataMode: boolean
-  productionUsable: boolean
 }
 
 export interface CatalogProduct {
@@ -26,8 +23,9 @@ export interface CatalogProduct {
   ageMin: number | null
   ageMax: number | null
   safetySummary: string | null
-  reviewStatus: string
-  publishable: boolean
+  knowledgeStatus: string
+  dataSource: 'TEST' | 'PILOT'
+  customerServiceStatus: 'ENABLED'
 }
 
 export interface CatalogSku {
@@ -40,7 +38,8 @@ export interface CatalogSku {
   canonicalSkuId: string | null
   referenceSkuId: string | null
   componentSkuRefs: string[]
-  publishable: boolean
+  dataSource: 'TEST' | 'PILOT'
+  customerServiceStatus: 'ENABLED'
 }
 
 export interface PlatformCatalogClient {

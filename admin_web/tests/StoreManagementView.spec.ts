@@ -8,7 +8,9 @@ const apiMocks = vi.hoisted(() => ({
   createOperationProduct: vi.fn(),
   createOperationStore: vi.fn(),
   getOperationStore: vi.fn(),
+  listCatalogActivationReceipts: vi.fn(),
   listOperationStores: vi.fn(),
+  setStoreCustomerServiceStatus: vi.fn(),
   updateOperationStore: vi.fn(),
 }))
 
@@ -23,6 +25,10 @@ const store = {
   product_count: 3,
   created_at: '2026-07-29T08:00:00Z',
   remarks: '玩具商品知识运营',
+  data_source: 'PILOT' as const,
+  customer_service_status: 'DISABLED' as const,
+  customer_service_status_updated_at: null,
+  customer_service_status_updated_by: null,
 }
 
 const product = {
@@ -35,6 +41,8 @@ const product = {
   data_status_name: '待审核',
   sku_count: 0,
   created_at: '2026-07-29T09:00:00Z',
+  data_source: 'PILOT' as const,
+  customer_service_status: 'DISABLED' as const,
 }
 
 describe('StoreManagementView', () => {
@@ -45,6 +53,11 @@ describe('StoreManagementView', () => {
     apiMocks.createOperationStore.mockResolvedValue(store)
     apiMocks.getOperationStore.mockResolvedValue(store)
     apiMocks.updateOperationStore.mockResolvedValue(store)
+    apiMocks.listCatalogActivationReceipts.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 })
+    apiMocks.setStoreCustomerServiceStatus.mockResolvedValue({
+      changed: true,
+      activation_receipt: { activation_receipt_id: 'ACT-STORE-1' },
+    })
   })
 
   it('lists Chinese business fields without operator-facing technical identifiers', async () => {
@@ -58,6 +71,28 @@ describe('StoreManagementView', () => {
     expect(wrapper.text()).not.toContain('tenant_id')
     expect(wrapper.text()).not.toContain('store_code')
     expect(wrapper.text()).not.toContain('external_id')
+    expect(wrapper.text()).toContain('客服状态')
+    expect(wrapper.text()).toContain('试运行')
+  })
+
+  it('requires an operator and uses the C activation action', async () => {
+    const wrapper = mount(StoreManagementView)
+    await flushPromises()
+    const activationButton = wrapper.findAll('button').find((button) => button.text() === '启用客服使用')
+    expect(activationButton).toBeDefined()
+    await activationButton!.trigger('click')
+    expect(wrapper.text()).toContain('请先填写本次操作人')
+
+    await wrapper.get('.operator-field input').setValue('运营甲')
+    await activationButton!.trigger('click')
+    await flushPromises()
+    expect(apiMocks.setStoreCustomerServiceStatus).toHaveBeenCalledWith(
+      8,
+      'ENABLED',
+      '运营甲',
+      expect.stringMatching(/^store-8-ENABLED-/),
+    )
+    expect(wrapper.text()).toContain('ACT-STORE-1')
   })
 
   it('creates a store from name, platform and remarks only', async () => {

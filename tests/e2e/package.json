@@ -1,0 +1,12 @@
+{
+  "name": "ai-cs-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node run.cjs",
+    "test:r006": "node workflows/r006-customer-available-catalog.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.0"
+  }
+}
