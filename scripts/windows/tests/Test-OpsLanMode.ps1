@@ -55,6 +55,16 @@ LanAddress = 'auto'; PreferredInterfaceAlias = ''; EnableLanMode = `$false
     if ($lanConfig.LanSelection.InterfaceAlias -ne 'Ethernet' -or $lanConfig.CustomerWebBindAddress -ne '10.20.30.40') { throw 'Ethernet was not preferred over WLAN.' }
     if ($lanConfig.RagBindAddress -ne '127.0.0.1' -or $lanConfig.PlatformBindAddress -ne '127.0.0.1' -or (Get-LanServiceListenerAddress $lanConfig $lanConfig.CustomerWebPort) -ne '10.20.30.40:15173') { throw 'Listener boundary is incorrect.' }
     if ($lanConfig.LanSubnet -ne '10.20.30.0/24') { throw 'Subnet calculation is incorrect.' }
+    $lanCorsOrigins = @([string]$lanConfig.LanCorsAllowedOrigins -split ',')
+    foreach ($requiredOrigin in @(
+        'http://10.20.30.40:15173',
+        'http://127.0.0.1:15173',
+        'http://127.0.0.1:5174',
+        'http://localhost:5174'
+    )) {
+        if ($requiredOrigin -notin $lanCorsOrigins) { throw "LAN CORS is missing: $requiredOrigin" }
+    }
+    if ('http://10.20.30.40:5174' -in $lanCorsOrigins) { throw 'Admin must remain loopback-only in LAN mode.' }
     if ((Resolve-LanRuntimeConfig $config @($wifi) $privateProfile).LanSelection.InterfaceAlias -ne 'Wi-Fi') { throw 'WLAN selection failed.' }
     if ((Resolve-LanRuntimeConfig $config @((New-LanCandidate '192.168.50.20' 'Wi-Fi' 17)) $privateProfile).LanAdvertisedHost -ne '192.168.50.20') { throw 'Changed IP was not selected.' }
     Assert-Throws { Resolve-LanRuntimeConfig $config @($ethernet, (New-LanCandidate '10.20.40.40' 'Ethernet 2' 10)) $privateProfile | Out-Null } 'Ambiguous physical adapters'

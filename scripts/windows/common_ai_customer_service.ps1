@@ -337,7 +337,13 @@ function Assert-LanNetworkSafety($Config, $NetworkProfile) {
 
 function Get-LanCorsAllowedOrigins($Config) {
     $lanOrigin = "http://$($Config.LanAdvertisedHost):$($Config.CustomerWebPort)"
-    $origins = @($lanOrigin, "http://127.0.0.1:$($Config.CustomerWebPort)", "http://localhost:$($Config.CustomerWebPort)") | Select-Object -Unique
+    $origins = @(
+        $lanOrigin,
+        "http://127.0.0.1:$($Config.CustomerWebPort)",
+        "http://localhost:$($Config.CustomerWebPort)",
+        "http://127.0.0.1:$($Config.AdminWebPort)",
+        "http://localhost:$($Config.AdminWebPort)"
+    ) | Select-Object -Unique
     if (@($origins | Where-Object { $_ -eq '*' -or $_ -match '\*' }).Count -gt 0) { throw '局域网 CORS 只允许显式 Origin，禁止通配符。' }
     return ($origins -join ',')
 }
