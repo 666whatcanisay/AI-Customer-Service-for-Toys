@@ -30,6 +30,27 @@ const visibleProducts = computed(() => pendingOnly.value
   ? products.value.filter((product) => product.data_status === 'APPROVED' && product.customer_service_status === 'DISABLED')
   : products.value)
 
+function isPendingCustomerEnable(product: ProductKnowledgeListItem): boolean {
+  return product.data_status === 'APPROVED'
+    && product.customer_service_status === 'DISABLED'
+    && Boolean(productId(product))
+}
+
+const pendingProductCount = computed(() => products.value.filter(isPendingCustomerEnable).length)
+const visiblePendingProductIds = computed(() => visibleProducts.value
+  .filter(isPendingCustomerEnable)
+  .map(productId))
+const allVisiblePendingSelected = computed({
+  get: () => visiblePendingProductIds.value.length > 0
+    && visiblePendingProductIds.value.every((id) => selectedProductIds.value.includes(id)),
+  set: (selected: boolean) => {
+    const visibleIds = new Set(visiblePendingProductIds.value)
+    selectedProductIds.value = selected
+      ? [...new Set([...selectedProductIds.value, ...visiblePendingProductIds.value])]
+      : selectedProductIds.value.filter((id) => !visibleIds.has(id))
+  },
+})
+
 function productId(product: ProductKnowledgeListItem): string {
   return product.technical_details.product_id || ''
 }
@@ -90,6 +111,9 @@ async function batchEnable(): Promise<void> {
     actionError.value = '请先选择至少一个“已审核、客服未启用”的商品。'
     return
   }
+  if (!window.confirm(`确认启用当前选择的 ${selectedProductIds.value.length} 个商品供客服使用？`)) {
+    return
+  }
   actionBusy.value = true
   actionError.value = ''
   actionMessage.value = ''
@@ -99,7 +123,7 @@ async function batchEnable(): Promise<void> {
       operator.value.trim(),
       `batch-enable-${crypto.randomUUID()}`,
     )
-    actionMessage.value = `批量启用完成：成功 ${result.changed_count}，已是目标状态 ${result.unchanged_count}，失败 ${result.failed_count}。每个成功变化均已生成 activation receipt。`
+    actionMessage.value = `批量启用完成：成功 ${result.changed_count}，已是目标状态 ${result.unchanged_count}，失败 ${result.failed_count}。每个成功变化均已生成 activation receipt。客服工作台刷新目录后即可使用。`
     await selectStore(activeStoreCode.value)
   } catch (reason: unknown) {
     actionError.value = apiErrorMessage(reason)
@@ -213,7 +237,17 @@ onMounted(load)
           </div>
           <label>本次操作人<input v-model.trim="operator" maxlength="128" placeholder="填写姓名或运营账号" data-testid="knowledge-activation-operator"></label>
           <div class="toolbar-actions">
+            <span class="pending-count" data-testid="pending-enable-count">当前待启用：{{ pendingProductCount }} 个</span>
             <label class="check-label"><input v-model="pendingOnly" type="checkbox">只看待客服启用</label>
+            <label class="check-label">
+              <input
+                v-model="allVisiblePendingSelected"
+                type="checkbox"
+                :disabled="visiblePendingProductIds.length === 0"
+                data-testid="select-all-filtered-products"
+              >
+              全选当前筛选结果（{{ visiblePendingProductIds.length }}）
+            </label>
             <button class="button" type="button" :disabled="actionBusy || selectedProductIds.length === 0" data-testid="batch-enable-products" @click="batchEnable">批量启用客服（{{ selectedProductIds.length }}）</button>
           </div>
           <p v-if="actionMessage" class="notice success" role="status">{{ actionMessage }}</p>
@@ -306,7 +340,7 @@ onMounted(load)
 .metric-card span { color: #617087; font-size: 13px; }.metric-card strong { color: #172554; font-size: 27px; }.metric-card strong.empty { font-size: 16px; color: #8090a5; }
 .empty-state { text-align: center; }.empty-state h2 { color: #172554; }.empty-state p { color: #617087; }
 .navigator { margin-bottom: 22px; }.section-heading, .product-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }.section-heading h2, .product-heading h3 { margin: 0; color: #172554; }.section-heading > span { color: #718096; font-size: 13px; }
-.activation-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px auto; gap: 16px; align-items: end; margin-bottom: 22px; }.activation-toolbar h2 { margin: 0; color: #172554; }.activation-toolbar p { margin-bottom: 0; color: #617087; }.activation-toolbar label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.activation-toolbar input { min-height: 39px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.toolbar-actions { display: grid; gap: 8px; }.toolbar-actions .check-label { display: flex; align-items: center; gap: 7px; }.toolbar-actions .check-label input, .select-product input { min-height: auto; }.activation-toolbar .notice { grid-column: 1 / -1; margin: 0; }
+.activation-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px auto; gap: 16px; align-items: end; margin-bottom: 22px; }.activation-toolbar h2 { margin: 0; color: #172554; }.activation-toolbar p { margin-bottom: 0; color: #617087; }.activation-toolbar label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.activation-toolbar input { min-height: 39px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.toolbar-actions { display: grid; gap: 8px; }.toolbar-actions .check-label { display: flex; align-items: center; gap: 7px; }.toolbar-actions .check-label input, .select-product input { min-height: auto; }.pending-count { color: #334965; font-size: 13px; font-weight: 700; }.activation-toolbar .notice { grid-column: 1 / -1; margin: 0; }
 .store-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }.store-tab { display: grid; gap: 5px; min-width: 240px; padding: 13px 15px; border: 1px solid #d7e1ee; border-radius: 10px; color: #25466f; background: #fff; text-align: left; cursor: pointer; }.store-tab.active { border-color: #3973c4; box-shadow: inset 0 0 0 1px #3973c4; background: #f4f8ff; }.store-tab small { color: #617087; }
 .catalog-section { margin-top: 8px; }.product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }.product-card { display: grid; gap: 15px; padding: 20px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }.product-heading small { color: #617087; }.product-heading h3 { margin-top: 5px; font-size: 18px; }.state-pill { padding: 5px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: #e7f5ec; color: #217447; }.state-pill.basic_available { background: #eaf2ff; color: #285493; }.state-pill.needs_completion { background: #fff1df; color: #9a5c0d; }
 .summary { margin: 0; color: #526279; line-height: 1.65; }.label { display: block; margin-bottom: 8px; color: #334965; font-size: 13px; }.tag-row, .sku-row { display: flex; flex-wrap: wrap; gap: 7px; }.tag, .sku-row span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.missing-text { margin: 0; color: #a56a1e; font-size: 13px; }.status-pair { display: grid; justify-items: end; gap: 6px; }.select-product { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #285493; font-size: 12px; }.state-pill.data { color: #365174; background: #edf2f8; }.state-pill.partially_available { color: #285493; background: #eaf2ff; }.state-pill.missing_knowledge, .state-pill.unconfirmed, .state-pill.publication-not_generated, .state-pill.publication-need_resync { color: #9a5c0d; background: #fff1df; }.state-pill.publication-published { color: #217447; background: #e7f5ec; }.state-pill.publication-sync_failed { color: #a23d3d; background: #fff0f0; }.state-pill.publication-generating { color: #285493; background: #eaf2ff; }.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }.fact-grid div { padding: 10px; border-radius: 8px; background: #f7f9fc; }.fact-grid dt { color: #617087; font-size: 11px; }.fact-grid dd { margin: 4px 0 0; color: #334965; font-size: 13px; line-height: 1.45; }.card-actions { display: flex; align-items: center; gap: 10px; }.published-note { color: #217447; font-size: 13px; }.pending-note { color: #9a5c0d; font-size: 13px; }
