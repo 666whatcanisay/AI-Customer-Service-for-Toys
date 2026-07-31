@@ -706,7 +706,22 @@ export type KnowledgeTopicStatus = 'SUPPORTED' | 'PARTIAL' | 'MISSING'
 export type ProductKnowledgeState = 'WELL_COVERED' | 'BASIC_AVAILABLE' | 'NEEDS_COMPLETION'
 export type KnowledgeDataStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED'
 export type KnowledgeAiStatus = 'EFFECTIVE' | 'PARTIALLY_AVAILABLE' | 'MISSING_KNOWLEDGE' | 'UNCONFIRMED'
+export type AiKnowledgePublicationStatus = 'NOT_GENERATED' | 'GENERATING' | 'PUBLISHED' | 'SYNC_FAILED' | 'NEED_RESYNC'
+export type AiKnowledgeEmbeddingStatus = 'NOT_GENERATED' | 'GENERATING' | 'COMPLETE' | 'FAILED'
 export type KnowledgeGapWorkflowStatus = 'PENDING' | 'IN_PROGRESS' | 'PENDING_VERIFICATION' | 'RESOLVED'
+
+export interface AiKnowledgePublicationSummary {
+  status: AiKnowledgePublicationStatus
+  embedding_status: AiKnowledgeEmbeddingStatus
+  current_fingerprint: string | null
+  indexed_fingerprint: string | null
+  active_collection: string | null
+  chunk_count: number
+  embedding_count: number
+  updated_at: string | null
+  published_at: string | null
+  last_error_code: string | null
+}
 
 export interface ProductKnowledgeTechnicalDetails {
   store_code: string | null
@@ -761,6 +776,7 @@ export interface ProductKnowledgeListItem {
   knowledge_state: ProductKnowledgeState
   data_status: KnowledgeDataStatus
   ai_status: KnowledgeAiStatus
+  ai_knowledge: AiKnowledgePublicationSummary
   answerable_topics: string[]
   missing_topics: string[]
   gap_count: number
@@ -840,6 +856,7 @@ export interface ProductKnowledgeDetail {
   knowledge_state: ProductKnowledgeState
   data_status: KnowledgeDataStatus
   ai_status: KnowledgeAiStatus
+  ai_knowledge: AiKnowledgePublicationSummary
   topic_coverage: TopicCoverage[]
   answerable_topics: string[]
   missing_topics: string[]
@@ -958,6 +975,48 @@ export interface CatalogActivationResponse {
   server_time: string
 }
 
+export interface CatalogBatchActivationResponse {
+  schema_version: 'pilot-business-catalog-batch-activation.v1'
+  result_status: 'COMPLETE' | 'PARTIAL' | 'FAILED'
+  target_status: 'ENABLED'
+  items: Array<{
+    product_id: string
+    status: 'CHANGED' | 'UNCHANGED' | 'FAILED'
+    activation_receipt: CatalogActivationReceipt | null
+    error_code: string | null
+    message: string
+  }>
+  changed_count: number
+  unchanged_count: number
+  failed_count: number
+  server_time: string
+}
+
+export interface AiKnowledgePublicationReceipt {
+  publication_receipt_id: string
+  product_id: string
+  knowledge_fingerprint: string
+  active_collection: string
+  chunk_count: number
+  embedding_count: number
+  status: 'PUBLISHED'
+  operator: string
+  created_at: string
+}
+
+export interface AiKnowledgePublicationResponse {
+  schema_version: 'product-knowledge-publication.v1'
+  changed: boolean
+  product_id: string
+  ai_knowledge: AiKnowledgePublicationSummary
+  publication_receipt: AiKnowledgePublicationReceipt | null
+}
+
+export interface AiKnowledgePublicationReceiptList {
+  items: AiKnowledgePublicationReceipt[]
+  total: number
+}
+
 export interface CatalogActivationReceiptList {
   items: CatalogActivationReceipt[]
   total: number
@@ -1047,6 +1106,56 @@ export async function setProductCustomerServiceStatus(
         : '运营已关闭该商品的客服人工选择入口',
     },
     { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function enableProductsForCustomerService(
+  productIds: string[],
+  confirmedBy: string,
+  idempotencyKey: string,
+): Promise<CatalogBatchActivationResponse> {
+  const response = await apiClient.post<CatalogBatchActivationResponse>(
+    '/api/v1/admin/operations/products/customer-service-status:batch',
+    {
+      product_ids: productIds,
+      confirmed_by: confirmedBy,
+      confirmation_note: '运营已批量确认这些已审核商品可供客服人工选择使用',
+    },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function publishProductAiKnowledge(
+  productId: string,
+  operator: string,
+  idempotencyKey: string,
+): Promise<AiKnowledgePublicationResponse> {
+  const response = await apiClient.post<AiKnowledgePublicationResponse>(
+    `/api/v1/admin/product-knowledge/products/${encodeURIComponent(productId)}/ai-publications`,
+    { operator, confirmation_note: '运营已确认将当前审核通过的商品知识增量发布到 AI' },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return response.data
+}
+
+export async function checkProductAiKnowledge(
+  productId: string,
+  operator: string,
+): Promise<AiKnowledgePublicationResponse> {
+  const response = await apiClient.post<AiKnowledgePublicationResponse>(
+    `/api/v1/admin/product-knowledge/products/${encodeURIComponent(productId)}/ai-publication-checks`,
+    { operator },
+  )
+  return response.data
+}
+
+export async function listProductAiKnowledgeReceipts(
+  productId: string,
+): Promise<AiKnowledgePublicationReceiptList> {
+  const response = await apiClient.get<AiKnowledgePublicationReceiptList>(
+    `/api/v1/admin/product-knowledge/products/${encodeURIComponent(productId)}/ai-publication-receipts`,
   )
   return response.data
 }
