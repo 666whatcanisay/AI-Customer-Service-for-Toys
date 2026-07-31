@@ -1,8 +1,11 @@
 # R006.1 Customer Enable Debug Report
 
-> 检查日期：2026-07-31  
-> 检查类型：正式 Runtime 只读诊断  
-> 指定商品：`C-PRODUCT-0ff808af95ce419db9be49427f1c4813`  
+> 检查日期：2026-07-31
+>
+> 检查类型：正式 Runtime 只读诊断
+>
+> 指定商品：`C-PRODUCT-0ff808af95ce419db9be49427f1c4813`
+>
 > 结论 Gate：`R006_1_CUSTOMER_ENABLE_DIAGNOSIS_COMPLETE`
 
 ## 1. 结论
