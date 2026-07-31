@@ -136,6 +136,7 @@
             placeholder="例如：拼多多 → 汕明"
             :loading="storesLoading"
             :disabled="loading"
+            :no-data-text="storeCatalogNoDataText"
             filterable
             @change="handleStoreChange"
           >
@@ -157,6 +158,7 @@
             placeholder="选择店铺后可选商品"
             :loading="productsLoading"
             :disabled="!selectedStore || loading"
+            :no-data-text="productCatalogNoDataText"
             filterable
             @change="handleProductChange"
           >
@@ -178,6 +180,7 @@
             placeholder="不确定就留空"
             :loading="skusLoading"
             :disabled="!selectedProduct || loading"
+            :no-data-text="skuCatalogNoDataText"
             clearable
             filterable
             @change="handleSkuChange"
@@ -749,6 +752,7 @@ import {
   toRagClientError
 } from '@/api/errorMapper'
 import type {
+  CatalogEnvelope,
   CatalogProduct,
   CatalogSku,
   CatalogStore,
@@ -918,6 +922,9 @@ const selectedSkuId = ref('')
 const stores = ref<CatalogStore[]>([])
 const products = ref<CatalogProduct[]>([])
 const skus = ref<CatalogSku[]>([])
+const storeCatalogResult = ref<CatalogEnvelope<CatalogStore> | null>(null)
+const productCatalogResult = ref<CatalogEnvelope<CatalogProduct> | null>(null)
+const skuCatalogResult = ref<CatalogEnvelope<CatalogSku> | null>(null)
 const loading = ref(false)
 const storesLoading = ref(false)
 const productsLoading = ref(false)
@@ -1062,7 +1069,8 @@ const systemReady = computed(() =>
   platformHealth.value?.status === 'ok' &&
   stores.value.length > 0 &&
   !ragHealthError.value &&
-  !platformError.value
+  !platformError.value &&
+  !hasPartialEmptyCatalog.value
 )
 
 const workflowStep = computed(() => {
@@ -1070,6 +1078,37 @@ const workflowStep = computed(() => {
   if (selectedStore.value && selectedProduct.value) return 2
   return 1
 })
+
+const catalogUnavailableMessage = '商品目录暂时异常，请联系运营处理。'
+const activeCatalogResults = computed(() => [
+  storeCatalogResult.value,
+  selectedStore.value ? productCatalogResult.value : null,
+  selectedProduct.value ? skuCatalogResult.value : null
+].filter((result) => result !== null))
+const hasPartialEmptyCatalog = computed(() => activeCatalogResults.value.some(
+  (result) => result?.resultStatus === 'PARTIAL' && result.total === 0
+))
+const hasPartialCatalogItems = computed(() => activeCatalogResults.value.some(
+  (result) => result?.resultStatus === 'PARTIAL' && result.items.length > 0
+))
+const partialCatalogWarningCount = computed(() => activeCatalogResults.value.reduce(
+  (total, result) => total + (result?.warnings.reduce(
+    (warningTotal, warning) => warningTotal + warning.count,
+    0
+  ) ?? 0),
+  0
+))
+const isPartialEmpty = <T,>(result: CatalogEnvelope<T> | null) =>
+  result?.resultStatus === 'PARTIAL' && result.total === 0
+const storeCatalogNoDataText = computed(() =>
+  isPartialEmpty(storeCatalogResult.value) ? catalogUnavailableMessage : '暂无可用店铺'
+)
+const productCatalogNoDataText = computed(() =>
+  isPartialEmpty(productCatalogResult.value) ? catalogUnavailableMessage : '该店铺暂无可用商品'
+)
+const skuCatalogNoDataText = computed(() =>
+  isPartialEmpty(skuCatalogResult.value) ? catalogUnavailableMessage : '暂无可选款式'
+)
 
 const catalogGuidance = computed(() => {
   if (storesLoading.value) {
@@ -1085,6 +1124,25 @@ const catalogGuidance = computed(() => {
       tone: 'error',
       title: '商品目录暂不可用',
       description: '刷新后再继续；不要绕过商品上下文直接生成建议。',
+      canRefresh: true
+    }
+  }
+  if (hasPartialEmptyCatalog.value) {
+    return {
+      tone: 'error',
+      title: catalogUnavailableMessage,
+      description: '当前结果不是业务空目录，请刷新后重试；持续异常时请联系运营处理。',
+      canRefresh: true
+    }
+  }
+  if (hasPartialCatalogItems.value) {
+    const affectedCount = partialCatalogWarningCount.value
+    return {
+      tone: 'warning',
+      title: '商品目录部分异常',
+      description: affectedCount > 0
+        ? `已显示有效商品；另有 ${affectedCount} 条目录记录异常，请联系运营处理。`
+        : '已显示有效商品；部分目录记录异常，请联系运营处理。',
       canRefresh: true
     }
   }
@@ -1155,6 +1213,8 @@ const ragHealthStatusText = computed(() => {
 const platformHealthStatusText = computed(() => {
   if (platformHealthLoading.value || storesLoading.value) return '正在检查'
   if (platformError.value) return '不可用'
+  if (hasPartialEmptyCatalog.value) return '目录异常'
+  if (hasPartialCatalogItems.value) return '部分可用'
   if (platformHealth.value?.status === 'ok' && stores.value.length) return '已就绪'
   if (platformHealth.value?.status === 'ok') return '在线，目录待发布'
   return '状态未知'
@@ -1168,6 +1228,7 @@ const ragHealthTagType = computed(() => {
 
 const platformHealthTagType = computed(() => {
   if (platformError.value) return 'danger'
+  if (hasPartialEmptyCatalog.value) return 'danger'
   if (platformHealth.value?.status === 'ok' && stores.value.length) return 'success'
   return 'warning'
 })
@@ -1361,8 +1422,10 @@ const loadStores = async () => {
   platformError.value = ''
   let storeKeyToLoad = ''
   try {
-    const nextStores = await platformClient.listStores(controller.signal)
-    stores.value = nextStores
+    const nextStoreCatalog = await platformClient.listStores(controller.signal)
+    storeCatalogResult.value = nextStoreCatalog
+    stores.value = nextStoreCatalog.items
+    const nextStores = nextStoreCatalog.items
     const currentStoreKey = selectedStoreKey.value
     const rememberedStoreKey = readRememberedStore()
     const defaultStoreKey = nextStores.find(
@@ -1375,6 +1438,7 @@ const loadStores = async () => {
     ].find((value) => nextStores.some((store) => storeKey(store) === value)) ?? ''
   } catch (error) {
     if (!controller.signal.aborted) {
+      storeCatalogResult.value = null
       stores.value = []
       platformError.value = toPlatformClientError(error).message
     }
@@ -1415,7 +1479,9 @@ const refreshCatalogPreservingContext = async () => {
   activeBackgroundCatalogController = controller
   try {
     const currentStoreKey = selectedStoreKey.value
-    const nextStores = await platformClient.listStores(controller.signal)
+    const nextStoreCatalog = await platformClient.listStores(controller.signal)
+    storeCatalogResult.value = nextStoreCatalog
+    const nextStores = nextStoreCatalog.items
     stores.value = nextStores
 
     if (!currentStoreKey) return
@@ -1425,6 +1491,8 @@ const refreshCatalogPreservingContext = async () => {
       selectedStoreKey.value = ''
       products.value = []
       skus.value = []
+      productCatalogResult.value = null
+      skuCatalogResult.value = null
       selectedProductId.value = ''
       selectedSkuId.value = ''
       clearCustomerKnowledgeStatus()
@@ -1433,7 +1501,9 @@ const refreshCatalogPreservingContext = async () => {
       return
     }
 
-    const nextProducts = await platformClient.listProducts(currentStore, controller.signal)
+    const nextProductCatalog = await platformClient.listProducts(currentStore, controller.signal)
+    productCatalogResult.value = nextProductCatalog
+    const nextProducts = nextProductCatalog.items
     if (nextProducts.some((product) =>
       product.platform !== currentStore.platform || product.storeCode !== currentStore.storeCode
     )) {
@@ -1473,6 +1543,8 @@ const handleStoreChange = async () => {
   activeCatalogController?.abort()
   products.value = []
   skus.value = []
+  productCatalogResult.value = null
+  skuCatalogResult.value = null
   selectedProductId.value = ''
   selectedSkuId.value = ''
   clearCustomerKnowledgeStatus()
@@ -1490,7 +1562,9 @@ const handleStoreChange = async () => {
   platformError.value = ''
   try {
     const store = selectedStore.value
-    const nextProducts = await platformClient.listProducts(store, controller.signal)
+    const nextProductCatalog = await platformClient.listProducts(store, controller.signal)
+    productCatalogResult.value = nextProductCatalog
+    const nextProducts = nextProductCatalog.items
     if (nextProducts.some((product) =>
       product.platform !== store.platform || product.storeCode !== store.storeCode
     )) {
@@ -1510,6 +1584,7 @@ const handleStoreChange = async () => {
 const handleProductChange = async () => {
   activeCatalogController?.abort()
   skus.value = []
+  skuCatalogResult.value = null
   selectedSkuId.value = ''
   clearCustomerKnowledgeStatus()
   clearAnswer()
@@ -1522,11 +1597,13 @@ const handleProductChange = async () => {
   try {
     const store = selectedStore.value
     const product = selectedProduct.value
-    const nextSkus = await platformClient.listSkus(
+    const nextSkuCatalog = await platformClient.listSkus(
       store,
       product,
       controller.signal
     )
+    skuCatalogResult.value = nextSkuCatalog
+    const nextSkus = nextSkuCatalog.items
     if (nextSkus.some((sku) => sku.productId !== product.productId)) {
       throw new PlatformClientError('contract', 'SKU 列表与所选商品不一致，已停止加载')
     }

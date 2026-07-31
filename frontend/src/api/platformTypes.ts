@@ -3,6 +3,23 @@ export interface PlatformHealth {
   service: string | null
 }
 
+export type CatalogResultStatus = 'COMPLETE' | 'PARTIAL'
+
+export interface CatalogWarning {
+  code: string
+  entityType: 'STORE' | 'PRODUCT' | 'SKU'
+  count: number
+  message: string
+}
+
+export interface CatalogEnvelope<T> {
+  schemaVersion: 'pilot-business-catalog.v1.1'
+  resultStatus: CatalogResultStatus
+  items: T[]
+  total: number
+  warnings: CatalogWarning[]
+}
+
 export interface CatalogStore {
   tenantId: string
   platform: string
@@ -44,11 +61,14 @@ export interface CatalogSku {
 
 export interface PlatformCatalogClient {
   getHealth(signal?: AbortSignal): Promise<PlatformHealth>
-  listStores(signal?: AbortSignal): Promise<CatalogStore[]>
-  listProducts(store: CatalogStore, signal?: AbortSignal): Promise<CatalogProduct[]>
+  listStores(signal?: AbortSignal): Promise<CatalogEnvelope<CatalogStore>>
+  listProducts(
+    store: CatalogStore,
+    signal?: AbortSignal
+  ): Promise<CatalogEnvelope<CatalogProduct>>
   listSkus(
     store: CatalogStore,
     product: CatalogProduct,
     signal?: AbortSignal
-  ): Promise<CatalogSku[]>
+  ): Promise<CatalogEnvelope<CatalogSku>>
 }

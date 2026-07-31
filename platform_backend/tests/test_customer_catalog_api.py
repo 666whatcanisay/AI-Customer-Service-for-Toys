@@ -227,6 +227,36 @@ def test_real_empty_catalog_is_complete(client: TestClient, session: Session) ->
     }
 
 
+def test_all_invalid_store_rows_return_partial_zero_with_warning(
+    client: TestClient, session: Session
+) -> None:
+    _seed_scope(
+        session,
+        package_id="PKG-INVALID-ONLY",
+        store_code="INVALID-ONLY",
+        data_source=None,
+        status="ENABLED",
+        import_status="UNKNOWN",
+        schema_version="unknown",
+    )
+
+    response = client.get("/api/v1/customer-service/catalog/stores")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["result_status"] == "PARTIAL"
+    assert body["total"] == 0
+    assert body["items"] == []
+    assert body["warnings"] == [
+        {
+            "code": "CUSTOMER_SERVICE_SOURCE_UNKNOWN",
+            "entity_type": "STORE",
+            "count": 1,
+            "message": "店铺数据来源无法确认，已隔离该记录。",
+        }
+    ]
+
+
 def test_product_and_sku_visibility_ignore_publishable_and_knowledge_gaps(
     client: TestClient, session: Session
 ) -> None:
