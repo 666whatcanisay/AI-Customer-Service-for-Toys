@@ -31,6 +31,7 @@ try {
     Assert-ManagedRuntimeSourceConsistency $config $services
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })
     if ($alreadyRunning.Count -eq $services.Count) {
+        try { Save-StandardRuntimeNetworkModePreference $config 'LAN' } catch { Write-Warning "无法保存 LAN Runtime 偏好：$($_.Exception.Message)" }
         Write-Host "局域网 AI 客服已运行：$($config.CustomerWebUrl)" -ForegroundColor Green
         Write-Host '使用检查局域网客服状态.bat 查看状态，或使用停止AI客服.bat 安全停止。'
         return
@@ -65,6 +66,7 @@ try {
     Update-ManagedServiceListenerRecord $config 'customer-web' | Out-Null
     Start-AdminWebService $config | Out-Null
     $startedServices += 'admin-web'
+    try { Save-StandardRuntimeNetworkModePreference $config 'LAN' } catch { Write-Warning "无法保存 LAN Runtime 偏好：$($_.Exception.Message)" }
 
     Write-Host '局域网 AI 客服已启动。' -ForegroundColor Green
     Write-Host "局域网页面：$($config.CustomerWebUrl)"

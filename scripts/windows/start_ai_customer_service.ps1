@@ -27,6 +27,7 @@ try {
     Assert-ManagedRuntimeSourceConsistency $config $services
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })
     if ($alreadyRunning.Count -eq $services.Count) {
+        try { Save-StandardRuntimeNetworkModePreference $config 'LOCAL' } catch { Write-Warning "无法保存 LOCAL Runtime 偏好：$($_.Exception.Message)" }
         Write-Host "AI 客服已运行：$($config.CustomerWebUrl)" -ForegroundColor Green
         Write-Host '使用检查AI客服状态.bat 查看状态，或使用停止AI客服.bat 安全停止。'
         return
@@ -65,6 +66,7 @@ try {
     Update-ManagedServiceListenerRecord $config 'customer-web' | Out-Null
     $startedServices += 'admin-web'
     Start-AdminWebService $config | Out-Null
+    try { Save-StandardRuntimeNetworkModePreference $config 'LOCAL' } catch { Write-Warning "无法保存 LOCAL Runtime 偏好：$($_.Exception.Message)" }
     Write-Host "AI 客服已启动：$($config.CustomerWebUrl)" -ForegroundColor Green
     Write-Host "运营后台：$($config.AdminWebUrl)"
     Write-Host 'API 模式：DIRECT（本机排错模式）'

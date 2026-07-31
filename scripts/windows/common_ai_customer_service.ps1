@@ -173,7 +173,47 @@ function Get-RecordedRuntimeNetworkMode($Config) {
         throw "受管运行记录的 network_mode 不一致：$($uniqueModes -join '、')。请先使用状态脚本核对，禁止混合启动。"
     }
     if ($uniqueModes.Count -eq 1) { return [string]$uniqueModes[0] }
-    return $null
+    return Get-StandardRuntimeNetworkModePreference $Config
+}
+
+function Get-StandardRuntimeNetworkModePreferencePath($Config) {
+    return Join-Path ([string]$Config.RuntimeDirectory) 'network-mode.preference.json'
+}
+
+function Get-StandardRuntimeNetworkModePreference($Config) {
+    $preferencePath = Get-StandardRuntimeNetworkModePreferencePath $Config
+    if (-not (Test-Path -LiteralPath $preferencePath -PathType Leaf)) { return $null }
+    try {
+        $preference = Get-Content -LiteralPath $preferencePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    } catch {
+        throw "无法解析 Runtime 网络模式偏好，拒绝自动选择 LOCAL/LAN：$preferencePath"
+    }
+    foreach ($field in @('schema','repository_root','network_mode')) {
+        if (-not ($preference.PSObject.Properties.Name -contains $field) -or [string]::IsNullOrWhiteSpace([string]$preference.$field)) {
+            throw "Runtime 网络模式偏好缺少 $field：$preferencePath"
+        }
+    }
+    if ([string]$preference.schema -ne 'ai-cs-runtime-network-mode.v1') { throw "未知 Runtime 网络模式偏好版本：$($preference.schema)" }
+    $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+    $preferenceRoot = [IO.Path]::GetFullPath([string]$preference.repository_root)
+    if (-not [string]::Equals($preferenceRoot, $repositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Runtime 网络模式偏好指向其他仓库，拒绝自动选择：$preferenceRoot"
+    }
+    $networkMode = ([string]$preference.network_mode).Trim().ToUpperInvariant()
+    if ($networkMode -notin @('LOCAL','LAN')) { throw "Runtime 网络模式偏好非法：$networkMode" }
+    return $networkMode
+}
+
+function Save-StandardRuntimeNetworkModePreference($Config, [string]$NetworkMode) {
+    $normalizedMode = $NetworkMode.Trim().ToUpperInvariant()
+    if ($normalizedMode -notin @('LOCAL','LAN')) { throw "不能保存非法 Runtime 网络模式：$NetworkMode" }
+    New-Item -ItemType Directory -Force -Path ([string]$Config.RuntimeDirectory) | Out-Null
+    [ordered]@{
+        schema = 'ai-cs-runtime-network-mode.v1'
+        repository_root = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+        network_mode = $normalizedMode
+        updated_at_utc = [DateTime]::UtcNow.ToString('o')
+    } | ConvertTo-Json | Set-Content -LiteralPath (Get-StandardRuntimeNetworkModePreferencePath $Config) -Encoding UTF8
 }
 
 function Resolve-StandardRuntimeNetworkMode($Config, [string]$Mode = 'Auto') {
