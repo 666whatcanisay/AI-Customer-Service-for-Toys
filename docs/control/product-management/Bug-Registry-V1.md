@@ -7,6 +7,7 @@
 | [BUG-A-003](../bugs/BUG-A-003.md) | P1 | A/回答质量 | FIXED_VERIFIED | 年龄路由与结构化字段证据闸门完成 |
 | [BUG-B-001](../bugs/BUG-B-001.md) | P1 | B/C Catalog | FIXED_VERIFIED_PRODUCTION_SMOKE | 正式0010、C/B API与浏览器目录Smoke通过；完整R003人工激活验收另行执行 |
 | [BUG-RUNTIME-001](../bugs/BUG-RUNTIME-001.md) | P2 | OPS | CLOSED_OPERATOR_ENTRY | 使用错误状态入口，不是代码缺陷 |
+| [BUG-RUNTIME-002](../bugs/BUG-RUNTIME-002.md) | P1 | OPS/Windows entry | FIXED_VERIFIED | 通用Auto入口、正式配置回退、模式偏好及中文BAT通过正式stop/start/status验收 |
 | [BUG-A-004](../bugs/BUG-A-004.md) | P2 | A/回答体验 | OPEN_DEFERRED | SKU 已明确时仍有泛化确认措辞 |
 
 ## 治理规则

@@ -3,10 +3,37 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "r006_production_release_complete",
-  "current_task": "R006 Customer Available Catalog Production Release V1",
-  "current_stage": "Release code b66506a is deployed from the sole AI-CS repository. The formal database was backed up and migrated 0008->0009->0010; all four standard/LAN services, API smoke, real A chat smoke and read-only B/Admin browser catalog smoke pass. BUG-B-001 is FIXED_VERIFIED_PRODUCTION_SMOKE. R003 full activation acceptance remains separate.",
-  "current_gate": "R006_PRODUCTION_RELEASE_COMPLETE: keep the four formal services running. The next business gate is R003 manual PILOT Store/Product activation, receipt, B visibility and disable rollback; do not modify A, RAG, Prompt, R009 or Import Center.",
+  "status": "runtime_entry_alignment_complete",
+  "current_task": "Windows Runtime Entry Alignment V1",
+  "current_stage": "The standard Windows start/status entries now resolve the formal runtime configuration automatically and preserve the formal LAN network mode across stop/start. The user command and Chinese batch shortcuts were verified against the formal four-service runtime without business, UI, database, contracts, Prompt or RAG changes.",
+  "current_gate": "RUNTIME_ENTRY_ALIGNMENT_COMPLETE: formal C/A/B/Admin services remain RUNNING in standard/LAN mode. Continue to preserve R006 and the 0010 database baseline; the next business gate remains R003 manual activation acceptance.",
+  "runtime_entry_alignment": {
+    "date": "2026-07-31",
+    "repository_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "branch": "release/r006-customer-available-catalog-v1",
+    "implementation_code_sha": "0eab157d7e53192ff5eae46d68d66b0ec25f8bae",
+    "runtime_mode": "standard",
+    "network_mode": "LAN",
+    "config_resolution": [
+      "explicit -ConfigPath",
+      "scripts/windows/config.local.ps1",
+      ".runtime/phase-e/config/green-standard.local.ps1"
+    ],
+    "network_mode_preference": ".runtime/phase-e/green-standard/network-mode.preference.json",
+    "network_mode_preference_schema": "ai-cs-runtime-network-mode.v1",
+    "services": {
+      "C_API": 8011,
+      "A": 8000,
+      "B": 5173,
+      "C_ADMIN": 5174
+    },
+    "database_revision": "0010_customer_available_catalog_v1",
+    "active_collection": "test_knowledge_v031",
+    "active_chunks": 47,
+    "verification": "Six selected Windows OPS test suites PASS; formal no-config stop/start/status PASS; the user's explicit ConfigPath command PASS; Chinese start/status batch entries exit 0; database integrity is ok.",
+    "report": "docs/control/AI-CS-Runtime-Entry-Alignment-Report-V1.md",
+    "bug": "docs/control/bugs/BUG-RUNTIME-002.md"
+  },
   "r006_production_release": {
     "date": "2026-07-31",
     "repository_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",

@@ -2,7 +2,7 @@
 
 - 等级：P1
 - 模块：OPS / Windows Runtime entrypoints
-- 状态：OPEN
+- 状态：FIXED_VERIFIED
 - 发现时间：2026-07-31
 - 发现版本：`AI-CS@2ed20bde56e2498f5eb8daa94d62777c01b48258`
 
@@ -44,3 +44,14 @@
 3. 无 `scripts/windows/config.local.ps1` 时，中文 start/status/stop/admin 入口能找到正式配置。
 4. 停止后通用 start 能沿用受管记录恢复同一 LAN Runtime；四服务同 SHA、standard/LAN、health PASS。
 5. 失败启动仍只清理本轮已启动服务，不按端口强杀，不修改数据库或防火墙。
+
+## 验证结果
+
+- 代码提交：`023afb7`、`0eab157`。
+- 6组隔离OPS回归通过。
+- 正式无配置 stop→通用 start→status 通过，完全停止后仍恢复 LAN。
+- `启动AI客服.bat`、`检查AI客服状态.bat` 真实执行退出码为0。
+- 四服务同 `0eab157`、CLEAN、standard/LAN、健康；A 47 chunks且模型ready。
+- 数据库保持0010、完整性ok；未修改业务数据、防火墙、A/B/C逻辑、UI、contracts、Prompt或RAG。
+
+状态：`FIXED_VERIFIED / RUNTIME_ENTRY_ALIGNMENT_COMPLETE`。完整证据见 [Runtime Entry Alignment Report V1](../AI-CS-Runtime-Entry-Alignment-Report-V1.md)。
