@@ -7,9 +7,9 @@
 | R008 Runtime 收敛 | DONE | 稳定性基线 | 正式目录 `AI-CS`；三轮启停、身份和回滚锚点复验 |
 | Runtime Identity Alignment | DONE | 运行前置 | 四服务 `runtimeMode=standard`、`networkMode=LAN` |
 | Browser Acceptance Enablement | DONE | 测试能力 | Playwright Chromium 可点击、填表、真实上传文件和截图 |
-| R009 商品知识导入 V1 | IMPLEMENTED / RC ACCEPTED | C/R009 回归对象 | 隔离 0009 浏览器闭环通过；尚未部署正式 0008 Runtime |
-| R006 Business Data Activation | DONE / IMPLEMENTATION COMPLETE | `BUG-B-001` 的正确修复入口 | C最终投影、运营控制、B消费、0010和隔离E2E完成；正式发布另立任务 |
-| Product Stabilization & Reliability Sprint V1 | CANDIDATE READY / RELEASE PENDING | 当前任务 | 原唯一P1已在R006候选修复；正式Runtime仍待独立发布 |
+| R009 商品知识导入 V1 | IMPLEMENTED / SCHEMA DEPLOYED | C/R009 回归对象 | 0009已随冻结迁移链进入正式库，业务逻辑未修改，正式导入数据仍为0；完整生产验收另立任务 |
+| R006 Business Data Activation | DONE / PRODUCTION RELEASED | `BUG-B-001` 的正确修复入口 | 正式Release、0010、C投影/运营控制、B消费和生产Smoke完成；R003业务验收独立跟踪 |
+| Product Stabilization & Reliability Sprint V1 | RELEASE GATE PASSED / BUSINESS REGRESSION PENDING | 稳定性任务 | 原唯一P1已完成正式Smoke；B完整日常咨询与R003激活验收仍需执行 |
 
 ## 防重复规则
 

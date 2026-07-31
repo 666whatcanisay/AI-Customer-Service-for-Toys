@@ -3,10 +3,28 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "0.1.0",
-  "status": "r006_implementation_complete_release_pending",
-  "current_task": "R006 Customer Available Catalog Implementation V1",
-  "current_stage": "Contracts 0.3.0, C 0010/provider/Admin control, B final-projection consumer and isolated browser E2E are complete. BUG-B-001 is FIXED_VERIFIED_CANDIDATE. Formal AI-CS@42bafcf/0008 remains unchanged; production migration and business acceptance require a separate authorized release task.",
-  "current_gate": "R006_IMPLEMENTATION_COMPLETE / PRODUCTION_RELEASE_PENDING: back up the formal database, migrate 0010 and deploy one approved SHA only in a separately authorized quiet window. Do not change A, RAG, Prompt, R009 or Import Center.",
+  "status": "r006_production_release_complete",
+  "current_task": "R006 Customer Available Catalog Production Release V1",
+  "current_stage": "Release code b66506a is deployed from the sole AI-CS repository. The formal database was backed up and migrated 0008->0009->0010; all four standard/LAN services, API smoke, real A chat smoke and read-only B/Admin browser catalog smoke pass. BUG-B-001 is FIXED_VERIFIED_PRODUCTION_SMOKE. R003 full activation acceptance remains separate.",
+  "current_gate": "R006_PRODUCTION_RELEASE_COMPLETE: keep the four formal services running. The next business gate is R003 manual PILOT Store/Product activation, receipt, B visibility and disable rollback; do not modify A, RAG, Prompt, R009 or Import Center.",
+  "r006_production_release": {
+    "date": "2026-07-31",
+    "repository_root": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "branch": "release/r006-customer-available-catalog-v1",
+    "release_code_sha": "b66506ab7706113df5207182d326f1cf03b40726",
+    "source_runtime_sha": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "source_feature_sha": "bebd27d53af8399717394e71e117762a5d000d1a",
+    "database_revision": "0010_customer_available_catalog_v1",
+    "runtime_mode": "standard",
+    "network_mode": "LAN",
+    "active_collection": "test_knowledge_v031",
+    "active_chunks": 47,
+    "backup": ".runtime/phase-e/green-standard/pilot-backups/platform-20260731-093655.sqlite3",
+    "backup_sha256": "7A90671B0419CB9672C8B3E2488C0E8AD2E241E8849E572F772094AA7EF29B85",
+    "verification": "C/A/B/Admin health PASS; C and B catalog projection PASS; B shows 1 projected Store and 5 Products; Admin shows 1 enabled and 1 disabled Store; no activation write was performed",
+    "bug_b_001": "FIXED_VERIFIED_PRODUCTION_SMOKE",
+    "report": "docs/control/AI-CS-R006-Production-Release-Report-V1.md"
+  },
   "r006_implementation_plan": {
     "date": "2026-07-31",
     "branch": "feature/r006-customer-available-catalog-v1",
@@ -253,11 +271,11 @@
     "R006 Customer Available Catalog implementation and isolated browser acceptance"
   ],
   "next_tasks": {
-    "CONTROL": "Prepare a separate R006 Production Release and R003 Business Acceptance task; do not treat implementation completion as formal deployment.",
-    "OPS": "Keep AI-CS@42bafcf/0008 running until an authorized quiet window. Back up before 0010, deploy one approved R006 SHA, and preserve rollback.",
+    "CONTROL": "Run R003 full business acceptance without expanding R006: manually activate one PILOT Store/Product, verify receipt and B visibility, then disable and verify rollback.",
+    "OPS": "Keep release b66506a/0010 running and preserve the offline 0008 backup. Do not delete the Recovery anchor.",
     "A": "No changes. Preserve A fix commit 18a20f7, Prompt, model and RAG data.",
-    "B_C": "No further implementation changes before release review. Preserve C ownership and the B consume-only boundary.",
-    "QA": "During the separate release, verify 0010 revision, TEST continuity, PILOT manual activation, B visibility, receipts and formal BUG-B-001 closure."
+    "B_C": "Preserve C ownership and the B consume-only boundary; do not reintroduce legacy field checks or local allowlists.",
+    "QA": "Use the formal browser and API paths for R003. Do not treat the release smoke as the complete activation acceptance."
   },
   "t02_executed": false,
   "blockers": [

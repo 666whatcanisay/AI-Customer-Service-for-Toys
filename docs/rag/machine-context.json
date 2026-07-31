@@ -7,13 +7,13 @@
   "status": "a_stability_pass",
   "current_task": "A runtime and answer reliability stabilization",
   "current_gate": "A_STABILITY_PASS",
-  "current_stage": "A loopback Ollama calls now bypass inherited proxy settings, unknown products cannot fall back to other product knowledge, and structured age/material evidence gates prevent unsupported generation. Formal AI-CS@42bafcf passed real qwen3.5:9b chat, scoped product/SKU checks, five-turn regression, high-risk transfer and three runtime lifecycle cycles.",
-  "next_recommended_task": "Preserve fix commit 18a20f7 and the current Prompt/model/RAG data. Do not use A changes to bypass BUG-B-001; the next product gate is explicitly authorized R006 implementation followed by B browser regression.",
-  "checked_at": "2026-07-30",
+  "current_stage": "A code, Prompt, model and RAG data are unchanged by R006. Formal release b66506a passed ready/model-configured checks, active collection test_knowledge_v031=47 and the real qwen3.5:9b startup chat smoke. Catalog ownership remains in C/B.",
+  "next_recommended_task": "Preserve fix commit 18a20f7 and the current Prompt/model/RAG data during R003 business acceptance. A must not infer or override customer catalog availability.",
+  "checked_at": "2026-07-31",
   "runtime": {
     "repository": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-    "branch": "stabilization/product-stable-runtime-v1",
-    "head": "42bafcf6630ccbcd1c2dd1d55cb7d3fe735cb1e2",
+    "branch": "release/r006-customer-available-catalog-v1",
+    "head": "b66506ab7706113df5207182d326f1cf03b40726",
     "stability_fix_commit": "18a20f70ec5cd4c4da7baef0179cc30db0dbff5a",
     "implementation_commits": [
       "acfdc1a92da652a7ea795b5e497eba5d997f5891",
@@ -57,7 +57,7 @@
     "windows_ops": "8 script suites passed",
     "runtime": "No-stop identity alignment passed; four original listener PIDs remained unchanged; LAN status reports RUNNING, healthy, runtimeMode=standard, networkMode=LAN and verified repository identity."
   },
-  "contracts": ["contracts/version.json 0.2.0 (unchanged)"],
+  "contracts": ["contracts/version.json 0.3.0 additive Customer Available Catalog; A interfaces unchanged"],
   "recovery": {
     "repository": "AI-CS-pilot-baseline-recovery-v1",
     "commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
@@ -85,6 +85,6 @@
   "known_risks": [
     "documents remains empty by design; operators must use active collection status.",
     "An empty active collection permits degraded service startup but does not satisfy AI smoke or Pilot acceptance.",
-    "R007 second-computer network access and R006 business-data activation remain separate tasks."
+    "R007 second-computer network access and R003 full business activation acceptance remain separate tasks."
   ]
 }

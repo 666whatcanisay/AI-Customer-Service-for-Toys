@@ -2,7 +2,7 @@
 
 - 等级：P1
 - 模块：B 客服 / C 商品目录投影 / R006 兼容边界
-- 状态：FIXED_VERIFIED_CANDIDATE / PRODUCTION_RELEASE_PENDING
+- 状态：FIXED_VERIFIED_PRODUCTION_SMOKE
 - 发现时间：2026-07-30
 
 ## 问题描述
@@ -54,4 +54,6 @@ B 的 `AiChat.loadStores()` 会查找任何不满足旧测试安全条件的店�
 - 隔离浏览器在一条异常Store、一条异常Product和一条异常SKU同时存在时，仍显示有效TEST目录；PILOT经Admin启用后B可见，Store停用后B隐藏且Product状态不被改写；
 - 修复提交：C `68457e1`、Admin `e858c02`、B `04e4a84`、E2E `8cbd92b`。
 
-正式 `AI-CS@42bafcf/0008` 未切换，Production Verified 需在独立发布任务中完成0010迁移、Runtime部署和正式业务回归。
+正式 `release/r006-customer-available-catalog-v1@b66506a` 已完成 0008→0009→0010 迁移和四服务部署。正式只读 API/浏览器 Smoke 验证：C 仅投影 1 个 TEST+ENABLED 店铺及 5 个商品，B 正常显示；同库中的 PILOT+DISABLED 店铺没有导致全目录 No data。Admin 同时显示 1 个启用和 1 个禁用状态入口，验证过程中未点击启停、未产生业务写入。
+
+当前状态为 `FIXED_VERIFIED_PRODUCTION_SMOKE`。本记录关闭 BUG-B-001 的发布阻塞；R003 对 PILOT Store/Product 的人工启用、receipt、B 可见和再次禁用仍是独立完整业务验收，不由本次 Smoke 替代。
