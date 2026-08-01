@@ -31,7 +31,9 @@ function Get-ServiceDiagnostic($Config, [string]$Name, [int]$Port) {
 }
 
 try {
-    $baseConfig = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $baseConfig = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $baseConfig $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     $config = $baseConfig; $resolutionError = ''
     try { $config = Resolve-LanRuntimeConfig $baseConfig $null $null -SkipPublicNetworkGuard } catch { $resolutionError = $_.Exception.Message }
     $candidates = @()

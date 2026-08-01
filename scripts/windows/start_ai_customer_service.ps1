@@ -13,6 +13,7 @@ $startedServices = @()
 try {
     $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
     $config = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $config $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     $effectiveNetworkMode = Resolve-StandardRuntimeNetworkMode $config $Mode
     if ($effectiveNetworkMode -eq 'LAN') {
         Write-Host '通用启动入口已选择 LAN Runtime；A/C/Admin 保持本机回环，B 使用当前受控局域网地址。' -ForegroundColor Cyan
@@ -23,6 +24,7 @@ try {
     Assert-RagVirtualEnvironment $config
     Assert-Dependencies $config
     Assert-AdminWebDependencies $config | Out-Null
+    Write-AiCsStartupPreflight $config $resolvedConfigPath
     $services = @(@{Name='platform';Port=$config.PlatformPort},@{Name='rag';Port=$config.RagPort},@{Name='customer-web';Port=$config.CustomerWebPort},@{Name='admin-web';Port=$config.AdminWebPort})
     Assert-ManagedRuntimeSourceConsistency $config $services
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })

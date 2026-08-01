@@ -3,12 +3,65 @@ $ErrorActionPreference = 'Stop'
 
 function Resolve-AiCustomerServiceConfigPath([string]$ConfigPath, [string]$ScriptRoot = $PSScriptRoot) {
     if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) { return $ConfigPath }
-    $legacyConfigPath = Join-Path $ScriptRoot 'config.local.ps1'
-    if (Test-Path -LiteralPath $legacyConfigPath -PathType Leaf) { return $legacyConfigPath }
     $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $ScriptRoot '..\..'))
     $standardRuntimeConfigPath = Join-Path $repositoryRoot '.runtime\phase-e\config\green-standard.local.ps1'
     if (Test-Path -LiteralPath $standardRuntimeConfigPath -PathType Leaf) { return $standardRuntimeConfigPath }
+    $legacyConfigPath = Join-Path $ScriptRoot 'config.local.ps1'
+    if (Test-Path -LiteralPath $legacyConfigPath -PathType Leaf) { return $legacyConfigPath }
     return $legacyConfigPath
+}
+
+function Assert-AiCsCanonicalRuntimeSource(
+    $Config,
+    [string]$ResolvedConfigPath,
+    [switch]$RequireCanonicalRoot,
+    [string]$EntryRepositoryRootOverride = ''
+) {
+    if (-not $RequireCanonicalRoot) { return }
+    $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+    $repositoryName = Split-Path -Leaf $repositoryRoot
+    if (-not [string]::Equals($repositoryName, 'AI-CS', [StringComparison]::OrdinalIgnoreCase)) {
+        throw '检测到旧项目路径，请使用迁移后的AI-CS目录。'
+    }
+
+    $entryRepositoryRoot = if ([string]::IsNullOrWhiteSpace($EntryRepositoryRootOverride)) {
+        [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    } else {
+        [IO.Path]::GetFullPath($EntryRepositoryRootOverride)
+    }
+    if (-not [string]::Equals((Split-Path -Leaf $entryRepositoryRoot), 'AI-CS', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "检测到旧项目路径，请使用迁移后的AI-CS目录：$entryRepositoryRoot"
+    }
+    if (-not [string]::Equals($repositoryRoot, $entryRepositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Runtime配置的RepositoryRoot不是当前AI-CS目录：$repositoryRoot"
+    }
+    $expectedConfigPath = [IO.Path]::GetFullPath((Join-Path $entryRepositoryRoot '.runtime\phase-e\config\green-standard.local.ps1'))
+    try { $actualConfigPath = (Resolve-Path -LiteralPath $ResolvedConfigPath -ErrorAction Stop).Path } catch { throw "Runtime配置不存在：$ResolvedConfigPath" }
+    if (-not [string]::Equals($actualConfigPath, $expectedConfigPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "标准Runtime必须使用green-standard.local.ps1：$expectedConfigPath"
+    }
+}
+
+function Write-AiCsStartupPreflight($Config, [string]$ResolvedConfigPath) {
+    $identity = Get-RepositoryRuntimeIdentity ([string]$Config.RepositoryRoot)
+    if (-not $identity.Available) { throw "无法读取启动Git身份：$($identity.Reason)" }
+    if ([string]$identity.SourceState -ne 'CLEAN') { throw '正式AI-CS工作区不是CLEAN，拒绝启动。请先确认并提交受控修改。' }
+
+    $ragVersion = [string](& $Config.RagPythonPath --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw "A Python环境不可用：$($Config.RagPythonPath)" }
+    $platformVersion = [string](& $Config.PlatformPythonPath --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw "C Python环境不可用：$($Config.PlatformPythonPath)" }
+    $nodeCommand = Get-Command node.exe -ErrorAction Stop
+    $nodeVersion = [string](& $nodeCommand.Source --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw 'Node.js版本检查失败。' }
+    $pnpmCommand = Get-Command $Config.PnpmCommand -ErrorAction Stop
+    $pnpmVersion = [string](& $pnpmCommand.Source --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw 'pnpm版本检查失败。' }
+
+    Write-Host "启动预检：Repository=$($identity.RepositoryRoot)" -ForegroundColor Cyan
+    Write-Host "启动预检：SHA=$($identity.GitSha)；Source=$($identity.SourceState)"
+    Write-Host "启动预检：Config=$([IO.Path]::GetFullPath($ResolvedConfigPath))"
+    Write-Host "启动预检：A Python=$ragVersion；C Python=$platformVersion；Node=$nodeVersion；pnpm=$pnpmVersion"
 }
 
 function Get-LocalConfig([string]$ConfigPath) {
@@ -770,8 +823,63 @@ function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
     return Test-HttpOk (Get-ManagedServiceHealthUrl $Config $Name $Port)
 }
 
-function Get-ProcessMetadata([int]$Id) {
-    Get-CimInstance Win32_Process -Filter "ProcessId = $Id" -ErrorAction SilentlyContinue
+function Get-ProcessMetadata([int]$Id, [int]$TimeoutMilliseconds = 1500) {
+    if ($Id -le 0) { return $null }
+    $searcher = $null
+    $results = $null
+    try {
+        $options = [System.Management.EnumerationOptions]::new()
+        $options.ReturnImmediately = $true
+        $options.Rewindable = $false
+        $options.Timeout = [TimeSpan]::FromMilliseconds($TimeoutMilliseconds)
+        $scope = [System.Management.ManagementScope]::new('\\.\root\cimv2')
+        $query = [System.Management.ObjectQuery]::new("SELECT ProcessId,ParentProcessId,ExecutablePath,CommandLine,CreationDate FROM Win32_Process WHERE ProcessId = $Id")
+        $searcher = [System.Management.ManagementObjectSearcher]::new($scope, $query, $options)
+        $results = $searcher.Get()
+        $item = @($results | Select-Object -First 1)
+        if ($item.Count -eq 0) { return $null }
+        return [pscustomobject]@{
+            ProcessId = [int]$item[0].ProcessId
+            ParentProcessId = [int]$item[0].ParentProcessId
+            ExecutablePath = [string]$item[0].ExecutablePath
+            CommandLine = [string]$item[0].CommandLine
+            CreationDate = [string]$item[0].CreationDate
+        }
+    } catch {
+        return $null
+    } finally {
+        if ($null -ne $results) { $results.Dispose() }
+        if ($null -ne $searcher) { $searcher.Dispose() }
+    }
+}
+
+function Get-ProcessMetadataSnapshot([int]$TimeoutMilliseconds = 2000) {
+    $searcher = $null
+    $results = $null
+    try {
+        $options = [System.Management.EnumerationOptions]::new()
+        $options.ReturnImmediately = $true
+        $options.Rewindable = $false
+        $options.Timeout = [TimeSpan]::FromMilliseconds($TimeoutMilliseconds)
+        $scope = [System.Management.ManagementScope]::new('\\.\root\cimv2')
+        $query = [System.Management.ObjectQuery]::new('SELECT ProcessId,ParentProcessId,ExecutablePath,CommandLine,CreationDate FROM Win32_Process')
+        $searcher = [System.Management.ManagementObjectSearcher]::new($scope, $query, $options)
+        $results = $searcher.Get()
+        return @($results | ForEach-Object {
+            [pscustomobject]@{
+                ProcessId = [int]$_.ProcessId
+                ParentProcessId = [int]$_.ParentProcessId
+                ExecutablePath = [string]$_.ExecutablePath
+                CommandLine = [string]$_.CommandLine
+                CreationDate = [string]$_.CreationDate
+            }
+        })
+    } catch {
+        return @()
+    } finally {
+        if ($null -ne $results) { $results.Dispose() }
+        if ($null -ne $searcher) { $searcher.Dispose() }
+    }
 }
 
 function Test-ProcessDescendantOf([int]$ProcessId, [int]$AncestorProcessId) {
@@ -1030,7 +1138,8 @@ function Update-AdminWebServiceRecord($Config, $Process) {
 }
 
 function Get-ProcessDescendantIds([int]$ProcessId) {
-    try { $allProcesses = @(Get-CimInstance Win32_Process -ErrorAction Stop) } catch { return @() }
+    $allProcesses = @(Get-ProcessMetadataSnapshot)
+    if ($allProcesses.Count -eq 0) { return @() }
     $queue = [Collections.Generic.Queue[int]]::new()
     $queue.Enqueue($ProcessId)
     $descendants = [Collections.Generic.List[int]]::new()

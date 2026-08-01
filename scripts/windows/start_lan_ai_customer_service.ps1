@@ -10,7 +10,9 @@ $ErrorActionPreference = 'Stop'
 $config = $null
 $startedServices = @()
 try {
-    $baseConfig = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $baseConfig = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $baseConfig $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     # This dedicated entry explicitly enables LAN mode without changing the local-mode entry or config file.
     $config = Resolve-LanRuntimeConfig $baseConfig
     $network = $config.LanNetworkProfile
@@ -27,6 +29,7 @@ try {
     Assert-RagVirtualEnvironment $config
     Assert-Dependencies $config
     Assert-AdminWebDependencies $config | Out-Null
+    Write-AiCsStartupPreflight $config $resolvedConfigPath
     $services = @(@{Name='platform';Port=$config.PlatformPort},@{Name='rag';Port=$config.RagPort},@{Name='customer-web';Port=$config.CustomerWebPort},@{Name='admin-web';Port=$config.AdminWebPort})
     Assert-ManagedRuntimeSourceConsistency $config $services
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })

@@ -7,7 +7,9 @@ $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'common_ai_customer_service.ps1')
 
 try {
-    $baseConfig = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $baseConfig = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $baseConfig $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     $config = $null
     $lanResolutionError = $null
     try {
@@ -40,7 +42,7 @@ try {
         Write-Host "  运行版本：$($serviceStatus.RuntimeIdentityState)；SHA $($serviceStatus.RuntimeGitShortSha)；源码 $($serviceStatus.RuntimeSourceState)；runtimeMode=$($serviceStatus.RuntimeMode)；networkMode=$($serviceStatus.NetworkMode)；$($serviceStatus.RuntimeIdentityDetail)"
     }
     $adminStatus = Get-ServiceStatus $config 'admin-web' $config.AdminWebPort (Get-ManagedServiceHealthUrl $config 'admin-web') $healthResults['admin-web']
-    $adminCheck = Test-RecordedProcess $config 'admin-web'
+    $adminCheck = $adminStatus.Record
     $adminRecord = if ($adminCheck) { $adminCheck.Record } else { $null }
     $adminListenerPid = if ($adminRecord -and ($adminRecord.PSObject.Properties.Name -contains 'listener_pid')) { [string]$adminRecord.listener_pid } else { '未记录' }
     $adminLan = if ([bool]$config.AdminEnableLanMode) { '是（本轮未修改防火墙）' } else { '否（仅服务器本机）' }

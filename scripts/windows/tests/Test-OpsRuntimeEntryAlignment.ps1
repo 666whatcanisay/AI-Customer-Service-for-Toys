@@ -25,16 +25,22 @@ try {
     . (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1')
     New-Item -ItemType Directory -Force -Path $temporaryRoot | Out-Null
 
-    $scriptRoot = Join-Path $temporaryRoot 'repo\scripts\windows'
-    $formalConfigDirectory = Join-Path $temporaryRoot 'repo\.runtime\phase-e\config'
+    $canonicalRepository = Join-Path $temporaryRoot 'AI-CS'
+    $scriptRoot = Join-Path $canonicalRepository 'scripts\windows'
+    $formalConfigDirectory = Join-Path $canonicalRepository '.runtime\phase-e\config'
     New-Item -ItemType Directory -Force -Path $scriptRoot, $formalConfigDirectory | Out-Null
     $legacyConfig = Join-Path $scriptRoot 'config.local.ps1'
     $formalConfig = Join-Path $formalConfigDirectory 'green-standard.local.ps1'
     Set-Content -LiteralPath $formalConfig -Value '@{}' -Encoding UTF8
     if ((Resolve-AiCustomerServiceConfigPath '' $scriptRoot) -ne $formalConfig) { throw 'Formal runtime config fallback was not selected.' }
     Set-Content -LiteralPath $legacyConfig -Value '@{}' -Encoding UTF8
-    if ((Resolve-AiCustomerServiceConfigPath '' $scriptRoot) -ne $legacyConfig) { throw 'Legacy explicit local config must retain priority.' }
+    if ((Resolve-AiCustomerServiceConfigPath '' $scriptRoot) -ne $formalConfig) { throw 'The standard green runtime config must remain preferred over legacy local config.' }
     if ((Resolve-AiCustomerServiceConfigPath 'X:\explicit\config.ps1' $scriptRoot) -ne 'X:\explicit\config.ps1') { throw 'Explicit ConfigPath was not preserved.' }
+
+    Assert-AiCsCanonicalRuntimeSource @{ RepositoryRoot=$canonicalRepository } $formalConfig -RequireCanonicalRoot -EntryRepositoryRootOverride $canonicalRepository
+    Assert-Throws {
+        Assert-AiCsCanonicalRuntimeSource @{ RepositoryRoot=(Join-Path $temporaryRoot 'legacy-repository') } $formalConfig -RequireCanonicalRoot -EntryRepositoryRootOverride $canonicalRepository
+    } 'Non-canonical repository protection'
 
     $runtimeDirectory = Join-Path $temporaryRoot 'runtime'
     $managedRepository = Join-Path $temporaryRoot 'managed-repository'
@@ -76,6 +82,24 @@ try {
     foreach ($entryScript in @('start_ai_customer_service.ps1','status_ai_customer_service.ps1','start_target_pilot.ps1')) {
         $matches = @($batchContents | Where-Object { $_.Content -match [regex]::Escape($entryScript) })
         if ($matches.Count -ne 1 -or $matches[0].Content -notmatch '-Mode Auto') { throw "Batch entry for $entryScript does not select Auto mode." }
+    }
+
+    foreach ($alignedEntryScript in @('start_ai_customer_service.ps1','stop_ai_customer_service.ps1','status_ai_customer_service.ps1','start_lan_ai_customer_service.ps1','diagnose_lan_ai_customer_service.ps1')) {
+        $batch = $batchContents | Where-Object { $_.Content -match [regex]::Escape($alignedEntryScript) } | Select-Object -First 1
+        if (-not $batch -or $batch.Content -notmatch 'chcp 65001' -or $batch.Content -notmatch 'ExecutionPolicy Bypass' -or
+            $batch.Content -notmatch 'pause' -or $batch.Content -notmatch 'exit /b') {
+            throw "Chinese batch entry is missing encoding or visible failure handling: $alignedEntryScript"
+        }
+    }
+
+    $aliasExpectations = @{
+        'Start-AICustomerService.ps1' = 'start_ai_customer_service.ps1'
+        'Stop-AICustomerService.ps1' = 'stop_ai_customer_service.ps1'
+        'Get-AICustomerServiceStatus.ps1' = 'status_ai_customer_service.ps1'
+    }
+    foreach ($aliasName in $aliasExpectations.Keys) {
+        $aliasText = Get-Content -LiteralPath (Join-Path $repositoryRoot "scripts\windows\$aliasName") -Raw -Encoding UTF8
+        if ($aliasText -notmatch [regex]::Escape($aliasExpectations[$aliasName])) { throw "$aliasName is not aligned to the standard runtime entry." }
     }
 
     Write-Host 'OPS runtime entry alignment tests passed.' -ForegroundColor Green

@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Continue'
 try {
     $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
     $config = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $config $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     $effectiveNetworkMode = Resolve-StandardRuntimeNetworkMode $config $Mode
     if ($effectiveNetworkMode -eq 'LAN') {
         Write-Host '通用状态入口已选择当前受管 LAN Runtime。' -ForegroundColor Cyan
@@ -30,12 +31,14 @@ try {
         @{Label='Admin';Name='admin-web';Port=$config.AdminWebPort;Url=(Get-ManagedServiceHealthUrl $config 'admin-web')}
     )
     $healthResults = Get-ParallelHttpHealth $serviceDefinitions 3000
+    $adminStatus = $null
     foreach ($item in $serviceDefinitions) {
         $serviceStatus = Get-ServiceStatus $config $item.Name $item.Port $item.Url $healthResults[$item.Name]
+        if ($item.Name -eq 'admin-web') { $adminStatus = $serviceStatus }
         Write-Host "$($item.Label)：$($serviceStatus.State)；受管 PID $($serviceStatus.ManagedProcessId)；监听 PID $($serviceStatus.ListenerProcessId)；端口 $($serviceStatus.Port)：$($serviceStatus.PortState)；health：$($serviceStatus.HealthState)"
         Write-Host "  运行版本：$($serviceStatus.RuntimeIdentityState)；SHA $($serviceStatus.RuntimeGitShortSha)；源码 $($serviceStatus.RuntimeSourceState)；runtimeMode=$($serviceStatus.RuntimeMode)；networkMode=$($serviceStatus.NetworkMode)；$($serviceStatus.RuntimeIdentityDetail)"
     }
-    $adminCheck = Test-RecordedProcess $config 'admin-web'
+    $adminCheck = if ($adminStatus) { $adminStatus.Record } else { $null }
     $adminRecord = if ($adminCheck) { $adminCheck.Record } else { $null }
     $adminListenerPid = if ($adminRecord -and ($adminRecord.PSObject.Properties.Name -contains 'listener_pid')) { [string]$adminRecord.listener_pid } else { '未记录' }
     $adminLan = if ([bool]$config.AdminEnableLanMode) { '是（本轮未修改防火墙）' } else { '否（仅服务器本机）' }

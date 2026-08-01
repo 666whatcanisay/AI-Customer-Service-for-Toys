@@ -46,6 +46,20 @@ try {
         throw "Parallel health checks exceeded the bounded test budget: $($stopwatch.ElapsedMilliseconds)ms"
     }
 
+    $metadataStopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $currentMetadata = Get-ProcessMetadata $PID 1500
+    $metadataStopwatch.Stop()
+    if (-not $currentMetadata -or [int]$currentMetadata.ProcessId -ne $PID) {
+        throw 'Bounded process metadata lookup did not return the current process.'
+    }
+    if ($metadataStopwatch.ElapsedMilliseconds -gt 3000) {
+        throw "Process metadata lookup exceeded the bounded test budget: $($metadataStopwatch.ElapsedMilliseconds)ms"
+    }
+    $commonText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1') -Raw -Encoding UTF8
+    if ($commonText -match 'Get-CimInstance\s+Win32_Process') {
+        throw 'Unbounded Win32_Process enumeration remains in the runtime helper.'
+    }
+
     $lanStatusText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\status_lan_ai_customer_service.ps1') -Raw -Encoding UTF8
     if ($lanStatusText -notmatch 'Resolve-LanStatusRuntimeConfig' -or $lanStatusText -notmatch 'Get-ParallelHttpHealth') {
         throw 'LAN status entry does not use record-first resolution and parallel health checks.'
