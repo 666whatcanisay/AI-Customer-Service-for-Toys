@@ -4,9 +4,9 @@
 
 正式项目：`C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS`
 
-正式实现提交：`443cce0`、`a99bf70`（首轮集成运行验证提交：`d450597d2cb09493a291f894e7dac6a3f0150e56`）
+正式实现提交：`443cce0`、`a99bf70`、`6f85892`（首轮集成运行验证提交：`d450597d2cb09493a291f894e7dac6a3f0150e56`）
 
-旧目录兼容提交：`fbcba20`、`cd61f0c`、`e35599dd69ac281c2f9ce04b755f84c7e8da3cec`
+旧目录兼容提交：`fbcba20`、`cd61f0c`、`e35599d`、`5f252f98e1588f1ae273b38642e0025de4c0889f`
 
 ## 1. 旧脚本清单
 
@@ -50,6 +50,7 @@ AI-CS\scripts\windows\标准入口
 - 标准入口：`start_ai_customer_service.ps1`、`stop_ai_customer_service.ps1`、`status_ai_customer_service.ps1`、`start_lan_ai_customer_service.ps1`、`status_lan_ai_customer_service.ps1`、`diagnose_lan_ai_customer_service.ps1`、`open_admin_web.ps1`、防火墙检查/配置入口。
 - 历史大写入口：统一调用小写标准入口，不再形成第二套 Runtime。
 - 5 个用户常用中文 BAT：统一 UTF-8 代码页、`ExecutionPolicy Bypass`、参数转发、退出码和失败后暂停。
+- `scripts/windows/.gitattributes`：强制 BAT 使用 Windows CRLF，防止 `cmd.exe` 吞掉行首字符。
 - OPS 测试：配置优先级、RepositoryRoot、安全停止、目标 Pilot 静态边界和状态性能检查。
 
 旧项目：
@@ -101,6 +102,8 @@ Admin 可用性检查/打开入口：
 | 显式 LAN 启动 | PASS，识别受控以太网和 LAN Runtime |
 | 旧目录兼容 `start` | PASS，显示迁移提示并执行正式脚本 |
 | 旧目录兼容 `status` | PASS，读取正式四服务，不读取旧 Runtime |
+| 旧目录中文状态 BAT | PASS，真实 `cmd.exe` 执行退出 0并跳转正式 SHA |
+| 正式中文状态 BAT | PASS，真实 `cmd.exe` 执行退出 0 |
 | B `192.168.1.11:5173` | HTTP 200 |
 | Admin `127.0.0.1:5174` | HTTP 200 |
 | A `127.0.0.1:8000/api/health` | HTTP 200 |
@@ -119,6 +122,7 @@ Admin 可用性检查/打开入口：
 
 - `BUG-OPS-003` 已关闭：无界 Windows CIM 进程查询改成有界查询，Admin 状态不再重复读取。
 - `BUG-OPS-004` 已关闭：部分服务残留不再被报告为成功，严格身份校验保持不变。
+- `BUG-OPS-005` 已关闭：BAT 强制 CRLF，真实 `cmd.exe` 不再破坏命令行。
 - 未配置、删除或放宽防火墙规则；第二台电脑的网络/VLAN可达性仍属于独立网络验收，不是本次脚本身份收敛范围。
 - 旧工作区保留其他用户脏修改；兼容提交只包含 `scripts/windows/**`，没有清理或覆盖。
 

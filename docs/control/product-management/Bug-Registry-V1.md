@@ -20,6 +20,7 @@
 | [BUG-RUNTIME-004](../bugs/BUG-RUNTIME-004.md) | P1 | OPS/Admin CORS | FIXED_VERIFIED_PRODUCTION | 仅放行本机Admin 5174，正式浏览器发布闭环通过且未暴露LAN 5174 |
 | [BUG-OPS-003](../bugs/BUG-OPS-003.md) | P1 | OPS/Windows status | FIXED_VERIFIED | 有界进程元数据查询替代无界 CIM；正式四服务状态约3秒完整返回 |
 | [BUG-OPS-004](../bugs/BUG-OPS-004.md) | P1 | OPS/Windows stop | FIXED_VERIFIED | 保持严格身份校验并有界重试；任何运行记录或标准端口残留均返回失败 |
+| [BUG-OPS-005](../bugs/BUG-OPS-005.md) | P1 | OPS/Windows BAT | FIXED_VERIFIED | `scripts/windows/.gitattributes` 强制BAT使用CRLF；真实cmd.exe状态入口退出0 |
 | [BUG-A-004](../bugs/BUG-A-004.md) | P2 | A/回答体验 | OPEN_DEFERRED | SKU 已明确时仍有泛化确认措辞 |
 
 ## 治理规则
