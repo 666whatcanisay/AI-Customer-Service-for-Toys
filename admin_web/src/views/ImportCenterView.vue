@@ -100,7 +100,7 @@ onMounted(loadStores)
         <strong>资料上传与审核</strong>
         <span>日常商品知识补充的主入口。选择业务名称、核对识别结果并由运营人工审核。</span>
       </RouterLink>
-      <RouterLink class="entry-card" to="/knowledge-editor"><strong>中文知识维护</strong><span>不使用Excel时，可按店铺、商品和SKU直接补充结构化知识。</span></RouterLink>
+      <RouterLink class="entry-card" to="/knowledge-editor"><strong>手工补充知识</strong><span>不使用Excel时，可按店铺、商品和SKU直接补充结构化知识。</span></RouterLink>
       <RouterLink class="entry-card" to="/knowledge-center">
         <strong>查看商品知识缺口</strong>
         <span>按店铺、商品和 SKU 查看 AI 能回答什么、不能回答什么以及下一步补什么。</span>

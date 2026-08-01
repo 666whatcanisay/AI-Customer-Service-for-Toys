@@ -74,13 +74,13 @@ onMounted(() => { void load() })
     <div class="page-header">
       <div>
         <p class="eyebrow">AI 运营 · 只读控制面</p>
-        <h1>AI 控制中心</h1>
+        <h1>AI状态</h1>
         <p>查看真实模型、知识和运行状态；本页不提供模型切换、提示词修改、知识发布或客户业务自动化。</p>
       </div>
       <button class="button secondary" type="button" :disabled="loading" @click="load">{{ loading ? '刷新中…' : '刷新状态' }}</button>
     </div>
 
-    <p v-if="loading" class="notice" role="status">正在读取 AI 控制中心状态…</p>
+    <p v-if="loading" class="notice" role="status">正在读取 AI状态…</p>
     <section v-else-if="error" class="card unavailable" role="alert">
       <h2>AI 服务尚未就绪</h2>
       <p>{{ error }}</p>
