@@ -50,13 +50,28 @@ describe('KnowledgeCenterView', () => {
     expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装')
     expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装 → 豪华版')
     expect(wrapper.text()).toContain('80%AI 核心知识覆盖度')
+    expect(wrapper.text()).toContain('资料：已审核')
     expect(wrapper.text()).toContain('客服：可用')
-    expect(wrapper.text()).toContain('AI知识：未生成')
+    expect(wrapper.text()).toContain('AI知识：未发布')
     expect(wrapper.text()).toContain('下一步发布 AI 知识')
     expect(wrapper.find('.product-business-details').attributes('open')).toBeUndefined()
     expect(wrapper.find('.product-technical-details').attributes('open')).toBeUndefined()
     expect(wrapper.find('.product-technical-details').text()).toContain('知识片段0')
     expect(wrapper.text()).not.toContain('tenant_id')
+  })
+
+  it('explains loading and full-page failure states with a next action', async () => {
+    vi.mocked(getProductKnowledgeOverview).mockReturnValueOnce(new Promise(() => {}))
+    const loadingWrapper = mount(KnowledgeCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(loadingWrapper.get('[data-testid="knowledge-loading-state"]').text()).toContain('正在汇总商品知识')
+    expect(loadingWrapper.get('[data-testid="knowledge-loading-state"]').text()).toContain('下一步：')
+
+    vi.mocked(getProductKnowledgeOverview).mockRejectedValueOnce(new Error('知识接口连接失败'))
+    const errorWrapper = mount(KnowledgeCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(errorWrapper.get('[data-testid="knowledge-error-state"]').text()).toContain('商品知识暂时无法读取')
+    expect(errorWrapper.get('[data-testid="knowledge-error-state"]').text()).toContain('原因：暂时不可用')
+    expect(errorWrapper.get('[data-testid="knowledge-error-state"]').text()).toContain('重新读取')
   })
 
   it('batch enables approved products and exposes explicit AI publish action', async () => {
@@ -109,5 +124,6 @@ describe('KnowledgeCenterView', () => {
 
     expect(wrapper.text().match(/暂无统计/g)).toHaveLength(5)
     expect(wrapper.text()).toContain('页面不会生成示例统计或虚构商品')
+    expect(wrapper.get('[data-testid="knowledge-empty-state"]').text()).toContain('下一步：')
   })
 })

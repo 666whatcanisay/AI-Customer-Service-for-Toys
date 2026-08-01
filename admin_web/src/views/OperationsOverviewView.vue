@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import OperationalStatePanel from '../components/OperationalStatePanel.vue'
+
 import {
   apiErrorMessage,
   getAdminOverview,
@@ -20,7 +22,7 @@ const knowledgeOverview = ref<ProductKnowledgeOverview | null>(null)
 const products = ref<ProductKnowledgeListItem[] | null>(null)
 const aiOverview = ref<AiControlCenterOverview | null>(null)
 const newProblemTotal = ref<number | null>(null)
-const loading = ref(false)
+const loading = ref(true)
 const overviewError = ref('')
 const knowledgeError = ref('')
 const problemError = ref('')
@@ -33,6 +35,17 @@ const openSuggestionCount = computed(() => {
   return suggestions
     ? suggestions.submitted + suggestions.reviewing + suggestions.planned
     : null
+})
+
+const noPendingWork = computed(() => {
+  const counts = [
+    knowledgeOverview.value?.stats.pending_review_count,
+    knowledgeOverview.value?.stats.gap_count,
+    newProblemTotal.value,
+    openSuggestionCount.value,
+  ]
+  return counts.every((value) => typeof value === 'number')
+    && counts.every((value) => value === 0)
 })
 
 const lifecycleTotal = computed(() => products.value?.length ?? null)
@@ -98,7 +111,6 @@ function lifecycleValue(value: number | null): string {
 }
 
 async function load(): Promise<void> {
-  if (loading.value) return
   loading.value = true
   overview.value = null
   knowledgeOverview.value = null
@@ -165,38 +177,62 @@ onMounted(() => { void load() })
       <button class="button secondary" type="button" :disabled="loading" @click="load">{{ loading ? '刷新中…' : '刷新工作台' }}</button>
     </div>
 
-    <p v-if="loading" class="notice" role="status">正在读取当前运营状态…</p>
     <p class="notice warning">AI 只生成建议。客服发送前必须人工确认；系统不会自动发送消息、自动退款或修改订单。</p>
 
+    <OperationalStatePanel
+      v-if="loading"
+      state="loading"
+      title="正在汇总运营工作台"
+      reason="系统正在读取当前待办、商品生命周期、AI 状态和平台健康信息。"
+      next-step="请稍候；读取完成后从当前工作开始处理。"
+      data-testid="overview-loading-state"
+    />
+
+    <template v-else>
     <section class="workspace-section" aria-labelledby="current-work-title">
       <div class="section-heading">
         <div><p class="eyebrow">区域 1</p><h2 id="current-work-title">当前工作</h2></div>
         <span>只显示当前待处理和需要关注的事项</span>
       </div>
+      <OperationalStatePanel
+        v-if="noPendingWork"
+        class="section-state"
+        state="success"
+        title="当前没有待处理事项"
+        reason="现有接口返回的待审核资料、知识缺口、AI 问题和未关闭运营建议均为 0。"
+        next-step="继续检查商品生命周期，或进入商品管理准备下一批资料。"
+        action-label="查看商品"
+        action-to="/store-management"
+        compact
+      />
       <div class="current-grid">
         <RouterLink class="current-card primary" to="/knowledge-center">
           <span>待审核资料</span>
           <strong>{{ displayCount(knowledgeOverview?.stats.pending_review_count) }}</strong>
           <small v-if="knowledgeError" class="error-text">读取失败：{{ knowledgeError }}</small>
           <small v-else>商品资料尚待运营确认。</small>
+          <em>去处理 →</em>
         </RouterLink>
         <RouterLink class="current-card" to="/knowledge-gaps">
           <span>知识缺口</span>
           <strong>{{ displayCount(knowledgeOverview?.stats.gap_count) }}</strong>
           <small v-if="knowledgeError" class="error-text">读取失败：{{ knowledgeError }}</small>
           <small v-else>需要补充或核实的商品知识项。</small>
+          <em>去处理 →</em>
         </RouterLink>
         <RouterLink class="current-card" to="/ai-issues">
           <span>待处理 AI 问题</span>
           <strong>{{ displayCount(newProblemTotal) }}</strong>
           <small v-if="problemError" class="error-text">读取失败：{{ problemError }}</small>
           <small v-else>当前状态为“新问题”的客服反馈。</small>
+          <em>去处理 →</em>
         </RouterLink>
         <RouterLink class="current-card" to="/customer-operations">
           <span>未关闭运营建议</span>
           <strong>{{ displayCount(openSuggestionCount) }}</strong>
           <small v-if="overviewError" class="error-text">读取失败：{{ overviewError }}</small>
           <small v-else>已提交、处理中或已规划但尚未完成。</small>
+          <em>去处理 →</em>
         </RouterLink>
       </div>
     </section>
@@ -207,7 +243,28 @@ onMounted(() => { void load() })
         <span v-if="overview">当前范围：{{ overview.counts.stores }} 个店铺 · {{ overview.counts.products }} 个商品</span>
         <span v-else>当前范围暂无法读取</span>
       </div>
-      <p v-if="knowledgeError" class="notice error" role="alert">商品状态读取失败：{{ knowledgeError }}。以下数量不会以 0 代替失败。</p>
+      <OperationalStatePanel
+        v-if="knowledgeError"
+        state="error"
+        title="商品生命周期暂时无法读取"
+        :reason="knowledgeError"
+        next-step="刷新工作台重试；如果持续失败，前往商品知识中心确认具体状态。"
+        action-label="打开商品知识中心"
+        action-to="/knowledge-center"
+        retry-label="重新读取"
+        compact
+        @retry="load"
+      />
+      <OperationalStatePanel
+        v-else-if="products?.length === 0"
+        state="empty"
+        title="当前还没有商品生命周期数据"
+        reason="商品目录读取成功，但没有返回可汇总的商品。"
+        next-step="先在商品管理中确认店铺与商品，再准备或导入商品资料。"
+        action-label="前往商品管理"
+        action-to="/store-management"
+        compact
+      />
       <div v-else class="lifecycle-grid">
         <article><span>资料已审核</span><strong>{{ lifecycleValue(approvedProductCount) }}</strong><small>已完成人工审核 / 当前读取商品</small></article>
         <article><span>客服可用</span><strong>{{ lifecycleValue(customerEnabledCount) }}</strong><small>已进入客服商品目录 / 当前读取商品</small></article>
@@ -218,16 +275,27 @@ onMounted(() => { void load() })
     <section class="workspace-section" aria-labelledby="quick-actions-title">
       <div class="section-heading"><div><p class="eyebrow">区域 3</p><h2 id="quick-actions-title">快捷操作</h2></div><span>全部跳转到已有页面</span></div>
       <div class="quick-grid">
-        <RouterLink class="quick-link primary" to="/knowledge-materials"><strong>上传商品资料</strong><span>进入三步上传与人工审核流程。</span></RouterLink>
-        <RouterLink class="quick-link" to="/store-management"><strong>查看商品</strong><span>维护店铺、商品和客服使用状态。</span></RouterLink>
-        <RouterLink class="quick-link" to="/knowledge-gaps"><strong>处理知识问题</strong><span>查看缺失内容和建议补充方向。</span></RouterLink>
-        <RouterLink class="quick-link" to="/ai-capabilities"><strong>查看AI状态</strong><span>确认 AI 服务、知识和回答能力。</span></RouterLink>
+        <RouterLink class="quick-link primary" to="/knowledge-materials"><strong>上传商品资料</strong><span>进入三步上传与人工审核流程。</span><em>立即前往 →</em></RouterLink>
+        <RouterLink class="quick-link" to="/store-management"><strong>查看商品</strong><span>维护店铺、商品和客服使用状态。</span><em>立即前往 →</em></RouterLink>
+        <RouterLink class="quick-link" to="/knowledge-gaps"><strong>处理知识问题</strong><span>查看缺失内容和建议补充方向。</span><em>立即前往 →</em></RouterLink>
+        <RouterLink class="quick-link" to="/ai-capabilities"><strong>查看AI状态</strong><span>确认 AI 服务、知识和回答能力。</span><em>立即前往 →</em></RouterLink>
       </div>
     </section>
 
     <section class="workspace-section ai-section" aria-labelledby="ai-status-title">
       <div class="section-heading"><div><p class="eyebrow">区域 4</p><h2 id="ai-status-title">AI状态</h2></div><RouterLink class="text-link" to="/ai-capabilities">查看完整状态</RouterLink></div>
-      <p v-if="aiError" class="notice error" role="alert">AI状态读取失败：{{ aiError }}</p>
+      <OperationalStatePanel
+        v-if="aiError"
+        state="error"
+        title="AI 状态暂时无法读取"
+        :reason="aiError"
+        next-step="重新读取；如果持续失败，前往 AI 状态页查看业务状态和诊断证据。"
+        action-label="打开 AI 状态"
+        action-to="/ai-capabilities"
+        retry-label="重新读取"
+        compact
+        @retry="load"
+      />
       <div v-else-if="aiOverview" class="ai-grid">
         <article><span>AI服务</span><strong>{{ aiServiceSummary }}</strong></article>
         <article><span>知识</span><strong>{{ aiKnowledgeSummary }}</strong></article>
@@ -238,10 +306,12 @@ onMounted(() => { void load() })
       <div class="platform-strip">
         <span>运营平台</span>
         <strong>{{ platformAvailable === 'available' ? '正常' : platformAvailable === 'loading' ? '检测中' : '需要关注' }}</strong>
-        <small v-if="platformError">{{ platformError }}</small>
+        <small v-if="platformError">{{ platformError }}。下一步：进入系统状态检查 C 服务。</small>
         <small v-else>平台状态来自 C 服务健康检查。</small>
+        <RouterLink v-if="platformError" class="text-link" to="/system-status">检查系统状态</RouterLink>
       </div>
     </section>
+    </template>
   </main>
 </template>
 
@@ -258,7 +328,9 @@ onMounted(() => { void load() })
 .current-card > span { color: #617087; font-size: 13px; }
 .current-card strong { color: #172554; font-size: 28px; overflow-wrap: anywhere; }
 .current-card small, .quick-link span { color: #617087; font-size: 13px; line-height: 1.55; }
+.current-card em, .quick-link em { align-self: end; color: #285493; font-size: 12px; font-style: normal; font-weight: 800; }
 .current-card .error-text { color: #a23d3d; }
+.section-state { margin-bottom: 14px; }
 .lifecycle-section { padding: 20px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }
 .lifecycle-section .section-heading { margin-bottom: 16px; }
 .lifecycle-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -272,7 +344,7 @@ onMounted(() => { void load() })
 .ai-grid article.attention { border-color: #efc98b; background: #fff9ed; }
 .ai-grid article.attention strong { color: #8a580e; font-size: 15px; line-height: 1.5; }
 .text-link { color: #285493; font-size: 13px; font-weight: 700; text-decoration: none; }
-.platform-strip { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid #dbe4ef; }
+.platform-strip { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid #dbe4ef; }
 .platform-strip span, .platform-strip small { color: #617087; font-size: 13px; }
 .platform-strip strong { color: #217447; }
 @media (max-width: 1050px) { .current-grid, .quick-grid, .ai-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

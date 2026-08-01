@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import OperationalStatePanel from '../components/OperationalStatePanel.vue'
+
 import {
   apiErrorMessage,
   enableProductsForCustomerService,
@@ -57,12 +59,20 @@ function productId(product: ProductKnowledgeListItem): string {
 
 function aiKnowledgeLabel(status: AiKnowledgePublicationStatus): string {
   return {
-    NOT_GENERATED: '未生成',
-    GENERATING: '生成中',
+    NOT_GENERATED: '未发布',
+    GENERATING: '发布中',
     PUBLISHED: '已发布',
     SYNC_FAILED: '同步失败',
-    NEED_RESYNC: '待重新同步',
+    NEED_RESYNC: '需重新同步',
   }[status]
+}
+
+function productDataStatusLabel(status: ProductKnowledgeListItem['data_status']): string {
+  return {
+    APPROVED: '已审核',
+    PENDING_REVIEW: '待审核',
+    DRAFT: '待补充',
+  }[status] || displayStatus(status)
 }
 
 function canPublish(product: ProductKnowledgeListItem): boolean {
@@ -217,11 +227,32 @@ onMounted(load)
         <h1>商品知识中心</h1>
         <p>按店铺、商品和 SKU 查看 AI 已具备的回答依据、当前缺口和下一步补充重点。</p>
       </div>
-      <RouterLink class="button" to="/knowledge-materials">补充并审核资料</RouterLink>
+      <div class="header-actions">
+        <RouterLink class="button secondary" to="/overview">返回运营工作台</RouterLink>
+        <RouterLink class="button" to="/knowledge-materials">补充并审核资料</RouterLink>
+      </div>
     </div>
 
-    <p v-if="loading" class="notice" role="status">正在汇总商品知识状态…</p>
-    <p v-else-if="error && !overview" class="notice error" role="alert">暂时无法读取商品知识。{{ error }}</p>
+    <OperationalStatePanel
+      v-if="loading"
+      state="loading"
+      title="正在汇总商品知识"
+      reason="系统正在读取店铺、商品、资料审核、客服可用和 AI 知识状态。"
+      next-step="请稍候；读取完成后按商品卡片中的“下一步”继续处理。"
+      data-testid="knowledge-loading-state"
+    />
+    <OperationalStatePanel
+      v-else-if="error && !overview"
+      state="error"
+      title="商品知识暂时无法读取"
+      :reason="error"
+      next-step="重新读取；如果持续失败，返回运营工作台检查平台状态。"
+      action-label="返回运营工作台"
+      action-to="/overview"
+      retry-label="重新读取"
+      data-testid="knowledge-error-state"
+      @retry="load"
+    />
 
     <template v-else-if="overview">
       <section class="metric-grid" aria-label="商品知识统计">
@@ -231,11 +262,16 @@ onMounted(load)
         </article>
       </section>
 
-      <section v-if="!overview.has_data" class="card empty-state">
-        <h2>暂无商品知识数据</h2>
-        <p>请先按现有运营流程导入并审核可核对的商品资料。页面不会生成示例统计或虚构商品。</p>
-        <RouterLink class="button secondary" to="/import-center">查看中文资料模板</RouterLink>
-      </section>
+      <OperationalStatePanel
+        v-if="!overview.has_data"
+        state="empty"
+        title="当前还没有商品知识"
+        reason="商品知识汇总读取成功，但没有返回已导入并可展示的商品资料。页面不会生成示例统计或虚构商品。"
+        next-step="先到导入中心下载模板，再进入资料上传与审核完成人工确认。"
+        action-label="查看中文资料模板"
+        action-to="/import-center"
+        data-testid="knowledge-empty-state"
+      />
 
       <template v-else>
         <section class="card navigator">
@@ -260,7 +296,7 @@ onMounted(load)
           </div>
         </section>
 
-        <section class="card activation-toolbar" aria-label="商品上线操作">
+        <section id="product-activation-toolbar" class="card activation-toolbar" aria-label="商品上线操作">
           <div>
             <p class="eyebrow">商品上线</p>
             <h2>资料审核 → 客服可用 → AI 可用</h2>
@@ -281,8 +317,26 @@ onMounted(load)
             </label>
             <button class="button" type="button" :disabled="actionBusy || selectedProductIds.length === 0" data-testid="batch-enable-products" @click="batchEnable">批量启用客服（{{ selectedProductIds.length }}）</button>
           </div>
-          <p v-if="actionMessage" class="notice success" role="status">{{ actionMessage }}</p>
-          <p v-if="actionError" class="notice error" role="alert">{{ actionError }}</p>
+          <OperationalStatePanel
+            v-if="actionMessage"
+            class="toolbar-state"
+            state="success"
+            title="商品上线操作已完成"
+            :reason="actionMessage"
+            next-step="检查商品卡片的客服和 AI 知识状态；客服工作台刷新目录后即可使用已启用商品。"
+            action-label="查看 AI 状态"
+            action-to="/ai-capabilities"
+            compact
+          />
+          <OperationalStatePanel
+            v-if="actionError"
+            class="toolbar-state"
+            state="error"
+            title="商品上线操作未完成"
+            :reason="actionError"
+            next-step="核对操作人、商品勾选和当前状态后，再次执行原操作。"
+            compact
+          />
         </section>
 
         <section class="catalog-section">
@@ -293,9 +347,38 @@ onMounted(load)
             </div>
             <span>选择商品查看完整知识详情</span>
           </div>
-          <p v-if="productLoading" class="notice" role="status">正在读取该店铺商品…</p>
-          <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
-          <p v-else-if="visibleProducts.length === 0" class="notice">{{ pendingOnly ? '该店铺暂无待客服启用的已审核商品。' : '该店铺暂无已导入商品。' }}</p>
+          <OperationalStatePanel
+            v-if="productLoading"
+            state="loading"
+            title="正在读取店铺商品"
+            reason="正在根据当前选择的店铺读取商品和上线状态。"
+            next-step="请稍候；完成后按商品卡片中的下一步继续处理。"
+            compact
+          />
+          <OperationalStatePanel
+            v-else-if="error"
+            state="error"
+            title="该店铺商品暂时无法读取"
+            :reason="error"
+            next-step="重新读取当前店铺；如果持续失败，返回运营工作台检查平台状态。"
+            retry-label="重新读取当前店铺"
+            compact
+            @retry="selectStore(activeStoreCode)"
+          />
+          <OperationalStatePanel
+            v-else-if="visibleProducts.length === 0"
+            state="empty"
+            :title="pendingOnly ? '当前筛选下没有待启用商品' : '该店铺还没有商品知识'"
+            :reason="pendingOnly ? '当前店铺没有同时满足“资料已审核、客服未启用”的商品。' : '店铺读取成功，但没有返回已导入商品。'"
+            :next-step="pendingOnly ? '查看全部商品，确认资料、客服和 AI 知识的实际状态。' : '前往资料上传与审核，为该店铺准备商品知识。'"
+            :action-label="pendingOnly ? '' : '补充并审核资料'"
+            :action-to="pendingOnly ? '' : '/knowledge-materials'"
+            compact
+          >
+            <template v-if="pendingOnly" #actions>
+              <button class="button secondary" type="button" @click="pendingOnly = false">查看全部商品</button>
+            </template>
+          </OperationalStatePanel>
           <div v-else class="product-grid">
             <article v-for="product in visibleProducts" :key="product.technical_details.product_id || product.product_name" class="product-card">
               <div class="product-heading">
@@ -308,7 +391,7 @@ onMounted(load)
                   <h3>{{ product.product_name }}</h3>
                 </div>
                 <div class="status-pair">
-                  <span class="state-pill data">资料：{{ displayStatus(product.data_status) }}</span>
+                  <span class="state-pill data">资料：{{ productDataStatusLabel(product.data_status) }}</span>
                   <span class="state-pill data">客服：{{ product.customer_service_status === 'ENABLED' ? '可用' : '未启用' }}</span>
                   <span :class="['state-pill', `publication-${product.ai_knowledge.status.toLowerCase()}`]">AI知识：{{ aiKnowledgeLabel(product.ai_knowledge.status) }}</span>
                 </div>
@@ -318,6 +401,7 @@ onMounted(load)
                 <strong>{{ productNextStep(product).title }}</strong>
                 <small>{{ productNextStep(product).description }}</small>
                 <RouterLink v-if="product.data_status !== 'APPROVED'" class="text-link" to="/knowledge-materials">前往资料上传与审核</RouterLink>
+                <a v-else-if="product.customer_service_status === 'DISABLED'" class="text-link" href="#product-activation-toolbar">前往批量启用</a>
                 <button v-else-if="canPublish(product) && product.customer_service_status === 'ENABLED'" class="button" type="button" :disabled="actionBusy" :data-testid="`publish-product-${productId(product)}`" @click="publishKnowledge(product)">{{ product.ai_knowledge.status === 'NEED_RESYNC' || product.ai_knowledge.status === 'SYNC_FAILED' ? '重新同步AI知识' : '同步AI知识' }}</button>
               </section>
 
@@ -385,12 +469,12 @@ onMounted(load)
 
 <style scoped>
 .eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
 .metric-card { display: grid; gap: 7px; padding: 18px; border: 1px solid #dbe4ef; border-radius: 13px; background: #fff; }
 .metric-card span { color: #617087; font-size: 13px; }.metric-card strong { color: #172554; font-size: 27px; }.metric-card strong.empty { font-size: 16px; color: #8090a5; }
-.empty-state { text-align: center; }.empty-state h2 { color: #172554; }.empty-state p { color: #617087; }
 .navigator { margin-bottom: 22px; }.section-heading, .product-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }.section-heading h2, .product-heading h3 { margin: 0; color: #172554; }.section-heading > span { color: #718096; font-size: 13px; }
-.activation-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px auto; gap: 16px; align-items: end; margin-bottom: 22px; }.activation-toolbar h2 { margin: 0; color: #172554; }.activation-toolbar p { margin-bottom: 0; color: #617087; }.activation-toolbar label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.activation-toolbar input { min-height: 39px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.toolbar-actions { display: grid; gap: 8px; }.toolbar-actions .check-label { display: flex; align-items: center; gap: 7px; }.toolbar-actions .check-label input, .select-product input { min-height: auto; }.pending-count { color: #334965; font-size: 13px; font-weight: 700; }.activation-toolbar .notice { grid-column: 1 / -1; margin: 0; }
+.activation-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px auto; gap: 16px; align-items: end; margin-bottom: 22px; }.activation-toolbar h2 { margin: 0; color: #172554; }.activation-toolbar p { margin-bottom: 0; color: #617087; }.activation-toolbar label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.activation-toolbar input { min-height: 39px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.toolbar-actions { display: grid; gap: 8px; }.toolbar-actions .check-label { display: flex; align-items: center; gap: 7px; }.toolbar-actions .check-label input, .select-product input { min-height: auto; }.pending-count { color: #334965; font-size: 13px; font-weight: 700; }.toolbar-state { grid-column: 1 / -1; }
 .store-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }.store-tab { display: grid; gap: 5px; min-width: 240px; padding: 13px 15px; border: 1px solid #d7e1ee; border-radius: 10px; color: #25466f; background: #fff; text-align: left; cursor: pointer; }.store-tab.active { border-color: #3973c4; box-shadow: inset 0 0 0 1px #3973c4; background: #f4f8ff; }.store-tab small { color: #617087; }
 .catalog-section { margin-top: 8px; }.product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }.product-card { display: grid; gap: 15px; padding: 20px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }.product-heading small { color: #617087; }.product-heading h3 { margin-top: 5px; font-size: 18px; }.state-pill { padding: 5px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: #e7f5ec; color: #217447; }.state-pill.basic_available { background: #eaf2ff; color: #285493; }.state-pill.needs_completion { background: #fff1df; color: #9a5c0d; }
 .summary { margin: 0; color: #526279; line-height: 1.65; }.label { display: block; margin-bottom: 8px; color: #334965; font-size: 13px; }.tag-row, .sku-row { display: flex; flex-wrap: wrap; gap: 7px; }.tag, .sku-row span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.missing-text { margin: 0; color: #a56a1e; font-size: 13px; }.status-pair { display: grid; justify-items: end; gap: 6px; }.select-product { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #285493; font-size: 12px; }.state-pill.data { color: #365174; background: #edf2f8; }.state-pill.partially_available { color: #285493; background: #eaf2ff; }.state-pill.missing_knowledge, .state-pill.unconfirmed, .state-pill.publication-not_generated, .state-pill.publication-need_resync { color: #9a5c0d; background: #fff1df; }.state-pill.publication-published { color: #217447; background: #e7f5ec; }.state-pill.publication-sync_failed { color: #a23d3d; background: #fff0f0; }.state-pill.publication-generating { color: #285493; background: #eaf2ff; }.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }.fact-grid div { padding: 10px; border-radius: 8px; background: #f7f9fc; }.fact-grid dt { color: #617087; font-size: 11px; }.fact-grid dd { margin: 4px 0 0; color: #334965; font-size: 13px; line-height: 1.45; }
