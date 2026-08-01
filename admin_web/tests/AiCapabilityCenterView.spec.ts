@@ -30,12 +30,21 @@ describe('AiCapabilityCenterView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('AI状态')
-    expect(wrapper.text()).toContain('qwen3.5:9b')
-    expect(wrapper.text()).toContain('可查询 47 条知识片段')
-    expect(wrapper.text()).toContain('调用次数')
+    expect(wrapper.findAll('.summary-card').map((item) => item.text())).toEqual([
+      'AI 服务正常服务和回答模型均就绪时才显示正常。',
+      '知识47 条知识可检索仅代表 A 当前可查询知识，不代表资料已自动发布。',
+      '回答能力正常综合 AI 服务、模型配置和知识可检索状态。',
+      '需要关注无真实异常不会显示为正常或 0。',
+    ])
+    expect(wrapper.text()).toContain('业务可用说明')
     expect(wrapper.text()).toContain('暂无已保存评测')
     expect(wrapper.find('details').exists()).toBe(true)
     expect(wrapper.find('details').attributes('open')).toBeUndefined()
+    expect(wrapper.find('details').text()).toContain('高级技术信息')
+    expect(wrapper.find('details').text()).toContain('模型名称qwen3.5:9b')
+    expect(wrapper.find('details').text()).toContain('知识集合当前接口未提供集合名称')
+    expect(wrapper.find('details').text()).toContain('服务版本当前接口未提供')
+    expect(wrapper.find('details').text()).toContain('调用次数12')
     expect(wrapper.text()).not.toContain('自动修改 Prompt')
   })
 })

@@ -72,6 +72,37 @@ function canPublish(product: ProductKnowledgeListItem): boolean {
     && product.ai_knowledge.status !== 'PUBLISHED'
 }
 
+type ProductNextStep = {
+  title: string
+  description: string
+  tone: 'ready' | 'attention' | 'progress'
+}
+
+function productNextStep(product: ProductKnowledgeListItem): ProductNextStep {
+  if (product.data_status !== 'APPROVED') {
+    return { title: '完成资料审核', description: '先核对商品资料，通过后再安排客服使用和 AI 发布。', tone: 'attention' }
+  }
+  if (product.data_source === 'UNKNOWN') {
+    return { title: '核对商品来源', description: '来源未确认，暂不继续客服启用或 AI 知识发布。', tone: 'attention' }
+  }
+  if (product.customer_service_status === 'DISABLED') {
+    return { title: '启用客服使用', description: '勾选当前商品，在上方批量启用并完成人工确认。', tone: 'attention' }
+  }
+  if (product.ai_knowledge.status === 'GENERATING') {
+    return { title: '等待 AI 知识发布完成', description: '当前正在生成知识，请稍后刷新状态。', tone: 'progress' }
+  }
+  if (product.ai_knowledge.status === 'SYNC_FAILED') {
+    return { title: '重新同步 AI 知识', description: '上次同步失败，请核对详情后由运营重新发起。', tone: 'attention' }
+  }
+  if (product.ai_knowledge.status === 'NEED_RESYNC') {
+    return { title: '重新同步 AI 知识', description: '商品资料已变化，需要更新 AI 可检索知识。', tone: 'attention' }
+  }
+  if (product.ai_knowledge.status === 'NOT_GENERATED') {
+    return { title: '发布 AI 知识', description: '客服已可选择商品；发布后 AI 才能检索商品知识。', tone: 'attention' }
+  }
+  return { title: '上线准备已完成', description: '资料已审核、客服已启用、AI 知识已发布。', tone: 'ready' }
+}
+
 const metrics = [
   { key: 'store_count', label: '店铺数量' },
   { key: 'product_count', label: '商品数量' },
@@ -278,46 +309,65 @@ onMounted(load)
                 </div>
                 <div class="status-pair">
                   <span class="state-pill data">资料：{{ displayStatus(product.data_status) }}</span>
-                  <span :class="['state-pill', product.ai_status.toLowerCase()]">资料覆盖：{{ displayStatus(product.ai_status) }}</span>
-                  <span class="state-pill data">客服：{{ product.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span>
+                  <span class="state-pill data">客服：{{ product.customer_service_status === 'ENABLED' ? '可用' : '未启用' }}</span>
                   <span :class="['state-pill', `publication-${product.ai_knowledge.status.toLowerCase()}`]">AI知识：{{ aiKnowledgeLabel(product.ai_knowledge.status) }}</span>
                 </div>
               </div>
-              <p class="summary">{{ product.product_summary || '当前资料未提供商品简介。' }}</p>
-              <div>
-                <strong class="label">核心卖点</strong>
-                <div v-if="product.core_selling_points.length" class="tag-row">
-                  <span v-for="point in product.core_selling_points" :key="point" class="tag">{{ point }}</span>
+              <section :class="['next-step', `next-step-${productNextStep(product).tone}`]" :data-testid="`next-step-${productId(product) || product.product_name}`">
+                <span>下一步</span>
+                <strong>{{ productNextStep(product).title }}</strong>
+                <small>{{ productNextStep(product).description }}</small>
+                <RouterLink v-if="product.data_status !== 'APPROVED'" class="text-link" to="/knowledge-materials">前往资料上传与审核</RouterLink>
+                <button v-else-if="canPublish(product) && product.customer_service_status === 'ENABLED'" class="button" type="button" :disabled="actionBusy" :data-testid="`publish-product-${productId(product)}`" @click="publishKnowledge(product)">{{ product.ai_knowledge.status === 'NEED_RESYNC' || product.ai_knowledge.status === 'SYNC_FAILED' ? '重新同步AI知识' : '同步AI知识' }}</button>
+              </section>
+
+              <details class="product-business-details">
+                <summary>查看商品资料摘要</summary>
+                <div class="product-business-content">
+                  <p class="summary">{{ product.product_summary || '当前资料未提供商品简介。' }}</p>
+                  <div>
+                    <strong class="label">核心卖点</strong>
+                    <div v-if="product.core_selling_points.length" class="tag-row">
+                      <span v-for="point in product.core_selling_points" :key="point" class="tag">{{ point }}</span>
+                    </div>
+                    <p v-else class="missing-text">尚未补充</p>
+                  </div>
+                  <dl class="fact-grid">
+                    <div><dt>适用年龄</dt><dd>{{ product.applicable_age || '当前资料未提供' }}</dd></div>
+                    <div><dt>材质安全</dt><dd>{{ product.material_safety || '当前资料未提供' }}</dd></div>
+                    <div><dt>包装内容</dt><dd>{{ product.package_contents || '当前资料未提供' }}</dd></div>
+                    <div><dt>FAQ</dt><dd>{{ product.faq_count }} 条</dd></div>
+                  </dl>
+                  <div class="coverage-row">
+                    <div><strong>{{ product.coverage_percent }}%</strong><span>AI 核心知识覆盖度</span></div>
+                    <div class="progress"><i :style="{ width: `${product.coverage_percent}%` }"></i></div>
+                  </div>
+                  <div>
+                    <strong class="label">SKU</strong>
+                    <div v-if="product.sku_names.length" class="sku-row">
+                      <span v-for="sku in product.sku_names" :key="sku">{{ product.product_name }} → {{ sku }}</span>
+                    </div>
+                    <p v-else class="missing-text">暂无 SKU</p>
+                  </div>
+                  <div class="knowledge-summary">
+                    <span>可回答 {{ product.answerable_topics.length }} 项</span>
+                    <span class="warning">缺失 {{ product.missing_topics.length }} 项</span>
+                  </div>
                 </div>
-                <p v-else class="missing-text">尚未补充</p>
-              </div>
-              <dl class="fact-grid">
-                <div><dt>适用年龄</dt><dd>{{ product.applicable_age || '当前资料未提供' }}</dd></div>
-                <div><dt>材质安全</dt><dd>{{ product.material_safety || '当前资料未提供' }}</dd></div>
-                <div><dt>包装内容</dt><dd>{{ product.package_contents || '当前资料未提供' }}</dd></div>
-                <div><dt>FAQ</dt><dd>{{ product.faq_count }} 条</dd></div>
-              </dl>
-              <div class="coverage-row">
-                <div><strong>{{ product.coverage_percent }}%</strong><span>AI 核心知识覆盖度</span></div>
-                <div class="progress"><i :style="{ width: `${product.coverage_percent}%` }"></i></div>
-              </div>
-              <div>
-                <strong class="label">SKU</strong>
-                <div v-if="product.sku_names.length" class="sku-row">
-                  <span v-for="sku in product.sku_names" :key="sku">{{ product.product_name }} → {{ sku }}</span>
-                </div>
-                <p v-else class="missing-text">暂无 SKU</p>
-              </div>
-              <div class="knowledge-summary">
-                <span>可回答 {{ product.answerable_topics.length }} 项</span>
-                <span class="warning">缺失 {{ product.missing_topics.length }} 项</span>
-                <span>RAG chunks {{ product.ai_knowledge.chunk_count }}</span>
-              </div>
-              <div class="card-actions">
-                <button v-if="canPublish(product)" class="button" type="button" :disabled="actionBusy" :data-testid="`publish-product-${productId(product)}`" @click="publishKnowledge(product)">{{ product.ai_knowledge.status === 'NEED_RESYNC' ? '重新同步AI知识' : '同步AI知识' }}</button>
-                <span v-else-if="product.ai_knowledge.status === 'PUBLISHED'" class="published-note">AI 知识已发布</span>
-                <span v-else-if="product.data_status !== 'APPROVED'" class="pending-note">资料审核通过后才能发布 AI 知识</span>
-              </div>
+              </details>
+
+              <details class="product-technical-details">
+                <summary>查看技术证据</summary>
+                <dl>
+                  <div><dt>知识片段</dt><dd>{{ product.ai_knowledge.chunk_count }}</dd></div>
+                  <div><dt>向量记录</dt><dd>{{ product.ai_knowledge.embedding_count }}</dd></div>
+                  <div><dt>知识集合</dt><dd>{{ product.ai_knowledge.active_collection || '暂未生成' }}</dd></div>
+                  <div><dt>当前内容校验</dt><dd>{{ product.ai_knowledge.current_fingerprint || '暂未生成' }}</dd></div>
+                  <div><dt>已发布内容校验</dt><dd>{{ product.ai_knowledge.indexed_fingerprint || '暂未生成' }}</dd></div>
+                  <div><dt>最近同步异常</dt><dd>{{ product.ai_knowledge.last_error_code || '无' }}</dd></div>
+                </dl>
+                <p>Activation receipt 和 AI 发布收据继续在商品详情中查看。</p>
+              </details>
               <RouterLink
                 v-if="product.technical_details.product_id"
                 class="button secondary"
@@ -343,9 +393,11 @@ onMounted(load)
 .activation-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px auto; gap: 16px; align-items: end; margin-bottom: 22px; }.activation-toolbar h2 { margin: 0; color: #172554; }.activation-toolbar p { margin-bottom: 0; color: #617087; }.activation-toolbar label { display: grid; gap: 6px; color: #526279; font-size: 13px; }.activation-toolbar input { min-height: 39px; padding: 8px; border: 1px solid #cbd7e6; border-radius: 8px; font: inherit; }.toolbar-actions { display: grid; gap: 8px; }.toolbar-actions .check-label { display: flex; align-items: center; gap: 7px; }.toolbar-actions .check-label input, .select-product input { min-height: auto; }.pending-count { color: #334965; font-size: 13px; font-weight: 700; }.activation-toolbar .notice { grid-column: 1 / -1; margin: 0; }
 .store-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }.store-tab { display: grid; gap: 5px; min-width: 240px; padding: 13px 15px; border: 1px solid #d7e1ee; border-radius: 10px; color: #25466f; background: #fff; text-align: left; cursor: pointer; }.store-tab.active { border-color: #3973c4; box-shadow: inset 0 0 0 1px #3973c4; background: #f4f8ff; }.store-tab small { color: #617087; }
 .catalog-section { margin-top: 8px; }.product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }.product-card { display: grid; gap: 15px; padding: 20px; border: 1px solid #dbe4ef; border-radius: 14px; background: #fff; }.product-heading small { color: #617087; }.product-heading h3 { margin-top: 5px; font-size: 18px; }.state-pill { padding: 5px 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: #e7f5ec; color: #217447; }.state-pill.basic_available { background: #eaf2ff; color: #285493; }.state-pill.needs_completion { background: #fff1df; color: #9a5c0d; }
-.summary { margin: 0; color: #526279; line-height: 1.65; }.label { display: block; margin-bottom: 8px; color: #334965; font-size: 13px; }.tag-row, .sku-row { display: flex; flex-wrap: wrap; gap: 7px; }.tag, .sku-row span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.missing-text { margin: 0; color: #a56a1e; font-size: 13px; }.status-pair { display: grid; justify-items: end; gap: 6px; }.select-product { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #285493; font-size: 12px; }.state-pill.data { color: #365174; background: #edf2f8; }.state-pill.partially_available { color: #285493; background: #eaf2ff; }.state-pill.missing_knowledge, .state-pill.unconfirmed, .state-pill.publication-not_generated, .state-pill.publication-need_resync { color: #9a5c0d; background: #fff1df; }.state-pill.publication-published { color: #217447; background: #e7f5ec; }.state-pill.publication-sync_failed { color: #a23d3d; background: #fff0f0; }.state-pill.publication-generating { color: #285493; background: #eaf2ff; }.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }.fact-grid div { padding: 10px; border-radius: 8px; background: #f7f9fc; }.fact-grid dt { color: #617087; font-size: 11px; }.fact-grid dd { margin: 4px 0 0; color: #334965; font-size: 13px; line-height: 1.45; }.card-actions { display: flex; align-items: center; gap: 10px; }.published-note { color: #217447; font-size: 13px; }.pending-note { color: #9a5c0d; font-size: 13px; }
+.summary { margin: 0; color: #526279; line-height: 1.65; }.label { display: block; margin-bottom: 8px; color: #334965; font-size: 13px; }.tag-row, .sku-row { display: flex; flex-wrap: wrap; gap: 7px; }.tag, .sku-row span { padding: 5px 8px; border-radius: 7px; background: #f1f5fa; color: #425b78; font-size: 12px; }.missing-text { margin: 0; color: #a56a1e; font-size: 13px; }.status-pair { display: grid; justify-items: end; gap: 6px; }.select-product { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #285493; font-size: 12px; }.state-pill.data { color: #365174; background: #edf2f8; }.state-pill.partially_available { color: #285493; background: #eaf2ff; }.state-pill.missing_knowledge, .state-pill.unconfirmed, .state-pill.publication-not_generated, .state-pill.publication-need_resync { color: #9a5c0d; background: #fff1df; }.state-pill.publication-published { color: #217447; background: #e7f5ec; }.state-pill.publication-sync_failed { color: #a23d3d; background: #fff0f0; }.state-pill.publication-generating { color: #285493; background: #eaf2ff; }.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }.fact-grid div { padding: 10px; border-radius: 8px; background: #f7f9fc; }.fact-grid dt { color: #617087; font-size: 11px; }.fact-grid dd { margin: 4px 0 0; color: #334965; font-size: 13px; line-height: 1.45; }
+.next-step { display: grid; gap: 6px; padding: 14px; border: 1px solid #e5c485; border-radius: 10px; background: #fff9ed; }.next-step > span { color: #8a6419; font-size: 12px; font-weight: 800; }.next-step > strong { color: #68470c; }.next-step > small { color: #75570a; line-height: 1.5; }.next-step .button, .next-step .text-link { justify-self: start; margin-top: 4px; }.next-step-ready { border-color: #b9dfca; background: #f0faf4; }.next-step-ready > span, .next-step-ready > strong, .next-step-ready > small { color: #217447; }.next-step-progress { border-color: #b9cde9; background: #f3f7ff; }.next-step-progress > span, .next-step-progress > strong, .next-step-progress > small { color: #285493; }.text-link { color: #285493; font-size: 13px; font-weight: 700; text-decoration: none; }
+.product-business-details, .product-technical-details { border-top: 1px solid #e3eaf3; color: #526279; }.product-business-details summary, .product-technical-details summary { padding-top: 12px; color: #334965; font-weight: 700; cursor: pointer; }.product-business-content { display: grid; gap: 15px; padding-top: 14px; }.product-technical-details { font-size: 12px; }.product-technical-details dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 13px 0; }.product-technical-details dl div { padding: 9px; border-radius: 8px; background: #f7f9fc; }.product-technical-details dt { color: #718096; }.product-technical-details dd { margin: 4px 0 0; overflow-wrap: anywhere; color: #334965; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }.product-technical-details p { margin-bottom: 0; color: #617087; }
 .coverage-row { display: grid; gap: 8px; }.coverage-row > div:first-child { display: flex; justify-content: space-between; align-items: baseline; }.coverage-row strong { color: #285493; font-size: 22px; }.coverage-row span { color: #617087; font-size: 13px; }.progress { height: 7px; overflow: hidden; border-radius: 999px; background: #e7edf5; }.progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3269b3, #42a67a); }
 .knowledge-summary { display: flex; gap: 16px; color: #28704c; font-size: 13px; }.knowledge-summary .warning { color: #a56618; }.boundary { margin-top: 20px; color: #75570a; background: #fff8df; line-height: 1.6; }
 @media (max-width: 1050px) { .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .product-grid { grid-template-columns: 1fr; }.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.section-heading { display: block; }.section-heading > span { display: block; margin-top: 6px; }.activation-toolbar { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .product-grid { grid-template-columns: 1fr; }.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.section-heading { display: block; }.section-heading > span { display: block; margin-top: 6px; }.activation-toolbar { grid-template-columns: 1fr; }.product-technical-details dl { grid-template-columns: 1fr; } }
 </style>
