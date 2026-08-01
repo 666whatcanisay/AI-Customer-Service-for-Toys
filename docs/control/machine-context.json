@@ -4,9 +4,33 @@
   "line": "CONTROL",
   "version": "1.0.0",
   "status": "internal_production_ready",
-  "current_task": "AI-CS UI Information Architecture Optimization Review V1",
-  "current_stage": "The current B and C information architecture has been reviewed from real routes and pages. A six-entry simple C navigation and progressive-disclosure model are ready for a separately authorized implementation.",
-  "current_gate": "UI_ARCHITECTURE_PLAN_READY",
+  "current_task": "AI-CS C Admin Navigation Simplification V1",
+  "current_stage": "The C Admin navigation hierarchy is implemented and validated on an isolated branch. The formal Runtime remains on the source baseline and has not been redeployed.",
+  "current_gate": "C_ADMIN_NAVIGATION_SIMPLIFIED_V1",
+  "c_admin_navigation_simplification_v1": {
+    "date": "2026-08-01",
+    "source_sha": "8fe36b109d533131e11609841f2ce5ec1b2d6f00",
+    "design_commit": "82328ffd196eaab0572f4f439ea3fa07b66920a6",
+    "implementation_branch": "codex/c-admin-navigation-simplification-v1",
+    "default_simple_entries": [
+      "运营工作台",
+      "商品",
+      "知识",
+      "导入",
+      "客服运营",
+      "AI状态"
+    ],
+    "advanced_groups": {
+      "知识治理": 6,
+      "运营复盘": 1,
+      "系统诊断": 1
+    },
+    "routes": "PASS: 14 former formal routes retained",
+    "verification": "Admin 28 files / 65 tests, typecheck, build and isolated browser regression PASS; Import Center six templates and R009 upload entry retained",
+    "scope": "admin_web and governance documents only; no API, database, contracts, R006, R009, A/RAG, B or Runtime changes",
+    "formal_runtime_changed": false,
+    "report": "docs/control/AI-CS-C-Admin-Navigation-Simplification-Implementation-Report-V1.md"
+  },
   "ui_information_architecture_optimization_v1": {
     "date": "2026-08-01",
     "source_sha": "8fe36b109d533131e11609841f2ce5ec1b2d6f00",
@@ -37,7 +61,7 @@
       "B manual confirmation and safety flow",
       "A/RAG behavior and contracts"
     ],
-    "implementation_authorized": false,
+    "implementation_authorized": true,
     "plan": "docs/control/AI-CS-UI-Information-Architecture-Optimization-Plan-V1.md"
   },
   "windows_runtime_script_alignment_v1": {

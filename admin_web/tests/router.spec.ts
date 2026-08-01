@@ -4,11 +4,25 @@ import { router } from '../src/router'
 
 
 describe('internal production routes', () => {
-  it('keeps operational routes and hides legacy test tools by default', () => {
+  it('keeps every former navigation route and hides legacy test tools by default', () => {
     const paths = router.getRoutes().map((route) => route.path)
 
-    expect(paths).toContain('/knowledge-materials')
-    expect(paths).toContain('/import-center')
+    expect(paths).toEqual(expect.arrayContaining([
+      '/overview',
+      '/ai-capabilities',
+      '/store-management',
+      '/knowledge-center',
+      '/knowledge-editor',
+      '/knowledge-review',
+      '/knowledge-gaps',
+      '/knowledge-materials',
+      '/faqs',
+      '/safety-rules',
+      '/import-center',
+      '/customer-operations',
+      '/ai-issues',
+      '/system-status',
+    ]))
     expect(paths).not.toContain('/imports')
     expect(paths).not.toContain('/imports/new')
     expect(paths).not.toContain('/imports/:batchId')

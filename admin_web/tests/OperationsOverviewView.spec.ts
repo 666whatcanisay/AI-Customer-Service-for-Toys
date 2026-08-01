@@ -56,7 +56,7 @@ describe('OperationsOverviewView', () => {
     expect(wrapper.text()).toContain('18')
     expect(wrapper.text()).toContain('4')
     expect(wrapper.text()).toContain('暂无法读取')
-    expect(wrapper.text()).toContain('AI 控制中心')
+    expect(wrapper.text()).toContain('AI状态')
     expect(wrapper.find('.service-status').text()).toContain('C 平台')
   })
 

@@ -10,6 +10,56 @@ import {
 
 type ServiceState = 'loading' | 'available' | 'unavailable' | 'not-probed'
 type EnvironmentState = 'loading' | 'internal-production' | 'unknown'
+type NavigationMode = 'simple' | 'advanced'
+type NavigationItem = { label: string; to: string }
+type NavigationGroup = { label: string; items: NavigationItem[] }
+
+const NAVIGATION_MODE_STORAGE_KEY = 'ai-cs-admin-navigation-mode-v1'
+
+const simpleNavigationItems: NavigationItem[] = [
+  { label: '运营工作台', to: '/overview' },
+  { label: '商品', to: '/store-management' },
+  { label: '知识', to: '/knowledge-center' },
+  { label: '导入', to: '/import-center' },
+  { label: '客服运营', to: '/customer-operations' },
+  { label: 'AI状态', to: '/ai-capabilities' },
+]
+
+const advancedNavigationGroups: NavigationGroup[] = [
+  {
+    label: '知识治理',
+    items: [
+      { label: '手工补充知识', to: '/knowledge-editor' },
+      { label: '知识审核队列', to: '/knowledge-review' },
+      { label: '知识缺口', to: '/knowledge-gaps' },
+      { label: '资料上传与审核', to: '/knowledge-materials' },
+      { label: 'FAQ管理', to: '/faqs' },
+      { label: '安全规则', to: '/safety-rules' },
+    ],
+  },
+  {
+    label: '运营复盘',
+    items: [
+      { label: 'AI问题中心', to: '/ai-issues' },
+    ],
+  },
+  {
+    label: '系统诊断',
+    items: [
+      { label: '服务状态', to: '/system-status' },
+    ],
+  },
+]
+
+function initialNavigationMode(): NavigationMode {
+  try {
+    return globalThis.localStorage?.getItem(NAVIGATION_MODE_STORAGE_KEY) === 'advanced'
+      ? 'advanced'
+      : 'simple'
+  } catch {
+    return 'simple'
+  }
+}
 
 const platformState = ref<ServiceState>('loading')
 const aiState = ref<ServiceState>('loading')
@@ -19,48 +69,20 @@ const health = ref<HealthResponse | null>(null)
 const checkedAt = ref('')
 const showTechnicalDetails = ref(false)
 const refreshing = ref(false)
+const navigationMode = ref<NavigationMode>(initialNavigationMode())
 
-const navGroups: Array<{ label: string; items: Array<{ label: string; to?: string; planned?: boolean }> }> = [
-  {
-    label: '开始工作',
-    items: [
-      { label: '首页', to: '/overview' },
-      { label: 'AI运营概览', to: '/ai-capabilities' },
-    ],
-  },
-  {
-    label: '商品知识',
-    items: [
-      { label: '店铺管理', to: '/store-management' },
-      { label: '商品知识中心', to: '/knowledge-center' },
-      { label: '商品知识维护', to: '/knowledge-editor' },
-      { label: '知识审核队列', to: '/knowledge-review' },
-      { label: '知识缺口', to: '/knowledge-gaps' },
-      { label: '知识资料', to: '/knowledge-materials' },
-      { label: 'FAQ管理', to: '/faqs' },
-      { label: '安全规则', to: '/safety-rules' },
-      { label: '导入中心', to: '/import-center' },
-    ],
-  },
-  {
-    label: '客服运营',
-    items: [
-      { label: '客服运营工作台', to: '/customer-operations' },
-    ],
-  },
-  {
-    label: 'AI 运营',
-    items: [
-      { label: 'AI问题中心', to: '/ai-issues' },
-    ],
-  },
-  {
-    label: '系统',
-    items: [
-      { label: '服务状态', to: '/system-status' },
-    ],
+const navigationModeDescription = computed(() => navigationMode.value === 'simple'
+  ? '显示日常运营最常用的 6 个入口。'
+  : '展开知识治理、运营复盘和系统诊断入口。')
+
+function setNavigationMode(mode: NavigationMode): void {
+  navigationMode.value = mode
+  try {
+    globalThis.localStorage?.setItem(NAVIGATION_MODE_STORAGE_KEY, mode)
+  } catch {
+    // Restricted browsers still keep the selected mode for the current page.
   }
-]
+}
 
 const environmentLabel = computed(() => {
   if (environmentState.value === 'internal-production') return '内部生产就绪'
@@ -128,19 +150,63 @@ onMounted(() => { void refreshStatus() })
         <span><strong>AI客服平台</strong><small>运营管理中心</small></span>
       </RouterLink>
 
-      <nav class="product-nav">
-        <section v-for="group in navGroups" :key="group.label" class="nav-group">
-          <h2>{{ group.label }}</h2>
-          <RouterLink v-for="item in group.items.filter((entry) => entry.to)" :key="item.label" :to="item.to!" class="nav-link">
+      <section class="navigation-mode" aria-label="导航显示模式">
+        <div class="navigation-mode__heading">
+          <strong>导航模式</strong>
+          <span>{{ navigationMode === 'simple' ? '简洁' : '高级' }}</span>
+        </div>
+        <div class="navigation-mode__buttons" role="group" aria-label="切换导航模式">
+          <button
+            type="button"
+            :class="{ active: navigationMode === 'simple' }"
+            :aria-pressed="navigationMode === 'simple'"
+            data-testid="navigation-mode-simple"
+            @click="setNavigationMode('simple')"
+          >简洁模式</button>
+          <button
+            type="button"
+            :class="{ active: navigationMode === 'advanced' }"
+            :aria-pressed="navigationMode === 'advanced'"
+            data-testid="navigation-mode-advanced"
+            @click="setNavigationMode('advanced')"
+          >高级模式</button>
+        </div>
+        <small>{{ navigationModeDescription }}</small>
+        <small>模式只改变导航显示，不改变页面权限。</small>
+      </section>
+
+      <nav class="product-nav" aria-label="运营管理中心导航">
+        <section class="nav-group">
+          <h2>常用工作</h2>
+          <RouterLink
+            v-for="item in simpleNavigationItems"
+            :key="item.to"
+            :to="item.to"
+            class="nav-link"
+            data-testid="simple-navigation-item"
+          >
             {{ item.label }}
           </RouterLink>
-          <span v-for="item in group.items.filter((entry) => entry.planned)" :key="item.label" class="nav-link planned">
-            {{ item.label }}<small>规划中</small>
-          </span>
         </section>
+
+        <template v-if="navigationMode === 'advanced'">
+          <p class="advanced-navigation-label" data-testid="advanced-navigation-label">高级功能</p>
+          <section v-for="group in advancedNavigationGroups" :key="group.label" class="nav-group" data-testid="advanced-navigation-group">
+            <h2>{{ group.label }}</h2>
+            <RouterLink
+              v-for="item in group.items"
+              :key="item.to"
+              :to="item.to"
+              class="nav-link"
+              data-testid="advanced-navigation-item"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </section>
+        </template>
       </nav>
 
-      <section class="planned-capabilities" aria-label="规划中的业务能力">
+      <section v-if="navigationMode === 'advanced'" class="planned-capabilities" aria-label="规划中的业务能力">
         <strong>后续能力</strong>
         <p>ERP 镜像、售后助手和退款风险辅助仍在规划中，当前没有自动业务动作。</p>
       </section>
@@ -206,9 +272,18 @@ a { color: #285493; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 17px; }
 .brand small { margin-top: 3px; color: #9fb2d1; font-size: 12px; }
+.navigation-mode { display: grid; gap: 8px; margin-bottom: 14px; padding: 10px; border: 1px solid rgb(160 183 220 / 22%); border-radius: 11px; background: rgb(255 255 255 / 5%); }
+.navigation-mode__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.navigation-mode__heading strong { font-size: 12px; }
+.navigation-mode__heading span { padding: 2px 7px; border-radius: 999px; color: #dbe8fb; background: rgb(111 159 244 / 22%); font-size: 10px; }
+.navigation-mode__buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.navigation-mode__buttons button { min-height: 30px; padding: 5px 7px; border: 1px solid rgb(160 183 220 / 25%); border-radius: 8px; color: #b9c8df; background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.navigation-mode__buttons button.active { border-color: #7aa5ef; color: #fff; background: rgb(103 153 245 / 24%); }
+.navigation-mode > small { color: #91a7ca; font-size: 10px; line-height: 1.45; }
 .product-nav { display: grid; gap: 12px; }
 .nav-group { display: grid; gap: 4px; }
 .nav-group h2 { margin: 0; padding: 0 9px 4px; color: #91a7ca; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+.advanced-navigation-label { margin: 4px 9px -4px; color: #dbe8fb; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
 .nav-link { display: flex; min-height: 34px; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 9px; color: #c1d0e7; font-size: 13px; text-decoration: none; }
 .nav-link:hover, .nav-link.router-link-active { color: #fff; background: rgb(103 153 245 / 21%); }
 .nav-link.planned { color: #8498b8; cursor: default; }

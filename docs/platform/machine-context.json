@@ -4,10 +4,35 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "AI-CS Production Finalization V1",
-  "current_stage": "C Admin and C API production-finalization changes are validated in the standard Runtime. Store source formalization is audited at revision 0012 without deleting products, receipts, publications or RAG data.",
-  "current_gate": "AI_CS_INTERNAL_PRODUCTION_READY",
+  "current_task": "AI-CS C Admin Navigation Simplification V1",
+  "current_stage": "C Admin navigation simplification is implemented and validated on an isolated branch. The formal standard Runtime remains unchanged and deployment requires a separate Runtime gate.",
+  "current_gate": "C_ADMIN_NAVIGATION_SIMPLIFIED_V1",
   "status": "internal_production_ready",
+  "c_admin_navigation_simplification_v1": {
+    "date": "2026-08-01",
+    "source_sha": "8fe36b109d533131e11609841f2ce5ec1b2d6f00",
+    "branch": "codex/c-admin-navigation-simplification-v1",
+    "default_mode": "simple",
+    "simple_entries": [
+      "运营工作台",
+      "商品",
+      "知识",
+      "导入",
+      "客服运营",
+      "AI状态"
+    ],
+    "advanced_groups": [
+      "知识治理",
+      "运营复盘",
+      "系统诊断"
+    ],
+    "route_compatibility": "PASS: all 14 former formal navigation routes remain directly accessible",
+    "import_center": "UNCHANGED: six templates remain available",
+    "r009_upload": "UNCHANGED: /knowledge-materials retains the three-step upload and review entry",
+    "tests": "Admin 28 files / 65 tests, typecheck and build PASS; isolated browser regression PASS with zero console errors",
+    "runtime_changed": false,
+    "report": "docs/control/AI-CS-C-Admin-Navigation-Simplification-Implementation-Report-V1.md"
+  },
   "production_finalization_v1": {
     "branch": "release/ai-cs-v1.0.0",
     "implementation_anchors": [

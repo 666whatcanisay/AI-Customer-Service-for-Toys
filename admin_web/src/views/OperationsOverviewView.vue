@@ -75,7 +75,7 @@ onMounted(() => { void load() })
   <main class="page">
     <div class="page-header">
       <div>
-        <p class="eyebrow">AI客服平台 · 运营首页</p>
+        <p class="eyebrow">AI客服平台 · 运营工作台</p>
         <h1>今天从哪里开始？</h1>
         <p>先看商品资料和待处理问题，再进入客服与 AI 工作区。所有数据均来自当前平台；不会展示虚构趋势。</p>
       </div>
@@ -121,14 +121,14 @@ onMounted(() => { void load() })
       <section class="workbench-grid">
         <RouterLink class="workbench-link" to="/import-center"><strong>导入中心</strong><span>下载模板，预检商品与 SKU，或准备待审核资料。</span></RouterLink>
         <RouterLink class="workbench-link" to="/knowledge-materials"><strong>资料上传与审核</strong><span>查看识别摘要，人工确认后才可供 AI 分析。</span></RouterLink>
-        <RouterLink class="workbench-link" to="/ai-capabilities"><strong>AI 控制中心</strong><span>查看模型、知识、运行和评测状态；不提供自动化操作。</span></RouterLink>
+        <RouterLink class="workbench-link" to="/ai-capabilities"><strong>AI状态</strong><span>查看模型、知识、运行和评测状态；不提供自动化操作。</span></RouterLink>
       </section>
     </template>
 
     <section class="card service-status">
       <h2>平台状态</h2>
       <p><span class="badge">C 平台</span> {{ platformAvailable === 'available' ? '可用' : platformAvailable === 'loading' ? '检测中' : '暂时不可用' }}</p>
-      <p>AI 状态请在“AI 控制中心”查看。该页只使用 A 冻结的只读控制面，不以 C 的探测结果替代 AI 真实状态。</p>
+      <p>AI状态请在“AI状态”页面查看。该页只使用 A 冻结的只读控制面，不以 C 的探测结果替代 AI 真实状态。</p>
     </section>
   </main>
 </template>

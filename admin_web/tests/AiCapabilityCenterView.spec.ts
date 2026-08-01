@@ -29,6 +29,7 @@ describe('AiCapabilityCenterView', () => {
     const wrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
+    expect(wrapper.text()).toContain('AI状态')
     expect(wrapper.text()).toContain('qwen3.5:9b')
     expect(wrapper.text()).toContain('可查询 47 条知识片段')
     expect(wrapper.text()).toContain('调用次数')

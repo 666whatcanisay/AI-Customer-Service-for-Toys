@@ -25,7 +25,7 @@ describe('KnowledgeEditorView', () => {
     const wrapper = mount(KnowledgeEditorView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
     const text = wrapper.text()
-    expect(text).toContain('中文知识维护')
+    expect(text).toContain('手工补充知识')
     expect(text).toContain('SKU差异知识')
     expect(text).not.toContain('product_id')
     expect(text).not.toContain('tenant_id')
