@@ -106,6 +106,38 @@ describe('OperationsOverviewView', () => {
     expect(wrapper.text()).not.toContain('customer_service_status')
   })
 
+  it('explains the loading state before current data has returned', () => {
+    vi.mocked(getAdminOverview).mockReturnValueOnce(new Promise(() => {}))
+
+    const wrapper = mount(OperationsOverviewView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+
+    expect(wrapper.get('[data-testid="overview-loading-state"]').text()).toContain('正在汇总运营工作台')
+    expect(wrapper.get('[data-testid="overview-loading-state"]').text()).toContain('原因：')
+    expect(wrapper.get('[data-testid="overview-loading-state"]').text()).toContain('下一步：')
+    expect(wrapper.find('.current-grid').exists()).toBe(false)
+  })
+
+  it('distinguishes a successful no-work snapshot from a data failure', async () => {
+    vi.mocked(getAdminOverview).mockResolvedValueOnce({
+      ...adminOverview,
+      counts: { ...adminOverview.counts, suggestions: { submitted: 0, reviewing: 0, planned: 0, done: 4, rejected: 0 } },
+    })
+    vi.mocked(getProductKnowledgeOverview).mockResolvedValueOnce({
+      ...knowledgeOverview,
+      stats: { store_count: 1, product_count: 0, ai_usable_product_count: 0, gap_count: 0, pending_review_count: 0 },
+    })
+    vi.mocked(listProductKnowledgeProducts).mockResolvedValueOnce({ items: [], total: 0 })
+    vi.mocked(listAiProblems).mockResolvedValueOnce({ items: [], total: 0 })
+
+    const wrapper = mount(OperationsOverviewView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('当前没有待处理事项')
+    expect(wrapper.text()).toContain('均为 0')
+    expect(wrapper.text()).toContain('当前还没有商品生命周期数据')
+    expect(wrapper.text()).toContain('前往商品管理')
+  })
+
   it('shows a real failure instead of zero when product lifecycle data cannot be read', async () => {
     vi.mocked(listProductKnowledgeProducts).mockRejectedValueOnce(new Error('商品状态接口暂时不可用'))
     vi.mocked(getAiControlCenterOverview).mockRejectedValueOnce(new Error('AI状态接口暂时不可用'))
@@ -113,9 +145,11 @@ describe('OperationsOverviewView', () => {
     const wrapper = mount(OperationsOverviewView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('商品状态读取失败：商品状态接口暂时不可用')
-    expect(wrapper.text()).toContain('以下数量不会以 0 代替失败')
-    expect(wrapper.text()).toContain('AI状态读取失败：AI状态接口暂时不可用')
+    expect(wrapper.text()).toContain('商品生命周期暂时无法读取')
+    expect(wrapper.text()).toContain('原因：商品状态接口暂时不可用')
+    expect(wrapper.text()).toContain('下一步：刷新工作台重试')
+    expect(wrapper.text()).toContain('AI 状态暂时无法读取')
+    expect(wrapper.text()).toContain('原因：AI状态接口暂时不可用')
     expect(wrapper.find('.lifecycle-grid').exists()).toBe(false)
   })
 })

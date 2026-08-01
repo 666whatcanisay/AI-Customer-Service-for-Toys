@@ -45,7 +45,23 @@ describe('ImportCenterView', () => {
     expect(wrapper.text()).not.toContain('测试数据包')
     expect(wrapper.text()).toContain('不会在下载或上传后自动发布知识')
     expect(wrapper.text()).toContain('当前还没有可用店铺')
-    expect(wrapper.text()).toContain('创建店铺')
+    expect(wrapper.get('[data-testid="import-store-empty-state"]').text()).toContain('原因：')
+    expect(wrapper.get('[data-testid="import-store-empty-state"]').text()).toContain('下一步：')
+    expect(wrapper.text()).toContain('前往店铺管理')
+  })
+
+  it('explains store loading and failure without hiding the six templates', async () => {
+    apiMocks.listOperationStores.mockReturnValueOnce(new Promise(() => {}))
+    const loadingWrapper = mount(ImportCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(loadingWrapper.get('[data-testid="import-store-loading-state"]').text()).toContain('正在读取可用店铺')
+    expect(loadingWrapper.findAll('a[download]')).toHaveLength(6)
+
+    apiMocks.listOperationStores.mockRejectedValueOnce(new Error('network'))
+    const errorWrapper = mount(ImportCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(errorWrapper.get('[data-testid="import-store-error-state"]').text()).toContain('可用店铺暂时无法读取')
+    expect(errorWrapper.get('[data-testid="import-store-error-state"]').text()).toContain('原因：暂时不可用')
+    expect(errorWrapper.get('[data-testid="import-store-error-state"]').text()).toContain('重新读取店铺')
   })
 
   it('allows a newly created active store to be selected by Chinese business name', async () => {
@@ -68,7 +84,9 @@ describe('ImportCenterView', () => {
     await wrapper.get('select').setValue('7')
 
     expect(wrapper.text()).toContain('木木小栈拼多多旗舰店 · 拼多多')
-    expect(wrapper.text()).toContain('已选择：木木小栈拼多多旗舰店')
+    expect(wrapper.get('[data-testid="import-store-success-state"]').text()).toContain('目标店铺已确认')
+    expect(wrapper.get('[data-testid="import-store-success-state"]').text()).toContain('已选择 木木小栈拼多多旗舰店')
+    expect(wrapper.get('[data-testid="import-store-success-state"]').text()).toContain('下一步：进入资料上传与审核')
     expect(sessionStorage.getItem('c-operation-import-store-ref')).toBe('7')
   })
 })

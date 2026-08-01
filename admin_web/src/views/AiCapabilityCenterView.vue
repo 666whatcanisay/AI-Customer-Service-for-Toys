@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import OperationalStatePanel from '../components/OperationalStatePanel.vue'
 import {
   apiErrorMessage,
   getAiControlCenterOverview,
@@ -9,7 +10,7 @@ import {
 import { displayPassRate } from '../presentation'
 
 const overview = ref<AiControlCenterOverview | null>(null)
-const loading = ref(false)
+const loading = ref(true)
 const error = ref('')
 
 const serviceSummary = computed(() => {
@@ -73,7 +74,6 @@ function formatDate(value: string | null): string {
 }
 
 async function load(): Promise<void> {
-  if (loading.value) return
   loading.value = true
   error.value = ''
   overview.value = null
@@ -97,15 +97,32 @@ onMounted(() => { void load() })
         <h1>AI状态</h1>
         <p>查看真实模型、知识和运行状态；本页不提供模型切换、提示词修改、知识发布或客户业务自动化。</p>
       </div>
-      <button class="button secondary" type="button" :disabled="loading" @click="load">{{ loading ? '刷新中…' : '刷新状态' }}</button>
+      <div class="header-actions">
+        <RouterLink class="button secondary" to="/overview">返回运营工作台</RouterLink>
+        <button class="button secondary" type="button" :disabled="loading" @click="load">{{ loading ? '刷新中…' : '刷新状态' }}</button>
+      </div>
     </div>
 
-    <p v-if="loading" class="notice" role="status">正在读取 AI状态…</p>
-    <section v-else-if="error" class="card unavailable" role="alert">
-      <h2>AI 服务尚未就绪</h2>
-      <p>{{ error }}</p>
-      <p>请先检查本机 A 服务和模型配置；资料质量、客服运营等 C 端页面仍可独立使用。</p>
-    </section>
+    <OperationalStatePanel
+      v-if="loading"
+      state="loading"
+      title="正在读取 AI 状态"
+      reason="系统正在检查 AI 服务、回答模型、可检索知识和最近运行证据。"
+      next-step="请稍候；读取完成后先查看“需要关注”。"
+      data-testid="ai-loading-state"
+    />
+    <OperationalStatePanel
+      v-else-if="error"
+      state="error"
+      title="AI 状态暂时无法读取"
+      :reason="error"
+      next-step="重新读取；如果持续失败，前往系统状态确认 A 服务是否可用。商品和资料管理仍可继续使用。"
+      action-label="检查系统状态"
+      action-to="/system-status"
+      retry-label="重新读取"
+      data-testid="ai-error-state"
+      @retry="load"
+    />
 
     <template v-else-if="overview">
       <section class="summary-grid" aria-label="AI 运行摘要">
@@ -152,14 +169,23 @@ onMounted(() => { void load() })
               <div><dt>通过率</dt><dd>{{ overview.latestEvaluation.evaluation.passRate === null ? '暂无法读取' : displayPassRate(overview.latestEvaluation.evaluation.passRate) }}</dd></div>
             </dl>
           </template>
-          <p v-else class="notice">暂无已保存评测。这不代表评测失败，也不会自动触发新的评测。</p>
-          <RouterLink class="text-link" to="/ai-optimization-pool">查看已有评测记录</RouterLink>
+          <OperationalStatePanel
+            v-else
+            state="empty"
+            title="当前没有已保存评测"
+            reason="AI 状态接口没有返回可展示的评测结果；这不代表评测失败。"
+            next-step="查看已有评测记录；本页不会自动触发新的评测。"
+            action-label="查看评测记录"
+            action-to="/ai-optimization-pool"
+            compact
+            data-testid="ai-evaluation-empty-state"
+          />
         </article>
       </section>
 
       <section class="workbench-links" aria-label="AI 运营工作区">
-        <RouterLink to="/knowledge-quality-pool" class="workbench-link"><strong>知识质量中心</strong><span>查看资料完整度、待补充项和人工审核后的分析结果。</span></RouterLink>
-        <RouterLink to="/ai-feedback-optimization-pool" class="workbench-link"><strong>AI 问题中心</strong><span>查看客服已确认问题的原因、建议和分析状态。</span></RouterLink>
+        <RouterLink to="/knowledge-quality-pool" class="workbench-link"><strong>知识质量中心</strong><span>查看资料完整度、待补充项和人工审核后的分析结果。</span><em>立即前往 →</em></RouterLink>
+        <RouterLink to="/ai-feedback-optimization-pool" class="workbench-link"><strong>AI 问题中心</strong><span>查看客服已确认问题的原因、建议和分析状态。</span><em>立即前往 →</em></RouterLink>
         <span class="workbench-link planned"><strong>模型策略管理</strong><span>规划中；当前不提供模型切换或提示词修改。</span></span>
       </section>
 
@@ -204,7 +230,7 @@ onMounted(() => { void load() })
 
 <style scoped>
 .eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.unavailable { border-left: 5px solid #c77a16; }
+.header-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .summary-card { display: grid; gap: 7px; min-height: 145px; padding: 18px; border: 1px solid #d9e4f1; border-radius: 14px; background: linear-gradient(145deg, #fff, #f5f9ff); }
 .summary-card span, .summary-card small, .last-called { color: #617087; font-size: 13px; line-height: 1.55; }
@@ -225,6 +251,7 @@ dd { margin: 3px 0 0; overflow-wrap: anywhere; }
 .workbench-link { display: grid; gap: 8px; min-height: 112px; padding: 16px; border: 1px solid #dbe4ef; border-radius: 12px; color: #25466f; background: #fff; text-decoration: none; }
 .workbench-link strong { color: #172554; }
 .workbench-link span { color: #617087; font-size: 13px; line-height: 1.55; }
+.workbench-link em { align-self: end; color: #285493; font-size: 12px; font-style: normal; font-weight: 800; }
 .workbench-link.planned { color: #718096; background: #fafbfc; }
 .technical-details { margin-top: 20px; padding: 16px 20px; border: 1px solid #dae5f1; border-radius: 12px; color: #526279; background: #f8fbff; }
 .technical-details summary { cursor: pointer; font-weight: 700; }

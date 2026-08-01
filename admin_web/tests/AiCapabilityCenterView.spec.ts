@@ -37,7 +37,8 @@ describe('AiCapabilityCenterView', () => {
       '需要关注无真实异常不会显示为正常或 0。',
     ])
     expect(wrapper.text()).toContain('业务可用说明')
-    expect(wrapper.text()).toContain('暂无已保存评测')
+    expect(wrapper.text()).toContain('当前没有已保存评测')
+    expect(wrapper.get('[data-testid="ai-evaluation-empty-state"]').text()).toContain('下一步：查看已有评测记录')
     expect(wrapper.find('details').exists()).toBe(true)
     expect(wrapper.find('details').attributes('open')).toBeUndefined()
     expect(wrapper.find('details').text()).toContain('高级技术信息')
@@ -46,5 +47,20 @@ describe('AiCapabilityCenterView', () => {
     expect(wrapper.find('details').text()).toContain('服务版本当前接口未提供')
     expect(wrapper.find('details').text()).toContain('调用次数12')
     expect(wrapper.text()).not.toContain('自动修改 Prompt')
+  })
+
+  it('explains loading and failure states and provides recovery paths', async () => {
+    mockedOverview.mockReturnValueOnce(new Promise(() => {}))
+    const loadingWrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(loadingWrapper.get('[data-testid="ai-loading-state"]').text()).toContain('正在读取 AI 状态')
+    expect(loadingWrapper.get('[data-testid="ai-loading-state"]').text()).toContain('下一步：')
+
+    mockedOverview.mockRejectedValueOnce(new Error('offline'))
+    const errorWrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('AI 状态暂时无法读取')
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('AI 服务尚未就绪，请先检查服务状态。')
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('检查系统状态')
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('重新读取')
   })
 })
