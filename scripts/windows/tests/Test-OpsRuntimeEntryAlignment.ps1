@@ -71,9 +71,11 @@ try {
 
     $startText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\start_ai_customer_service.ps1') -Raw -Encoding UTF8
     $statusText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\status_ai_customer_service.ps1') -Raw -Encoding UTF8
+    $stopText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\stop_ai_customer_service.ps1') -Raw -Encoding UTF8
     $pilotText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\start_target_pilot.ps1') -Raw -Encoding UTF8
     if ($startText -notmatch 'Resolve-StandardRuntimeNetworkMode' -or $startText -notmatch 'start_lan_ai_customer_service\.ps1' -or $startText -notmatch 'Save-StandardRuntimeNetworkModePreference') { throw 'Generic start entry does not route and preserve the LAN mode.' }
     if ($statusText -notmatch 'Resolve-StandardRuntimeNetworkMode' -or $statusText -notmatch 'status_lan_ai_customer_service\.ps1') { throw 'Generic status entry does not route the recorded LAN mode.' }
+    if ($stopText -notmatch 'remainingRecords' -or $stopText -notmatch 'remainingPorts' -or $stopText -notmatch 'Stop did not complete') { throw 'Standard stop entry does not fail visibly when only part of the runtime stops.' }
     if ($pilotText -notmatch '-Mode \$Mode' -or $pilotText -notmatch '\$readinessMode') { throw 'Pilot entry does not forward and verify the selected network mode.' }
 
     $batchContents = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'scripts\windows') -Filter '*.bat' -File | ForEach-Object {

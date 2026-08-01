@@ -1712,7 +1712,14 @@ function Start-ManagedService($Config, [string]$Name, [string]$ExecutablePath, [
 function Stop-ManagedService($Config, [string]$Name) {
     $path = Get-ServiceRecordPath $Config $Name
     if (-not (Test-Path -LiteralPath $path)) { Write-Host "$Name：没有本工具的运行记录。"; return }
-    $check = Test-RecordedProcess $Config $Name
+    $check = $null
+    foreach ($attempt in 1..2) {
+        $check = Test-RecordedProcess $Config $Name
+        if ($check.Valid -or (-not $check.Process -and -not $check.ListenerProcess) -or $attempt -eq 2) { break }
+        # A bounded WMI query may transiently time out on Windows. Retry once;
+        # never relax identity fields and never fall back to killing by port.
+        Start-Sleep -Milliseconds 250
+    }
     if (-not $check.Process -and -not $check.ListenerProcess) {
         $owners = @(Get-PortOwner ([int]$check.Record.port))
         if ($owners.Count -gt 0) { Write-Warning "$Name：记录的受管 PID 已退出，但端口仍由 PID $($owners -join ', ') 监听；拒绝清理记录或按端口停止。"; return }
