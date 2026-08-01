@@ -4,9 +4,42 @@
   "line": "CONTROL",
   "version": "1.0.0",
   "status": "internal_production_ready",
-  "current_task": "AI-CS Windows Runtime Script Alignment V1",
-  "current_stage": "The migrated AI-CS repository is the only Windows Runtime source. Legacy shortcuts are compatibility redirects, and the standard stop/start/status/LAN lifecycle has passed.",
-  "current_gate": "WINDOWS_RUNTIME_SCRIPT_ALIGNED_V1",
+  "current_task": "AI-CS UI Information Architecture Optimization Review V1",
+  "current_stage": "The current B and C information architecture has been reviewed from real routes and pages. A six-entry simple C navigation and progressive-disclosure model are ready for a separately authorized implementation.",
+  "current_gate": "UI_ARCHITECTURE_PLAN_READY",
+  "ui_information_architecture_optimization_v1": {
+    "date": "2026-08-01",
+    "source_sha": "8fe36b109d533131e11609841f2ce5ec1b2d6f00",
+    "documentation_branch": "codex/ui-information-architecture-review-v1",
+    "current_admin_navigation": {
+      "groups": 5,
+      "direct_items": 14,
+      "product_knowledge_items": 9
+    },
+    "current_customer_navigation": {
+      "primary_items": 4,
+      "help_items": 2
+    },
+    "proposed_simple_admin_navigation": [
+      "运营工作台",
+      "商品",
+      "知识",
+      "导入",
+      "客服运营",
+      "AI状态"
+    ],
+    "mode_boundary": "Simple and advanced modes only change navigation density and default disclosure; they are not authentication or authorization.",
+    "unchanged_boundaries": [
+      "existing routes and business capabilities",
+      "R006 customer-service activation model",
+      "R009 import and review logic",
+      "Import Center six-template ownership",
+      "B manual confirmation and safety flow",
+      "A/RAG behavior and contracts"
+    ],
+    "implementation_authorized": false,
+    "plan": "docs/control/AI-CS-UI-Information-Architecture-Optimization-Plan-V1.md"
+  },
   "windows_runtime_script_alignment_v1": {
     "date": "2026-08-01",
     "formal_repository": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
