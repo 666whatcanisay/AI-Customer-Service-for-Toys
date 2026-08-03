@@ -3,12 +3,65 @@ $ErrorActionPreference = 'Stop'
 
 function Resolve-AiCustomerServiceConfigPath([string]$ConfigPath, [string]$ScriptRoot = $PSScriptRoot) {
     if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) { return $ConfigPath }
-    $legacyConfigPath = Join-Path $ScriptRoot 'config.local.ps1'
-    if (Test-Path -LiteralPath $legacyConfigPath -PathType Leaf) { return $legacyConfigPath }
     $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $ScriptRoot '..\..'))
     $standardRuntimeConfigPath = Join-Path $repositoryRoot '.runtime\phase-e\config\green-standard.local.ps1'
     if (Test-Path -LiteralPath $standardRuntimeConfigPath -PathType Leaf) { return $standardRuntimeConfigPath }
+    $legacyConfigPath = Join-Path $ScriptRoot 'config.local.ps1'
+    if (Test-Path -LiteralPath $legacyConfigPath -PathType Leaf) { return $legacyConfigPath }
     return $legacyConfigPath
+}
+
+function Assert-AiCsCanonicalRuntimeSource(
+    $Config,
+    [string]$ResolvedConfigPath,
+    [switch]$RequireCanonicalRoot,
+    [string]$EntryRepositoryRootOverride = ''
+) {
+    if (-not $RequireCanonicalRoot) { return }
+    $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+    $repositoryName = Split-Path -Leaf $repositoryRoot
+    if (-not [string]::Equals($repositoryName, 'AI-CS', [StringComparison]::OrdinalIgnoreCase)) {
+        throw '检测到旧项目路径，请使用迁移后的AI-CS目录。'
+    }
+
+    $entryRepositoryRoot = if ([string]::IsNullOrWhiteSpace($EntryRepositoryRootOverride)) {
+        [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    } else {
+        [IO.Path]::GetFullPath($EntryRepositoryRootOverride)
+    }
+    if (-not [string]::Equals((Split-Path -Leaf $entryRepositoryRoot), 'AI-CS', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "检测到旧项目路径，请使用迁移后的AI-CS目录：$entryRepositoryRoot"
+    }
+    if (-not [string]::Equals($repositoryRoot, $entryRepositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Runtime配置的RepositoryRoot不是当前AI-CS目录：$repositoryRoot"
+    }
+    $expectedConfigPath = [IO.Path]::GetFullPath((Join-Path $entryRepositoryRoot '.runtime\phase-e\config\green-standard.local.ps1'))
+    try { $actualConfigPath = (Resolve-Path -LiteralPath $ResolvedConfigPath -ErrorAction Stop).Path } catch { throw "Runtime配置不存在：$ResolvedConfigPath" }
+    if (-not [string]::Equals($actualConfigPath, $expectedConfigPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "标准Runtime必须使用green-standard.local.ps1：$expectedConfigPath"
+    }
+}
+
+function Write-AiCsStartupPreflight($Config, [string]$ResolvedConfigPath) {
+    $identity = Get-RepositoryRuntimeIdentity ([string]$Config.RepositoryRoot)
+    if (-not $identity.Available) { throw "无法读取启动Git身份：$($identity.Reason)" }
+    if ([string]$identity.SourceState -ne 'CLEAN') { throw '正式AI-CS工作区不是CLEAN，拒绝启动。请先确认并提交受控修改。' }
+
+    $ragVersion = [string](& $Config.RagPythonPath --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw "A Python环境不可用：$($Config.RagPythonPath)" }
+    $platformVersion = [string](& $Config.PlatformPythonPath --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw "C Python环境不可用：$($Config.PlatformPythonPath)" }
+    $nodeCommand = Get-Command node.exe -ErrorAction Stop
+    $nodeVersion = [string](& $nodeCommand.Source --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw 'Node.js版本检查失败。' }
+    $pnpmCommand = Get-Command $Config.PnpmCommand -ErrorAction Stop
+    $pnpmVersion = [string](& $pnpmCommand.Source --version 2>&1 | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0) { throw 'pnpm版本检查失败。' }
+
+    Write-Host "启动预检：Repository=$($identity.RepositoryRoot)" -ForegroundColor Cyan
+    Write-Host "启动预检：SHA=$($identity.GitSha)；Source=$($identity.SourceState)"
+    Write-Host "启动预检：Config=$([IO.Path]::GetFullPath($ResolvedConfigPath))"
+    Write-Host "启动预检：A Python=$ragVersion；C Python=$platformVersion；Node=$nodeVersion；pnpm=$pnpmVersion"
 }
 
 function Get-LocalConfig([string]$ConfigPath) {
@@ -276,8 +329,89 @@ function Get-LanSubnetCidr($Candidate) {
     return "$($network -join '.')/$prefixLength"
 }
 
-function Get-LanIpv4Candidates {
+function Get-Ipv4PrefixLengthFromMask([System.Net.IPAddress]$Mask) {
+    if ($null -eq $Mask) { return 0 }
+    $prefixLength = 0
+    foreach ($byte in $Mask.GetAddressBytes()) {
+        for ($bit = 7; $bit -ge 0; $bit--) {
+            if (($byte -band (1 -shl $bit)) -ne 0) { $prefixLength++ }
+        }
+    }
+    return $prefixLength
+}
+
+function Get-LanVpnRiskAdapters {
+    try {
+        return @([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object {
+            ("$($_.Name) $($_.Description)") -match '(?i)(vpn|tun|tap|wireguard|tailscale|zerotier)'
+        } | ForEach-Object {
+            [pscustomobject]@{ Name=[string]$_.Name; InterfaceDescription=[string]$_.Description }
+        })
+    } catch {
+        return @()
+    }
+}
+
+function Get-LanIpv4Candidates([switch]$UseLegacyPowerShellDiscovery) {
     $candidates = @()
+    if (-not $UseLegacyPowerShellDiscovery) {
+        try {
+            $interfaces = @([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces())
+        } catch {
+            throw "无法通过.NET读取Windows网络适配器：$($_.Exception.Message)"
+        }
+        foreach ($networkInterface in $interfaces) {
+            if ($networkInterface.OperationalStatus -ne [System.Net.NetworkInformation.OperationalStatus]::Up) { continue }
+            $adapter = [pscustomobject]@{
+                Status = 'Up'
+                Name = [string]$networkInterface.Name
+                InterfaceDescription = [string]$networkInterface.Description
+                HardwareInterface = $networkInterface.NetworkInterfaceType -in @(
+                    [System.Net.NetworkInformation.NetworkInterfaceType]::Ethernet,
+                    [System.Net.NetworkInformation.NetworkInterfaceType]::GigabitEthernet,
+                    [System.Net.NetworkInformation.NetworkInterfaceType]::Wireless80211
+                )
+            }
+            if (-not (Test-LanAdapterEligible $adapter)) { continue }
+            try {
+                $properties = $networkInterface.GetIPProperties()
+                $ipv4Properties = $properties.GetIPv4Properties()
+            } catch { continue }
+            if ($null -eq $ipv4Properties) { continue }
+            $gateways = @($properties.GatewayAddresses | Where-Object {
+                $null -ne $_.Address -and
+                $_.Address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.Address)
+            })
+            if ($gateways.Count -eq 0) { continue }
+            foreach ($unicast in @($properties.UnicastAddresses)) {
+                if ($unicast.Address.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { continue }
+                $ip = [string]$unicast.Address
+                if (-not (Test-PrivateLanIpv4 $ip)) { continue }
+                $prefixLength = 0
+                if ($unicast.PSObject.Properties.Name -contains 'PrefixLength') {
+                    $prefixLength = [int]$unicast.PrefixLength
+                }
+                if ($prefixLength -lt 1 -or $prefixLength -gt 30) {
+                    $prefixLength = Get-Ipv4PrefixLengthFromMask $unicast.IPv4Mask
+                }
+                if ($prefixLength -lt 1 -or $prefixLength -gt 30) { continue }
+                $candidates += [pscustomobject]@{
+                    IPAddress = $ip
+                    InterfaceIndex = [int]$ipv4Properties.Index
+                    InterfaceAlias = [string]$networkInterface.Name
+                    InterfaceDescription = [string]$networkInterface.Description
+                    PrefixLength = $prefixLength
+                    SubnetMask = Get-Ipv4SubnetMask $prefixLength
+                    DefaultGateway = [string]$gateways[0].Address
+                }
+            }
+        }
+        return @($candidates | Sort-Object InterfaceIndex, IPAddress -Unique)
+    }
+
+    # Kept only as a deterministic unit-test seam and compatibility diagnostic.
+    # Production start/status paths use the bounded .NET enumeration above.
     try {
         $adapters = @(Get-NetAdapter -ErrorAction Stop)
     } catch {
@@ -309,10 +443,27 @@ function Get-LanIpv4Candidates {
 }
 
 function Get-LanNetworkProfile($Candidate) {
+    $job = $null
     try {
-        $profiles = @(Get-NetConnectionProfile -InterfaceIndex ([int]$Candidate.InterfaceIndex) -ErrorAction Stop)
+        $job = Start-Job -ScriptBlock {
+            param([int]$InterfaceIndex)
+            @(Get-NetConnectionProfile -InterfaceIndex $InterfaceIndex -ErrorAction Stop) |
+                Select-Object -First 1 -Property Name, NetworkCategory
+        } -ArgumentList ([int]$Candidate.InterfaceIndex)
+        if ($null -eq (Wait-Job -Job $job -Timeout 5)) {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            return [pscustomobject]@{
+                InterfaceAlias=[string]$Candidate.InterfaceAlias
+                NetworkName=''
+                NetworkCategory='Unknown'
+                Detail='Windows网络类型查询超过5秒；已跳过，脚本未修改网络或防火墙。'
+            }
+        }
+        $profiles = @(Receive-Job -Job $job -ErrorAction Stop)
     } catch {
         return [pscustomobject]@{ InterfaceAlias=[string]$Candidate.InterfaceAlias; NetworkName=''; NetworkCategory='Unknown'; Detail=$_.Exception.Message }
+    } finally {
+        if ($null -ne $job) { Remove-Job -Job $job -Force -ErrorAction SilentlyContinue }
     }
     $profile = $profiles | Select-Object -First 1
     if ($null -eq $profile) {
@@ -412,6 +563,64 @@ function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfil
     $lanConfig.LanSubnet = Get-LanSubnetCidr $selected
     $lanConfig.LanCorsAllowedOrigins = Get-LanCorsAllowedOrigins $lanConfig
     return $lanConfig
+}
+
+function Resolve-LanStatusRuntimeConfig($Config) {
+    $recordPath = Get-ServiceRecordPath $Config 'customer-web'
+    if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
+        try {
+            $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $recordRoot = [IO.Path]::GetFullPath([string]$record.repository_root)
+            $expectedRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+            $healthUri = [uri][string]$record.healthUrl
+            if (
+                [string]$record.network_mode -eq 'LAN' -and
+                [string]::Equals($recordRoot, $expectedRoot, [StringComparison]::OrdinalIgnoreCase) -and
+                $healthUri.IsAbsoluteUri -and
+                $healthUri.Scheme -in @('http','https') -and
+                $healthUri.Port -eq [int]$Config.CustomerWebPort -and
+                (Test-PrivateLanIpv4 $healthUri.Host)
+            ) {
+                $statusConfig = @{}
+                foreach ($entry in $Config.GetEnumerator()) { $statusConfig[$entry.Key] = $entry.Value }
+                $selection = [pscustomobject]@{
+                    IPAddress = $healthUri.Host
+                    InterfaceIndex = 0
+                    InterfaceAlias = '受管运行记录'
+                    InterfaceDescription = '受管运行记录（状态命令不重新扫描网卡）'
+                    PrefixLength = 0
+                    SubnetMask = '未探测'
+                    DefaultGateway = '未探测'
+                }
+                $statusConfig.EnableLanMode = $true
+                $statusConfig.LanMode = $true
+                $statusConfig.LanAddress = $healthUri.Host
+                $statusConfig.LanAdvertisedHost = $healthUri.Host
+                $statusConfig.BindAddress = '127.0.0.1'
+                $statusConfig.RagBindAddress = '127.0.0.1'
+                $statusConfig.PlatformBindAddress = '127.0.0.1'
+                $statusConfig.CustomerWebBindAddress = $healthUri.Host
+                $statusConfig.CustomerWebUrl = $healthUri.AbsoluteUri
+                $statusConfig.LocalCustomerWebUrl = $healthUri.AbsoluteUri
+                $statusConfig.LanNetworkProfile = [pscustomobject]@{
+                    InterfaceAlias = '受管运行记录'
+                    NetworkName = '未重新探测'
+                    NetworkCategory = 'Unknown'
+                    Detail = '状态命令使用受管运行记录；动态网卡检查请运行诊断脚本。'
+                }
+                $statusConfig.LanSelection = $selection
+                $statusConfig.LanSubnet = '未重新探测'
+                $statusConfig.LanStatusResolutionSource = 'MANAGED_RECORD'
+                return $statusConfig
+            }
+        } catch {
+            # A malformed or stale record must not be trusted. The caller falls
+            # back to the existing dynamic discovery and reports its failure.
+        }
+    }
+    $dynamicConfig = Resolve-LanRuntimeConfig $Config $null $null -SkipPublicNetworkGuard
+    $dynamicConfig.LanStatusResolutionSource = 'DYNAMIC_DISCOVERY'
+    return $dynamicConfig
 }
 
 function Get-LanServiceListenerAddress($Config, [int]$Port) {
@@ -520,12 +729,24 @@ function Get-LanFirewallStatusMessage($NetworkProfile) {
     if ([string]::IsNullOrWhiteSpace($profileName)) {
         return 'Windows 防火墙状态：无法按当前网络类型确认；它仍可能阻断来自笔记本的访问。脚本未修改任何规则。'
     }
+    $job = $null
     try {
-        $profile = Get-NetFirewallProfile -Profile $profileName -ErrorAction Stop
+        $job = Start-Job -ScriptBlock {
+            param([string]$ProfileName)
+            Get-NetFirewallProfile -Profile $ProfileName -ErrorAction Stop |
+                Select-Object -First 1 -Property Name, Enabled
+        } -ArgumentList $profileName
+        if ($null -eq (Wait-Job -Job $job -Timeout 5)) {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            return "Windows 防火墙状态：读取 $profileName 配置超过5秒；它仍可能阻断入站TCP 5173。脚本未修改任何规则。"
+        }
+        $profile = Receive-Job -Job $job -ErrorAction Stop
         if (-not [bool]$profile.Enabled) { return "Windows 防火墙状态：$profileName 配置文件已关闭（脚本未作任何修改）。" }
         return "Windows firewall: $profileName profile is enabled and may block inbound TCP 5173. A/C are loopback-only; do not open 8000 or 8011. Use the dedicated firewall tool only on a trusted network."
     } catch {
         return "Windows 防火墙状态：无法读取 $profileName 配置文件（$($_.Exception.Message)）；它仍可能阻断笔记本访问。脚本未修改任何规则。"
+    } finally {
+        if ($null -ne $job) { Remove-Job -Job $job -Force -ErrorAction SilentlyContinue }
     }
 }
 
@@ -602,8 +823,63 @@ function Test-ManagedServiceRunning($Config, [string]$Name, [int]$Port) {
     return Test-HttpOk (Get-ManagedServiceHealthUrl $Config $Name $Port)
 }
 
-function Get-ProcessMetadata([int]$Id) {
-    Get-CimInstance Win32_Process -Filter "ProcessId = $Id" -ErrorAction SilentlyContinue
+function Get-ProcessMetadata([int]$Id, [int]$TimeoutMilliseconds = 1500) {
+    if ($Id -le 0) { return $null }
+    $searcher = $null
+    $results = $null
+    try {
+        $options = [System.Management.EnumerationOptions]::new()
+        $options.ReturnImmediately = $true
+        $options.Rewindable = $false
+        $options.Timeout = [TimeSpan]::FromMilliseconds($TimeoutMilliseconds)
+        $scope = [System.Management.ManagementScope]::new('\\.\root\cimv2')
+        $query = [System.Management.ObjectQuery]::new("SELECT ProcessId,ParentProcessId,ExecutablePath,CommandLine,CreationDate FROM Win32_Process WHERE ProcessId = $Id")
+        $searcher = [System.Management.ManagementObjectSearcher]::new($scope, $query, $options)
+        $results = $searcher.Get()
+        $item = @($results | Select-Object -First 1)
+        if ($item.Count -eq 0) { return $null }
+        return [pscustomobject]@{
+            ProcessId = [int]$item[0].ProcessId
+            ParentProcessId = [int]$item[0].ParentProcessId
+            ExecutablePath = [string]$item[0].ExecutablePath
+            CommandLine = [string]$item[0].CommandLine
+            CreationDate = [string]$item[0].CreationDate
+        }
+    } catch {
+        return $null
+    } finally {
+        if ($null -ne $results) { $results.Dispose() }
+        if ($null -ne $searcher) { $searcher.Dispose() }
+    }
+}
+
+function Get-ProcessMetadataSnapshot([int]$TimeoutMilliseconds = 2000) {
+    $searcher = $null
+    $results = $null
+    try {
+        $options = [System.Management.EnumerationOptions]::new()
+        $options.ReturnImmediately = $true
+        $options.Rewindable = $false
+        $options.Timeout = [TimeSpan]::FromMilliseconds($TimeoutMilliseconds)
+        $scope = [System.Management.ManagementScope]::new('\\.\root\cimv2')
+        $query = [System.Management.ObjectQuery]::new('SELECT ProcessId,ParentProcessId,ExecutablePath,CommandLine,CreationDate FROM Win32_Process')
+        $searcher = [System.Management.ManagementObjectSearcher]::new($scope, $query, $options)
+        $results = $searcher.Get()
+        return @($results | ForEach-Object {
+            [pscustomobject]@{
+                ProcessId = [int]$_.ProcessId
+                ParentProcessId = [int]$_.ParentProcessId
+                ExecutablePath = [string]$_.ExecutablePath
+                CommandLine = [string]$_.CommandLine
+                CreationDate = [string]$_.CreationDate
+            }
+        })
+    } catch {
+        return @()
+    } finally {
+        if ($null -ne $results) { $results.Dispose() }
+        if ($null -ne $searcher) { $searcher.Dispose() }
+    }
 }
 
 function Test-ProcessDescendantOf([int]$ProcessId, [int]$AncestorProcessId) {
@@ -862,7 +1138,8 @@ function Update-AdminWebServiceRecord($Config, $Process) {
 }
 
 function Get-ProcessDescendantIds([int]$ProcessId) {
-    try { $allProcesses = @(Get-CimInstance Win32_Process -ErrorAction Stop) } catch { return @() }
+    $allProcesses = @(Get-ProcessMetadataSnapshot)
+    if ($allProcesses.Count -eq 0) { return @() }
     $queue = [Collections.Generic.Queue[int]]::new()
     $queue.Enqueue($ProcessId)
     $descendants = [Collections.Generic.List[int]]::new()
@@ -935,6 +1212,62 @@ function Assert-PortAvailable($Config, [string]$Name, [int]$Port) {
 }
 
 function Test-HttpOk([string]$Url) { try { $r = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3; return $r.StatusCode -ge 200 -and $r.StatusCode -lt 400 } catch { return $false } }
+
+function Get-ParallelHttpHealth([object[]]$Endpoints, [int]$TimeoutMilliseconds = 3000) {
+    if ($TimeoutMilliseconds -lt 100 -or $TimeoutMilliseconds -gt 30000) {
+        throw 'HTTP健康检查超时必须在100-30000毫秒之间。'
+    }
+    $pending = @()
+    foreach ($endpoint in @($Endpoints)) {
+        $request = [System.Net.HttpWebRequest]::Create([string]$endpoint.Url)
+        $request.Method = 'GET'
+        $request.Timeout = $TimeoutMilliseconds
+        $request.ReadWriteTimeout = $TimeoutMilliseconds
+        $pending += [pscustomobject]@{
+            Name = [string]$endpoint.Name
+            Url = [string]$endpoint.Url
+            Request = $request
+            Async = $request.BeginGetResponse($null, $null)
+        }
+    }
+
+    $results = @{}
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+    foreach ($probe in $pending) {
+        $response = $null
+        try {
+            $remainingMilliseconds = [Math]::Max(
+                0,
+                [int][Math]::Ceiling(($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+            )
+            if (-not $probe.Async.AsyncWaitHandle.WaitOne($remainingMilliseconds)) {
+                $probe.Request.Abort()
+                throw "${TimeoutMilliseconds}ms超时"
+            }
+            $response = $probe.Request.EndGetResponse($probe.Async)
+            $statusCode = [int]$response.StatusCode
+            $results[$probe.Name] = [pscustomobject]@{
+                Name = $probe.Name
+                Url = $probe.Url
+                Ok = ($statusCode -ge 200 -and $statusCode -lt 400)
+                StatusCode = $statusCode
+                Error = ''
+            }
+        } catch {
+            $results[$probe.Name] = [pscustomobject]@{
+                Name = $probe.Name
+                Url = $probe.Url
+                Ok = $false
+                StatusCode = 0
+                Error = $_.Exception.Message
+            }
+        } finally {
+            if ($null -ne $response) { $response.Dispose() }
+            $probe.Async.AsyncWaitHandle.Dispose()
+        }
+    }
+    return $results
+}
 function Wait-HttpOk([string]$Url, [int]$Seconds, [string]$Label) { for ($i=0; $i -lt $Seconds; $i++) { if (Test-HttpOk $Url) { return }; Start-Sleep -Seconds 1 }; throw "$Label 未在 $Seconds 秒内就绪：$Url。请查看运行日志。" }
 
 function Assert-AdminWebDependencies($Config) {
@@ -1014,7 +1347,7 @@ function Get-PlatformMigrationStatus($Config) {
     return "已迁移（revision $($revision | Select-Object -Last 1)）"
 }
 
-function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl) {
+function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUrl, $HealthProbe = $null) {
     $record = Test-RecordedProcess $Config $Name
     $runtimeIdentity = if ($record -and $record.Record) { Test-ManagedServiceRuntimeIdentity $Config $record.Record } else { $null }
     $serviceProcessId = if ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'managed_pid')) { [string]$record.Record.managed_pid } elseif ($record -and $record.Process) { [string]$record.Process.Id } else { '-' }
@@ -1022,9 +1355,9 @@ function Get-ServiceStatus($Config, [string]$Name, [int]$Port, [string]$HealthUr
     $portOwners = @(Get-PortOwner $Port)
     $ownsPort = $record -and $record.Valid -and (($record.ListenerProcess -and $portOwners.Count -eq 1 -and [int]$portOwners[0] -eq [int]$record.ListenerProcess.Id) -or ($record.Process -and $portOwners.Count -gt 0 -and @($portOwners | Where-Object { Test-ProcessDescendantOf $_ $record.Process.Id }).Count -eq $portOwners.Count))
     $serviceState = if ($ownsPort) { '运行中（RUNNING）' } elseif ($record -and $record.Valid) { '记录存在，未确认监听' } else { '未运行' }
-    $healthOk = Test-HttpOk $HealthUrl
+    $healthOk = if ($null -eq $HealthProbe) { Test-HttpOk $HealthUrl } else { [bool]$HealthProbe.Ok }
     $portState = if ($portOwners.Count -gt 0) { "监听（LISTENING；PID $($portOwners -join ', ')）" } elseif ($healthOk) { '监听（LISTENING；health 已确认；未能读取端口 PID）' } else { '未监听' }
-    $healthState = if ($healthOk) { '可用' } else { '不可用' }
+    $healthState = if ($healthOk) { '可用' } elseif ($null -ne $HealthProbe -and -not [string]::IsNullOrWhiteSpace([string]$HealthProbe.Error)) { "不可用（$($HealthProbe.Error)）" } else { '不可用（HTTP健康检查失败）' }
     $runtimeIdentityState = if ($null -eq $runtimeIdentity) { '未登记' } elseif ($runtimeIdentity.Valid) { '已验证' } else { '不一致' }
     $runtimeGitShortSha = if ($runtimeIdentity -and $runtimeIdentity.Current -and $runtimeIdentity.Current.GitSha) { $runtimeIdentity.Current.GitSha.Substring(0, 12) } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_git_sha') -and -not [string]::IsNullOrWhiteSpace([string]$record.Record.repository_git_sha)) { ([string]$record.Record.repository_git_sha).Substring(0, [Math]::Min(12, ([string]$record.Record.repository_git_sha).Length)) } else { '不可用' }
     $runtimeSourceState = if ($runtimeIdentity -and $runtimeIdentity.Current) { [string]$runtimeIdentity.Current.SourceState } elseif ($record -and $record.Record -and ($record.Record.PSObject.Properties.Name -contains 'repository_source_state')) { [string]$record.Record.repository_source_state } else { '不可用' }
@@ -1379,7 +1712,14 @@ function Start-ManagedService($Config, [string]$Name, [string]$ExecutablePath, [
 function Stop-ManagedService($Config, [string]$Name) {
     $path = Get-ServiceRecordPath $Config $Name
     if (-not (Test-Path -LiteralPath $path)) { Write-Host "$Name：没有本工具的运行记录。"; return }
-    $check = Test-RecordedProcess $Config $Name
+    $check = $null
+    foreach ($attempt in 1..2) {
+        $check = Test-RecordedProcess $Config $Name
+        if ($check.Valid -or (-not $check.Process -and -not $check.ListenerProcess) -or $attempt -eq 2) { break }
+        # A bounded WMI query may transiently time out on Windows. Retry once;
+        # never relax identity fields and never fall back to killing by port.
+        Start-Sleep -Milliseconds 250
+    }
     if (-not $check.Process -and -not $check.ListenerProcess) {
         $owners = @(Get-PortOwner ([int]$check.Record.port))
         if ($owners.Count -gt 0) { Write-Warning "$Name：记录的受管 PID 已退出，但端口仍由 PID $($owners -join ', ') 监听；拒绝清理记录或按端口停止。"; return }

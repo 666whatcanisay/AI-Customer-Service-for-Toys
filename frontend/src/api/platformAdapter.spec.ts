@@ -6,12 +6,23 @@ import {
   PlatformAdapterError
 } from './platformAdapter'
 
-const envelope = (items: unknown[], resultStatus: 'COMPLETE' | 'PARTIAL' = 'COMPLETE') => ({
+const warning = {
+  code: 'CUSTOMER_SERVICE_SOURCE_INVALID',
+  entity_type: 'PRODUCT',
+  count: 1,
+  message: '1 product source row was isolated.'
+}
+
+const envelope = (
+  items: unknown[],
+  resultStatus: 'COMPLETE' | 'PARTIAL' = 'COMPLETE',
+  warnings: unknown[] = []
+) => ({
   schema_version: 'pilot-business-catalog.v1.1',
   result_status: resultStatus,
   items,
   total: items.length,
-  warnings: []
+  warnings
 })
 
 const store = {
@@ -27,7 +38,7 @@ const store = {
 
 describe('platformAdapter Customer Available Catalog contract', () => {
   it('adapts the C-owned final Store, Product, and SKU projections', () => {
-    expect(adaptStoresResponse(envelope([store]))[0]).toMatchObject({
+    expect(adaptStoresResponse(envelope([store])).items[0]).toMatchObject({
       tenantId: 'TENANT-PDD-SM-TEST',
       storeCode: 'PDD-SM',
       dataSource: 'TEST',
@@ -48,7 +59,7 @@ describe('platformAdapter Customer Available Catalog contract', () => {
       knowledge_status: 'DRAFT',
       data_source: 'TEST',
       customer_service_status: 'ENABLED'
-    }]))[0]).toMatchObject({
+    }])).items[0]).toMatchObject({
       displayName: '测试积木套装',
       knowledgeStatus: 'DRAFT',
       customerServiceStatus: 'ENABLED'
@@ -67,11 +78,11 @@ describe('platformAdapter Customer Available Catalog contract', () => {
       component_sku_refs: [],
       data_source: 'TEST',
       customer_service_status: 'ENABLED'
-    }]))[0]).toMatchObject({ skuId: 'SKU-RED', componentSkuRefs: [] })
+    }])).items[0]).toMatchObject({ skuId: 'SKU-RED', componentSkuRefs: [] })
   })
 
   it('accepts the formalized INITIAL_IMPORT source without changing availability rules', () => {
-    expect(adaptStoresResponse(envelope([{ ...store, data_source: 'INITIAL_IMPORT' }]))[0])
+    expect(adaptStoresResponse(envelope([{ ...store, data_source: 'INITIAL_IMPORT' }])).items[0])
       .toMatchObject({
         dataSource: 'INITIAL_IMPORT',
         customerServiceStatus: 'ENABLED'
@@ -95,8 +106,62 @@ describe('platformAdapter Customer Available Catalog contract', () => {
       { ...store, store_code: '', store_name: '坏数据' }
     ], 'PARTIAL'))
 
-    expect(result).toHaveLength(1)
-    expect(result[0]?.storeCode).toBe('PDD-SM')
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]?.storeCode).toBe('PDD-SM')
+    expect(result.resultStatus).toBe('PARTIAL')
+    expect(result.total).toBe(2)
+  })
+
+  it('rejects a malformed item when C declares the envelope COMPLETE', () => {
+    expect(() => adaptStoresResponse(envelope([
+      store,
+      { ...store, store_code: '', store_name: '坏数据' }
+    ]))).toThrow('store_code')
+  })
+
+  it('preserves COMPLETE zero as an authoritative empty envelope', () => {
+    expect(adaptProductsResponse(envelope([]))).toEqual({
+      schemaVersion: 'pilot-business-catalog.v1.1',
+      resultStatus: 'COMPLETE',
+      items: [],
+      total: 0,
+      warnings: []
+    })
+  })
+
+  it('preserves PARTIAL zero and warning evidence instead of collapsing it to an empty list', () => {
+    const result = adaptProductsResponse(envelope([], 'PARTIAL', [warning]))
+
+    expect(result).toEqual({
+      schemaVersion: 'pilot-business-catalog.v1.1',
+      resultStatus: 'PARTIAL',
+      items: [],
+      total: 0,
+      warnings: [{
+        code: 'CUSTOMER_SERVICE_SOURCE_INVALID',
+        entityType: 'PRODUCT',
+        count: 1,
+        message: '1 product source row was isolated.'
+      }]
+    })
+  })
+
+  it('keeps valid PARTIAL items and warning evidence together', () => {
+    const result = adaptStoresResponse(envelope([store], 'PARTIAL', [{
+      ...warning,
+      entity_type: 'STORE'
+    }]))
+
+    expect(result.resultStatus).toBe('PARTIAL')
+    expect(result.items).toHaveLength(1)
+    expect(result.warnings[0]).toMatchObject({ entityType: 'STORE', count: 1 })
+  })
+
+  it('rejects an invalid warning instead of discarding its audit evidence', () => {
+    expect(() => adaptProductsResponse(envelope([], 'PARTIAL', [{
+      ...warning,
+      count: 0
+    }]))).toThrow('warning 字段 count')
   })
 
   it('surfaces a contract failure when every returned item is malformed', () => {

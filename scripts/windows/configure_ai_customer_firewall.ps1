@@ -6,7 +6,10 @@ $ErrorActionPreference = 'Stop'
 
 try {
     if (-not (Test-AICustomerServiceAdministrator)) { throw 'Administrator rights are required. Run the firewall configuration batch file as Administrator.' }
-    $config = Resolve-LanRuntimeConfig (Get-LocalConfig $ConfigPath)
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $baseConfig = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $baseConfig $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
+    $config = Resolve-LanRuntimeConfig $baseConfig
     if ([int]$config.CustomerWebPort -ne 5173) { throw "This safety tool only opens TCP 5173; CustomerWebPort is $($config.CustomerWebPort). No firewall rule was changed." }
     Write-Host "This will create/update exactly one Private inbound rule: TCP 5173, remote subnet $($config.LanSubnet)."
     Write-Host 'It will not open 8000 or 8011, disable the firewall, or change VPN/network settings.'

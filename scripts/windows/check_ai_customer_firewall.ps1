@@ -5,7 +5,10 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common_ai_customer_service.ps1')
 
 try {
-    $config = Resolve-LanRuntimeConfig (Get-LocalConfig $ConfigPath) $null $null -SkipPublicNetworkGuard
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $baseConfig = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $baseConfig $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
+    $config = Resolve-LanRuntimeConfig $baseConfig $null $null -SkipPublicNetworkGuard
     $rules = @(Get-AICustomerFirewallRules)
     Write-Host "Rule name: $(Get-AICustomerFirewallRuleName)"
     Write-Host "Customer URL: $($config.CustomerWebUrl)"

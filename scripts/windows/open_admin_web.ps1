@@ -8,7 +8,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common_ai_customer_service.ps1')
 
 try {
-    $config = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $config = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $config $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     $url = Open-AdminWeb $config -NoLaunch:$NoLaunch
     if ($NoLaunch) {
         Write-Host "管理后台可用：$url" -ForegroundColor Green

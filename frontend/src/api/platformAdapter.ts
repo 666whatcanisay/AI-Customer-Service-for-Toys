@@ -1,7 +1,10 @@
 import type {
+  CatalogEnvelope,
   CatalogProduct,
+  CatalogResultStatus,
   CatalogSku,
   CatalogStore,
+  CatalogWarning,
   PlatformHealth
 } from './platformTypes'
 
@@ -70,7 +73,36 @@ const stringList = (record: UnknownRecord, key: string): string[] => {
   return value
 }
 
-const listEnvelope = (payload: unknown, entity: string): UnknownRecord[] => {
+interface ProjectedEnvelope {
+  schemaVersion: 'pilot-business-catalog.v1.1'
+  resultStatus: CatalogResultStatus
+  records: UnknownRecord[]
+  total: number
+  warnings: CatalogWarning[]
+}
+
+const catalogWarning = (value: unknown): CatalogWarning => {
+  if (!isRecord(value)) {
+    throw new PlatformAdapterError('C 目录 warnings 包含无效记录')
+  }
+  const count = value.count
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) {
+    throw new PlatformAdapterError('C 目录 warning 字段 count 类型无效')
+  }
+  return {
+    code: requiredString(value, 'code', '目录 warning'),
+    entityType: requiredEnum(
+      value,
+      'entity_type',
+      '目录 warning',
+      ['STORE', 'PRODUCT', 'SKU'] as const
+    ),
+    count,
+    message: requiredString(value, 'message', '目录 warning')
+  }
+}
+
+const listEnvelope = (payload: unknown, entity: string): ProjectedEnvelope => {
   if (
     !isRecord(payload) ||
     payload.schema_version !== 'pilot-business-catalog.v1.1' ||
@@ -85,10 +117,17 @@ const listEnvelope = (payload: unknown, entity: string): UnknownRecord[] => {
       `C ${entity}接口必须返回 pilot-business-catalog.v1.1 envelope`
     )
   }
-  return payload.items.map((value) => {
+  const records = payload.items.map((value) => {
     if (!isRecord(value)) throw new PlatformAdapterError(`C ${entity}列表包含无效记录`)
     return value
   })
+  return {
+    schemaVersion: 'pilot-business-catalog.v1.1',
+    resultStatus: payload.result_status as CatalogResultStatus,
+    records,
+    total: payload.total,
+    warnings: payload.warnings.map(catalogWarning)
+  }
 }
 
 /**
@@ -101,11 +140,11 @@ const adaptProjectedItems = <T>(
   payload: unknown,
   entity: string,
   mapper: (record: UnknownRecord) => T
-): T[] => {
-  const records = listEnvelope(payload, entity)
+): CatalogEnvelope<T> => {
+  const envelope = listEnvelope(payload, entity)
   const items: T[] = []
   let firstError: PlatformAdapterError | null = null
-  for (const record of records) {
+  for (const record of envelope.records) {
     try {
       items.push(mapper(record))
     } catch (error) {
@@ -113,8 +152,15 @@ const adaptProjectedItems = <T>(
       if (firstError === null) firstError = error
     }
   }
-  if (records.length > 0 && items.length === 0 && firstError) throw firstError
-  return items
+  if (firstError && envelope.resultStatus === 'COMPLETE') throw firstError
+  if (envelope.records.length > 0 && items.length === 0 && firstError) throw firstError
+  return {
+    schemaVersion: envelope.schemaVersion,
+    resultStatus: envelope.resultStatus,
+    items,
+    total: envelope.total,
+    warnings: envelope.warnings
+  }
 }
 
 export const adaptPlatformHealth = (payload: unknown): PlatformHealth => {
@@ -125,7 +171,7 @@ export const adaptPlatformHealth = (payload: unknown): PlatformHealth => {
   }
 }
 
-export const adaptStoresResponse = (payload: unknown): CatalogStore[] =>
+export const adaptStoresResponse = (payload: unknown): CatalogEnvelope<CatalogStore> =>
   adaptProjectedItems(payload, '店铺', (value) => {
     const allowAutoSend = requiredBoolean(value, 'allow_auto_send', '店铺')
     if (allowAutoSend) throw new PlatformAdapterError('C 店铺记录违反禁止自动发送契约')
@@ -145,7 +191,7 @@ export const adaptStoresResponse = (payload: unknown): CatalogStore[] =>
     }
   })
 
-export const adaptProductsResponse = (payload: unknown): CatalogProduct[] =>
+export const adaptProductsResponse = (payload: unknown): CatalogEnvelope<CatalogProduct> =>
   adaptProjectedItems(payload, '商品', (value) => ({
     productId: requiredString(value, 'product_id', '商品'),
     platform: requiredString(value, 'platform', '商品'),
@@ -166,7 +212,7 @@ export const adaptProductsResponse = (payload: unknown): CatalogProduct[] =>
     )
   }))
 
-export const adaptSkusResponse = (payload: unknown): CatalogSku[] =>
+export const adaptSkusResponse = (payload: unknown): CatalogEnvelope<CatalogSku> =>
   adaptProjectedItems(payload, 'SKU', (value) => ({
     skuId: requiredString(value, 'sku_id', 'SKU'),
     productId: requiredString(value, 'product_id', 'SKU'),

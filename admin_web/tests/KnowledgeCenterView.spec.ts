@@ -50,15 +50,38 @@ describe('KnowledgeCenterView', () => {
     expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装')
     expect(wrapper.text()).toContain('Q66城市消防局机械积木玩具套装 → 豪华版')
     expect(wrapper.text()).toContain('80%AI 核心知识覆盖度')
-    expect(wrapper.text()).toContain('客服：已启用')
-    expect(wrapper.text()).toContain('AI知识：未生成')
+    expect(wrapper.text()).toContain('资料：已审核')
+    expect(wrapper.text()).toContain('客服：可用')
+    expect(wrapper.text()).toContain('AI知识：未发布')
+    expect(wrapper.text()).toContain('下一步发布 AI 知识')
+    expect(wrapper.find('.product-business-details').attributes('open')).toBeUndefined()
+    expect(wrapper.find('.product-technical-details').attributes('open')).toBeUndefined()
+    expect(wrapper.find('.product-technical-details').text()).toContain('知识片段0')
     expect(wrapper.text()).not.toContain('tenant_id')
+  })
+
+  it('explains loading and full-page failure states with a next action', async () => {
+    vi.mocked(getProductKnowledgeOverview).mockReturnValueOnce(new Promise(() => {}))
+    const loadingWrapper = mount(KnowledgeCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(loadingWrapper.get('[data-testid="knowledge-loading-state"]').text()).toContain('正在汇总商品知识')
+    expect(loadingWrapper.get('[data-testid="knowledge-loading-state"]').text()).toContain('下一步：')
+
+    vi.mocked(getProductKnowledgeOverview).mockRejectedValueOnce(new Error('知识接口连接失败'))
+    const errorWrapper = mount(KnowledgeCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(errorWrapper.get('[data-testid="knowledge-error-state"]').text()).toContain('商品知识暂时无法读取')
+    expect(errorWrapper.get('[data-testid="knowledge-error-state"]').text()).toContain('原因：暂时不可用')
+    expect(errorWrapper.get('[data-testid="knowledge-error-state"]').text()).toContain('重新读取')
   })
 
   it('batch enables approved products and exposes explicit AI publish action', async () => {
     const disabled = await listProductKnowledgeProducts()
     disabled.items[0].customer_service_status = 'DISABLED'
-    vi.mocked(listProductKnowledgeProducts).mockResolvedValue(disabled)
+    const enabled = {
+      ...disabled,
+      items: [{ ...disabled.items[0], customer_service_status: 'ENABLED' as const }],
+    }
+    vi.mocked(listProductKnowledgeProducts).mockResolvedValueOnce(disabled).mockResolvedValue(enabled)
     vi.mocked(enableProductsForCustomerService).mockResolvedValue({
       schema_version: 'pilot-business-catalog-batch-activation.v1', result_status: 'COMPLETE', target_status: 'ENABLED',
       items: [], changed_count: 1, unchanged_count: 0, failed_count: 0, server_time: '2026-07-31T00:00:00Z',
@@ -73,6 +96,7 @@ describe('KnowledgeCenterView', () => {
     const wrapper = mount(KnowledgeCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
     expect(wrapper.get('[data-testid="pending-enable-count"]').text()).toContain('当前待启用：1 个')
+    expect(wrapper.text()).toContain('下一步启用客服使用')
     await wrapper.get('[data-testid="knowledge-activation-operator"]').setValue('运营A')
     await wrapper.get('[data-testid="select-all-filtered-products"]').setValue(true)
     expect(wrapper.get('[data-testid="batch-enable-products"]').text()).toContain('批量启用客服（1）')
@@ -81,6 +105,7 @@ describe('KnowledgeCenterView', () => {
     expect(confirm).toHaveBeenCalledWith('确认启用当前选择的 1 个商品供客服使用？')
     expect(enableProductsForCustomerService).toHaveBeenCalledWith(['PRODUCT-Q66'], '运营A', expect.stringContaining('batch-enable-'))
     expect(wrapper.text()).toContain('客服工作台刷新目录后即可使用')
+    expect(wrapper.text()).toContain('下一步发布 AI 知识')
 
     await wrapper.get('[data-testid="publish-product-PRODUCT-Q66"]').trigger('click')
     await flushPromises()
@@ -99,5 +124,6 @@ describe('KnowledgeCenterView', () => {
 
     expect(wrapper.text().match(/暂无统计/g)).toHaveLength(5)
     expect(wrapper.text()).toContain('页面不会生成示例统计或虚构商品')
+    expect(wrapper.get('[data-testid="knowledge-empty-state"]').text()).toContain('下一步：')
   })
 })

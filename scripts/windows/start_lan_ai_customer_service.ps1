@@ -10,13 +10,15 @@ $ErrorActionPreference = 'Stop'
 $config = $null
 $startedServices = @()
 try {
-    $baseConfig = Get-LocalConfig $ConfigPath
+    $resolvedConfigPath = Resolve-AiCustomerServiceConfigPath $ConfigPath
+    $baseConfig = Get-LocalConfig $resolvedConfigPath
+    Assert-AiCsCanonicalRuntimeSource $baseConfig $resolvedConfigPath -RequireCanonicalRoot:([string]::IsNullOrWhiteSpace($ConfigPath))
     # This dedicated entry explicitly enables LAN mode without changing the local-mode entry or config file.
     $config = Resolve-LanRuntimeConfig $baseConfig
     $network = $config.LanNetworkProfile
 
     $selection = $config.LanSelection
-    $vpnRisk = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { ("$($_.Name) $($_.InterfaceDescription)") -match '(?i)(vpn|tun|tap|wireguard|tailscale|zerotier)' })
+    $vpnRisk = @(Get-LanVpnRiskAdapters)
     Write-Host "选择网卡：$($selection.InterfaceAlias)（$($selection.InterfaceDescription)）" -ForegroundColor Cyan
     Write-Host "IPv4：$($selection.IPAddress)；子网掩码：$($selection.SubnetMask)；默认网关：$($selection.DefaultGateway)；网段：$($config.LanSubnet)"
     Write-Host "网络配置类型：$($network.NetworkCategory)；检测到 VPN：$(if ($vpnRisk.Count -gt 0) { '是（' + (($vpnRisk | ForEach-Object { $_.Name }) -join '、') + '）' } else { '否' })"
@@ -27,6 +29,7 @@ try {
     Assert-RagVirtualEnvironment $config
     Assert-Dependencies $config
     Assert-AdminWebDependencies $config | Out-Null
+    Write-AiCsStartupPreflight $config $resolvedConfigPath
     $services = @(@{Name='platform';Port=$config.PlatformPort},@{Name='rag';Port=$config.RagPort},@{Name='customer-web';Port=$config.CustomerWebPort},@{Name='admin-web';Port=$config.AdminWebPort})
     Assert-ManagedRuntimeSourceConsistency $config $services
     $alreadyRunning = @($services | Where-Object { Test-ManagedServiceRunning $config $_.Name $_.Port })

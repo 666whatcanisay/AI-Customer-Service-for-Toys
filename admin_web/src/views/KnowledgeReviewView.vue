@@ -88,9 +88,9 @@ onMounted(load)
       <div>
         <p class="eyebrow">商品知识治理</p>
         <h1>知识审核队列</h1>
-        <p>审核“商品知识维护”提交的待审核资料；R009 Excel 导入仍在“资料上传与审核”页面处理。</p>
+        <p>审核“手工补充知识”提交的待审核资料；R009 Excel 导入仍在“资料上传与审核”页面处理。</p>
       </div>
-      <RouterLink class="button secondary" to="/knowledge-editor">返回商品知识维护</RouterLink>
+      <RouterLink class="button secondary" to="/knowledge-editor">返回手工补充知识</RouterLink>
     </div>
 
     <p class="notice boundary">审核通过只允许资料进入受控质量分析，不会直接写入 R009 正式商品字段，也不会自动发布 RAG、启用客服、修改 Prompt 或执行客户动作。</p>
