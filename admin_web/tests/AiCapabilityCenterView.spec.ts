@@ -29,12 +29,38 @@ describe('AiCapabilityCenterView', () => {
     const wrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('qwen3.5:9b')
-    expect(wrapper.text()).toContain('可查询 47 条知识片段')
-    expect(wrapper.text()).toContain('调用次数')
-    expect(wrapper.text()).toContain('暂无已保存评测')
+    expect(wrapper.text()).toContain('AI状态')
+    expect(wrapper.findAll('.summary-card').map((item) => item.text())).toEqual([
+      'AI 服务正常服务和回答模型均就绪时才显示正常。',
+      '知识47 条知识可检索仅代表 A 当前可查询知识，不代表资料已自动发布。',
+      '回答能力正常综合 AI 服务、模型配置和知识可检索状态。',
+      '需要关注无真实异常不会显示为正常或 0。',
+    ])
+    expect(wrapper.text()).toContain('业务可用说明')
+    expect(wrapper.text()).toContain('当前没有已保存评测')
+    expect(wrapper.get('[data-testid="ai-evaluation-empty-state"]').text()).toContain('下一步：查看已有评测记录')
     expect(wrapper.find('details').exists()).toBe(true)
     expect(wrapper.find('details').attributes('open')).toBeUndefined()
+    expect(wrapper.find('details').text()).toContain('高级技术信息')
+    expect(wrapper.find('details').text()).toContain('模型名称qwen3.5:9b')
+    expect(wrapper.find('details').text()).toContain('知识集合当前接口未提供集合名称')
+    expect(wrapper.find('details').text()).toContain('服务版本当前接口未提供')
+    expect(wrapper.find('details').text()).toContain('调用次数12')
     expect(wrapper.text()).not.toContain('自动修改 Prompt')
+  })
+
+  it('explains loading and failure states and provides recovery paths', async () => {
+    mockedOverview.mockReturnValueOnce(new Promise(() => {}))
+    const loadingWrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(loadingWrapper.get('[data-testid="ai-loading-state"]').text()).toContain('正在读取 AI 状态')
+    expect(loadingWrapper.get('[data-testid="ai-loading-state"]').text()).toContain('下一步：')
+
+    mockedOverview.mockRejectedValueOnce(new Error('offline'))
+    const errorWrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('AI 状态暂时无法读取')
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('AI 服务尚未就绪，请先检查服务状态。')
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('检查系统状态')
+    expect(errorWrapper.get('[data-testid="ai-error-state"]').text()).toContain('重新读取')
   })
 })

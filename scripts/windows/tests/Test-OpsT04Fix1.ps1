@@ -1,7 +1,8 @@
 ﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$testRoot = Join-Path ([IO.Path]::GetTempPath()) ("ops-t04-fix1-" + [Guid]::NewGuid().ToString('N'))
+$testSandboxRoot = Join-Path ([IO.Path]::GetTempPath()) ("ops-t04-fix1-" + [Guid]::NewGuid().ToString('N'))
+$testRoot = Join-Path $testSandboxRoot 'AI-CS'
 $configPath = Join-Path $testRoot 'config.local.ps1'
 $statusScript = Join-Path $PSScriptRoot '..\status_ai_customer_service.ps1'
 $startScript = Join-Path $PSScriptRoot '..\start_ai_customer_service.ps1'
@@ -113,5 +114,8 @@ try {
     Write-Host 'OPS-T04-FIX1 测试：PASS（状态未运行、仅 C、过期 PID、$PID 冲突、缺少 .runtime、缺少 A .venv 与语法）。' -ForegroundColor Green
 } finally {
     if ($fakeProcess -and -not $fakeProcess.HasExited) { Stop-Process -Id $fakeProcess.Id -Force -ErrorAction SilentlyContinue }
-    if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
+    if ((Test-Path -LiteralPath $testSandboxRoot) -and
+        (Split-Path -Parent $testSandboxRoot) -eq [IO.Path]::GetTempPath().TrimEnd([char]92)) {
+        Remove-Item -LiteralPath $testSandboxRoot -Recurse -Force
+    }
 }

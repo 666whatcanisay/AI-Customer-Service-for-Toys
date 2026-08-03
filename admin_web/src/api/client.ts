@@ -1553,13 +1553,13 @@ function nullableNumber(value: unknown): number | null {
 export function aiControlOverviewFromSuccessEnvelope(payload: unknown): AiControlCenterOverview {
   const envelope = recordOrEmpty(payload)
   if (envelope.success !== true) {
-    throw new Error('AI 控制中心未返回成功结果。')
+    throw new Error('AI状态未返回成功结果。')
   }
 
   const data = recordOrEmpty(envelope.data)
   const moduleId = nullableString(data.module_id)
   if (!moduleId) {
-    throw new Error('AI 控制中心返回的数据不符合已冻结接口。')
+    throw new Error('AI状态返回的数据不符合已冻结接口。')
   }
 
   const service = recordOrEmpty(data.service)

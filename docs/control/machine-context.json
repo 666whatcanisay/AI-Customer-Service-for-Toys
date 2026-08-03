@@ -4,9 +4,25 @@
   "line": "CONTROL",
   "version": "1.0.0",
   "status": "internal_production_ready",
-  "current_task": "AI-CS Production Finalization V1",
-  "current_stage": "AI-CS V1.0.0 code, database, contract, automated-test, browser and standard Runtime evidence are complete. The canonical identity is the ai-cs-v1.0.0 annotated tag.",
-  "current_gate": "AI_CS_INTERNAL_PRODUCTION_READY",
+  "current_task": "AI-CS Windows Runtime Script Alignment V1",
+  "current_stage": "The migrated AI-CS repository is the only Windows Runtime source. Legacy shortcuts are compatibility redirects, and the standard stop/start/status/LAN lifecycle has passed.",
+  "current_gate": "WINDOWS_RUNTIME_SCRIPT_ALIGNED_V1",
+  "windows_runtime_script_alignment_v1": {
+    "date": "2026-08-01",
+    "formal_repository": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
+    "implementation_branch": "codex/windows-runtime-script-alignment-v1",
+    "implementation_commits": ["443cce0", "a99bf70", "6f85892"],
+    "legacy_redirect_commits": ["fbcba20", "cd61f0c", "e35599d", "5f252f9"],
+    "standard_config": ".runtime/phase-e/config/green-standard.local.ps1",
+    "runtime_mode": "standard",
+    "network_mode": "LAN",
+    "services": {"B": 5173, "C_ADMIN": 5174, "A": 8000, "C_API": 8011},
+    "verification": "PowerShell syntax PASS; 10/10 OPS suites PASS; formal stop/start/status PASS; explicit LAN, legacy redirect, and real cmd.exe Chinese BAT PASS; all four HTTP endpoints 200.",
+    "database_revision": "0012_internal_production_finalization_v1",
+    "active_collection": "test_knowledge_v031",
+    "active_chunks": 56,
+    "report": "docs/control/AI-CS-Windows-Runtime-Script-Alignment-Report-V1.md"
+  },
   "production_finalization_v1": {
     "date": "2026-07-31",
     "branch": "release/ai-cs-v1.0.0",
@@ -101,8 +117,8 @@
     "network_mode": "LAN",
     "config_resolution": [
       "explicit -ConfigPath",
-      "scripts/windows/config.local.ps1",
-      ".runtime/phase-e/config/green-standard.local.ps1"
+      ".runtime/phase-e/config/green-standard.local.ps1",
+      "scripts/windows/config.local.ps1 (legacy fallback only)"
     ],
     "network_mode_preference": ".runtime/phase-e/green-standard/network-mode.preference.json",
     "network_mode_preference_schema": "ai-cs-runtime-network-mode.v1",
@@ -396,5 +412,5 @@
     "R009 is accepted only in an isolated 0009 runtime. Formal production remains at 0008 and no RAG publication or B consumption is implied.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
   ],
-  "last_updated": "2026-07-31"
+  "last_updated": "2026-08-01"
 }

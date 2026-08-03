@@ -115,6 +115,30 @@ const sku = {
   customerServiceStatus: 'ENABLED' as const
 }
 
+const catalogEnvelope = <T,>(
+  items: T[],
+  resultStatus: 'COMPLETE' | 'PARTIAL' = 'COMPLETE',
+  warnings: Array<{
+    code: string
+    entityType: 'STORE' | 'PRODUCT' | 'SKU'
+    count: number
+    message: string
+  }> = []
+) => ({
+  schemaVersion: 'pilot-business-catalog.v1.1' as const,
+  resultStatus,
+  items,
+  total: items.length,
+  warnings
+})
+
+const partialWarning = (entityType: 'STORE' | 'PRODUCT' | 'SKU') => ({
+  code: 'CUSTOMER_SERVICE_SOURCE_INVALID',
+  entityType,
+  count: 1,
+  message: 'One source row was isolated.'
+})
+
 const resultFor = (action: RagAction = 'DIRECT_ANSWER', withSku = true): RagChatResult => ({
   requestId: 'req-ui-1',
   model: 'qwen-turbo',
@@ -213,13 +237,13 @@ describe('AiChat B-T04 three-step workbench', () => {
     window.localStorage.clear()
     apiMocks.getRagHealth.mockResolvedValue({ status: 'ok', ready: true })
     apiMocks.getPlatformHealth.mockResolvedValue({ status: 'ok', service: 'platform' })
-    apiMocks.listStores.mockResolvedValue([store, secondStore])
+    apiMocks.listStores.mockResolvedValue(catalogEnvelope([store, secondStore]))
     apiMocks.listProducts.mockImplementation((selectedStore) =>
-      Promise.resolve(selectedStore.storeCode === 'PDD-SM-2'
+      Promise.resolve(catalogEnvelope(selectedStore.storeCode === 'PDD-SM-2'
         ? secondStoreProducts
-        : [product, secondProduct])
+        : [product, secondProduct]))
     )
-    apiMocks.listSkus.mockResolvedValue([sku])
+    apiMocks.listSkus.mockResolvedValue(catalogEnvelope([sku]))
     apiMocks.getCustomerKnowledgeStatus.mockResolvedValue({
       productId: 'PROD-001',
       status: 'PUBLISHED',
@@ -401,9 +425,9 @@ describe('AiChat B-T04 three-step workbench', () => {
     await selectAt(wrapper, 2, 'SKU-RED')
 
     apiMocks.listProducts.mockImplementation((selectedStore) =>
-      Promise.resolve(selectedStore.storeCode === 'PDD-SM-2'
+      Promise.resolve(catalogEnvelope(selectedStore.storeCode === 'PDD-SM-2'
         ? secondStoreProducts
-        : [product, secondProduct, newlyEnabledProduct])
+        : [product, secondProduct, newlyEnabledProduct]))
     )
     const callsBeforeFocus = apiMocks.listProducts.mock.calls.length
 
@@ -441,7 +465,7 @@ describe('AiChat B-T04 three-step workbench', () => {
   })
 
   it('keeps a no-product catalog state recoverable without allowing a context-free shortcut', async () => {
-    apiMocks.listProducts.mockResolvedValue([])
+    apiMocks.listProducts.mockResolvedValue(catalogEnvelope([]))
     const wrapper = mountPage()
     await flushPromises()
 
@@ -450,6 +474,41 @@ describe('AiChat B-T04 three-step workbench', () => {
     )
     expect(wrapper.get('[data-testid="catalog-refresh-button"]').text()).toContain('刷新商品目录')
     expect(wrapper.get('[data-testid="store-scope-note"]').text()).toContain('切换店铺会清空商品、SKU 和当前建议')
+  })
+
+  it('treats PARTIAL zero as a catalog failure instead of an authoritative empty store list', async () => {
+    apiMocks.listStores.mockResolvedValue(catalogEnvelope(
+      [],
+      'PARTIAL',
+      [partialWarning('STORE')]
+    ))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const guidance = wrapper.get('[data-testid="catalog-guidance"]')
+    expect(guidance.text()).toContain('商品目录暂时异常，请联系运营处理。')
+    expect(guidance.text()).not.toContain('暂无可用测试店铺')
+    expect(wrapper.findComponent({ name: 'ElSelect' }).props('noDataText')).toBe(
+      '商品目录暂时异常，请联系运营处理。'
+    )
+  })
+
+  it('shows valid PARTIAL products and a non-blocking partial-catalog warning', async () => {
+    apiMocks.listProducts.mockResolvedValue(catalogEnvelope(
+      [product],
+      'PARTIAL',
+      [partialWarning('PRODUCT')]
+    ))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const guidance = wrapper.get('[data-testid="catalog-guidance"]')
+    expect(guidance.text()).toContain('商品目录部分异常')
+    expect(guidance.text()).toContain('已显示有效商品')
+    const productSelect = wrapper.findAllComponents({ name: 'ElSelect' })[1]
+    expect(productSelect?.findAllComponents({ name: 'ElOption' }).some(
+      (option) => option.props('value') === 'PROD-001'
+    )).toBe(true)
   })
 
   it('clears product and SKU on store switch, and clears SKU on product switch', async () => {

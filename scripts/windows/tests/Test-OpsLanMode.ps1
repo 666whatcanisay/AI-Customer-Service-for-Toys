@@ -47,7 +47,7 @@ LanAddress = 'auto'; PreferredInterfaceAlias = ''; EnableLanMode = `$false
     function Get-NetAdapter { [pscustomobject]@{ Status='Up'; Name='Ethernet'; InterfaceDescription='Physical Ethernet'; ifIndex=77; HardwareInterface=$true } }
     function Get-NetIPConfiguration { [pscustomobject]@{ IPv4DefaultGateway=[pscustomobject]@{ NextHop='10.77.0.1' } } }
     function Get-NetIPAddress { [pscustomobject]@{ IPAddress='10.77.0.20'; PrefixLength=24 } }
-    $singleGatewayCandidates = @(Get-LanIpv4Candidates)
+    $singleGatewayCandidates = @(Get-LanIpv4Candidates -UseLegacyPowerShellDiscovery)
     if ($singleGatewayCandidates.Count -ne 1 -or $singleGatewayCandidates[0].DefaultGateway -ne '10.77.0.1') { throw 'A single default gateway must produce one LAN candidate.' }
 
     $wifi = New-LanCandidate '192.168.1.20' 'Wi-Fi' 17; $ethernet = New-LanCandidate '10.20.30.40' 'Ethernet' 9; $privateProfile = New-NetworkProfile 'Private'

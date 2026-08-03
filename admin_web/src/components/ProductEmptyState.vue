@@ -18,7 +18,7 @@ withDefaults(defineProps<{
   actionLabel?: string
   to?: string
 }>(), {
-  actionLabel: '返回运营首页',
+  actionLabel: '返回运营工作台',
   to: '/overview'
 })
 </script>

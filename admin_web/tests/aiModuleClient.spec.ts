@@ -86,6 +86,6 @@ describe('listAiModules', () => {
 
   it('treats a failed overview envelope as an error, never as empty operational data', async () => {
     aiGet.mockResolvedValue({ data: { success: false, data: {} } })
-    await expect(getAiControlCenterOverview()).rejects.toThrow('AI 控制中心未返回成功结果')
+    await expect(getAiControlCenterOverview()).rejects.toThrow('AI状态未返回成功结果')
   })
 })

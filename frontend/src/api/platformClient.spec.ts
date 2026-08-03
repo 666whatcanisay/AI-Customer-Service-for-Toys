@@ -58,9 +58,9 @@ describe('platformClient frozen paths', () => {
   })
 
   it('calls only the three C-owned customer-service catalog routes', async () => {
-    await platformClient.listStores()
-    await platformClient.listProducts(store)
-    await platformClient.listSkus(store, product)
+    const stores = await platformClient.listStores()
+    const products = await platformClient.listProducts(store)
+    const skus = await platformClient.listSkus(store, product)
 
     expect(httpGet.mock.calls).toEqual([
       ['/api/v1/customer-service/catalog/stores', { signal: undefined }],
@@ -69,6 +69,29 @@ describe('platformClient frozen paths', () => {
         { signal: undefined, params: { store_code: 'PDD-SM' } }
       ],
       ['/api/v1/customer-service/catalog/products/PROD%2F001/skus', { signal: undefined }]
+    ])
+    expect([stores, products, skus]).toEqual([
+      {
+        schemaVersion: 'pilot-business-catalog.v1.1',
+        resultStatus: 'COMPLETE',
+        items: [],
+        total: 0,
+        warnings: []
+      },
+      {
+        schemaVersion: 'pilot-business-catalog.v1.1',
+        resultStatus: 'COMPLETE',
+        items: [],
+        total: 0,
+        warnings: []
+      },
+      {
+        schemaVersion: 'pilot-business-catalog.v1.1',
+        resultStatus: 'COMPLETE',
+        items: [],
+        total: 0,
+        warnings: []
+      }
     ])
   })
 })
