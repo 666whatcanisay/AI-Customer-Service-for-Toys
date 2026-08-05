@@ -54,6 +54,21 @@ try {
     if ($runtimeEnvironment.ContainsKey('GATEWAY_HMAC_SECRET')) { throw 'Plaintext Gateway secret must never enter unified runtime config.' }
     if ($runtimeEnvironment.AI_CS_SERVER_RUNTIME_MODE -ne 'standard') { throw 'Runtime mode was not propagated.' }
     Assert-AiCsGatewayProductionConfig $config | Out-Null
+
+    # The formal secret reference lives below the ignored .runtime tree. This
+    # must work in Windows PowerShell 5.1, which lacks Path.GetRelativePath.
+    $repositorySecretRoot = Join-Path $repositoryRoot ".runtime\ops-gateway-runtime-$([Guid]::NewGuid().ToString('N'))"
+    $repositorySecretPath = Join-Path $repositorySecretRoot 'gateway-hmac.secret'
+    New-Item -ItemType Directory -Force -Path $repositorySecretRoot | Out-Null
+    try {
+        [IO.File]::WriteAllText($repositorySecretPath, ('r' * 32), [Text.UTF8Encoding]::new($false))
+        $config.GatewaySecretReference = $repositorySecretPath
+        Assert-AiCsGatewayProductionConfig $config | Out-Null
+    } finally {
+        $config.GatewaySecretReference = $secretPath
+        Remove-Item -LiteralPath $repositorySecretRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $headers = New-AiCsGatewayAuthHeaders $config 'GET' '/gateway/v1/health'
     foreach ($header in @('Authorization','X-AI-CS-Contract-Version','X-AI-CS-Timestamp','X-AI-CS-Nonce','X-AI-CS-Content-SHA256','X-Request-ID','X-Correlation-ID','Idempotency-Key')) {
         if ([string]::IsNullOrWhiteSpace([string]$headers[$header])) { throw "Missing signed health header: $header" }

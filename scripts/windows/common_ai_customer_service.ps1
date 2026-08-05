@@ -405,7 +405,10 @@ function Assert-AiCsGatewayProductionConfig($Config) {
     $secretPath = [IO.Path]::GetFullPath([string]$Config.GatewaySecretReference)
     $repositoryPrefix = $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     if ($secretPath.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        $relativeSecretPath = [IO.Path]::GetRelativePath($repositoryRoot, $secretPath).Replace('\', '/')
+        # Windows PowerShell 5.1 runs on .NET Framework, where
+        # System.IO.Path.GetRelativePath is unavailable. The prefix check above
+        # already proves that this path is a descendant of RepositoryRoot.
+        $relativeSecretPath = $secretPath.Substring($repositoryPrefix.Length).Replace('\', '/')
         $tracked = @(& git -C $repositoryRoot ls-files -- $relativeSecretPath 2>$null)
         if ($LASTEXITCODE -ne 0) { throw '无法验证 Gateway secret reference 的 Git 状态。' }
         if ($tracked.Count -gt 0) { throw 'Gateway secret reference 指向 Git 已跟踪文件；Production Runtime 拒绝启动。' }
