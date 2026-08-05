@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`AI_CS_SERVER_RC_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`AI_CS_SERVER_RELEASE_CANDIDATE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
 
 ## 1. 台账目标
 
@@ -102,10 +102,11 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 商品知识导入实现、浏览器验收和0009能力已保留至当前0012运行链，R010未改变其逻辑。 |
 | R010 | AI-CS Production Finalization V1 | `DONE` | Control、OPS、A/B/C、QA、contracts | AI-CS V1.0.0正式文案、来源正式化、测试入口隔离、contracts 0.5.0、0012与全量回归完成。 |
 | R011 | AI-CS Gateway Server Foundation V1 | `DONE` | A、contracts、Control、QA | 独立`/gateway/v1` Decision/Health、HMAC、严格Contract、ErrorEnvelope与持久化幂等已完成；B和`/api/chat`不变，未连接生产Channel Engine。 |
-| R012 | AI-CS Gateway Source Baseline V1 | `DONE` | A、contracts、Control、QA | Gateway Candidate已完成Production/Deferred/Experimental分类、职责与文件冻结、contracts 0.6复核及R006/R009回归；保护锚点未改写，尚未部署或连接生产。 |
-| R013 | AI-CS Production Server Runtime RC V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | Production wrapper、file-reference secret、签名Health Gate、Server Runtime Console与全量回归完成；仍未commit/deploy或连接生产Engine/PDD。 |
+| R012 | AI-CS Gateway Source Baseline V1 | `DONE` | A、contracts、Control、QA | Gateway Candidate已完成Production/Deferred/Experimental分类、职责与文件冻结、contracts 0.6复核及R006/R009回归；保护锚点未改写，后由R014受控提交。 |
+| R013 | AI-CS Production Server Runtime RC V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | Production wrapper、file-reference secret、签名Health Gate、Server Runtime Console与全量回归完成；源码已由R014提交，仍未部署或连接生产Engine/PDD。 |
+| R014 | AI-CS Server Release Candidate Stabilization V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | R011–R013 dirty Candidate已精确提交；clean SHA完成Windows start/status/Decision/Console/stop，未连接生产Engine/PDD。 |
 
-状态数量：`DONE=10`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计13项。
+状态数量：`DONE=11`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计14项。
 
 ## 6. 需求明细
 
@@ -368,6 +369,21 @@ R006.2不改变R006业务模型，只补齐已经打开页面对激活变化的�
 | 验收证据 | [Task Card](product-management/AI-CS-Production-Server-Runtime-RC-V1-Task-Card.md)与[RC Report](../rag/AI-CS-Production-Server-Runtime-RC-Report-V1.md)：A 138/3 skipped、专项36、C定向25、Admin76、OPS11/11、contracts7、17 schemas valid。 |
 | 防止重复错误规则 | 不得把Server RC误报为已部署/已生产连接；不得提交secret/SQLite/log/runtime record；不得让浏览器持有Gateway secret或直接调用HMAC Health；Receipt/Event/Execution继续延后。 |
 
+### R014 — AI-CS Server Release Candidate Stabilization V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R014 |
+| 提出时间 | 2026-08-05 |
+| 需求名称 | AI-CS Server Release Candidate Stabilization V1 |
+| 用户原始目标 | 解决 Windows Deployment Validation 对 dirty source 的拒绝，将 Server Candidate 固化为可验证 Release Candidate。 |
+| 当前状态 | `DONE` |
+| 负责模块 | A/OPS：源码提交与 Runtime；C Admin：Console验证；contracts：冻结完整性；Control/QA：manifest、身份、测试与Gate。 |
+| 影响范围 | 精确提交 R011–R013 Gateway/Wrapper/Console/Contract/Test/Docs；修复 PowerShell 5.1 preflight；不改 R006/R009、RAG、Prompt、B、数据库或 Gateway Contract。 |
+| 完成标准 | cached diff 无敏感/运行资产；保护锚点为祖先；Git clean；同一 clean SHA 的 BAT start、status、Health、Decision、Console、stop 全部通过。 |
+| 验收证据 | [Task Card](product-management/AI-CS-Server-Release-Candidate-Stabilization-V1-Task-Card.md)与[Stabilization Report](../rag/AI-CS-Server-Release-Candidate-Stabilization-Report-V1.md)：source `6ae8d407...`、code RC `4b6c0bd0...`；A 138/3 skipped、C定向25、Admin76、OPS11/11、contracts7、17 schemas；真实 Runtime identity与四端口stop PASS。 |
+| 防止重复错误规则 | 不得再把已提交的R011–R013称为dirty Candidate；不得把本机验证secret、clean commit或本地运行等同于生产secret管理、远端发布、TLS或生产Engine联通。 |
+
 ## 7. 历史错误防复发规则
 
 1. 不要重复开发已经完成的模块。先检索需求 ID、验收证据和关联代码；`DONE` 能力只允许登记回归、修复或明确的新目标。
@@ -407,4 +423,4 @@ R006、R006.1、R006.2能力已纳入V1.0.0内部生产正式基线。发布分�
 
 R008物理迁移和标准端口切换已完成：`AI-CS/`是唯一正式运行与后续开发目录，Recovery仅保留为回滚锚点。旧Worktree是否退役仍须按独立归档计划逐一确认，不能因R008完成而批量删除。R008结果不替代R003/R005业务验收，也不授权R006。
 
-当前Gate：`AI_CS_INTERNAL_PRODUCTION_READY`。A/B/C/Admin全量回归、四服务正式版本、Admin与B浏览器验收、数据库和RAG保护证据通过；`BUG-B-001`为`FIXED_VERIFIED_PRODUCTION_SMOKE`。R003、R005、R007保持原状态。当前origin是本地历史保护仓库，没有远端发布声明。
+当前Gate：`AI_CS_SERVER_RELEASE_CANDIDATE_READY / AI_CS_INTERNAL_PRODUCTION_READY`。Server RC已形成clean本地提交并通过Windows Runtime Gate；尚未push/tag/deploy或连接生产Engine。R003、R005、R007保持原状态。当前origin是本地历史保护仓库，没有远端发布声明。

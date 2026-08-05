@@ -16,9 +16,9 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 
 本地 `origin` 是历史保护仓库，本版本没有声明已经推送到远端或完成远端发布。
 
-## 当前开发增量：R011 Gateway Server Foundation
+## 当前 Release Candidate：R014 Production Server Stabilization
 
-当前开发分支已新增默认关闭的`/gateway/v1`源码Foundation，并将仓库源码contracts增量提升为`0.6.0`；正式V1.0.0 Runtime仍是上节记录的contracts 0.5.0，尚未部署或连接生产Channel Engine。B客服继续使用`/api/chat`。启用Gateway前必须另做TLS、运行时secret托管、ACL、ingress限制与非生产集成Gate；详见[`docs/rag/AI-CS-Gateway-Server-Foundation-V1.md`](docs/rag/AI-CS-Gateway-Server-Foundation-V1.md)。
+当前分支已将 R011–R013 Server Candidate 固化为 clean Release Candidate `4b6c0bd09de2cca25ae1cb2ca2af76da4455217b`。Gateway wire 保持 `1.0`，repository contracts 为 additive `0.7.0`；Windows `start_ai_cs_server.bat` 已在同一 clean SHA 上完成 Core、Gateway、B、Operations Console 与 C API 的 start/status/Decision/stop 验证。B 客服继续使用 `/api/chat`，未连接生产 Channel Engine/PDD。详见 [`AI-CS Server Release Candidate Stabilization Report V1`](docs/rag/AI-CS-Server-Release-Candidate-Stabilization-Report-V1.md)。
 
 ## 四项服务
 
@@ -42,6 +42,14 @@ cd C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS
 ```
 
 启动、停止和状态脚本保持 R008 运行方式，不因 V1.0.0 正式化而改名或改入口。
+
+Gateway Production Server RC 使用独立 wrapper；正式 config 必须显式启用 Gateway，并只引用 Git ignored 的 UTF-8 单行 secret 文件：
+
+```powershell
+.\scripts\windows\start_ai_cs_server.bat -NoBrowser -Mode Local
+.\scripts\windows\status_ai_cs_server.ps1 -Mode Local
+.\scripts\windows\stop_ai_cs_server.ps1
+```
 
 ## 已验证状态
 
