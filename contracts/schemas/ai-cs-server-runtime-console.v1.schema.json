@@ -74,6 +74,15 @@
         "runtime_mode": {
           "title": "Runtime Mode",
           "type": "string"
+        },
+        "network_mode": {
+          "default": "LOCAL",
+          "enum": [
+            "LOCAL",
+            "LAN"
+          ],
+          "title": "Network Mode",
+          "type": "string"
         }
       },
       "required": [

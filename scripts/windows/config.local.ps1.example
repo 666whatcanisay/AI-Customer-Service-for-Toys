@@ -2,7 +2,7 @@
     # 发布运行角色与网络暴露分离。正式端口使用 standard；影子环境使用 shadow。
     RuntimeMode = 'standard'
     RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-    # Server Runtime configuration. Core and Gateway share BindAddress/RagPort.
+    # A Core always stays on BindAddress/RagPort. LAN Gateway uses a separate edge.
     GatewayEnabled = $false
     GatewayClientId = 'channel-engine'
     GatewayKeyId = 'gateway-key-v1'
@@ -13,6 +13,13 @@
     GatewayNonceTtlSeconds = 600
     GatewayDecisionRetentionSeconds = 604800
     GatewayDecisionLeaseSeconds = 30
+    # Gateway LAN edge: explicit private adapter address or auto; never 0.0.0.0.
+    GatewayLanBindAddress = 'auto'
+    GatewayLanPort = 18080
+    # auto resolves to the selected physical adapter subnet. Explicit entries
+    # must be canonical RFC1918 CIDRs contained by that subnet.
+    GatewayAllowedNetworks = @('auto')
+    GatewayUpstreamTimeoutSeconds = 180
     RagPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\.venv\Scripts\python.exe')
     PlatformPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'platform_backend\.venv\Scripts\python.exe')
     PnpmCommand = 'pnpm.cmd'

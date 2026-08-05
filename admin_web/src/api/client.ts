@@ -13,6 +13,7 @@ export interface ServerRuntimeResponse {
     status: 'READY' | 'STARTING' | 'UNHEALTHY'
     version: string
     runtime_mode: string
+    network_mode?: 'LOCAL' | 'LAN'
   }
   gateway: {
     enabled: boolean

@@ -13,6 +13,9 @@ wire `1.0`. Channel Engine clients continue to use only authenticated
   Gateway enablement/state/version/Contract version/configuration state.
 - C Admin consumes the projection only on the existing local `/ai-api` proxy
   and displays it on the read-only System Status page.
+- `server.network_mode` is optional for compatibility with 0.7.0 producers;
+  consumers default an absent value to `LOCAL`. Current 0.8.0 producers emit
+  `LOCAL` or `LAN`.
 - B does not call this route. `/api/chat`, the B customer workflow and customer
   catalog behavior are unchanged.
 - The response excludes credentials, secret references, filesystem/database
@@ -25,7 +28,7 @@ wire `1.0`. Channel Engine clients continue to use only authenticated
 
 | Line | Effect | Review result |
 | --- | --- | --- |
-| A | New read-only projection; no model/RAG/Prompt call and no business write | Compatible |
+| A | Adds one operator-safe network-mode fact; no model/RAG/Prompt call and no business write | Compatible |
 | B | No consumer or route semantic change | Unaffected |
-| C | System Status adds a typed read-only consumer; R006/R009 pages unchanged | Compatible |
+| C | System Status displays the optional fact and defaults older responses to LOCAL; R006/R009 pages unchanged | Compatible |
 | Gateway Contract V1 | Production routes, objects, HMAC and canonical SHA unchanged | Unaffected |

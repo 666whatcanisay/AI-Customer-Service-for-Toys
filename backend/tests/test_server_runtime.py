@@ -37,6 +37,7 @@ def test_server_runtime_console_reports_disabled_gateway_without_sensitive_data(
             "status": "READY",
             "version": "ai-cs-server-runtime.rc1",
             "runtime_mode": "standard",
+            "network_mode": "LOCAL",
         },
         "gateway": {
             "enabled": False,

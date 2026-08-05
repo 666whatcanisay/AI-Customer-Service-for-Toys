@@ -84,6 +84,11 @@ function Get-LocalConfig([string]$ConfigPath) {
         GatewayNonceTtlSeconds = 600
         GatewayDecisionRetentionSeconds = 604800
         GatewayDecisionLeaseSeconds = 30
+        # The Core stays on loopback. LAN mode uses a separate allowlisted edge.
+        GatewayLanBindAddress = 'auto'
+        GatewayLanPort = 18080
+        GatewayAllowedNetworks = @('auto')
+        GatewayUpstreamTimeoutSeconds = 180
         OllamaBaseUrl = 'http://127.0.0.1:11434'
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
@@ -143,12 +148,12 @@ function Get-LocalConfig([string]$ConfigPath) {
         throw 'RuntimeMode 只允许 standard、shadow 或 recovery。'
     }
     $config.RuntimeMode = $runtimeMode
-    foreach ($name in @('RagPort','CustomerWebPort','PlatformPort','AdminWebPort')) {
+    foreach ($name in @('RagPort','CustomerWebPort','PlatformPort','AdminWebPort','GatewayLanPort')) {
         $port = 0
         if (-not [int]::TryParse([string]$config[$name], [ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw "$name 必须为 1-65535 的端口。" }
         $config[$name] = $port
     }
-    if ((@($config.RagPort,$config.CustomerWebPort,$config.PlatformPort,$config.AdminWebPort) | Select-Object -Unique).Count -ne 4) { throw '四个服务端口必须不同。' }
+    if ((@($config.RagPort,$config.CustomerWebPort,$config.PlatformPort,$config.AdminWebPort,$config.GatewayLanPort) | Select-Object -Unique).Count -ne 5) { throw '五个受管服务端口必须不同。' }
     foreach ($pathKey in @('RagPythonPath','PlatformPythonPath')) { if (-not (Test-Path -LiteralPath $config[$pathKey])) { throw "$pathKey 不存在：$($config[$pathKey])" } }
     if (-not (Get-Command $config.PnpmCommand -ErrorAction SilentlyContinue) -and -not (Test-Path -LiteralPath $config.PnpmCommand)) { throw "PnpmCommand 不可用：$($config.PnpmCommand)" }
     if (@($config.CorsAllowedOrigins).Count -eq 0) { throw 'CorsAllowedOrigins 至少要有一个来源。' }
@@ -189,7 +194,7 @@ function Get-LocalConfig([string]$ConfigPath) {
             throw 'AdminEnableLanMode=false 时 AdminWebUrl 必须是本机回环地址。'
         }
     }
-    foreach ($key in @('GatewayClockSkewSeconds','GatewayNonceTtlSeconds','GatewayDecisionRetentionSeconds','GatewayDecisionLeaseSeconds')) {
+    foreach ($key in @('GatewayClockSkewSeconds','GatewayNonceTtlSeconds','GatewayDecisionRetentionSeconds','GatewayDecisionLeaseSeconds','GatewayUpstreamTimeoutSeconds')) {
         $value = 0
         if (-not [int]::TryParse([string]$config[$key], [ref]$value) -or $value -lt 1) {
             throw "$key 必须为正整数。"
@@ -198,6 +203,18 @@ function Get-LocalConfig([string]$ConfigPath) {
     }
     if ([string]$config.GatewayClientId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') { throw 'GatewayClientId 格式无效。' }
     if ([string]$config.GatewayKeyId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') { throw 'GatewayKeyId 格式无效。' }
+    $gatewayLanBindAddress = ([string]$config.GatewayLanBindAddress).Trim()
+    if ($gatewayLanBindAddress -ne 'auto' -and -not (Test-PrivateLanIpv4 $gatewayLanBindAddress)) {
+        throw 'GatewayLanBindAddress 必须为 auto 或 RFC1918 私有 IPv4；禁止通配符、回环和公网地址。'
+    }
+    $config.GatewayLanBindAddress = $gatewayLanBindAddress
+    $gatewayAllowedNetworks = @($config.GatewayAllowedNetworks | ForEach-Object { ([string]$_).Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    if ($gatewayAllowedNetworks.Count -eq 0) { throw 'GatewayAllowedNetworks 至少需要一个私有 CIDR，或仅填写 auto。' }
+    if ($gatewayAllowedNetworks -contains 'auto' -and $gatewayAllowedNetworks.Count -ne 1) { throw 'GatewayAllowedNetworks=auto 不能与显式 CIDR 混用。' }
+    foreach ($network in $gatewayAllowedNetworks) {
+        if ($network -ne 'auto' -and -not (Test-PrivateLanCidr $network)) { throw "GatewayAllowedNetworks 仅允许规范 RFC1918 CIDR：$network" }
+    }
+    $config.GatewayAllowedNetworks = $gatewayAllowedNetworks
     $runtimeDirectory = [IO.Path]::GetFullPath([string]$config.RuntimeDirectory)
     $runtimePrefix = $runtimeDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     if ([string]::IsNullOrWhiteSpace([string]$config.GatewayStatePath)) {
@@ -400,7 +417,9 @@ function Assert-AiCsGatewayProductionConfig($Config) {
         throw 'Production Server Runtime 只允许 standard、shadow 或 recovery。'
     }
     Get-AiCsGatewaySecretBytes $Config | Out-Null
-    if ([string]::IsNullOrWhiteSpace([string]$Config.BindAddress)) { throw 'Production Server Runtime 缺少 BindAddress。' }
+    if ([string]$Config.BindAddress -notin @('127.0.0.1','localhost')) {
+        throw 'Production Server Runtime 要求 A Core BindAddress 保持回环；LAN Gateway 必须使用独立受控入口。'
+    }
     $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
     $secretPath = [IO.Path]::GetFullPath([string]$Config.GatewaySecretReference)
     $repositoryPrefix = $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
@@ -420,7 +439,8 @@ function Get-AiCsGatewayRuntimeHealth($Config) {
     Assert-AiCsGatewayProductionConfig $Config | Out-Null
     $path = '/gateway/v1/health'
     $headers = New-AiCsGatewayAuthHeaders $Config 'GET' $path
-    $health = Invoke-RestMethod -UseBasicParsing -Method Get -Uri (Get-ServiceUrl $Config ([int]$Config.RagPort) $path) -Headers $headers -TimeoutSec 5
+    $origin = if ($Config.ContainsKey('GatewayEndpointOrigin') -and -not [string]::IsNullOrWhiteSpace([string]$Config.GatewayEndpointOrigin)) { [string]$Config.GatewayEndpointOrigin } else { Get-ServiceUrl $Config ([int]$Config.RagPort) '' }
+    $health = Invoke-RestMethod -UseBasicParsing -Method Get -Uri "$($origin.TrimEnd('/'))$path" -Headers $headers -TimeoutSec 5
     if ([string]$health.contract_version -ne (Get-AiCsGatewayContractVersion)) { throw 'Gateway health contract_version 不匹配。' }
     if ([string]::IsNullOrWhiteSpace([string]$health.version)) { throw 'Gateway health 缺少 version。' }
     if ([string]$health.status -notin @('HEALTHY','UNHEALTHY')) { throw "Gateway health 状态无效：$($health.status)" }
@@ -454,6 +474,59 @@ function Test-PrivateLanIpv4([string]$Address) {
     if ($bytes[0] -eq 10) { return $true }
     if ($bytes[0] -eq 172 -and $bytes[1] -ge 16 -and $bytes[1] -le 31) { return $true }
     return $bytes[0] -eq 192 -and $bytes[1] -eq 168
+}
+
+function ConvertTo-Ipv4UInt64([string]$Address) {
+    $parsed = $null
+    if (-not [System.Net.IPAddress]::TryParse($Address, [ref]$parsed) -or $parsed.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+        throw "无效 IPv4 地址：$Address"
+    }
+    $bytes = $parsed.GetAddressBytes()
+    return [uint64](([uint64]$bytes[0] * 16777216) + ([uint64]$bytes[1] * 65536) + ([uint64]$bytes[2] * 256) + [uint64]$bytes[3])
+}
+
+function Get-Ipv4CidrRange([string]$Cidr) {
+    $parts = $Cidr.Split('/')
+    $prefix = 0
+    if ($parts.Count -ne 2 -or -not [int]::TryParse($parts[1], [ref]$prefix) -or $prefix -lt 1 -or $prefix -gt 30) {
+        throw "无效 IPv4 CIDR：$Cidr"
+    }
+    $addressValue = ConvertTo-Ipv4UInt64 $parts[0]
+    $hostCount = [uint64][Math]::Pow(2, 32 - $prefix)
+    $mask = [uint64](4294967296 - $hostCount)
+    $networkValue = [uint64]($addressValue -band $mask)
+    if ($addressValue -ne $networkValue) { throw "CIDR 必须使用规范网络地址：$Cidr" }
+    return [pscustomobject]@{ Network=$networkValue; Broadcast=([uint64]($networkValue + $hostCount - 1)); PrefixLength=$prefix }
+}
+
+function Test-PrivateLanCidr([string]$Cidr) {
+    try {
+        $range = Get-Ipv4CidrRange $Cidr
+        $address = $Cidr.Split('/')[0]
+        if (-not (Test-PrivateLanIpv4 $address)) { return $false }
+        $privateRanges = @(
+            Get-Ipv4CidrRange '10.0.0.0/8'
+            Get-Ipv4CidrRange '172.16.0.0/12'
+            Get-Ipv4CidrRange '192.168.0.0/16'
+        )
+        return @($privateRanges | Where-Object { $range.Network -ge $_.Network -and $range.Broadcast -le $_.Broadcast }).Count -eq 1
+    } catch { return $false }
+}
+
+function Test-Ipv4InCidr([string]$Address, [string]$Cidr) {
+    try {
+        $value = ConvertTo-Ipv4UInt64 $Address
+        $range = Get-Ipv4CidrRange $Cidr
+        return $value -ge $range.Network -and $value -le $range.Broadcast
+    } catch { return $false }
+}
+
+function Test-Ipv4CidrWithin([string]$CandidateCidr, [string]$ParentCidr) {
+    try {
+        $candidate = Get-Ipv4CidrRange $CandidateCidr
+        $parent = Get-Ipv4CidrRange $ParentCidr
+        return $candidate.Network -ge $parent.Network -and $candidate.Broadcast -le $parent.Broadcast
+    } catch { return $false }
 }
 
 function Test-LanAdapterEligible($Adapter) {
@@ -728,6 +801,42 @@ function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfil
     return $lanConfig
 }
 
+function Resolve-AiCsGatewayNetworkConfig($Config, [ValidateSet('LOCAL','LAN')] [string]$NetworkMode, [object[]]$Candidates = $null, $NetworkProfile = $null) {
+    $gatewayConfig = @{}
+    foreach ($entry in $Config.GetEnumerator()) { $gatewayConfig[$entry.Key] = $entry.Value }
+    if ($NetworkMode -eq 'LOCAL') {
+        $gatewayConfig.LanMode = $false
+        $gatewayConfig.EnableLanMode = $false
+        $gatewayConfig.GatewayNetworkMode = 'LOCAL'
+        $gatewayConfig.GatewayEndpointOrigin = "http://127.0.0.1:$($gatewayConfig.RagPort)"
+        $gatewayConfig.GatewayLanBindAddressResolved = '127.0.0.1'
+        $gatewayConfig.GatewayAllowedNetworksResolved = @()
+        return $gatewayConfig
+    }
+
+    $lanConfig = Resolve-LanRuntimeConfig $Config $Candidates $NetworkProfile
+    if ([string]$lanConfig.LanNetworkProfile.NetworkCategory -ne 'Private') {
+        throw 'Gateway LAN 模式仅允许 Windows Private 网络；Unknown/Public 均拒绝启动，且不会修改网络配置。'
+    }
+    $selectedAddress = [string]$lanConfig.LanSelection.IPAddress
+    $configuredBind = [string]$lanConfig.GatewayLanBindAddress
+    if ($configuredBind -ne 'auto' -and $configuredBind -ne $selectedAddress) {
+        throw "GatewayLanBindAddress=$configuredBind 与选定物理网卡地址 $selectedAddress 不一致。"
+    }
+    $allowedNetworks = if (@($lanConfig.GatewayAllowedNetworks) -contains 'auto') { @([string]$lanConfig.LanSubnet) } else { @($lanConfig.GatewayAllowedNetworks) }
+    foreach ($network in $allowedNetworks) {
+        if (-not (Test-PrivateLanCidr ([string]$network)) -or -not (Test-Ipv4CidrWithin ([string]$network) ([string]$lanConfig.LanSubnet))) {
+            throw "Gateway allowed network 必须位于当前物理网卡子网 $($lanConfig.LanSubnet) 内：$network"
+        }
+    }
+    $lanConfig.GatewayNetworkMode = 'LAN'
+    $lanConfig.GatewayLanBindAddressResolved = $selectedAddress
+    $lanConfig.GatewayAllowedNetworksResolved = @($allowedNetworks)
+    $lanConfig.GatewayEndpointOrigin = "http://${selectedAddress}:$($lanConfig.GatewayLanPort)"
+    $lanConfig.GatewayUpstreamOrigin = "http://127.0.0.1:$($lanConfig.RagPort)"
+    return $lanConfig
+}
+
 function Resolve-LanStatusRuntimeConfig($Config) {
     $recordPath = Get-ServiceRecordPath $Config 'customer-web'
     if (Test-Path -LiteralPath $recordPath -PathType Leaf) {
@@ -823,6 +932,7 @@ function Get-RagRuntimeEnvironment($Config, [string]$CorsAllowedOrigins) {
         TEST_KNOWLEDGE_COLLECTION_NAME = [string]$Config.RagActiveCollectionName
         ACTIVE_COLLECTION_NAME = [string]$Config.RagActiveCollectionName
         AI_CS_SERVER_RUNTIME_MODE = Get-ConfiguredRuntimeMode $Config
+        AI_CS_SERVER_NETWORK_MODE = Get-ConfiguredNetworkMode $Config
         GATEWAY_ENABLED = ([bool]$Config.GatewayEnabled).ToString().ToLowerInvariant()
         GATEWAY_CLIENT_ID = [string]$Config.GatewayClientId
         GATEWAY_KEY_ID = [string]$Config.GatewayKeyId
@@ -932,6 +1042,118 @@ function Get-AICustomerFirewallRules {
     return @(Get-NetFirewallRule -DisplayName (Get-AICustomerFirewallRuleName) -ErrorAction SilentlyContinue)
 }
 
+function Test-AiCsGatewayLanServiceRunning($Config) {
+    $record = Test-RecordedProcess $Config 'gateway-lan'
+    if (-not $record -or -not $record.Valid) { return $false }
+    $runtimeIdentity = Test-ManagedServiceRuntimeIdentity $Config $record.Record
+    if (-not $runtimeIdentity.Valid) { return $false }
+    $listeners = @(Get-TcpListeningConnection ([int]$Config.GatewayLanPort))
+    if ($listeners.Count -ne 1 -or [string]$listeners[0].LocalAddress -ne [string]$Config.GatewayLanBindAddressResolved) { return $false }
+    try { return [string](Get-AiCsGatewayRuntimeHealth $Config).status -eq 'HEALTHY' } catch { return $false }
+}
+
+function Start-AiCsGatewayLanService($Config) {
+    if ([string]$Config.GatewayNetworkMode -ne 'LAN') { throw 'Gateway LAN edge 只能在 LAN 模式启动。' }
+    Assert-AiCsGatewayLanFirewallReady $Config | Out-Null
+    if (Test-AiCsGatewayLanServiceRunning $Config) { return }
+    Assert-PortAvailable $Config 'gateway-lan' ([int]$Config.GatewayLanPort)
+    $arguments = @(
+        '-m','app.gateway.lan_proxy',
+        '--bind-address',[string]$Config.GatewayLanBindAddressResolved,
+        '--port',[string]$Config.GatewayLanPort,
+        '--interface-network',[string]$Config.LanSubnet,
+        '--upstream-origin',[string]$Config.GatewayUpstreamOrigin,
+        '--upstream-timeout-seconds',[string]$Config.GatewayUpstreamTimeoutSeconds
+    )
+    foreach ($network in @($Config.GatewayAllowedNetworksResolved)) { $arguments += @('--allowed-network',[string]$network) }
+    Start-ManagedServiceWithEnvironment $Config 'gateway-lan' $Config.RagPythonPath $arguments (Join-Path $Config.RepositoryRoot 'backend') 'app.gateway.lan_proxy' ([int]$Config.GatewayLanPort) @{} | Out-Null
+    try {
+        Wait-AiCsGatewayRuntimeReady $Config 45 | Out-Null
+        Update-ManagedServiceListenerRecord $Config 'gateway-lan' | Out-Null
+    } catch {
+        try { Stop-ManagedService $Config 'gateway-lan' } catch { Write-Warning "Gateway LAN startup cleanup failed: $($_.Exception.Message)" }
+        throw
+    }
+}
+
+function Get-AiCsGatewayLanServiceStatus($Config) {
+    $probe = [pscustomobject]@{ Ok=$false; Error='signed Gateway health failed' }
+    try {
+        $health = Get-AiCsGatewayRuntimeHealth $Config
+        $probe = [pscustomobject]@{ Ok=([string]$health.status -eq 'HEALTHY'); Error='' }
+    } catch { }
+    return Get-ServiceStatus $Config 'gateway-lan' ([int]$Config.GatewayLanPort) (Get-ManagedServiceHealthUrl $Config 'gateway-lan' ([int]$Config.GatewayLanPort)) $probe
+}
+
+function Get-AiCsGatewayFirewallRuleName($Config) { return "AI-CS Gateway LAN $($Config.GatewayLanPort) (Private)" }
+
+function Get-AiCsGatewayFirewallRuleDetails($Config) {
+    $rules = @(Get-NetFirewallRule -DisplayName (Get-AiCsGatewayFirewallRuleName $Config) -ErrorAction SilentlyContinue)
+    return @($rules | ForEach-Object {
+        $portFilter = Get-NetFirewallPortFilter -AssociatedNetFirewallRule $_ -ErrorAction Stop
+        $addressFilter = Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $_ -ErrorAction Stop
+        [pscustomobject]@{
+            Enabled = [string]$_.Enabled
+            Direction = [string]$_.Direction
+            Action = [string]$_.Action
+            Profile = [string]$_.Profile
+            Protocol = [string]$portFilter.Protocol
+            LocalPort = @($portFilter.LocalPort)
+            LocalAddress = @($addressFilter.LocalAddress)
+            RemoteAddress = @($addressFilter.RemoteAddress)
+        }
+    })
+}
+
+function Test-StringSetEqual([object[]]$Actual, [object[]]$Expected) {
+    $actualValues = @($Actual | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
+    $expectedValues = @($Expected | ForEach-Object { ([string]$_).Trim() } | Sort-Object -Unique)
+    if ($actualValues.Count -ne $expectedValues.Count) { return $false }
+    return (@(Compare-Object -ReferenceObject $expectedValues -DifferenceObject $actualValues -CaseSensitive).Count -eq 0)
+}
+
+function ConvertTo-CanonicalFirewallCidr([string]$Address) {
+    $value = $Address.Trim()
+    if ($value -match '^([^/]+)/([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)$') {
+        try {
+            $prefix = Get-Ipv4PrefixLengthFromMask ([System.Net.IPAddress]::Parse($Matches[2]))
+            return "$($Matches[1])/$prefix"
+        } catch { return $value }
+    }
+    return $value
+}
+
+function Get-AiCsGatewayLanFirewallReadiness($Config, [scriptblock]$RuleProvider = $null) {
+    $expectedName = Get-AiCsGatewayFirewallRuleName $Config
+    $expectedNetworks = @($Config.GatewayAllowedNetworksResolved)
+    $expectedAddress = [string]$Config.GatewayLanBindAddressResolved
+    $rules = @(if ($RuleProvider) { & $RuleProvider } else { Get-AiCsGatewayFirewallRuleDetails $Config })
+    if ($rules.Count -eq 0) {
+        return [pscustomobject]@{ Ready=$false; State='MISSING'; RuleName=$expectedName; BindAddress=$expectedAddress; Port=[int]$Config.GatewayLanPort; AllowedNetworks=$expectedNetworks }
+    }
+    if ($rules.Count -ne 1) {
+        return [pscustomobject]@{ Ready=$false; State='AMBIGUOUS'; RuleName=$expectedName; BindAddress=$expectedAddress; Port=[int]$Config.GatewayLanPort; AllowedNetworks=$expectedNetworks }
+    }
+    $rule = $rules[0]
+    $protocolOk = [string]$rule.Protocol -in @('TCP','6')
+    $portOk = Test-StringSetEqual @($rule.LocalPort) @([string]$Config.GatewayLanPort)
+    $localAddressOk = Test-StringSetEqual @($rule.LocalAddress) @($expectedAddress)
+    $normalizedRemoteAddresses = @($rule.RemoteAddress | ForEach-Object { ConvertTo-CanonicalFirewallCidr ([string]$_) })
+    $remoteAddressOk = Test-StringSetEqual $normalizedRemoteAddresses $expectedNetworks
+    $metadataOk = [string]$rule.Enabled -eq 'True' -and [string]$rule.Direction -eq 'Inbound' -and [string]$rule.Action -eq 'Allow' -and [string]$rule.Profile -eq 'Private'
+    $ready = $metadataOk -and $protocolOk -and $portOk -and $localAddressOk -and $remoteAddressOk
+    $state = if ($ready) { 'READY' } elseif (-not $metadataOk) { 'RULE_POLICY_MISMATCH' } elseif (-not $protocolOk -or -not $portOk) { 'RULE_PORT_MISMATCH' } elseif (-not $localAddressOk) { 'RULE_LOCAL_ADDRESS_MISMATCH' } else { 'RULE_REMOTE_NETWORK_MISMATCH' }
+    return [pscustomobject]@{ Ready=$ready; State=$state; RuleName=$expectedName; BindAddress=$expectedAddress; Port=[int]$Config.GatewayLanPort; AllowedNetworks=$expectedNetworks }
+}
+
+function Assert-AiCsGatewayLanFirewallReady($Config, [scriptblock]$RuleProvider = $null) {
+    $readiness = Get-AiCsGatewayLanFirewallReadiness $Config $RuleProvider
+    if (-not $readiness.Ready) {
+        throw "Gateway LAN 防火墙 Gate=$($readiness.State)。需要启用的 Private 入站规则：$($readiness.RuleName)，TCP $($readiness.BindAddress):$($readiness.Port)，Remote=$($readiness.AllowedNetworks -join ',')。脚本不会关闭或自动修改 Windows 防火墙；请先运行 check_ai_cs_gateway_firewall.ps1 并由管理员显式配置。"
+    }
+    return $readiness
+}
+
 function Test-AICustomerServiceAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -962,6 +1184,10 @@ function Get-ManagedServiceHealthUrl($Config, [string]$Name, [int]$FallbackPort 
         if ($adminBindAddress -in @('0.0.0.0', '::', '')) { $adminBindAddress = '127.0.0.1' }
         return "http://${adminBindAddress}:$port/"
     }
+    if ($Name -eq 'gateway-lan') {
+        $origin = if ($Config.ContainsKey('GatewayEndpointOrigin')) { [string]$Config.GatewayEndpointOrigin } else { "http://127.0.0.1:$FallbackPort" }
+        return "$($origin.TrimEnd('/'))/gateway/v1/health"
+    }
     # Test helpers may register a deliberately unknown service name to verify
     # that a tampered record cannot stop it. Its record still needs a harmless
     # loopback URL; normal launchers only use the three standard names above.
@@ -969,6 +1195,10 @@ function Get-ManagedServiceHealthUrl($Config, [string]$Name, [int]$FallbackPort 
 }
 
 function Get-ManagedServiceExpectedListenerAddress($Config, [string]$Name, [int]$Port) {
+    if ($Name -eq 'gateway-lan') {
+        $address = if ($Config.ContainsKey('GatewayLanBindAddressResolved')) { [string]$Config.GatewayLanBindAddressResolved } else { [string]$Config.GatewayLanBindAddress }
+        return "${address}:$Port"
+    }
     if ($Name -eq 'admin-web') {
         $address = if ($Config.ContainsKey('AdminWebBindAddress')) { [string]$Config.AdminWebBindAddress } else { '127.0.0.1' }
         return "${address}:$Port"

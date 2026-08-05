@@ -32,6 +32,7 @@ class ServerRuntimeSummary(_RuntimeModel):
     status: ServerRuntimeState
     version: Literal[SERVER_RUNTIME_VERSION]
     runtime_mode: str
+    network_mode: Literal["LOCAL", "LAN"] = "LOCAL"
 
 
 class GatewayRuntimeSummary(_RuntimeModel):
@@ -91,6 +92,7 @@ def server_runtime_console_snapshot(application: Any) -> ServerRuntimeConsoleSna
             status=server_status,
             version=SERVER_RUNTIME_VERSION,
             runtime_mode=settings.server_runtime_mode,
+            network_mode=settings.server_network_mode,
         ),
         gateway=GatewayRuntimeSummary(
             enabled=gateway_enabled,

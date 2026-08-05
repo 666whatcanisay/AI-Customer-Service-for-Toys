@@ -4,7 +4,7 @@ This directory is jointly owned by all three development lines. Schemas are the
 versioned compatibility boundary; do not make breaking changes without updating
 `version.json`, `CHANGELOG.md`, and the compatibility notes in the pull request.
 
-Current additive baseline: `0.7.0`. Customer-service catalog consumers must use
+Current additive baseline: `0.8.0`. Customer-service catalog consumers must use
 the C-owned `pilot-business-catalog.v1.1` projection and must not derive
 availability from legacy test or publication fields.
 
@@ -40,3 +40,9 @@ versions, runtime mode and the frozen Gateway Contract version. It never
 contains a credential, secret reference, state path or request content. This
 additive console contract does not change Gateway wire `1.0`, `/api/chat`, or
 any B/C business contract.
+
+`0.8.0` adds the optional `server.network_mode` (`LOCAL` or `LAN`, default
+`LOCAL`) to that read-only Console projection. It reports the selected runtime
+exposure mode without disclosing a bind address, allowed CIDR, credential or
+secret reference. The frozen Gateway wire schema and Contract `1.0` are
+unchanged.

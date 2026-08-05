@@ -20,6 +20,7 @@ const serverRuntime = {
     status: 'READY' as const,
     version: 'ai-cs-server-runtime.rc1',
     runtime_mode: 'standard',
+    network_mode: 'LAN' as const,
   },
   gateway: {
     enabled: true,
@@ -57,6 +58,7 @@ describe('SystemStatusView', () => {
     expect(wrapper.get('[data-testid="server-runtime-status"]').text()).toContain('READY')
     expect(wrapper.get('[data-testid="server-runtime-status"]').text()).toContain('HEALTHY')
     expect(wrapper.get('[data-testid="server-runtime-status"]').text()).toContain('1.0')
+    expect(wrapper.get('[data-testid="server-runtime-status"]').text()).toContain('LAN')
   })
 
   it('shows the offline state when no server response is available', async () => {

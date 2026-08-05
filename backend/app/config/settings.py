@@ -54,6 +54,13 @@ def _normalize_server_runtime_mode(value: str | None) -> str:
     return mode
 
 
+def _normalize_server_network_mode(value: str | None) -> str:
+    mode = (value or "LOCAL").strip().upper()
+    if mode not in {"LOCAL", "LAN"}:
+        raise ValueError("AI_CS_SERVER_NETWORK_MODE must be LOCAL or LAN")
+    return mode
+
+
 def _read_single_line_secret(path: Path) -> bytes:
     try:
         secret_text = path.read_text(encoding="utf-8")
@@ -217,6 +224,7 @@ class Settings:
     host: str
     port: int
     server_runtime_mode: str = "standard"
+    server_network_mode: str = "LOCAL"
     gateway_enabled: bool = False
     gateway_client_id: str = "channel-engine"
     gateway_key_id: str = "gateway-key-v1"
@@ -331,6 +339,9 @@ class Settings:
             port=int(os.getenv("PORT", "8000")),
             server_runtime_mode=_normalize_server_runtime_mode(
                 os.getenv("AI_CS_SERVER_RUNTIME_MODE")
+            ),
+            server_network_mode=_normalize_server_network_mode(
+                os.getenv("AI_CS_SERVER_NETWORK_MODE")
             ),
             gateway_enabled=_as_bool(os.getenv("GATEWAY_ENABLED"), False),
             gateway_client_id=os.getenv(

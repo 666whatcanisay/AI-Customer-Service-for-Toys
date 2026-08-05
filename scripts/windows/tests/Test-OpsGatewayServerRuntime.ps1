@@ -53,6 +53,7 @@ try {
     if ($runtimeEnvironment.GATEWAY_HMAC_SECRET_FILE -ne $secretPath) { throw 'Gateway secret reference was not propagated.' }
     if ($runtimeEnvironment.ContainsKey('GATEWAY_HMAC_SECRET')) { throw 'Plaintext Gateway secret must never enter unified runtime config.' }
     if ($runtimeEnvironment.AI_CS_SERVER_RUNTIME_MODE -ne 'standard') { throw 'Runtime mode was not propagated.' }
+    if ($runtimeEnvironment.AI_CS_SERVER_NETWORK_MODE -ne 'LOCAL') { throw 'Network mode was not propagated.' }
     Assert-AiCsGatewayProductionConfig $config | Out-Null
 
     # The formal secret reference lives below the ignored .runtime tree. This
@@ -99,11 +100,16 @@ try {
     }
     @'
 function Resolve-AiCustomerServiceConfigPath([string]$ConfigPath) { return $ConfigPath }
-function Get-LocalConfig([string]$ConfigPath) { return @{ AdminWebUrl='http://127.0.0.1:5174/' } }
+function Get-LocalConfig([string]$ConfigPath) { return @{ AdminWebUrl='http://127.0.0.1:5174/'; RuntimeDirectory=$PSScriptRoot } }
 function Assert-AiCsGatewayProductionConfig($Config) { return $true }
+function Assert-AiCsCanonicalRuntimeSource($Config,[string]$ResolvedConfigPath,[switch]$RequireCanonicalRoot) { return }
+function Resolve-StandardRuntimeNetworkMode($Config,[string]$Mode) { if ($Mode -eq 'Lan') { return 'LAN' } else { return 'LOCAL' } }
+function Resolve-AiCsGatewayNetworkConfig($Config,[string]$NetworkMode) { $Config.GatewayNetworkMode=$NetworkMode; $Config.GatewayEndpointOrigin='http://127.0.0.1:8000'; return $Config }
+function Get-ServiceRecordPath($Config,[string]$Name) { return (Join-Path $Config.RuntimeDirectory "$Name.json") }
+function Stop-ManagedService($Config,[string]$Name) { "$Name" | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'gateway-stop.marker') }
 function Wait-AiCsGatewayRuntimeReady($Config, [int]$Seconds) { return [pscustomobject]@{ status='HEALTHY'; version='ai-cs-gateway.v1'; contract_version='1.0' } }
 function Get-AiCsGatewayRuntimeHealth($Config) { return [pscustomobject]@{ status='HEALTHY'; version='ai-cs-gateway.v1'; contract_version='1.0' } }
-function Get-AiCsServerRuntimeConsole($Config) { return [pscustomobject]@{ server=[pscustomobject]@{ status='READY'; version='ai-cs-server-runtime.rc1'; runtime_mode='standard' }; gateway=[pscustomobject]@{ configuration_state='CONFIGURED' } } }
+function Get-AiCsServerRuntimeConsole($Config) { return [pscustomobject]@{ server=[pscustomobject]@{ status='READY'; version='ai-cs-server-runtime.rc1'; runtime_mode='standard'; network_mode='LOCAL' }; gateway=[pscustomobject]@{ configuration_state='CONFIGURED' } } }
 '@ | Set-Content -LiteralPath (Join-Path $fixtureRoot 'common_ai_customer_service.ps1') -Encoding UTF8
     @'
 param([string]$ConfigPath,[switch]$NoBrowser,[string]$Mode)
@@ -124,6 +130,7 @@ param([string]$ConfigPath)
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'status.marker'))) { throw 'Production status wrapper delegation failed.' }
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixtureRoot 'stop_ai_cs_server.ps1') -ConfigPath 'fixture.ps1' | Out-Null
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'stop.marker'))) { throw 'Production stop wrapper delegation failed.' }
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'gateway-stop.marker'))) { throw 'Production stop wrapper did not stop the LAN edge first.' }
 
     Write-Host 'OPS Gateway Server Runtime lifecycle checks: PASS'
 } finally {

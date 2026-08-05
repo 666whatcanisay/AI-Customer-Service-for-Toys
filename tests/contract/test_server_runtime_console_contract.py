@@ -17,6 +17,10 @@ def test_server_runtime_console_contract_is_strict_additive_projection() -> None
     assert schema["additionalProperties"] is False
     assert definitions["ServerRuntimeSummary"]["additionalProperties"] is False
     assert definitions["GatewayRuntimeSummary"]["additionalProperties"] is False
+    network_mode = definitions["ServerRuntimeSummary"]["properties"]["network_mode"]
+    assert network_mode["enum"] == ["LOCAL", "LAN"]
+    assert network_mode["default"] == "LOCAL"
+    assert "network_mode" not in definitions["ServerRuntimeSummary"]["required"]
     gateway = definitions["GatewayRuntimeSummary"]["properties"]
     assert gateway["contract_version"]["const"] == "1.0"
     assert gateway["version"]["const"] == "ai-cs-gateway.v1"

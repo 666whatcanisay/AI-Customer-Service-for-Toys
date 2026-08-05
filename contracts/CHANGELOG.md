@@ -1,5 +1,16 @@
 # Contract changelog
 
+## 0.8.0 - 2026-08-05
+
+- Added optional `server.network_mode` (`LOCAL` or `LAN`, default `LOCAL`) to
+  the read-only `ai-cs.server-runtime-console.v1` projection so Operations can
+  see the active Gateway exposure mode.
+- No bind address, allowed network, firewall detail, credential, secret
+  reference or request content is added to the shared response.
+- This is additive over 0.7.0. Frozen Gateway wire `1.0`, its canonical schema,
+  HMAC/nonce/timestamp/signature rules, `/api/chat`, R006/R009 and all business
+  contracts are unchanged.
+
 ## 0.7.0 - 2026-08-05
 
 - Added the read-only `ai-cs.server-runtime-console.v1` schema consumed by the

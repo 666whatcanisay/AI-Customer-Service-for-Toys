@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 from app.config.settings import Settings
@@ -22,6 +23,7 @@ from app.gateway.contract import (
     MAX_DECISION_BODY_BYTES,
 )
 from app.gateway.service import GatewayRuntimeConfig, GatewayServer
+from app.gateway.lan_proxy import GatewayLanProxyConfig, create_gateway_lan_proxy_app
 from app.gateway.store import DecisionClaimState, GatewayStateStore
 from app.main import create_app
 
@@ -196,6 +198,77 @@ def test_gateway_decision_returns_contract_response_and_required_approval(
     assert payload["requires_approval"] is True
     assert payload["proposed_content"]
     assert payload["metadata"]["source_count"] == 1
+
+
+def test_gateway_lan_edge_preserves_hmac_decision_and_idempotency(
+    gateway_harness,
+) -> None:
+    core_client, _, _ = gateway_harness
+
+    def upstream(request: httpx.Request) -> httpx.Response:
+        response = core_client.request(
+            request.method,
+            request.url.path,
+            content=request.content,
+            headers=dict(request.headers),
+        )
+        return httpx.Response(
+            response.status_code,
+            content=response.content,
+            headers=dict(response.headers),
+        )
+
+    proxy_config = GatewayLanProxyConfig.build(
+        bind_address="192.168.1.11",
+        port=18080,
+        interface_network="192.168.1.0/24",
+        allowed_networks=["192.168.1.0/24"],
+        upstream_origin="http://127.0.0.1:8000",
+    )
+    proxy = create_gateway_lan_proxy_app(
+        proxy_config,
+        transport=httpx.MockTransport(upstream),
+        client_host_resolver=lambda _: "192.168.1.50",
+    )
+    payload = _request_payload()
+    body = _body(payload)
+
+    with TestClient(proxy) as lan_client:
+        anonymous = lan_client.post(
+            DECISION_PATH, content=body, headers={"Content-Type": "application/json"}
+        )
+        first = lan_client.post(
+            DECISION_PATH,
+            content=body,
+            headers=_signed_headers(
+                method="POST",
+                path=DECISION_PATH,
+                body=body,
+                request_id=payload["request_id"],
+                correlation_id=payload["correlation_id"],
+                idempotency_key=payload["idempotency_key"],
+            ),
+        )
+        replay = lan_client.post(
+            DECISION_PATH,
+            content=body,
+            headers=_signed_headers(
+                method="POST",
+                path=DECISION_PATH,
+                body=body,
+                request_id=payload["request_id"],
+                correlation_id=payload["correlation_id"],
+                idempotency_key=payload["idempotency_key"],
+            ),
+        )
+
+    assert anonymous.status_code == 401
+    assert anonymous.json()["error"]["error_code"] == "AUTHENTICATION_REQUIRED"
+    assert first.status_code == 200
+    assert first.json()["requires_approval"] is True
+    assert replay.status_code == 200
+    assert replay.json()["decision_id"] == first.json()["decision_id"]
+    assert replay.headers["idempotency-replayed"] == "true"
 
 
 @pytest.mark.parametrize(

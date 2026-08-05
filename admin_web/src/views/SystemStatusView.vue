@@ -55,6 +55,7 @@ onMounted(loadStatus)
           <div><dt>Server 状态</dt><dd>{{ runtime?.server.status }}</dd></div>
           <div><dt>Server 版本</dt><dd>{{ runtime?.server.version }}</dd></div>
           <div><dt>Runtime 模式</dt><dd>{{ runtime?.server.runtime_mode }}</dd></div>
+          <div><dt>Gateway 网络模式</dt><dd>{{ runtime?.server.network_mode ?? 'LOCAL' }}</dd></div>
           <div><dt>Gateway 状态</dt><dd>{{ runtime?.gateway.status }}</dd></div>
           <div><dt>Gateway 版本</dt><dd>{{ runtime?.gateway.version }}</dd></div>
           <div><dt>Contract 版本</dt><dd>{{ runtime?.gateway.contract_version }}</dd></div>
