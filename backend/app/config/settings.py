@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from ipaddress import ip_address
 from pathlib import Path
@@ -36,6 +36,33 @@ def _resolve_backend_path(value: str | None, default_name: str) -> Path:
     if not raw.is_absolute():
         raw = BACKEND_ROOT / raw
     return raw.resolve()
+
+
+def _resolve_optional_backend_path(value: str | None) -> Path | None:
+    if value is None or not value.strip():
+        return None
+    return _resolve_backend_path(value.strip(), value.strip())
+
+
+def _normalize_server_runtime_mode(value: str | None) -> str:
+    mode = (value or "standard").strip().lower()
+    if mode not in {"standard", "shadow", "recovery", "development", "test"}:
+        raise ValueError(
+            "AI_CS_SERVER_RUNTIME_MODE must be standard, shadow, recovery, "
+            "development, or test"
+        )
+    return mode
+
+
+def _read_single_line_secret(path: Path) -> bytes:
+    try:
+        secret_text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValueError("Gateway HMAC secret reference is unreadable") from exc
+    secret_text = secret_text.rstrip("\r\n")
+    if "\r" in secret_text or "\n" in secret_text:
+        raise ValueError("Gateway HMAC secret reference must contain one line")
+    return secret_text.encode("utf-8")
 
 
 def _normalize_origin_host(host: str) -> str:
@@ -189,6 +216,44 @@ class Settings:
     cors_allowed_origins: tuple[str, ...]
     host: str
     port: int
+    server_runtime_mode: str = "standard"
+    gateway_enabled: bool = False
+    gateway_client_id: str = "channel-engine"
+    gateway_key_id: str = "gateway-key-v1"
+    gateway_hmac_secret: str = field(default="", repr=False)
+    gateway_hmac_secret_file: Path | None = field(default=None, repr=False)
+    gateway_state_path: Path = field(
+        default_factory=lambda: (BACKEND_ROOT / "gateway_state.sqlite3").resolve()
+    )
+    gateway_clock_skew_seconds: int = 300
+    gateway_nonce_ttl_seconds: int = 600
+    gateway_decision_retention_seconds: int = 7 * 24 * 60 * 60
+    gateway_decision_lease_seconds: int = 30
+
+    def gateway_secret_bytes(self) -> bytes:
+        """Resolve the Gateway credential without exposing it in server config."""
+        has_inline_secret = bool(self.gateway_hmac_secret)
+        has_secret_reference = self.gateway_hmac_secret_file is not None
+        if has_inline_secret and has_secret_reference:
+            raise ValueError("Configure only one Gateway HMAC secret source")
+        if self.server_runtime_mode in {"standard", "shadow", "recovery"}:
+            if has_inline_secret:
+                raise ValueError(
+                    "Production Gateway requires GATEWAY_HMAC_SECRET_FILE; "
+                    "inline secrets are forbidden"
+                )
+            if not has_secret_reference:
+                raise ValueError(
+                    "Production Gateway requires a Gateway HMAC secret reference"
+                )
+        secret = (
+            _read_single_line_secret(self.gateway_hmac_secret_file)
+            if self.gateway_hmac_secret_file is not None
+            else self.gateway_hmac_secret.encode("utf-8")
+        )
+        if len(secret) < 32:
+            raise ValueError("Gateway HMAC secret must contain at least 32 bytes")
+        return secret
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -264,6 +329,38 @@ class Settings:
             ),
             host=os.getenv("HOST", "127.0.0.1").strip(),
             port=int(os.getenv("PORT", "8000")),
+            server_runtime_mode=_normalize_server_runtime_mode(
+                os.getenv("AI_CS_SERVER_RUNTIME_MODE")
+            ),
+            gateway_enabled=_as_bool(os.getenv("GATEWAY_ENABLED"), False),
+            gateway_client_id=os.getenv(
+                "GATEWAY_CLIENT_ID", "channel-engine"
+            ).strip(),
+            gateway_key_id=os.getenv("GATEWAY_KEY_ID", "gateway-key-v1").strip(),
+            gateway_hmac_secret=os.getenv("GATEWAY_HMAC_SECRET", ""),
+            gateway_hmac_secret_file=_resolve_optional_backend_path(
+                os.getenv("GATEWAY_HMAC_SECRET_FILE")
+            ),
+            gateway_state_path=_resolve_backend_path(
+                os.getenv("GATEWAY_STATE_PATH"), "gateway_state.sqlite3"
+            ),
+            gateway_clock_skew_seconds=max(
+                1, int(os.getenv("GATEWAY_CLOCK_SKEW_SECONDS", "300"))
+            ),
+            gateway_nonce_ttl_seconds=max(
+                1, int(os.getenv("GATEWAY_NONCE_TTL_SECONDS", "600"))
+            ),
+            gateway_decision_retention_seconds=max(
+                60,
+                int(
+                    os.getenv(
+                        "GATEWAY_DECISION_RETENTION_SECONDS", str(7 * 24 * 60 * 60)
+                    )
+                ),
+            ),
+            gateway_decision_lease_seconds=max(
+                1, int(os.getenv("GATEWAY_DECISION_LEASE_SECONDS", "30"))
+            ),
         )
 
 

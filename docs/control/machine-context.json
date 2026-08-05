@@ -4,9 +4,50 @@
   "line": "CONTROL",
   "version": "1.0.0",
   "status": "internal_production_ready",
-  "current_task": "AI-CS Windows Runtime Script Alignment V1",
-  "current_stage": "The migrated AI-CS repository is the only Windows Runtime source. Legacy shortcuts are compatibility redirects, and the standard stop/start/status/LAN lifecycle has passed.",
-  "current_gate": "WINDOWS_RUNTIME_SCRIPT_ALIGNED_V1",
+  "current_task": "R013 AI-CS Production Server Runtime RC V1",
+  "current_stage": "The protected Gateway candidate is integrated into an opt-in Production Server wrapper with reference-only secret loading, safe Operations Console status and frozen Gateway Contract 1.0 compatibility. The protection anchor remains HEAD; no commit, deployment or production connection is claimed.",
+  "current_gate": "AI_CS_SERVER_RC_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING",
+  "production_server_runtime_rc_v1": {
+    "date": "2026-08-05",
+    "requirement": "R013",
+    "protection_anchor": "0b3367f85999f1dc840accf23742c290eb53746b",
+    "head_matches_anchor": true,
+    "candidate_state": "dirty worktree; implemented and tested; not committed, tagged, deployed or production-connected",
+    "runtime": "New start/status/stop Production Server wrappers delegate to the preserved AI customer-service lifecycle; Gateway is opt-in and shares the A FastAPI process",
+    "security": "standard/shadow/recovery require an external UTF-8 secret file reference; preflight rejects short or Git-tracked secret files; runtime environment and console never project plaintext secret material",
+    "console": "Operations Console displays Server state/version/runtime mode and Gateway state/version/Contract version through additive ai-cs.server-runtime-console.v1",
+    "contracts": "repository contracts 0.7.0 additive; Gateway wire 1.0 schema and canonical SHA-256 e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5 unchanged",
+    "tests": "Gateway/runtime/contracts 36 passed; A 138 passed and 3 opt-in real E2E skipped; R006/R009 targeted 25 passed; Admin 76 passed plus typecheck/build; Windows OPS 11 suites passed; 17 JSON schemas valid",
+    "preservation": "Existing scripts, B flow, /api/chat, R006, R009, RAG, Prompt, model, product knowledge and databases remain unchanged",
+    "report": "docs/rag/AI-CS-Production-Server-Runtime-RC-Report-V1.md"
+  },
+  "gateway_source_baseline_v1": {
+    "date": "2026-08-05",
+    "requirement": "R012",
+    "protection_anchor": "0b3367f85999f1dc840accf23742c290eb53746b",
+    "head_matches_anchor": true,
+    "candidate_state": "dirty worktree; classified and tested; not committed, tagged, deployed or production-connected",
+    "production_candidate": ["DecisionRequest/DecisionResponse", "authenticated Health", "HMAC timestamp nonce and body hash", "approval-only mapping", "ErrorEnvelope", "single-instance durable idempotency"],
+    "deferred": ["production Channel Engine", "signed external health adapter", "TLS and secret management", "idempotency data encryption/retention/recovery audit", "multi-instance shared state", "deployment observability", "Receipt/Event/Execution"],
+    "experimental": ["application/json request compatibility window", "Decision metadata diagnostics"],
+    "tests": "Gateway 24 passed; contracts 6 passed; A 133 passed and 3 opt-in real E2E skipped; R006/R009 targeted 26 passed; 16 JSON schemas valid",
+    "actual_change_scope": "docs only; Gateway, contracts and business code were read-only",
+    "report": "docs/rag/AI-CS-Gateway-Source-Baseline-Report-V1.md"
+  },
+  "gateway_server_foundation_v1": {
+    "date": "2026-08-04",
+    "requirement": "R011",
+    "source_branch": "release/product-reliability-hardening-v1",
+    "source_start_anchor": "0b3367f85999f1dc840accf23742c290eb53746b",
+    "routes": ["POST /gateway/v1/decisions", "GET /gateway/v1/health"],
+    "contract_version": "Gateway wire 1.0; repository contracts 0.6.0 additive",
+    "security": "HMAC-SHA256, timestamp skew, durable nonce replay prevention, raw-body hash, strict identity matching and private durable idempotency with lease owner tokens",
+    "decision_policy": "requires_approval=true; no automatic customer action",
+    "tests": "Gateway 24 passed; A 133 passed and 3 opt-in real E2E skipped; shared contracts 6 passed; 16 JSON schemas valid; B 127 passed plus typecheck/build PASS",
+    "preservation": "B, /api/chat, C/Admin, RAG, Prompt, model, product knowledge and business database semantics unchanged",
+    "deployment_state": "source foundation only; gateway disabled by default; no production Channel Engine connection; TLS, secret management and deployment acceptance pending",
+    "report": "docs/rag/AI-CS-Gateway-Server-Foundation-V1.md"
+  },
   "windows_runtime_script_alignment_v1": {
     "date": "2026-08-01",
     "formal_repository": "C:/Users/EDY/Documents/Codex/2026-07-21/AI-CS",
@@ -412,5 +453,5 @@
     "R009 is accepted only in an isolated 0009 runtime. Formal production remains at 0008 and no RAG publication or B consumption is implied.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
   ],
-  "last_updated": "2026-08-01"
+  "last_updated": "2026-08-05"
 }

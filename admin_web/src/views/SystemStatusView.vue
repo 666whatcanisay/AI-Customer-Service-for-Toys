@@ -1,19 +1,32 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { getHealth, isOfflineError, type HealthResponse } from '../api/client'
+import {
+  getHealth,
+  getServerRuntime,
+  isOfflineError,
+  type HealthResponse,
+  type ServerRuntimeResponse,
+} from '../api/client'
 
 type ViewState = 'loading' | 'ok' | 'offline' | 'error'
 
 const state = ref<ViewState>('loading')
 const health = ref<HealthResponse | null>(null)
+const runtime = ref<ServerRuntimeResponse | null>(null)
 
 async function loadStatus(): Promise<void> {
   state.value = 'loading'
   health.value = null
+  runtime.value = null
 
   try {
-    health.value = await getHealth()
+    const [platformHealth, serverRuntime] = await Promise.all([
+      getHealth(),
+      getServerRuntime(),
+    ])
+    health.value = platformHealth
+    runtime.value = serverRuntime
     state.value = 'ok'
   } catch (error: unknown) {
     state.value = isOfflineError(error) ? 'offline' : 'error'
@@ -38,6 +51,14 @@ onMounted(loadStatus)
         <strong>正常</strong>
         <span>{{ health?.service }} · v{{ health?.version }}</span>
         <small>Request ID: {{ health?.request_id }}</small>
+        <dl class="runtime-grid" data-testid="server-runtime-status">
+          <div><dt>Server 状态</dt><dd>{{ runtime?.server.status }}</dd></div>
+          <div><dt>Server 版本</dt><dd>{{ runtime?.server.version }}</dd></div>
+          <div><dt>Runtime 模式</dt><dd>{{ runtime?.server.runtime_mode }}</dd></div>
+          <div><dt>Gateway 状态</dt><dd>{{ runtime?.gateway.status }}</dd></div>
+          <div><dt>Gateway 版本</dt><dd>{{ runtime?.gateway.version }}</dd></div>
+          <div><dt>Contract 版本</dt><dd>{{ runtime?.gateway.contract_version }}</dd></div>
+        </dl>
       </div>
 
       <div v-else-if="state === 'offline'" class="state state-offline" role="alert">
@@ -114,6 +135,30 @@ h1 {
 .state small {
   overflow-wrap: anywhere;
   color: #53627a;
+}
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 0;
+}
+
+.runtime-grid div {
+  padding: 10px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 72%);
+}
+
+.runtime-grid dt {
+  color: #53627a;
+  font-size: 12px;
+}
+
+.runtime-grid dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
 }
 
 .state-loading {

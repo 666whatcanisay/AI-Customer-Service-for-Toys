@@ -7,6 +7,22 @@ export interface HealthResponse {
   request_id: string
 }
 
+export interface ServerRuntimeResponse {
+  schema_version: 'ai-cs.server-runtime-console.v1'
+  server: {
+    status: 'READY' | 'STARTING' | 'UNHEALTHY'
+    version: string
+    runtime_mode: string
+  }
+  gateway: {
+    enabled: boolean
+    status: 'DISABLED' | 'HEALTHY' | 'UNHEALTHY'
+    version: string
+    contract_version: '1.0'
+    configuration_state: 'CONFIGURED' | 'DISABLED' | 'INVALID'
+  }
+}
+
 export type BatchStatus =
   | 'RECEIVED'
   | 'PARSING'
@@ -1622,6 +1638,11 @@ export async function getAiControlCenterOverview(): Promise<AiControlCenterOverv
 
 export async function getHealth(): Promise<HealthResponse> {
   const response = await apiClient.get<HealthResponse>('/health')
+  return response.data
+}
+
+export async function getServerRuntime(): Promise<ServerRuntimeResponse> {
+  const response = await aiClient.get<ServerRuntimeResponse>('/api/admin/server-runtime')
   return response.data
 }
 

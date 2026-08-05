@@ -15,7 +15,7 @@ vi.mock('axios', () => {
   }
 })
 
-import { getAiControlCenterOverview, listAiModules } from '../src/api/client'
+import { getAiControlCenterOverview, getServerRuntime, listAiModules } from '../src/api/client'
 
 describe('listAiModules', () => {
   beforeEach(() => aiGet.mockReset())
@@ -87,5 +87,17 @@ describe('listAiModules', () => {
   it('treats a failed overview envelope as an error, never as empty operational data', async () => {
     aiGet.mockResolvedValue({ data: { success: false, data: {} } })
     await expect(getAiControlCenterOverview()).rejects.toThrow('AI状态未返回成功结果')
+  })
+
+  it('reads the additive server runtime projection from the local AI proxy', async () => {
+    const runtime = {
+      schema_version: 'ai-cs.server-runtime-console.v1',
+      server: { status: 'READY', version: 'ai-cs-server-runtime.rc1', runtime_mode: 'standard' },
+      gateway: { enabled: true, status: 'HEALTHY', version: 'ai-cs-gateway.v1', contract_version: '1.0', configuration_state: 'CONFIGURED' },
+    }
+    aiGet.mockResolvedValue({ data: runtime })
+
+    await expect(getServerRuntime()).resolves.toEqual(runtime)
+    expect(aiGet).toHaveBeenCalledWith('/api/admin/server-runtime')
   })
 })

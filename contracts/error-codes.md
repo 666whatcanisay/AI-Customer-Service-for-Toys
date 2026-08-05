@@ -6,6 +6,30 @@
 | `RISK_REVIEW_REQUIRED` | Answer needs controlled handling. | Follow the returned action. |
 | `INTERNAL_ERROR` | Service failed unexpectedly. | Retry or transfer to a human. |
 
+## Channel Engine Gateway Server Foundation V1
+
+All `/gateway/v1/**` non-2xx responses use the frozen Gateway ErrorEnvelope.
+Phase 1 implements:
+
+- `INVALID_REQUEST`
+- `AUTHENTICATION_REQUIRED`
+- `AUTHENTICATION_FAILED`
+- `RESOURCE_NOT_FOUND`
+- `METHOD_NOT_ALLOWED`
+- `UNSUPPORTED_CONTRACT_VERSION`
+- `IDEMPOTENCY_IN_PROGRESS`
+- `IDEMPOTENCY_CONFLICT`
+- `PAYLOAD_TOO_LARGE`
+- `UNSUPPORTED_MEDIA_TYPE`
+- `SCHEMA_VALIDATION_FAILED`
+- `INTERNAL_ERROR`
+- `SERVICE_UNAVAILABLE`
+
+Only `IDEMPOTENCY_IN_PROGRESS`, `INTERNAL_ERROR` and `SERVICE_UNAVAILABLE` are
+retryable among the Phase-1 responses currently emitted. Authentication,
+schema, version, media-type and idempotency-conflict failures require correction
+and must not be retried unchanged.
+
 ## Customer Feedback Loop V1
 
 - `AI_INTERACTION_EVENT_VALIDATION_FAILED`: event payload or required

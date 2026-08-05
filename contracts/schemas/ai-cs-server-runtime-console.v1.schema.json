@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:server-runtime-console:v1",
+  "$defs": {
+    "GatewayRuntimeState": {
+      "enum": [
+        "DISABLED",
+        "HEALTHY",
+        "UNHEALTHY"
+      ],
+      "title": "GatewayRuntimeState",
+      "type": "string"
+    },
+    "GatewayRuntimeSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/GatewayRuntimeState"
+        },
+        "version": {
+          "const": "ai-cs-gateway.v1",
+          "title": "Version",
+          "type": "string"
+        },
+        "contract_version": {
+          "const": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "configuration_state": {
+          "enum": [
+            "CONFIGURED",
+            "DISABLED",
+            "INVALID"
+          ],
+          "title": "Configuration State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "status",
+        "version",
+        "contract_version",
+        "configuration_state"
+      ],
+      "title": "GatewayRuntimeSummary",
+      "type": "object"
+    },
+    "ServerRuntimeState": {
+      "enum": [
+        "READY",
+        "STARTING",
+        "UNHEALTHY"
+      ],
+      "title": "ServerRuntimeState",
+      "type": "string"
+    },
+    "ServerRuntimeSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/ServerRuntimeState"
+        },
+        "version": {
+          "const": "ai-cs-server-runtime.rc1",
+          "title": "Version",
+          "type": "string"
+        },
+        "runtime_mode": {
+          "title": "Runtime Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "version",
+        "runtime_mode"
+      ],
+      "title": "ServerRuntimeSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "ai-cs.server-runtime-console.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "server": {
+      "$ref": "#/$defs/ServerRuntimeSummary"
+    },
+    "gateway": {
+      "$ref": "#/$defs/GatewayRuntimeSummary"
+    }
+  },
+  "required": [
+    "schema_version",
+    "server",
+    "gateway"
+  ],
+  "title": "ServerRuntimeConsoleSnapshot",
+  "type": "object"
+}

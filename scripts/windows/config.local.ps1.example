@@ -2,6 +2,17 @@
     # 发布运行角色与网络暴露分离。正式端口使用 standard；影子环境使用 shadow。
     RuntimeMode = 'standard'
     RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    # Server Runtime configuration. Core and Gateway share BindAddress/RagPort.
+    GatewayEnabled = $false
+    GatewayClientId = 'channel-engine'
+    GatewayKeyId = 'gateway-key-v1'
+    # Reference only. Create this ignored runtime file as one UTF-8 line (32+ bytes).
+    GatewaySecretReference = 'secrets\gateway-hmac.secret'
+    GatewayStatePath = 'gateway\gateway_state.sqlite3'
+    GatewayClockSkewSeconds = 300
+    GatewayNonceTtlSeconds = 600
+    GatewayDecisionRetentionSeconds = 604800
+    GatewayDecisionLeaseSeconds = 30
     RagPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\.venv\Scripts\python.exe')
     PlatformPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'platform_backend\.venv\Scripts\python.exe')
     PnpmCommand = 'pnpm.cmd'

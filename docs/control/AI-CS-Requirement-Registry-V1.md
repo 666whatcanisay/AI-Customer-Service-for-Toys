@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`AI_CS_SERVER_RC_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
 
 ## 1. 台账目标
 
@@ -101,8 +101,11 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R008 | AI-CS Project Structure Simplification V1 | `DONE` | Control、OPS、A/B/C、QA | 物理迁移、目标验证与标准端口切换完成；AI-CS为正式目录。 |
 | R009 | 商品知识采集模板导入 V1 | `DONE` | C、Control、QA | 商品知识导入实现、浏览器验收和0009能力已保留至当前0012运行链，R010未改变其逻辑。 |
 | R010 | AI-CS Production Finalization V1 | `DONE` | Control、OPS、A/B/C、QA、contracts | AI-CS V1.0.0正式文案、来源正式化、测试入口隔离、contracts 0.5.0、0012与全量回归完成。 |
+| R011 | AI-CS Gateway Server Foundation V1 | `DONE` | A、contracts、Control、QA | 独立`/gateway/v1` Decision/Health、HMAC、严格Contract、ErrorEnvelope与持久化幂等已完成；B和`/api/chat`不变，未连接生产Channel Engine。 |
+| R012 | AI-CS Gateway Source Baseline V1 | `DONE` | A、contracts、Control、QA | Gateway Candidate已完成Production/Deferred/Experimental分类、职责与文件冻结、contracts 0.6复核及R006/R009回归；保护锚点未改写，尚未部署或连接生产。 |
+| R013 | AI-CS Production Server Runtime RC V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | Production wrapper、file-reference secret、签名Health Gate、Server Runtime Console与全量回归完成；仍未commit/deploy或连接生产Engine/PDD。 |
 
-状态数量：`DONE=7`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计10项。
+状态数量：`DONE=10`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计13项。
 
 ## 6. 需求明细
 
@@ -315,6 +318,55 @@ R006.2不改变R006业务模型，只补齐已经打开页面对激活变化的�
 | 验收证据 | 分支`release/ai-cs-v1.0.0`；主正式化提交`9f2b500dc0d6469a04a6953b7886d65e34412a22`，P2文案补丁`9911ba67cef330a7a1b4f03f82de227cbee6982d`，防复发测试`0f230c6f50f8b6162c4e52f3b167053e6592c656`。Contracts 0.5.0；0012 `integrity_check=ok`；A 109 passed/3 skipped、B 120、C全量通过+contracts 5、Admin 64，两前端typecheck/build通过。standard/LAN四服务正式版本和浏览器Admin/B验收通过；B已发布商品为3 chunks/3 citations，安全边界通过。 |
 | 关联代码/文档 | `README.md`、`contracts/CHANGELOG.md`、`platform_backend/migrations/versions/0012_internal_production_finalization_v1.py`、本Registry、状态看板、风险、变更和交接文档；正式标签为`ai-cs-v1.0.0`，精确SHA从Git与Runtime记录解析。 |
 | 防止重复错误规则 | 不得为消除内部物理名称而重命名`test_knowledge_v031`或全量重建RAG；不得删除测试夹具、业务数据、收据或迁移历史；不得把本地保护origin或计划标签误报为远端发布；不得用本需求关闭R003、R005或R007。 |
+
+### R011 — AI-CS Gateway Server Foundation V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R011 |
+| 提出时间 | 2026-08-04 |
+| 需求名称 | AI-CS Gateway Server Foundation V1 |
+| 用户原始目标 | 在保留B客服与`/api/chat`的同时建立独立`/gateway/v1`，使AI-CS具备Channel Engine Gateway Contract V1 Server基础能力。 |
+| 业务背景 | 兼容性审计确认`/api/chat`缺少Gateway路径、HMAC、Decision Contract、统一ErrorEnvelope和幂等，不能直接作为Gateway Server。 |
+| 当前状态 | `DONE` |
+| 负责模块 | A：`backend/**`与`docs/rag/**`；contracts：schema/version/changelog/compatibility；Control/QA：任务、受影响线复核与Gate。B/C只回归验证，不改代码。 |
+| 影响范围 | 新增Decision/Health、HMAC、nonce replay、Decision Mapping、ErrorEnvelope、私有幂等状态与Contract tests；不改B、`/api/chat`、RAG、Prompt、模型、商品知识或业务数据库。 |
+| 完成标准 | Phase 1两个路由、严格V1校验、禁止匿名、HMAC、防重放、`requires_approval=true`、非2xx错误、跨重启幂等、Gateway Chat Regression与A/B全量回归通过。 |
+| 验收证据 | [Task Card](product-management/AI-CS-Gateway-Server-Foundation-V1-Task-Card.md)与[Foundation Report](../rag/AI-CS-Gateway-Server-Foundation-V1.md)：Gateway `24 passed`；A `133 passed, 3 skipped`；contracts `6 passed`；16 schema valid；B `127 passed`且typecheck/build通过。 |
+| 关联代码/文档 | `backend/app/gateway/**`、`backend/app/main.py`、`contracts/schemas/channel-engine-gateway-server.v1.schema.json`、`contracts/compatibility/channel-engine-gateway-v1.md`、本任务卡与报告。 |
+| 防止重复错误规则 | 不得复用或改写`/api/chat`为Gateway；不得接受`schema_version/message`别名形成第二套V1；不得把Foundation Ready误报为已部署、TLS已完成或生产Engine已连接；Receipt/Event必须另立Phase 2任务。 |
+
+### R012 — AI-CS Gateway Source Baseline V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R012 |
+| 提出时间 | 2026-08-05 |
+| 需求名称 | AI-CS Gateway Source Baseline V1 |
+| 用户原始目标 | 将当前Gateway Candidate整理为Production MVP可维护源码基线，明确进入项、延后项、职责边界、Contract状态和T4输入。 |
+| 业务背景 | R011已完成Server Foundation，但源码候选仍需在不破坏`0b3367…`保护锚点的前提下完成分类、范围冻结和业务回归，避免把实验兼容或部署能力误纳入MVP。 |
+| 当前状态 | `DONE` |
+| 负责模块 | A：Gateway能力与RAG边界；contracts：0.6覆盖复核；Control/QA：任务、保护锚点、R006/R009回归和Gate。B/C业务代码只读、零修改。 |
+| 影响范围 | `docs/**`治理资产；只读审计当前Gateway、contracts、tests及既有A集成胶水。未修改Gateway代码、contracts schema、R006/R009、RAG、B/C、数据库或运行服务。 |
+| 完成标准 | Current Capability Matrix、三类源码分类、Server职责/非职责、四个Contract对象覆盖、专项/Contract/A/R006/R009测试、T4输入和风险边界全部可复核。 |
+| 验收证据 | [Task Card](product-management/AI-CS-Gateway-Source-Baseline-V1-Task-Card.md)与[Source Baseline Report](../rag/AI-CS-Gateway-Source-Baseline-Report-V1.md)：Gateway 24、contracts 6、A 133/3 skipped、R006/R009定向26、16 schema valid；保护锚点仍为HEAD且禁止业务路径零差异。 |
+| 关联代码/文档 | R011；`backend/app/gateway/**`；contracts 0.6 Gateway schema/compatibility；Gateway tests；本任务卡与报告。 |
+| 防止重复错误规则 | 不得把Source Baseline Ready误报为candidate已commit/tag、已部署或已生产联通；不得把Browser/PDD/Execution/Chrome纳入Server；不得在A增加匿名`/health`绕过外部adapter修正；多实例、TLS、secret和Receipt/Event均须后续独立Gate。 |
+
+### R013 — AI-CS Production Server Runtime RC V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R013 |
+| 提出时间 | 2026-08-05 |
+| 需求名称 | AI-CS Production Server Runtime RC V1 |
+| 用户原始目标 | 一键启动 AI-CS Core、Gateway Server 与 Operations Console，统一 Server 配置并验证 Gateway/Contract/lifecycle。 |
+| 当前状态 | `DONE` |
+| 负责模块 | A/OPS：Server/Gateway/runtime；C Admin：只读 Console；contracts：0.7 additive schema；Control/QA：边界与Gate。 |
+| 影响范围 | 新增 Production wrapper、secret file reference、签名 Health probe、`/api/admin/server-runtime` 与 Console 展示；不改 R006/R009、RAG、Prompt、B、商品数据库。 |
+| 完成标准 | start/status/stop、Gateway Health/Decision/Contract、统一配置、Console 状态、A/C/Admin/OPS 回归全部通过。 |
+| 验收证据 | [Task Card](product-management/AI-CS-Production-Server-Runtime-RC-V1-Task-Card.md)与[RC Report](../rag/AI-CS-Production-Server-Runtime-RC-Report-V1.md)：A 138/3 skipped、专项36、C定向25、Admin76、OPS11/11、contracts7、17 schemas valid。 |
+| 防止重复错误规则 | 不得把Server RC误报为已部署/已生产连接；不得提交secret/SQLite/log/runtime record；不得让浏览器持有Gateway secret或直接调用HMAC Health；Receipt/Event/Execution继续延后。 |
 
 ## 7. 历史错误防复发规则
 

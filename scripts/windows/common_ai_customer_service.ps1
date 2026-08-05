@@ -75,6 +75,15 @@ function Get-LocalConfig([string]$ConfigPath) {
         # RuntimeMode identifies the deployment role. Network exposure is
         # recorded separately as network_mode and must not redefine identity.
         RuntimeMode = 'standard'
+        GatewayEnabled = $false
+        GatewayClientId = 'channel-engine'
+        GatewayKeyId = 'gateway-key-v1'
+        GatewaySecretReference = ''
+        GatewayStatePath = ''
+        GatewayClockSkewSeconds = 300
+        GatewayNonceTtlSeconds = 600
+        GatewayDecisionRetentionSeconds = 604800
+        GatewayDecisionLeaseSeconds = 30
         OllamaBaseUrl = 'http://127.0.0.1:11434'
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
@@ -165,7 +174,7 @@ function Get-LocalConfig([string]$ConfigPath) {
         throw "AdminWebUrl 必须是与 AdminWebPort 一致的有效 http(s) 地址：$($config.AdminWebUrl)"
     }
     if ([string]::IsNullOrWhiteSpace([string]$config.AdminWebBindAddress)) { throw 'AdminWebBindAddress 不能为空。' }
-    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser')) {
+    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser', 'GatewayEnabled')) {
         if ($config[$key] -isnot [bool]) {
             $parsed = $false
             if (-not [bool]::TryParse([string]$config[$key], [ref]$parsed)) { throw "配置项 $key 必须为 true 或 false。" }
@@ -179,6 +188,35 @@ function Get-LocalConfig([string]$ConfigPath) {
         if ($adminWebUri.Host -notin @('127.0.0.1', '::1', 'localhost')) {
             throw 'AdminEnableLanMode=false 时 AdminWebUrl 必须是本机回环地址。'
         }
+    }
+    foreach ($key in @('GatewayClockSkewSeconds','GatewayNonceTtlSeconds','GatewayDecisionRetentionSeconds','GatewayDecisionLeaseSeconds')) {
+        $value = 0
+        if (-not [int]::TryParse([string]$config[$key], [ref]$value) -or $value -lt 1) {
+            throw "$key 必须为正整数。"
+        }
+        $config[$key] = $value
+    }
+    if ([string]$config.GatewayClientId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') { throw 'GatewayClientId 格式无效。' }
+    if ([string]$config.GatewayKeyId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') { throw 'GatewayKeyId 格式无效。' }
+    $runtimeDirectory = [IO.Path]::GetFullPath([string]$config.RuntimeDirectory)
+    $runtimePrefix = $runtimeDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    if ([string]::IsNullOrWhiteSpace([string]$config.GatewayStatePath)) {
+        $config.GatewayStatePath = Join-Path $runtimeDirectory 'gateway\gateway_state.sqlite3'
+    } else {
+        $statePath = [string]$config.GatewayStatePath
+        $config.GatewayStatePath = if ([IO.Path]::IsPathRooted($statePath)) { [IO.Path]::GetFullPath($statePath) } else { [IO.Path]::GetFullPath((Join-Path $runtimeDirectory $statePath)) }
+    }
+    if (-not ([string]$config.GatewayStatePath).StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "GatewayStatePath 必须位于 RuntimeDirectory 内：$($config.GatewayStatePath)"
+    }
+    if ([bool]$config.GatewayEnabled) {
+        if ([string]::IsNullOrWhiteSpace([string]$config.GatewaySecretReference)) {
+            throw 'GatewayEnabled=true 时必须配置 GatewaySecretReference；禁止在配置中填写明文 secret。'
+        }
+        $secretReference = [string]$config.GatewaySecretReference
+        $secretPath = if ([IO.Path]::IsPathRooted($secretReference)) { [IO.Path]::GetFullPath($secretReference) } else { [IO.Path]::GetFullPath((Join-Path $runtimeDirectory $secretReference)) }
+        if (-not (Test-Path -LiteralPath $secretPath -PathType Leaf)) { throw "GatewaySecretReference 不存在：$secretPath" }
+        $config.GatewaySecretReference = $secretPath
     }
     return $config
 }
@@ -281,6 +319,128 @@ function Get-ServiceUrl($Config, [int]$Port, [string]$Path = '/') {
     $serviceHost = [string]$Config.BindAddress
     if ($serviceHost -in @('0.0.0.0', '::')) { $serviceHost = '127.0.0.1' }
     "http://${serviceHost}:$Port$Path"
+}
+
+function Get-AiCsGatewayContractVersion { return '1.0' }
+
+function Get-AiCsGatewaySecretBytes($Config) {
+    if (-not [bool]$Config.GatewayEnabled) { throw 'Gateway 未启用。' }
+    $secretPath = [string]$Config.GatewaySecretReference
+    if ([string]::IsNullOrWhiteSpace($secretPath) -or -not (Test-Path -LiteralPath $secretPath -PathType Leaf)) {
+        throw 'Gateway secret reference 不可用。'
+    }
+    try {
+        $secretText = [IO.File]::ReadAllText($secretPath, [Text.UTF8Encoding]::new($false, $true))
+    } catch {
+        throw 'Gateway secret reference 必须是可读取的 UTF-8 单行文件。'
+    }
+    $secretText = $secretText.TrimEnd(@([char]13, [char]10))
+    if ($secretText.Contains("`r") -or $secretText.Contains("`n")) {
+        throw 'Gateway secret reference 必须只包含一行。'
+    }
+    $secretBytes = [Text.Encoding]::UTF8.GetBytes($secretText)
+    if ($secretBytes.Length -lt 32) { throw 'Gateway HMAC secret 至少需要 32 bytes。' }
+    return $secretBytes
+}
+
+function ConvertTo-AiCsBase64Url([byte[]]$Bytes) {
+    return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+function New-AiCsGatewayAuthHeaders(
+    $Config,
+    [ValidateSet('GET','POST')][string]$Method,
+    [string]$Path,
+    [byte[]]$Body = [byte[]]@(),
+    [string]$Timestamp = '',
+    [string]$Nonce = '',
+    [string]$RequestId = '',
+    [string]$CorrelationId = '',
+    [string]$IdempotencyKey = ''
+) {
+    $contractVersion = Get-AiCsGatewayContractVersion
+    if ([string]::IsNullOrWhiteSpace($RequestId)) { $RequestId = "runtime-$([Guid]::NewGuid().ToString('N'))" }
+    if ([string]::IsNullOrWhiteSpace($CorrelationId)) { $CorrelationId = "runtime-$([Guid]::NewGuid().ToString('N'))" }
+    if ([string]::IsNullOrWhiteSpace($IdempotencyKey)) { $IdempotencyKey = "runtime-$([Guid]::NewGuid().ToString('N'))" }
+    if ([string]::IsNullOrWhiteSpace($Nonce)) { $Nonce = [Guid]::NewGuid().ToString('N') }
+    if ([string]::IsNullOrWhiteSpace($Timestamp)) { $Timestamp = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture) }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $contentHash = ([BitConverter]::ToString($sha.ComputeHash($Body))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+    $signingText = @(
+        'HMAC-SHA256',
+        $Method.ToUpperInvariant(),
+        $Path,
+        $contractVersion,
+        [string]$Config.GatewayClientId,
+        [string]$Config.GatewayKeyId,
+        $Timestamp,
+        $Nonce,
+        $RequestId,
+        $CorrelationId,
+        $IdempotencyKey,
+        $contentHash
+    ) -join "`n"
+    $hmac = [Security.Cryptography.HMACSHA256]::new((Get-AiCsGatewaySecretBytes $Config))
+    try { $signature = ConvertTo-AiCsBase64Url ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($signingText))) } finally { $hmac.Dispose() }
+    return @{
+        Authorization = "HMAC-SHA256 Credential=$($Config.GatewayClientId)/$($Config.GatewayKeyId),Signature=$signature"
+        'X-AI-CS-Contract-Version' = $contractVersion
+        'X-AI-CS-Timestamp' = $Timestamp
+        'X-AI-CS-Nonce' = $Nonce
+        'X-AI-CS-Content-SHA256' = $contentHash
+        'X-Request-ID' = $RequestId
+        'X-Correlation-ID' = $CorrelationId
+        'Idempotency-Key' = $IdempotencyKey
+    }
+}
+
+function Assert-AiCsGatewayProductionConfig($Config) {
+    if (-not [bool]$Config.GatewayEnabled) { throw 'Production Server Runtime 要求 GatewayEnabled=true。' }
+    if ((Get-ConfiguredRuntimeMode $Config) -notin @('standard','shadow','recovery')) {
+        throw 'Production Server Runtime 只允许 standard、shadow 或 recovery。'
+    }
+    Get-AiCsGatewaySecretBytes $Config | Out-Null
+    if ([string]::IsNullOrWhiteSpace([string]$Config.BindAddress)) { throw 'Production Server Runtime 缺少 BindAddress。' }
+    $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
+    $secretPath = [IO.Path]::GetFullPath([string]$Config.GatewaySecretReference)
+    $repositoryPrefix = $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    if ($secretPath.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        $relativeSecretPath = [IO.Path]::GetRelativePath($repositoryRoot, $secretPath).Replace('\', '/')
+        $tracked = @(& git -C $repositoryRoot ls-files -- $relativeSecretPath 2>$null)
+        if ($LASTEXITCODE -ne 0) { throw '无法验证 Gateway secret reference 的 Git 状态。' }
+        if ($tracked.Count -gt 0) { throw 'Gateway secret reference 指向 Git 已跟踪文件；Production Runtime 拒绝启动。' }
+    }
+    return $true
+}
+
+function Get-AiCsGatewayRuntimeHealth($Config) {
+    Assert-AiCsGatewayProductionConfig $Config | Out-Null
+    $path = '/gateway/v1/health'
+    $headers = New-AiCsGatewayAuthHeaders $Config 'GET' $path
+    $health = Invoke-RestMethod -UseBasicParsing -Method Get -Uri (Get-ServiceUrl $Config ([int]$Config.RagPort) $path) -Headers $headers -TimeoutSec 5
+    if ([string]$health.contract_version -ne (Get-AiCsGatewayContractVersion)) { throw 'Gateway health contract_version 不匹配。' }
+    if ([string]::IsNullOrWhiteSpace([string]$health.version)) { throw 'Gateway health 缺少 version。' }
+    if ([string]$health.status -notin @('HEALTHY','UNHEALTHY')) { throw "Gateway health 状态无效：$($health.status)" }
+    return $health
+}
+
+function Wait-AiCsGatewayRuntimeReady($Config, [int]$Seconds = 120) {
+    $lastState = 'UNREACHABLE'
+    for ($attempt = 0; $attempt -lt $Seconds; $attempt++) {
+        try {
+            $health = Get-AiCsGatewayRuntimeHealth $Config
+            $lastState = [string]$health.status
+            if ($lastState -eq 'HEALTHY') { return $health }
+        } catch {
+            $lastState = 'UNREACHABLE'
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "Gateway 未在 $Seconds 秒内达到 HEALTHY；最后状态=$lastState。"
+}
+
+function Get-AiCsServerRuntimeConsole($Config) {
+    return Get-Json (Get-ServiceUrl $Config ([int]$Config.RagPort) '/api/admin/server-runtime') 'Server Runtime Console'
 }
 
 function Test-PrivateLanIpv4([string]$Address) {
@@ -647,7 +807,7 @@ function Get-LocalPlatformEnvironment($Config) {
 }
 
 function Get-RagRuntimeEnvironment($Config, [string]$CorsAllowedOrigins) {
-    return @{
+    $environment = @{
         CORS_ALLOWED_ORIGINS = $CorsAllowedOrigins
         LLM_PROVIDER = 'ollama'
         LLM_MODEL = [string]$Config.OllamaModel
@@ -659,7 +819,20 @@ function Get-RagRuntimeEnvironment($Config, [string]$CorsAllowedOrigins) {
         CHROMA_COLLECTION_NAME = [string]$Config.RagPrimaryCollectionName
         TEST_KNOWLEDGE_COLLECTION_NAME = [string]$Config.RagActiveCollectionName
         ACTIVE_COLLECTION_NAME = [string]$Config.RagActiveCollectionName
+        AI_CS_SERVER_RUNTIME_MODE = Get-ConfiguredRuntimeMode $Config
+        GATEWAY_ENABLED = ([bool]$Config.GatewayEnabled).ToString().ToLowerInvariant()
+        GATEWAY_CLIENT_ID = [string]$Config.GatewayClientId
+        GATEWAY_KEY_ID = [string]$Config.GatewayKeyId
+        GATEWAY_STATE_PATH = [string]$Config.GatewayStatePath
+        GATEWAY_CLOCK_SKEW_SECONDS = [string]$Config.GatewayClockSkewSeconds
+        GATEWAY_NONCE_TTL_SECONDS = [string]$Config.GatewayNonceTtlSeconds
+        GATEWAY_DECISION_RETENTION_SECONDS = [string]$Config.GatewayDecisionRetentionSeconds
+        GATEWAY_DECISION_LEASE_SECONDS = [string]$Config.GatewayDecisionLeaseSeconds
     }
+    if ([bool]$Config.GatewayEnabled) {
+        $environment.GATEWAY_HMAC_SECRET_FILE = [string]$Config.GatewaySecretReference
+    }
+    return $environment
 }
 
 function Get-LanRagEnvironment($Config) { Get-RagRuntimeEnvironment $Config ([string]$Config.LanCorsAllowedOrigins) }

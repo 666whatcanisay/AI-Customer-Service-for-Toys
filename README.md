@@ -16,6 +16,10 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 
 本地 `origin` 是历史保护仓库，本版本没有声明已经推送到远端或完成远端发布。
 
+## 当前开发增量：R011 Gateway Server Foundation
+
+当前开发分支已新增默认关闭的`/gateway/v1`源码Foundation，并将仓库源码contracts增量提升为`0.6.0`；正式V1.0.0 Runtime仍是上节记录的contracts 0.5.0，尚未部署或连接生产Channel Engine。B客服继续使用`/api/chat`。启用Gateway前必须另做TLS、运行时secret托管、ACL、ingress限制与非生产集成Gate；详见[`docs/rag/AI-CS-Gateway-Server-Foundation-V1.md`](docs/rag/AI-CS-Gateway-Server-Foundation-V1.md)。
+
 ## 四项服务
 
 | 服务 | 目录 | 端口 | 作用 |

@@ -4,10 +4,20 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "AI-CS Production Finalization V1",
-  "current_stage": "C Admin and C API production-finalization changes are validated in the standard Runtime. Store source formalization is audited at revision 0012 without deleting products, receipts, publications or RAG data.",
-  "current_gate": "AI_CS_INTERNAL_PRODUCTION_READY",
+  "current_task": "R013 AI-CS Production Server Runtime RC V1 - Operations Console integration",
+  "current_stage": "The Operations Console consumes an additive, read-only A runtime projection and displays Server, Gateway and frozen Contract version status. C API, R006/R009 logic and platform data remain unchanged.",
+  "current_gate": "AI_CS_SERVER_RC_READY / AI_CS_INTERNAL_PRODUCTION_READY",
   "status": "internal_production_ready",
+  "server_runtime_console_v1": {
+    "requirement": "R013",
+    "route": "/ai-api/api/admin/server-runtime",
+    "schema": "contracts/schemas/ai-cs-server-runtime-console.v1.schema.json",
+    "displayed": ["Server state", "Server runtime version", "runtime mode", "Gateway enabled/state/version", "Gateway Contract version"],
+    "excluded": ["secret values", "secret paths", "request bodies", "nonces", "idempotency data", "customer data"],
+    "tests": "Admin 29 files / 76 tests passed; typecheck and production build PASS; R006/R009 targeted C backend 25 passed",
+    "compatibility": "repository contracts 0.7.0 additive; frozen Gateway wire 1.0 unchanged; platform_backend, C database and R006/R009 semantics unchanged",
+    "report": "docs/rag/AI-CS-Production-Server-Runtime-RC-Report-V1.md"
+  },
   "production_finalization_v1": {
     "branch": "release/ai-cs-v1.0.0",
     "implementation_anchors": [

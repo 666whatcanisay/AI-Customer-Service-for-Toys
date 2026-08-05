@@ -1,5 +1,47 @@
 # Contract changelog
 
+## 0.7.0 - 2026-08-05
+
+- Added the read-only `ai-cs.server-runtime-console.v1` schema consumed by the
+  local Operations Console at `GET /api/admin/server-runtime`.
+- The projection contains only Server state/version/runtime mode and Gateway
+  enablement/state/version/Contract version/configuration state. Credentials,
+  secret references, local paths, request content and idempotency data are
+  excluded.
+- This is additive over 0.6.0. Frozen Gateway wire `1.0`, canonical schema SHA,
+  `/api/chat`, R006/R009, RAG, Prompt and all existing B/C contracts are
+  unchanged.
+
+## 0.6.0 Production Gateway V1 freeze - 2026-08-05
+
+- Froze the AI-CS Server/Channel Agent Gateway wire at `1.0` with canonical
+  Decision, Health, Error and HMAC authentication objects.
+- Promoted `risk_level` to a required DecisionResponse field; normalized Health
+  to `status`, `version`, `capabilities` and `timestamp`; normalized the stable
+  error discriminator to `error_code`.
+- Locked both repositories to the same canonical JSON Schema SHA-256:
+  `e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5`.
+- Explicitly deferred Execution Receipt ingestion, Event synchronization, Agent
+  registration, multi-tenancy and multi-instance scheduling from Production
+  V1. Internal Channel Engine Receipt/Event domain models are unchanged.
+- This is a Gateway boundary freeze only. Existing AI decision, RAG, B/C APIs,
+  Channel execution and database behavior are unchanged.
+
+## 0.6.0 - 2026-08-04
+
+- Added the isolated Channel Engine Gateway Server Foundation V1 schema for
+  authenticated `POST /gateway/v1/decisions` and `GET /gateway/v1/health`.
+- Gateway wire objects use frozen `contract_version=1.0`, strict unknown-field
+  rejection, `requires_approval=true`, stable ErrorEnvelope codes, HMAC request
+  identity, and durable Decision idempotency.
+- AI-CS requires the additive `context.ai_cs_scope` compatibility profile with
+  tenant, platform, store, product and optional SKU identifiers. Missing scope
+  fails closed; the Gateway never falls back to the legacy unscoped `message`
+  request.
+- Existing `/api/chat`, `/api/health`, A answer schemas, C APIs and all B
+  consumers are unchanged. The Gateway is opt-in and production Channel Engine
+  connectivity remains disabled.
+
 ## 0.5.0 - 2026-07-31
 
 - Added `INITIAL_IMPORT` to the additive C-owned customer-service catalog,
