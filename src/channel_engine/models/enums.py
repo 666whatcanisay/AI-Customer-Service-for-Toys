@@ -67,5 +67,6 @@ class EventType(StrEnum):
 
 class OutboxState(StrEnum):
     PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
     PUBLISHED = "PUBLISHED"
     FAILED = "FAILED"

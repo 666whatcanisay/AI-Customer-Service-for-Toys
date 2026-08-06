@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from channel_engine.channel import ChannelMessage
 from channel_engine.conversation import ConversationService
-from channel_engine.execution import ExecutionCoordinator, FakeExecutor
+from channel_engine.execution import ExecutionCoordinator, ExecutionWorker, FakeExecutor
 from channel_engine.models import (
     DecisionState,
     ExecutionState,
@@ -16,7 +16,10 @@ from channel_engine.policy import ApprovalPolicy
 def test_message_to_receipt_flow_requires_human_approval(foundation) -> None:
     service = ConversationService(foundation["uow_factory"], foundation["gateway"])
     coordinator = ExecutionCoordinator(
-        foundation["uow_factory"], foundation["executor"], ApprovalPolicy()
+        foundation["uow_factory"], ApprovalPolicy()
+    )
+    worker = ExecutionWorker(
+        foundation["uow_factory"], foundation["executor"], "integration-worker"
     )
 
     intake = service.receive(
@@ -32,8 +35,13 @@ def test_message_to_receipt_flow_requires_human_approval(foundation) -> None:
     assert intake.requires_approval is True
     assert foundation["executor"].call_count == 0
 
-    outcome = coordinator.approve_and_execute(intake.decision_id, "human-operator")
+    enqueued = coordinator.approve_and_enqueue(intake.decision_id, "human-operator")
 
+    assert enqueued.execution_state is ExecutionState.PENDING
+    assert foundation["executor"].call_count == 0
+
+    outcome = worker.run_once()
+    assert outcome is not None
     assert outcome.execution_state is ExecutionState.SUCCESS
     assert outcome.receipt_outcome is ReceiptOutcome.SUCCESS
     assert foundation["executor"].call_count == 1
@@ -41,8 +49,8 @@ def test_message_to_receipt_flow_requires_human_approval(foundation) -> None:
     with foundation["uow_factory"]() as uow:
         repo = uow.require_repository()
         assert repo.get_decision(intake.decision_id).state is DecisionState.APPROVED
-        execution = repo.get_execution(outcome.execution_id)
-        receipt = repo.get_receipt_for_execution(outcome.execution_id)
+        execution = repo.get_execution(enqueued.execution_id)
+        receipt = repo.get_receipt_for_execution(enqueued.execution_id)
         outbox = repo.list_pending_outbox()
 
     assert execution.state is ExecutionState.SUCCESS
@@ -64,7 +72,7 @@ def test_message_to_receipt_flow_requires_human_approval(foundation) -> None:
 def test_rejection_never_calls_executor(foundation) -> None:
     service = ConversationService(foundation["uow_factory"], foundation["gateway"])
     coordinator = ExecutionCoordinator(
-        foundation["uow_factory"], foundation["executor"], ApprovalPolicy()
+        foundation["uow_factory"], ApprovalPolicy()
     )
     intake = service.receive(
         ChannelMessage(
@@ -108,7 +116,7 @@ def test_duplicate_external_message_with_changed_content_is_rejected(foundation)
     service.receive(first)
 
     try:
-        service.receive(first.model_copy(update={"text": "changed message"}))
+        service.receive(first.model_copy(update={"content": "changed message"}))
     except ValueError as exc:
         assert "different content" in str(exc)
     else:
@@ -119,7 +127,10 @@ def test_unknown_execution_requires_manual_reconciliation(foundation) -> None:
     unknown_executor = FakeExecutor(outcome=ReceiptOutcome.UNKNOWN)
     service = ConversationService(foundation["uow_factory"], foundation["gateway"])
     coordinator = ExecutionCoordinator(
-        foundation["uow_factory"], unknown_executor, ApprovalPolicy()
+        foundation["uow_factory"], ApprovalPolicy()
+    )
+    worker = ExecutionWorker(
+        foundation["uow_factory"], unknown_executor, "unknown-worker"
     )
     intake = service.receive(
         ChannelMessage(
@@ -130,11 +141,13 @@ def test_unknown_execution_requires_manual_reconciliation(foundation) -> None:
         )
     )
 
-    outcome = coordinator.approve_and_execute(intake.decision_id, "human-operator")
+    enqueued = coordinator.approve_and_enqueue(intake.decision_id, "human-operator")
+    outcome = worker.run_once()
+    assert outcome is not None
     assert outcome.execution_state is ExecutionState.UNKNOWN
 
     with foundation["uow_factory"]() as uow:
-        execution = uow.require_repository().get_execution(outcome.execution_id)
+        execution = uow.require_repository().get_execution(enqueued.execution_id)
 
     try:
         assert_not_automatic_retry(execution)

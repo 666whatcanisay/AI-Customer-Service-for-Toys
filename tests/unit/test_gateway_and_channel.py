@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from channel_engine.channel import ChannelMessage, FakeChannel
-from channel_engine.gateway import DecisionRequest, FakeGateway
+from channel_engine.gateway import CONTRACT_VERSION, DecisionRequest, FakeGateway
 from channel_engine.models import DecisionAction
 
 
@@ -9,15 +11,24 @@ def test_fake_gateway_is_deterministic_and_requires_approval() -> None:
     gateway = FakeGateway()
     response = gateway.decide(
         DecisionRequest(
+            contract_version=CONTRACT_VERSION,
+            request_id="gateway-request-1",
+            idempotency_key="decision-msg-1",
+            correlation_id="msg-1",
             conversation_id="conv-1",
             message_id="msg-1",
             customer_message="Where is my order?",
+            requested_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
         )
     )
 
     assert response.action is DecisionAction.SUGGEST_REPLY
     assert response.requires_approval is True
     assert response.gateway_version == "fake-gateway.v1"
+    assert response.contract_version == CONTRACT_VERSION
+    assert response.request_id == "gateway-request-1"
+    assert response.idempotency_key == "decision-msg-1"
+    assert response.correlation_id == "msg-1"
     assert response.metadata["real_ai_cs_called"] is False
     assert "Where is my order?" in (response.proposed_content or "")
     assert gateway.call_count == 1
@@ -32,7 +43,7 @@ def test_fake_channel_is_fifo() -> None:
         text="first",
     )
     second = first.model_copy(
-        update={"external_message_id": "message-2", "text": "second"}
+        update={"external_message_id": "message-2", "content": "second"}
     )
     channel.enqueue(first)
     channel.enqueue(second)

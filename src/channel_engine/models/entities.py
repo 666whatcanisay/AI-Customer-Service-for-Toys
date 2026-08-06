@@ -80,7 +80,10 @@ class Execution(DomainModel):
     approval_id: str
     state: ExecutionState = ExecutionState.PENDING
     idempotency_key: str
-    attempt: int = Field(default=1, ge=1)
+    attempt: int = Field(default=0, ge=0)
+    lease_owner: str | None = None
+    lease_token: str | None = None
+    lease_expires_at: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     error_code: str | None = None
