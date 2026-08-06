@@ -6,6 +6,25 @@
 | `RISK_REVIEW_REQUIRED` | Answer needs controlled handling. | Follow the returned action. |
 | `INTERNAL_ERROR` | Service failed unexpectedly. | Retry or transfer to a human. |
 
+## Identity & Access Management V1
+
+- `AUTHENTICATION_REQUIRED`: a Bearer credential is missing or malformed.
+- `AUTHENTICATION_FAILED`: username/password or Bearer token is invalid.
+- `SESSION_EXPIRED`: the authenticated session is expired or revoked.
+- `PASSWORD_CHANGE_REQUIRED`: the authenticated account is using an
+  initialization/reset credential and must replace it before business APIs are
+  authorized.
+- `AUTHORIZATION_DENIED`: the authenticated user lacks a server-side permission
+  or Store binding.
+- `USER_NOT_FOUND`: the target user does not exist.
+- `USERNAME_CONFLICT`: the normalized username is already registered.
+- `ROLE_INVALID`: one or more assigned roles are outside the fixed V1 set.
+- `STORE_BINDING_INVALID`: a Store does not exist, is duplicated, or is outside
+  the allowed binding shape.
+- `DEFAULT_STORE_REQUIRED`: retained for 0.9 compatibility; 0.10 no longer
+  emits it because CUSTOMER_SERVICE may start unbound and select multiple
+  enabled Stores.
+
 ## Channel Engine Gateway Server Foundation V1
 
 All `/gateway/v1/**` non-2xx responses use the frozen Gateway ErrorEnvelope.

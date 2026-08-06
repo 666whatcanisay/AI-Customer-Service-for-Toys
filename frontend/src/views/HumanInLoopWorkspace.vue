@@ -99,7 +99,10 @@ const loadCatalog = async (): Promise<void> => {
         : '当前没有已启用的客服店铺。'
       return
     }
-    selectedStoreCode.value = stores.value[0].storeCode
+    const initialStore = stores.value.find(
+      (item) => item.storeCode === identity.value.defaultStoreCode
+    ) ?? stores.value[0]
+    selectedStoreCode.value = initialStore.storeCode
     await loadProducts()
   } catch (error) {
     contextError.value = error instanceof Error ? error.message : '客服商品目录暂时不可用。'
@@ -350,4 +353,3 @@ onMounted(async () => {
   .human-loop-workspace { grid-template-columns: 230px minmax(540px, 1fr) 220px; }
 }
 </style>
-

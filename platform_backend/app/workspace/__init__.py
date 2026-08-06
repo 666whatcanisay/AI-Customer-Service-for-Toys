@@ -1,0 +1,1 @@
+"""Authenticated B workspace facade."""

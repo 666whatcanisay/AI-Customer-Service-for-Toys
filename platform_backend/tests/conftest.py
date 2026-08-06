@@ -11,6 +11,24 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.ingestion.parsers.product_sku_xlsx import DATA_SHEET, EXPECTED_HEADERS
 from app.main import app
+from app.iam.dependencies import Principal, get_current_principal
+from app.iam.schemas import RoleName
+
+
+LEGACY_TEST_ADMIN = Principal(
+    user_id="00000000-0000-0000-0000-000000000001",
+    username="pytest-admin",
+    display_name="Pytest Admin",
+    roles=frozenset({RoleName.ADMIN}),
+    permissions=frozenset({
+        "workspace.access", "ai.reply", "feedback.submit", "customer_service.manage",
+        "product.manage", "sku.manage", "knowledge.manage", "faq.manage",
+        "ai_quality.view", "store.view", "feedback.view", "user.manage",
+    }),
+    store_ids=frozenset(),
+    all_store_access=True,
+    must_change_password=False,
+)
 
 
 @pytest.fixture
@@ -35,6 +53,7 @@ def client(session: Session) -> Iterator[TestClient]:
         yield session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_principal] = lambda: LEGACY_TEST_ADMIN
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

@@ -78,13 +78,14 @@
         <div class="tester-summary" data-testid="tester-summary">
           <div>
             <small>当前客服</small>
-            <strong>{{ identity.reporterName || '尚未填写姓名' }}</strong>
+            <strong>{{ identity.reporterName }}</strong>
           </div>
           <div>
             <small>负责店铺</small>
-            <strong>{{ identity.defaultStoreCode || '未设置' }}</strong>
+            <strong>{{ storeScopeLabel }}</strong>
           </div>
-          <button type="button" @click="openIdentityEditor">修改</button>
+          <RouterLink v-if="auth.user.value?.roles.includes('CUSTOMER_SERVICE')" to="/store-selection" class="store-link">管理店铺</RouterLink>
+          <button type="button" data-testid="customer-logout" @click="signOut">退出</button>
         </div>
         <button
           class="technical-toggle"
@@ -118,47 +119,6 @@
     </section>
 
     <el-dialog
-      v-model="identityDialogOpen"
-      title="设置客服工作台身份"
-      width="min(520px, calc(100vw - 32px))"
-      :close-on-click-modal="Boolean(identity.reporterName)"
-      :close-on-press-escape="Boolean(identity.reporterName)"
-      :show-close="Boolean(identity.reporterName)"
-      data-testid="identity-dialog"
-    >
-      <div class="identity-notice">
-        这是本机工作台标识，不是登录或权限认证。请勿填写密码、电话、客户姓名或订单信息。
-      </div>
-      <label class="identity-field">
-        <span>显示姓名 <em>必填</em></span>
-        <el-input
-          v-model="identityDraft.reporterName"
-          data-testid="identity-name"
-          maxlength="40"
-          placeholder="例如：客服小木"
-        />
-      </label>
-      <label class="identity-field">
-        <span>默认店铺 <small>可选</small></span>
-        <el-input
-          v-model="identityDraft.defaultStoreCode"
-          data-testid="identity-store"
-          maxlength="64"
-          placeholder="例如：PDD-SM"
-        />
-      </label>
-      <p v-if="identityError" class="identity-error" data-testid="identity-error">
-        {{ identityError }}
-      </p>
-      <template #footer>
-        <el-button v-if="identity.reporterName" @click="identityDialogOpen = false">取消</el-button>
-        <el-button type="primary" data-testid="identity-save" @click="saveIdentity">
-          保存工作台身份
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog
       v-model="pilotGuideOpen"
       title="AI客服助手"
       width="min(560px, calc(100vw - 32px))"
@@ -190,31 +150,37 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide, reactive, ref, watch } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
-import {
-  TesterIdentityKey,
-  createTesterIdentityStore
-} from '@/workspace/testerIdentity'
+import { computed, onMounted, provide, ref, watch } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { TesterIdentityKey, type TesterIdentityStore } from '@/workspace/testerIdentity'
 import { SystemStatusKey, createSystemStatusStore } from '@/workspace/systemStatus'
+import { useAuthSession } from '@/auth/authSession'
 
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthSession()
 const mobileMenuOpen = ref(false)
-const identityDialogOpen = ref(false)
-const identityError = ref('')
 const pilotGuideOpen = ref(false)
 const showProductDetails = ref(false)
-const identityStore = createTesterIdentityStore()
-const identity = identityStore.identity
+const identity = computed(() => ({
+  reporterId: auth.user.value?.id ?? '',
+  reporterName: auth.user.value?.display_name ?? '',
+  defaultStoreCode: auth.user.value?.stores[0]?.store_code ?? ''
+}))
+const storeScopeLabel = computed(() => {
+  if (auth.user.value?.all_store_access === true) return '全部店铺'
+  const names = auth.user.value?.stores.map((item) => item.store_name) ?? []
+  return names.length ? names.join('、') : '未绑定'
+})
+const identityStore: TesterIdentityStore = {
+  identity,
+  save: () => undefined,
+  reload: () => undefined
+}
 const systemStatus = createSystemStatusStore()
 
 provide(TesterIdentityKey, identityStore)
 provide(SystemStatusKey, systemStatus)
-
-const identityDraft = reactive({
-  reporterName: identity.value.reporterName,
-  defaultStoreCode: identity.value.defaultStoreCode
-})
 
 const PILOT_GUIDE_STORAGE_KEY = 'mumu-customer-workspace:pilot-guide-seen'
 
@@ -250,32 +216,15 @@ const closeMobileMenu = () => {
   mobileMenuOpen.value = false
 }
 
-const openIdentityEditor = () => {
-  identityDraft.reporterName = identity.value.reporterName
-  identityDraft.defaultStoreCode = identity.value.defaultStoreCode
-  identityError.value = ''
-  identityDialogOpen.value = true
-}
-
-const saveIdentity = () => {
-  if (!identityDraft.reporterName.trim()) {
-    identityError.value = '请填写用于工作台显示的姓名。'
-    return
-  }
-  identityStore.save(identityDraft.reporterName, identityDraft.defaultStoreCode)
-  identityError.value = ''
-  identityDialogOpen.value = false
-  pilotGuideOpen.value = shouldShowPilotGuide()
+const signOut = async () => {
+  await auth.logout()
+  await router.replace('/login')
 }
 
 watch(() => route.fullPath, closeMobileMenu)
 
 onMounted(() => {
-  identityStore.reload()
-  identityDraft.reporterName = identity.value.reporterName
-  identityDraft.defaultStoreCode = identity.value.defaultStoreCode
-  identityDialogOpen.value = !identity.value.reporterName
-  pilotGuideOpen.value = Boolean(identity.value.reporterName) && shouldShowPilotGuide()
+  pilotGuideOpen.value = shouldShowPilotGuide()
   void systemStatus.refresh()
 })
 </script>
@@ -549,6 +498,7 @@ onMounted(() => {
 .identity-field em { color: #c33d35; font-style: normal; font-size: 12px; }
 .identity-field small { color: #748198; font-weight: 400; }
 .identity-error { margin: 12px 0 0; color: #c33d35; font-size: 13px; }
+.store-link{color:#b9d5ff;font-size:12px;text-decoration:none}
 .pilot-guide-intro { margin: 0 0 12px; color: #52627a; }
 .pilot-guide-steps { display: grid; gap: 9px; margin: 0 0 18px; padding-left: 24px; color: #203555; line-height: 1.5; }
 .mobile-mask { display: none; }

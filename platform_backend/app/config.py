@@ -67,6 +67,7 @@ class Settings:
     knowledge_material_storage_dir: str
     ai_service_base_url: str
     ai_service_timeout_seconds: float
+    iam_session_ttl_minutes: int
 
 
 @lru_cache
@@ -104,4 +105,5 @@ def get_settings() -> Settings:
         ai_service_timeout_seconds=float(
             os.getenv("AI_SERVICE_TIMEOUT_SECONDS", "120")
         ),
+        iam_session_ttl_minutes=int(os.getenv("IAM_SESSION_TTL_MINUTES", "480")),
     )

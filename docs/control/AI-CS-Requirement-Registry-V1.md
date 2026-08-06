@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`AI_CS_SERVER_RELEASE_CANDIDATE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`AI_CS_ACCOUNT_POLICY_READY / AI_CS_INITIAL_ACCOUNTS_BLOCKED / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
 
 ## 1. 台账目标
 
@@ -105,8 +105,12 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R012 | AI-CS Gateway Source Baseline V1 | `DONE` | A、contracts、Control、QA | Gateway Candidate已完成Production/Deferred/Experimental分类、职责与文件冻结、contracts 0.6复核及R006/R009回归；保护锚点未改写，后由R014受控提交。 |
 | R013 | AI-CS Production Server Runtime RC V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | Production wrapper、file-reference secret、签名Health Gate、Server Runtime Console与全量回归完成；源码已由R014提交，仍未部署或连接生产Engine/PDD。 |
 | R014 | AI-CS Server Release Candidate Stabilization V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | R011–R013 dirty Candidate已精确提交；clean SHA完成Windows start/status/Decision/Console/stop，未连接生产Engine/PDD。 |
+| R015 | AI-CS Gateway LAN Mode Enablement V1 | `DONE` | A、OPS、C Admin、contracts、Control、QA | LOCAL与受控RFC1918 LAN Gateway已实现；HMAC与冻结wire不变，正式跨机仍需防火墙规则和独立终端验收。 |
+| R016 | AI-CS User Management & Store Binding V1 | `DONE` | C、B、A、contracts、Control、QA | 真实登录、固定RBAC、Store绑定、Workspace服务端鉴权和Admin用户管理已实现并通过全量回归；待受控部署0013及首个ADMIN初始化。 |
+| R017 | AI-CS Initial Production Accounts V1 | `BLOCKED` | Control、OPS、C IAM | Runtime仍为0012/pre-IAM，R016/R018源码未受控部署；账号策略输入已由R018解决，但只读审计后仍为零账号写入。 |
+| R018 | AI-CS Account Policy Adjustment V1 | `DONE` | C、B、A、contracts、OPS、Control、QA | Unicode账号、临时口令首次改密、客服多店、运营/管理员全店和受控三账号脚本已完成；生产账号仍由R017执行。 |
 
-状态数量：`DONE=11`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计14项。
+状态数量：`DONE=14`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=2`、`DEPRECATED=0`，合计18项。
 
 ## 6. 需求明细
 
@@ -384,6 +388,75 @@ R006.2不改变R006业务模型，只补齐已经打开页面对激活变化的�
 | 验收证据 | [Task Card](product-management/AI-CS-Server-Release-Candidate-Stabilization-V1-Task-Card.md)与[Stabilization Report](../rag/AI-CS-Server-Release-Candidate-Stabilization-Report-V1.md)：source `6ae8d407...`、code RC `4b6c0bd0...`；A 138/3 skipped、C定向25、Admin76、OPS11/11、contracts7、17 schemas；真实 Runtime identity与四端口stop PASS。 |
 | 防止重复错误规则 | 不得再把已提交的R011–R013称为dirty Candidate；不得把本机验证secret、clean commit或本地运行等同于生产secret管理、远端发布、TLS或生产Engine联通。 |
 
+### R015 — AI-CS Gateway LAN Mode Enablement V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R015 |
+| 提出时间 | 2026-08-05 |
+| 需求名称 | AI-CS Gateway LAN Mode Enablement V1 |
+| 用户原始目标 | 在保持LOCAL默认安全模式的同时，让独立客服电脑能够通过受控内网访问冻结Gateway。 |
+| 当前状态 | `DONE` |
+| 负责模块 | A/OPS：LAN edge与运行校验；C Admin：网络模式投影；contracts：0.8 additive；Control/QA：安全边界与Gate。 |
+| 影响范围 | 新增显式RFC1918 bind/CIDR、专用端口和Windows Firewall只读/显式配置引导；不开放A Core、C、Admin、`/api/chat`或公网。 |
+| 完成标准 | LOCAL与LAN模式、signed Health/Decision/HMAC/幂等、状态显示、fail-closed防火墙预检和回归均通过。 |
+| 验收证据 | [Gateway LAN Mode Report](../rag/AI-CS-Gateway-LAN-Mode-Enablement-Report-V1.md)：A 143/3 skipped、C121、Admin76、OPS12/12、contracts7；本机私网data plane通过。 |
+| 关联代码/文档 | `backend/app/gateway/lan_proxy.py`、`scripts/windows/start_lan_ai_cs_server.ps1`、contracts 0.8 Console schema及上述报告。 |
+| 防止重复错误规则 | 不得把本机私网请求冒充独立电脑验收；不得关闭HMAC、暴露8000/8011/5174、自动关闭防火墙或声称HTTP LAN可用于不可信网络。 |
+
+### R016 — AI-CS User Management & Store Binding V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R016 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS User Management & Store Binding V1 |
+| 用户原始目标 | 让客服、运营和管理员拥有真实身份、角色、权限及店铺绑定，并按身份进入Workspace。 |
+| 业务背景 | Human Workspace、C Admin、商品知识、RAG与Feedback Loop已存在，但浏览器tester identity不是认证，接口缺少统一RBAC和Store授权。 |
+| 当前状态 | `DONE` |
+| 负责模块 | C：IAM权威数据、session、RBAC、Store绑定和Workspace facade；B：登录/自动默认店铺；C Admin：用户管理；A：管理端点向C验权及凭证透传；contracts/Control/QA：跨线冻结与验收。 |
+| 影响范围 | 新增0013、`/api/v1/auth/*`、`/api/v1/admin/users/*`、`/api/v1/workspace/*`、B/Admin登录与路由；不改R006/R009、商品库语义、RAG、Prompt、模型、PDD Adapter或Gateway wire。 |
+| 完成标准 | 密码只存强hash；opaque session只存digest并可撤销；三种固定角色服务端鉴权；客服恰有一个默认Store；管理员可创建/分配/绑定/停用；前后端及Contract回归通过。 |
+| 验收证据 | [Completion Report](AI-CS-User-Management-Store-Binding-V1-Completion-Report.md)：A147/3 skipped、C127、B139、Admin82、contracts9，typecheck和两套production build通过；0013迁移往返及登录/RBAC/Store scope测试通过。 |
+| 关联代码/文档 | `platform_backend/app/iam/`、`platform_backend/app/workspace/`、`platform_backend/migrations/versions/0013_user_management_v1.py`、B/Admin auth与登录页面、contracts 0.9 IAM schema/compatibility。 |
+| 防止重复错误规则 | 不得以隐藏按钮代替服务端授权，不得恢复浏览器tester identity作为身份，不得把密码/token明文写入数据库、日志、脚本或Git，不得让B绕过C直接调用A。 |
+
+### R017 — AI-CS Initial Production Accounts V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R017 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Initial Production Accounts V1 |
+| 用户原始目标 | 基于R016创建管理员、客服主管和运营主管三个初始生产账号，完成角色、Store绑定、登录、Session及权限隔离验证。 |
+| 业务背景 | R016源码能力已经通过自动化Gate，但生产初始化必须基于已部署0013、受控source identity、合规凭证和明确Store/权限输入执行。 |
+| 当前状态 | `BLOCKED` |
+| 负责模块 | Control/OPS：部署与证据Gate；C IAM：账号、Session、RBAC与Store绑定权威执行。 |
+| 影响范围 | 仅初始账号、角色、Session验证和Store binding；不修改R006、R009、RAG、Prompt、模型、Gateway Contract、PDD Adapter或Channel Engine。 |
+| 完成标准 | 正式数据库备份后迁移0013；重复账号检查无覆盖；三个合规账号经系统hash创建；角色和Store范围正确；首次改密、登录、Session、200/401/403和跨角色隔离全部通过。 |
+| 当前阻塞 | Runtime为0012/pre-IAM，IAM表不存在；R016/R018 Candidate尚未形成可部署的受控source identity。账号格式、首次改密、客服多Store和运营/管理员全Store策略已由R018冻结，不再是策略阻塞。 |
+| 验收证据 | 当前仅有[Initialization Report](AI-CS-Initial-Production-Accounts-Initialization-Report-V1.md)的只读失败证据：数据库完整性ok、账号/Session/绑定零写入。 |
+| 解除条件 | 单独授权源码固化、备份/0013协调迁移/Runtime切换；在受控控制台交互运行初始化脚本并完成三个账号首次改密、Session和角色隔离验收。 |
+| 关联任务 | [R017 Remediation Task Card](product-management/AI-CS-Initial-Production-Accounts-Remediation-V1-Task-Card.md)。 |
+| 防止重复错误规则 | 不得直接SQL或降级校验绕过，不得覆盖重复账号，不得在聊天/命令行/文档/Git中记录密码、hash或token，不得把源码测试冒充生产登录验收。 |
+
+### R018 — AI-CS Account Policy Adjustment V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R018 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Account Policy Adjustment V1 |
+| 用户原始目标 | 调整内部初始账号、临时口令、角色权限和Store策略，使管理员、客服主管和运营主管能按公司实际方式初始化和使用。 |
+| 业务背景 | R017前置审计发现R016的ASCII/长度/唯一默认Store假设与批准的内部账号策略冲突，不能通过直接SQL、降级hash或覆盖账号绕过。 |
+| 当前状态 | `DONE` |
+| 负责模块 | C：身份、RBAC、首次改密、Store范围和初始化CLI；B/Admin：强制改密与Store选择；A：管理鉴权桥；contracts/OPS/Control/QA：协调契约、脚本、审计与验收。 |
+| 影响范围 | Repository contracts升至0.10；新增/调整IAM API、B/Admin路由、A鉴权桥和Windows初始化wrapper；不改Channel Engine、Gateway wire、PDD Adapter、R006/R009、RAG、Prompt、模型或`/api/chat`语义。 |
+| 完成标准 | Unicode/大小写显示用户名可创建和登录；8–128字符临时口令只用于初始化/重置并强制首次改密；客服支持多Store自选；运营/管理员全Store；重复账号只跳过；服务端RBAC与全量回归通过。 |
+| 验收证据 | [Completion Report](AI-CS-Account-Policy-Adjustment-V1-Completion-Report.md)：A147/3 skipped、C130、B143、Admin84、contracts10、两套typecheck/build和Windows bootstrap policy均通过；正式数据库与账号零写入。 |
+| 关联代码/文档 | `platform_backend/app/iam/`、B/Admin auth与页面、`backend/app/service/iam_authorization.py`、`contracts/schemas/identity-access-management.v1.schema.json`、`scripts/windows/bootstrap_ai_cs_initial_users.ps1`、[Task Card](product-management/AI-CS-Account-Policy-Adjustment-V1-Task-Card.md)。 |
+| 防止重复错误规则 | 不得硬编码或记录长期/临时口令，不得以UI隐藏代替服务端403，不得让客服自选非启用Store，不得将0.9客户端与0.10 Provider混合部署，不得将源码Policy Ready冒充生产账号Ready。 |
+
 ## 7. 历史错误防复发规则
 
 1. 不要重复开发已经完成的模块。先检索需求 ID、验收证据和关联代码；`DONE` 能力只允许登记回归、修复或明确的新目标。
@@ -418,6 +491,8 @@ R005 Feedback Loop真实运行验证（TODO）
 ```
 
 R007 是并行的外部网络阻塞，不应通过修改 AI-CS 业务代码处理。
+
+R018 已关闭R017的账号与Store策略输入缺口。R017 仍是并行的生产身份初始化阻塞；解除前必须保持零账号写入，不得用R016/R018源码完成状态替代受控0013部署和真实首次改密/登录验收。
 
 R006、R006.1、R006.2能力已纳入V1.0.0内部生产正式基线。发布分支为`release/ai-cs-v1.0.0`，功能正式化提交`9f2b500dc0d6469a04a6953b7886d65e34412a22`，P2文案补丁`9911ba67cef330a7a1b4f03f82de227cbee6982d`，防复发测试`0f230c6f50f8b6162c4e52f3b167053e6592c656`；contracts为0.5.0，数据库为0012，内部物理集合保持56 chunks。R003仍需完整业务结果验收，不能用单商品Smoke直接关闭。
 

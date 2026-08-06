@@ -1,5 +1,37 @@
 # Contract changelog
 
+## 0.10.0 - 2026-08-06
+
+- Coordinated the C IAM provider, B Customer Workspace and C Admin around the
+  internal account policy: 1–64 character Unicode usernames, 8–128 character
+  temporary initialization credentials, and server-enforced first-login
+  password replacement with a 12–128 character new credential.
+- Added `must_change_password` and `all_store_access` to the IAM user
+  projection, self-service password replacement, and CUSTOMER_SERVICE
+  enabled-Store option/multi-binding objects. CUSTOMER_SERVICE no longer
+  requires a fixed default Store.
+- Expanded fixed permissions for customer-service self-management and explicit
+  product/SKU/knowledge/FAQ/AI-quality/store operations. OPERATOR and ADMIN
+  receive server-derived all-Store scope; only ADMIN receives user management.
+- This is a coordinated pre-1.0 IAM revision because an old B consumer depends
+  on a unique default Store. B, C and Admin must deploy together. A chat,
+  Gateway wire `1.0`, Channel Engine, PDD Adapter, R006/R009, Prompt, RAG and
+  model behavior are unchanged.
+
+## 0.9.0 - 2026-08-06
+
+- Added `ai-cs.iam.v1` login, current-user, user administration, fixed role,
+  permission, Store-binding, and platform ErrorEnvelope objects.
+- Added an authenticated C workspace facade that validates the user's Store
+  scope before forwarding the unchanged A `/api/chat` request/response.
+- A, B and C are affected. Frontend controls are presentation only; C remains
+  the IAM authority and reuses the existing Store model. Browser-reachable A
+  AI-admin routes validate the Bearer session and operations permission through
+  C before serving the frozen control response.
+- This is additive over 0.8.0. Gateway wire `1.0` and its canonical schema,
+  Channel Engine RC1, PDD Adapter, R006/R009, Prompt, RAG, and A answer
+  semantics are unchanged.
+
 ## 0.8.0 - 2026-08-05
 
 - Added optional `server.network_mode` (`LOCAL` or `LAN`, default `LOCAL`) to

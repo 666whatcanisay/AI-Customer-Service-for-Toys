@@ -1,6 +1,6 @@
 # Platform backend
 
-C-line FastAPI service. C-T02 adds an isolated, review-only product/SKU XLSX ingestion path on top of the C-T01 health baseline. Valid rows stop at `PENDING_REVIEW`; there is no publish, RAG, Kingdee, model-completion, authentication, or formal product CRUD capability.
+C-line FastAPI service. It owns the production IAM V1 user, role, opaque session and Store-binding records, in addition to the existing product, knowledge and operations capabilities. It does not own RAG/model behavior, PDD integration or browser automation.
 
 ## Local setup
 
@@ -16,6 +16,17 @@ python -m venv .venv
 $env:CORS_ALLOWED_ORIGINS = "http://127.0.0.1:5173"
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
+
+The normal Windows production wrapper runs `alembic upgrade head` before it starts this service. After an authorized backup and migration to `0013_user_management_v1`, use a repository wrapper so the CLI reads the same controlled database configuration. Passwords are read by Python `getpass` and must never be supplied on the command line or stored in a script:
+
+```powershell
+..\scripts\windows\bootstrap_ai_cs_admin.ps1 -Username admin -DisplayName "系统管理员"
+..\scripts\windows\bootstrap_ai_cs_initial_users.ps1
+```
+
+The initial-users wrapper contains only the approved non-secret identities. It normalizes usernames with NFKC plus casefold for duplicate detection, skips existing accounts without changing their credential, role, status or Store bindings, and prompts only when an account is missing. Direct CLI use is safe only when the process already has the exact production `DATABASE_URL`; otherwise it may target the local default database.
+
+IAM endpoints are under `/api/v1/auth` and ADMIN-only user management is under `/api/v1/admin/users`. Browser-facing business endpoints require a Bearer session and are authorized on the server. New or reset accounts always have `must_change_password=true`; business permissions fail closed until `/api/v1/auth/change-password` succeeds. `CUSTOMER_SERVICE` users may start with no Store, then use `/api/v1/auth/store-options` and `/api/v1/auth/store-bindings` to select one or more enabled customer Stores. `OPERATOR` and `ADMIN` receive all-Store scope from their role. The Customer Workspace derives identity and allowed Store scope from `/api/v1/auth/me`. Session lifetime defaults to 480 minutes and can be changed with `IAM_SESSION_TTL_MINUTES`.
 
 `GET /health` returns service status and a request ID. Product/SKU import endpoints are under `/api/v1`; the fixed template is served by `GET /api/v1/import-templates/product-sku`.
 
@@ -33,6 +44,6 @@ C-T05 adds local customer-suggestion persistence plus read-only `/api/v1/admin/*
 
 Configuration is loaded from environment variables documented in `.env.example`. The application does not automatically read `.env` files.
 
-`CORS_ALLOWED_ORIGINS` is a comma-separated list of complete browser origins. Its safe local default is only `http://127.0.0.1:5173`. If the browser is opened with `localhost`, add `http://localhost:5173` explicitly. Wildcards, empty lists, non-HTTP(S) URLs, credentials, paths, queries, and fragments are rejected during application startup. CORS does not provide authentication or authorization.
+`CORS_ALLOWED_ORIGINS` is a comma-separated list of complete browser origins. Its safe local default is only `http://127.0.0.1:5173`. If the browser is opened with `localhost`, add `http://localhost:5173` explicitly. Wildcards, empty lists, non-HTTP(S) URLs, credentials, paths, queries, and fragments are rejected during application startup. CORS is only a browser boundary; Bearer authentication and server-side RBAC remain mandatory.
 
 The local default is `sqlite:///./platform.db`. Database files, uploaded source files, logs, environments, and dependencies are Git-ignored. The parser processes the upload in memory and does not retain the workbook itself.

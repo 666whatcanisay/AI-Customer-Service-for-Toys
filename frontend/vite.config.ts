@@ -39,11 +39,6 @@ export default defineConfig(({ mode }) => ({
     proxy: {
       // Deliberately limited to the two approved service prefixes. The browser
       // never receives a route that can proxy to an arbitrary upstream.
-      '/rag-api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/rag-api/, '')
-      },
       '/platform-api': {
         target: 'http://127.0.0.1:8011',
         changeOrigin: true,

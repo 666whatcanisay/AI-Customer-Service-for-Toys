@@ -99,9 +99,12 @@ class KnowledgeQualitySnapshot:
 class PlatformKnowledgeQualityClient:
     """C client restricted to the frozen quality-loop provider endpoints."""
 
-    def __init__(self, base_url: str, timeout_seconds: float) -> None:
+    def __init__(
+        self, base_url: str, timeout_seconds: float, authorization: str | None = None
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.authorization = authorization
 
     def _request_json(
         self,
@@ -118,13 +121,16 @@ class PlatformKnowledgeQualityClient:
             if payload is not None
             else None
         )
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        if self.authorization:
+            headers["Authorization"] = self.authorization
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=body,
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json; charset=utf-8",
-            },
+            headers=headers,
             method=method,
         )
         try:
@@ -382,11 +388,12 @@ class KnowledgeQualityRecord:
 class KnowledgeQualityService:
     """Manual provider-agnostic API bridge constrained to local qwen3.5:9b."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, authorization: str | None = None) -> None:
         self.settings = settings
         self.platform_client = PlatformKnowledgeQualityClient(
             settings.platform_api_base_url,
             settings.platform_api_timeout_seconds,
+            authorization,
         )
 
     def _call_ollama(self, prompt: str) -> str:

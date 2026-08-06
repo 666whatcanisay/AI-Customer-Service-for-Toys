@@ -6,7 +6,7 @@
 
 它不是通用代理、模型管理接口或业务自动化接口。不得据此自动修改 Prompt、发布知识、训练或切换模型、发送客户消息、退款、售后执行、订单/ERP 写入。
 
-版本：`v1`。本文件以 `origin/develop@32feb6108156f5fb4ec297417537d60452d0743f` 的已实现路由为依据；不修改 `contracts/**`。
+版本：`v1`。响应字段保持冻结；R016从repository contracts 0.9.0起新增传输层Bearer要求，不改变成功/失败业务对象。
 
 ## 2. 所有者
 
@@ -16,7 +16,9 @@
 | Provider | A，`backend/app/api/routes.py` |
 | Consumer | C Admin，`admin_web`，通过 `/ai-api` 同源代理访问 A |
 | 传输边界 | Admin 浏览器只访问 C 的 `5174`；Vite 的 `/ai-api/**` 固定代理到服务器本机 `127.0.0.1:8000/**` |
-| 认证状态 | 当前测试基线没有正式鉴权；仅限本机 Admin 使用，不能宣称具备生产权限控制 |
+| 认证状态 | R016要求opaque Bearer；A逐请求向C `/api/v1/auth/me`验证活动session及运营权限。Vite同源代理不是安全边界。 |
+
+R016兼容补充：C Admin为所有`/api/admin/ai/**`请求附带Bearer。A只接受至少具有`product.manage`、`knowledge.manage`、`feedback.view`或`user.manage`之一的身份；缺失/无效session返回401，客服角色返回403，C IAM不可用时fail closed为503。R006内部`knowledge-publications`两条loopback服务接口不在浏览器AI控制面内，保持原服务间兼容。
 
 ## 3. 通用约定
 

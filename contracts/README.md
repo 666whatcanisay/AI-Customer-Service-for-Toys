@@ -4,7 +4,7 @@ This directory is jointly owned by all three development lines. Schemas are the
 versioned compatibility boundary; do not make breaking changes without updating
 `version.json`, `CHANGELOG.md`, and the compatibility notes in the pull request.
 
-Current additive baseline: `0.8.0`. Customer-service catalog consumers must use
+Current coordinated baseline: `0.10.0`. Customer-service catalog consumers must use
 the C-owned `pilot-business-catalog.v1.1` projection and must not derive
 availability from legacy test or publication fields.
 
@@ -46,3 +46,21 @@ any B/C business contract.
 exposure mode without disclosing a bind address, allowed CIDR, credential or
 secret reference. The frozen Gateway wire schema and Contract `1.0` are
 unchanged.
+
+`0.9.0` adds C-owned browser-user authentication, opaque Bearer sessions,
+three fixed roles, server-enforced permissions, and bindings to the existing
+Store model. B enters the authenticated user's default Store automatically and
+uses the C workspace facade for the unchanged A chat envelope. C Admin adds
+ADMIN-only user management; OPERATOR and CUSTOMER_SERVICE permissions are
+enforced by C, not by hidden buttons. A AI-admin routes validate the same Bearer
+session and operations permission through C; A stores no identity or token.
+Gateway wire `1.0`, Channel Engine, PDD, R006/R009, Prompt, RAG, and A
+`/api/chat` semantics remain unchanged.
+
+`0.10.0` is a coordinated IAM policy revision. It supports Unicode internal
+usernames and temporary 8-character initialization credentials, but marks every
+new or reset credential for mandatory first-login replacement with a 12+
+character password. CUSTOMER_SERVICE selects one or more enabled Stores and no
+longer depends on a unique default; OPERATOR and ADMIN have server-derived
+all-Store scope. B, C and Admin must deploy this revision together. No password
+value is part of the contract or source tree.

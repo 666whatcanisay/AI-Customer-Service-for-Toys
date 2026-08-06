@@ -23,6 +23,10 @@ from app.ai_feedback.schemas import (
 from app.database import get_db
 from app.customer_feedback_loop.service import link_feedback_classification, minimize_summary
 from app.errors import AppError
+from app.iam.dependencies import (
+    Principal, effective_user_reference, ensure_store_code_access,
+    get_current_principal,
+)
 
 
 router = APIRouter(prefix="/api/v1/ai-response-feedback", tags=["ai-response-feedback"])
@@ -94,6 +98,7 @@ def create_ai_response_feedback(
     payload: AIResponseFeedbackCreate,
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=255),
     session: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> AIResponseFeedbackCreated:
     """Create exactly one C-owned NEW record for a B explicit submission."""
     key = idempotency_key.strip()
@@ -103,6 +108,10 @@ def create_ai_response_feedback(
             "Idempotency-Key must not be blank.",
             status_code=422,
         )
+    ensure_store_code_access(session, principal, payload.store_code)
+    payload = payload.model_copy(update={
+        "created_by": effective_user_reference(principal, payload.created_by)
+    })
     fingerprint = _fingerprint(payload)
     receipt = _idempotency_record(session, created_by=payload.created_by, idempotency_key=key)
     if receipt is not None:
@@ -187,8 +196,10 @@ def list_ai_response_feedback(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     session: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> AIResponseFeedbackListResponse:
     """Return B's minimum personal status projection; no audit or A evidence leaks."""
+    created_by = effective_user_reference(principal, created_by)
     statement = select(AIResponseFeedback).where(AIResponseFeedback.created_by == created_by)
     if feedback_type is not None:
         statement = statement.where(AIResponseFeedback.feedback_type == feedback_type)

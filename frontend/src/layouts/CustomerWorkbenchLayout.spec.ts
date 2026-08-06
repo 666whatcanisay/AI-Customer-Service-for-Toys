@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TESTER_IDENTITY_STORAGE_KEY } from '@/workspace/testerIdentity'
+import { authSessionTestControl } from '@/auth/authSession'
 import CustomerWorkbenchLayout from './CustomerWorkbenchLayout.vue'
 
 const healthMocks = vi.hoisted(() => ({ rag: vi.fn(), platform: vi.fn() }))
@@ -13,7 +13,7 @@ const mountLayout = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      '/', '/workspace', '/ai-chat', '/experience-cases', '/feedback', '/suggestions', '/suggestions/mine'
+      '/', '/workspace', '/ai-chat', '/experience-cases', '/feedback', '/suggestions', '/suggestions/mine', '/store-selection'
     ].map((path) => ({ path, component: { template: '<div>页面内容</div>' } }))
   })
   await router.push('/')
@@ -24,13 +24,21 @@ const mountLayout = async () => {
 describe('CustomerWorkbenchLayout', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     document.body.innerHTML = ''
+    authSessionTestControl.setUser({
+      id: '11111111-1111-4111-8111-111111111111', username: 'support.one',
+      display_name: '小木', status: 'ACTIVE', roles: ['CUSTOMER_SERVICE'],
+      permissions: ['workspace.access', 'ai.reply', 'feedback.submit'],
+      stores: [{ id: 1, store_id: 1, store_code: 'PDD-SM', store_name: '玩趣乐园积木店', platform: 'pdd', is_default: false }],
+      must_change_password: false, all_store_access: false,
+      created_at: '2026-08-06T00:00:00Z', updated_at: '2026-08-06T00:00:00Z'
+    })
     healthMocks.rag.mockResolvedValue({ ready: true })
     healthMocks.platform.mockResolvedValue({ status: 'ok' })
   })
 
   it('shows the unified product navigation, honest status labels and safety banner', async () => {
-    localStorage.setItem(TESTER_IDENTITY_STORAGE_KEY, JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' }))
     const wrapper = await mountLayout()
     await flushPromises()
     expect(wrapper.get('nav').text()).toContain('首页')
@@ -44,6 +52,8 @@ describe('CustomerWorkbenchLayout', () => {
     expect(wrapper.get('[data-testid="global-test-banner"]').text()).toContain('AI 生成建议须由客服确认后发送')
     expect(wrapper.text()).toContain('AI客服工作台')
     expect(wrapper.text()).toContain('AI 生成建议需人工确认')
+    expect(wrapper.get('[data-testid="tester-summary"]').text()).toContain('小木')
+    expect(wrapper.get('[data-testid="tester-summary"]').text()).toContain('玩趣乐园积木店')
     expect(wrapper.text()).not.toContain('测试工作台')
     expect(wrapper.text()).not.toContain('不是正式登录系统')
     expect(wrapper.find('[data-testid="product-technical-details"]').exists()).toBe(false)
@@ -52,19 +62,16 @@ describe('CustomerWorkbenchLayout', () => {
     wrapper.unmount()
   })
 
-  it('asks a first-time tester for a display name without claiming authentication', async () => {
+  it('uses the authenticated server identity and has no local identity editor', async () => {
     const wrapper = await mountLayout()
     await flushPromises()
-    expect(document.body.textContent).toContain('设置客服工作台身份')
-    expect(document.body.textContent).toContain('不是登录或权限认证')
+    expect(document.body.textContent).not.toContain('设置客服工作台身份')
+    expect(document.body.textContent).not.toContain('不是登录或权限认证')
+    expect(wrapper.get('[data-testid="customer-logout"]').text()).toBe('退出')
     wrapper.unmount()
   })
 
   it('shows the test guide once for a known tester and records dismissal', async () => {
-    localStorage.setItem(
-      TESTER_IDENTITY_STORAGE_KEY,
-      JSON.stringify({ reporterId: 'TESTER-ONE', reporterName: '小木', defaultStoreCode: 'PDD-SM' })
-    )
     const wrapper = await mountLayout()
     await flushPromises()
 

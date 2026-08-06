@@ -1,6 +1,7 @@
 """HTTP routes for the C-owned customer available catalog."""
 
 from fastapi import APIRouter, Depends, Header, Query, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.customer_catalog.schemas import (
@@ -21,6 +22,45 @@ from app.customer_catalog.service import (
     CustomerAvailableCatalogService,
 )
 from app.database import get_db
+from app.errors import AppError
+from app.iam.dependencies import Principal, get_current_principal
+from app.test_catalog.models import TestProduct, TestStore
+
+
+def _ensure_store_code_access(
+    session: Session, principal: Principal, store_code: str
+) -> None:
+    if principal.all_store_access:
+        return
+    store_ids = set(session.scalars(
+        select(TestStore.id).where(TestStore.store_code == store_code)
+    ).all())
+    if not store_ids.intersection(principal.store_ids):
+        raise AppError(
+            "AUTHORIZATION_DENIED",
+            "This account is not bound to the requested Store.",
+            status_code=403,
+        )
+
+
+def _ensure_product_access(
+    session: Session, principal: Principal, product_id: str
+) -> None:
+    if principal.all_store_access:
+        return
+    product = session.get(TestProduct, product_id)
+    if product is None:
+        raise AppError("CUSTOMER_SERVICE_ENTITY_NOT_FOUND", "未找到客服可用商品", status_code=404)
+    stores = session.scalars(select(TestStore).where(
+        TestStore.package_id == product.package_id,
+        TestStore.store_code == product.store_code,
+    )).all()
+    if not any(store.id in principal.store_ids for store in stores):
+        raise AppError(
+            "AUTHORIZATION_DENIED",
+            "This account is not bound to the requested Store.",
+            status_code=403,
+        )
 
 
 customer_router = APIRouter(
@@ -33,16 +73,20 @@ admin_router = APIRouter(
 
 @customer_router.get("/stores", response_model=StoreCatalogResponse)
 def list_customer_service_stores(
+    principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_db),
 ) -> StoreCatalogResponse:
-    return CustomerAvailableCatalogService(session).list_stores()
+    allowed = None if principal.all_store_access else principal.store_ids
+    return CustomerAvailableCatalogService(session).list_stores(allowed)
 
 
 @customer_router.get("/products", response_model=ProductCatalogResponse)
 def list_customer_service_products(
     store_code: str = Query(min_length=1, max_length=96),
+    principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_db),
 ) -> ProductCatalogResponse:
+    _ensure_store_code_access(session, principal, store_code.strip())
     return CustomerAvailableCatalogService(session).list_products(store_code.strip())
 
 
@@ -52,8 +96,10 @@ def list_customer_service_products(
 )
 def get_customer_service_product_ai_knowledge(
     product_id: str,
+    principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_db),
 ) -> CustomerProductAiKnowledgeStatus:
+    _ensure_product_access(session, principal, product_id)
     return CustomerAvailableCatalogService(session).get_product_ai_knowledge_status(
         product_id
     )
@@ -64,8 +110,10 @@ def get_customer_service_product_ai_knowledge(
 )
 def list_customer_service_skus(
     product_id: str,
+    principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_db),
 ) -> SkuCatalogResponse:
+    _ensure_product_access(session, principal, product_id)
     return CustomerAvailableCatalogService(session).list_skus(product_id)
 
 

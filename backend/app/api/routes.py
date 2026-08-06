@@ -3,7 +3,7 @@ from __future__ import annotations
 from ipaddress import ip_address
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from app.config.settings import update_env_values
@@ -35,6 +35,7 @@ from app.service.knowledge_quality import (
     KnowledgeQualityError,
     KnowledgeQualityService,
 )
+from app.service.iam_authorization import require_operations_identity
 from app.service.ai_capability import (
     INITIALIZATION_FAILED_CODE,
     MODULE_DEFINITIONS,
@@ -86,27 +87,30 @@ def get_rag(request: Request):
 
 
 def get_experience_evaluation_service(request: Request) -> ExperienceEvaluationService:
-    service = getattr(request.app.state, "experience_evaluation_service", None)
-    if service is None:
-        service = ExperienceEvaluationService(request.app.state.settings)
-        request.app.state.experience_evaluation_service = service
-    return service
+    injected = getattr(request.app.state, "experience_evaluation_service", None)
+    if injected is not None:
+        return injected
+    return ExperienceEvaluationService(
+        request.app.state.settings, request.headers.get("Authorization")
+    )
 
 
 def get_feedback_analysis_service(request: Request) -> FeedbackAnalysisService:
-    service = getattr(request.app.state, "feedback_analysis_service", None)
-    if service is None:
-        service = FeedbackAnalysisService(request.app.state.settings)
-        request.app.state.feedback_analysis_service = service
-    return service
+    injected = getattr(request.app.state, "feedback_analysis_service", None)
+    if injected is not None:
+        return injected
+    return FeedbackAnalysisService(
+        request.app.state.settings, request.headers.get("Authorization")
+    )
 
 
 def get_knowledge_quality_service(request: Request) -> KnowledgeQualityService:
-    service = getattr(request.app.state, "knowledge_quality_service", None)
-    if service is None:
-        service = KnowledgeQualityService(request.app.state.settings)
-        request.app.state.knowledge_quality_service = service
-    return service
+    injected = getattr(request.app.state, "knowledge_quality_service", None)
+    if injected is not None:
+        return injected
+    return KnowledgeQualityService(
+        request.app.state.settings, request.headers.get("Authorization")
+    )
 
 
 def require_loopback_client(request: Request) -> None:
@@ -377,7 +381,10 @@ def get_product_knowledge_visibility(
     )
 
 
-@router.get("/admin/ai/modules", tags=["ai-admin"])
+@router.get(
+    "/admin/ai/modules", tags=["ai-admin"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def list_ai_modules(request: Request) -> dict[str, Any]:
     details = customer_service_detail(request.app)
     modules = [
@@ -389,7 +396,10 @@ def list_ai_modules(request: Request) -> dict[str, Any]:
     return envelope({"modules": modules})
 
 
-@router.get("/admin/ai/modules/{module_id}", tags=["ai-admin"])
+@router.get(
+    "/admin/ai/modules/{module_id}", tags=["ai-admin"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def get_ai_module(request: Request, module_id: str) -> dict[str, Any]:
     module = admin_module_or_404(module_id)
     detail = (
@@ -400,7 +410,10 @@ def get_ai_module(request: Request, module_id: str) -> dict[str, Any]:
     return envelope(detail)
 
 
-@router.get("/admin/ai/modules/{module_id}/prompt", tags=["ai-admin"])
+@router.get(
+    "/admin/ai/modules/{module_id}/prompt", tags=["ai-admin"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def get_ai_module_prompt(request: Request, module_id: str) -> dict[str, Any]:
     module = admin_module_or_404(module_id)
     if not module.implemented:
@@ -420,6 +433,7 @@ def get_ai_module_prompt(request: Request, module_id: str) -> dict[str, Any]:
     "/admin/ai/modules/{module_id}/test",
     tags=["ai-admin"],
     response_model=None,
+    dependencies=[Depends(require_operations_identity)],
 )
 def run_ai_module_test(
     request: Request,
@@ -462,6 +476,7 @@ def run_ai_module_test(
     "/admin/ai/experience-evaluations/run",
     tags=["ai-admin"],
     response_model=None,
+    dependencies=[Depends(require_operations_identity)],
 )
 def run_experience_evaluation(
     request: Request,
@@ -485,6 +500,7 @@ def run_experience_evaluation(
     "/admin/ai/feedback-analysis/run",
     tags=["ai-admin"],
     response_model=None,
+    dependencies=[Depends(require_operations_identity)],
 )
 def run_feedback_analysis(
     request: Request,
@@ -506,6 +522,7 @@ def run_feedback_analysis(
     "/admin/ai/knowledge-quality/run",
     tags=["ai-admin"],
     response_model=None,
+    dependencies=[Depends(require_operations_identity)],
 )
 def run_knowledge_quality_analysis(
     request: Request,
@@ -523,7 +540,10 @@ def run_knowledge_quality_analysis(
     return envelope(recorded, message="Knowledge-quality analysis recorded")
 
 
-@router.get("/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"])
+@router.get(
+    "/admin/ai/modules/{module_id}/evaluations/latest", tags=["ai-admin"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def get_latest_ai_module_evaluation(
     request: Request, module_id: str
 ) -> dict[str, Any]:
@@ -549,7 +569,10 @@ def get_latest_ai_module_evaluation(
     )
 
 
-@router.get("/admin/ai/control-center/overview", tags=["ai-admin"])
+@router.get(
+    "/admin/ai/control-center/overview", tags=["ai-admin"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def get_ai_control_center_overview(request: Request):
     """Return the frozen, read-only AI control-center aggregate projection."""
     if not customer_service_detail(request.app)["ready"]:
@@ -561,6 +584,7 @@ def get_ai_control_center_overview(request: Request):
     "/admin/ai/control-center/product-overview",
     tags=["ai-admin"],
     response_model=AiControlCenterProductResponse,
+    dependencies=[Depends(require_operations_identity)],
 )
 def get_ai_control_center_product_overview(request: Request) -> dict[str, Any]:
     """Return the stable read-only product projection for the 5174 console."""

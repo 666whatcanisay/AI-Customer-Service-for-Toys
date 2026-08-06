@@ -12,10 +12,10 @@ vi.mock('axios', () => ({
 
 import { ragClient } from './ragClient'
 
-describe('ragClient proxy base URL', () => {
-  it('uses the same-origin RAG proxy by default', () => {
+describe('ragClient authenticated workspace base URL', () => {
+  it('uses the same-origin Platform proxy so direct A chat is not browser-exposed', () => {
     expect(httpCreate).toHaveBeenCalledWith(expect.objectContaining({
-      baseURL: '/rag-api'
+      baseURL: '/platform-api'
     }))
     expect(ragClient).toBeDefined()
   })

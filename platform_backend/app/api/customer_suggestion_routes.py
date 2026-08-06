@@ -7,6 +7,10 @@ from fastapi import APIRouter, Depends, Query
 from app.database import get_db
 from app.suggestions.models import CustomerSuggestion
 from app.suggestions.schemas import SuggestionCreate, SuggestionListResponse, SuggestionResponse
+from app.iam.dependencies import (
+    Principal, effective_user_reference, ensure_store_code_access,
+    get_current_principal,
+)
 
 router = APIRouter(prefix="/api/v1/customer-suggestions", tags=["customer-suggestions"])
 
@@ -32,11 +36,14 @@ def _response(item: CustomerSuggestion) -> SuggestionResponse:
 @router.post("", response_model=SuggestionResponse, status_code=201)
 def create_customer_suggestion(
     payload: SuggestionCreate,
+    principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_db),
 ) -> SuggestionResponse:
+    if payload.store_code:
+        ensure_store_code_access(session, principal, payload.store_code)
     item = CustomerSuggestion(
-        reporter_id=payload.reporter_id,
-        reporter_name=payload.reporter_name,
+        reporter_id=effective_user_reference(principal, payload.reporter_id),
+        reporter_name=(payload.reporter_name if principal.all_store_access else principal.display_name),
         store_code=payload.store_code,
         module_key=payload.module_key,
         category=payload.category,
@@ -58,7 +65,9 @@ def list_reporter_suggestions(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     session: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> SuggestionListResponse:
+    reporter_id = effective_user_reference(principal, reporter_id)
     statement = select(CustomerSuggestion).where(CustomerSuggestion.reporter_id == reporter_id)
     total = session.scalar(select(func.count()).select_from(statement.subquery())) or 0
     items = session.scalars(

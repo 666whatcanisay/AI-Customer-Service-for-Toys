@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.database import get_db
 from app.errors import AppError
+from app.iam.dependencies import Principal, ensure_store_code_access, get_current_principal
 from app.knowledge_materials.models import (
     KnowledgeMaterial,
     KnowledgeMaterialUploadReceipt,
@@ -575,8 +576,10 @@ def get_customer_knowledge_status(
     product_id: str = Query(min_length=1, max_length=128),
     sku_id: str | None = Query(default=None, max_length=128),
     session: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> CustomerKnowledgeStatusResponse:
     """Return only a compact Chinese scope status for B; never source content."""
+    ensure_store_code_access(session, principal, store_code)
     scope = [
         KnowledgeMaterial.store_code == store_code,
         KnowledgeMaterial.product_id == product_id,

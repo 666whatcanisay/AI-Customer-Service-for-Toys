@@ -22,6 +22,10 @@ describe('internal production routes', () => {
       '/customer-operations',
       '/ai-issues',
       '/system-status',
+      '/login',
+      '/forbidden',
+      '/change-password',
+      '/user-management',
     ]))
     expect(paths).not.toContain('/imports')
     expect(paths).not.toContain('/imports/new')

@@ -19,6 +19,11 @@ import KnowledgeReviewView from '../views/KnowledgeReviewView.vue'
 import KnowledgeGapCenterView from '../views/KnowledgeGapCenterView.vue'
 import StoreManagementView from '../views/StoreManagementView.vue'
 import AiIssueCenterView from '../views/AiIssueCenterView.vue'
+import LoginView from '../views/LoginView.vue'
+import ForbiddenView from '../views/ForbiddenView.vue'
+import UserManagementView from '../views/UserManagementView.vue'
+import ChangePasswordView from '../views/ChangePasswordView.vue'
+import { useAdminSession } from '../auth/session'
 
 const testToolsEnabled = import.meta.env.VITE_ENABLE_TEST_TOOLS === 'true'
 const testToolRoutes: RouteRecordRaw[] = testToolsEnabled
@@ -50,6 +55,9 @@ const testToolRoutes: RouteRecordRaw[] = testToolsEnabled
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
+    { path: '/forbidden', name: 'forbidden', component: ForbiddenView, meta: { public: true } },
+    { path: '/change-password', name: 'change-password', component: ChangePasswordView, meta: { authFlow: true } },
     { path: '/', redirect: '/overview' },
     { path: '/overview', name: 'overview', component: OperationsOverviewView },
     { path: '/knowledge-center', name: 'knowledge-center', component: KnowledgeCenterView },
@@ -115,6 +123,19 @@ export const router = createRouter({
       name: 'system-status',
       component: SystemStatusView,
     },
+    { path: '/user-management', name: 'user-management', component: UserManagementView, meta: { requiredPermission: 'user.manage' } },
     ...testToolRoutes,
   ],
+})
+
+router.beforeEach(async (to) => {
+  if (to.meta.public === true) return true
+  const auth = useAdminSession()
+  if (!await auth.restore()) return { path: '/login', query: { redirect: to.fullPath } }
+  if (auth.user.value?.must_change_password === true && to.path !== '/change-password') return '/change-password'
+  if (to.path === '/change-password') return true
+  const permission = typeof to.meta.requiredPermission === 'string' ? to.meta.requiredPermission : null
+  if (permission && !auth.hasPermission(permission)) return '/forbidden'
+  if (!permission && !auth.hasAnyPermission(['product.manage', 'knowledge.manage', 'feedback.view', 'user.manage'])) return '/forbidden'
+  return true
 })

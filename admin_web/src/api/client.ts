@@ -1,10 +1,26 @@
 import axios, { AxiosError } from 'axios'
+import { authorizationHeader, clearAdminSession } from '../auth/session'
+import type { AuthUser, RoleName } from '../auth/session'
 
 export interface HealthResponse {
   status: 'ok'
   service: string
   version: string
   request_id: string
+}
+
+export interface UserListResponse {
+  schema_version: 'ai-cs.iam.v1'
+  items: AuthUser[]
+  total: number
+}
+
+export interface UserCreateInput {
+  username: string
+  password: string
+  display_name: string
+  roles: RoleName[]
+  store_bindings: Array<{ store_id: number; is_default: boolean }>
 }
 
 export interface ServerRuntimeResponse {
@@ -170,6 +186,21 @@ const aiClient = axios.create({
   baseURL: AI_API_BASE_URL,
   timeout: 30000,
 })
+
+for (const client of [apiClient, aiClient]) {
+  client.interceptors?.request.use((request) => {
+    const authorization = authorizationHeader().Authorization
+    if (authorization) request.headers.Authorization = authorization
+    return request
+  })
+  client.interceptors?.response.use(
+    (response) => response,
+    (error) => {
+      if (error?.response?.status === 401) clearAdminSession()
+      return Promise.reject(error)
+    },
+  )
+}
 
 type OptionalQueryParam = string | number | undefined
 
@@ -1639,6 +1670,41 @@ export async function getAiControlCenterOverview(): Promise<AiControlCenterOverv
 
 export async function getHealth(): Promise<HealthResponse> {
   const response = await apiClient.get<HealthResponse>('/health')
+  return response.data
+}
+
+export async function listUsers(): Promise<UserListResponse> {
+  const response = await apiClient.get<UserListResponse>('/api/v1/admin/users')
+  return response.data
+}
+
+export async function createUser(input: UserCreateInput): Promise<AuthUser> {
+  const response = await apiClient.post<AuthUser>('/api/v1/admin/users', input)
+  return response.data
+}
+
+export async function assignUserRoles(userId: string, roles: RoleName[]): Promise<AuthUser> {
+  const response = await apiClient.put<AuthUser>(
+    `/api/v1/admin/users/${encodeURIComponent(userId)}/roles`, { roles },
+  )
+  return response.data
+}
+
+export async function assignUserStores(
+  userId: string,
+  storeBindings: Array<{ store_id: number; is_default: boolean }>,
+): Promise<AuthUser> {
+  const response = await apiClient.put<AuthUser>(
+    `/api/v1/admin/users/${encodeURIComponent(userId)}/store-bindings`,
+    { store_bindings: storeBindings },
+  )
+  return response.data
+}
+
+export async function deactivateUser(userId: string): Promise<AuthUser> {
+  const response = await apiClient.delete<AuthUser>(
+    `/api/v1/admin/users/${encodeURIComponent(userId)}`,
+  )
   return response.data
 }
 

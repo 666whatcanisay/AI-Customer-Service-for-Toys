@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   getAdminOverview,
   getAiControlCenterOverview,
   getHealth,
   type HealthResponse
 } from './api/client'
+import { useAdminSession } from './auth/session'
 
 type ServiceState = 'loading' | 'available' | 'unavailable' | 'not-probed'
 type EnvironmentState = 'loading' | 'internal-production' | 'unknown'
@@ -15,6 +16,9 @@ type NavigationItem = { label: string; to: string }
 type NavigationGroup = { label: string; items: NavigationItem[] }
 
 const NAVIGATION_MODE_STORAGE_KEY = 'ai-cs-admin-navigation-mode-v1'
+const route = useRoute()
+const router = useRouter()
+const auth = useAdminSession()
 
 const simpleNavigationItems: NavigationItem[] = [
   { label: '运营工作台', to: '/overview' },
@@ -141,11 +145,14 @@ const runtimeDetails = {
   buildMode: import.meta.env.VITE_BUILD_MODE ?? 'development'
 }
 
-onMounted(() => { void refreshStatus() })
+const signOut = async () => { await auth.logout(); await router.replace('/login') }
+
+onMounted(() => { if (route.meta.public !== true) void refreshStatus() })
 </script>
 
 <template>
-  <div class="product-shell">
+  <RouterView v-if="route.meta.public === true" />
+  <div v-else class="product-shell">
     <aside class="product-sidebar" aria-label="运营管理中心导航">
       <RouterLink class="brand" to="/overview">
         <span class="brand-mark" aria-hidden="true">AI</span>
@@ -189,6 +196,12 @@ onMounted(() => { void refreshStatus() })
           >
             {{ item.label }}
           </RouterLink>
+          <RouterLink
+            v-if="auth.hasPermission('user.manage')"
+            to="/user-management"
+            class="nav-link"
+            data-testid="user-management-navigation"
+          >用户管理</RouterLink>
         </section>
 
         <template v-if="navigationMode === 'advanced'">
@@ -215,7 +228,7 @@ onMounted(() => { void refreshStatus() })
 
       <div class="sidebar-boundary">
         <strong>内部运营管理</strong>
-        <p>当前页面不提供正式认证、自动客户发送、订单修改、退款或 ERP 写入。</p>
+        <p>页面权限由服务端校验；系统不自动发送、修改订单、退款或写入 ERP。</p>
       </div>
     </aside>
 
@@ -230,6 +243,10 @@ onMounted(() => { void refreshStatus() })
           <span :class="aiState"><i />AI {{ stateLabel(aiState) }}</span>
           <span :class="customerState"><i />客服 {{ stateLabel(customerState) }}</span>
           <button type="button" :disabled="refreshing" @click="refreshStatus">{{ refreshing ? '检查中' : '刷新' }}</button>
+        </div>
+        <div class="admin-identity" data-testid="admin-identity">
+          <strong>{{ auth.displayName.value }}</strong>
+          <button type="button" data-testid="admin-logout" @click="signOut">退出</button>
         </div>
         <button
           class="technical-toggle"

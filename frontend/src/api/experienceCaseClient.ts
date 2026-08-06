@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { createAuthenticatedHttp } from './authenticatedHttp'
 import { adaptExperienceCaseReceipt, toExperienceCasePayload } from './experienceCaseAdapter'
 import { toPlatformClientError } from './errorMapper'
 import type { ExperienceCaseApiClient } from './experienceCaseTypes'
@@ -7,7 +7,7 @@ const configuredBaseUrl = (import.meta.env.VITE_PLATFORM_API_BASE_URL || '/platf
   .trim()
   .replace(/\/$/, '')
 
-const http = axios.create({
+const http = createAuthenticatedHttp({
   baseURL: configuredBaseUrl,
   timeout: 15_000,
   headers: {

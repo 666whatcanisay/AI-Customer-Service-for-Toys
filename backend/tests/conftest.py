@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from app.config.settings import Settings
 from app.main import create_app
 from app.service.rag_service import RAGService
+from app.service.iam_authorization import require_operations_identity
 from app.service.vector_store import VectorStore
 
 
@@ -93,6 +94,9 @@ def api_client(tmp_path: Path):
         return RAGService(active_settings, vector_store=store)
 
     app = create_app(settings=settings, rag_factory=factory)
+    app.dependency_overrides[require_operations_identity] = lambda: {
+        "permissions": ["user.manage"]
+    }
     with TestClient(app) as client:
         for _ in range(100):
             payload = client.get("/api/status").json()

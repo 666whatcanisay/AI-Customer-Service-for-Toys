@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -128,7 +129,7 @@ async def validation_exception_handler(
                 else "VALIDATION_ERROR"
             ),
             message="The request is invalid." if ai_feedback_path else "Request validation failed",
-            details=exc.errors(),
+            details=jsonable_encoder(exc.errors()),
         ),
     )
 

@@ -81,10 +81,12 @@ class CustomerAvailableCatalogService:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def list_stores(self) -> StoreCatalogResponse:
+    def list_stores(self, allowed_store_ids: frozenset[int] | None = None) -> StoreCatalogResponse:
         warnings = _Warnings()
         items: list[CustomerCatalogStore] = []
         for store in self.session.scalars(select(TestStore).order_by(TestStore.store_code)):
+            if allowed_store_ids is not None and store.id not in allowed_store_ids:
+                continue
             projected = self._project_store(store, warnings)
             if projected is not None:
                 items.append(projected)

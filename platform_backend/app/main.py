@@ -1,6 +1,6 @@
-"""FastAPI entrypoint for the minimal C-line platform baseline."""
+"""FastAPI entrypoint for the C Platform API and production IAM boundary."""
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -25,7 +25,10 @@ from app.api.knowledge_material_routes import (
     customer_router as customer_knowledge_status_router,
 )
 from app.api.import_routes import router as import_router
-from app.api.test_catalog_routes import router as test_catalog_router
+from app.api.test_catalog_routes import (
+    internal_router as test_knowledge_internal_router,
+    router as test_catalog_router,
+)
 from app.product_knowledge.routes import router as product_knowledge_router
 from app.operation_management.routes import router as operation_management_router
 from app.customer_feedback_loop.routes import (
@@ -46,6 +49,13 @@ from app.errors import (
     validation_exception_handler,
 )
 from app.middleware import request_id_middleware
+from app.iam.dependencies import (
+    require_feedback_submit,
+    require_operations_access,
+    require_workspace_access,
+)
+from app.iam.routes import admin_router as iam_admin_router, auth_router
+from app.workspace.routes import router as workspace_router
 
 def create_app(settings_override: Settings | None = None) -> FastAPI:
     settings = settings_override or get_settings()
@@ -60,11 +70,13 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=list(settings.cors_allowed_origins),
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "PUT"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
         # B submits the frozen feedback v1 Idempotency-Key header from the
         # browser. Keep the CORS policy explicit; do not widen it to a
         # wildcard just to accommodate this preflight.
-        allow_headers=["Accept", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+        allow_headers=[
+            "Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"
+        ],
         expose_headers=["X-Request-ID", "Idempotency-Replayed"],
     )
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
@@ -72,28 +84,39 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.add_exception_handler(AppError, app_exception_handler)
 
-    application.include_router(import_router)
-    application.include_router(test_catalog_router)
-    application.include_router(customer_suggestion_router)
-    application.include_router(admin_suggestion_router)
-    application.include_router(customer_experience_case_router)
-    application.include_router(customer_ai_feedback_router)
-    application.include_router(customer_feedback_loop_customer_router)
-    application.include_router(admin_experience_case_router)
-    application.include_router(ai_optimization_router)
-    application.include_router(admin_ai_feedback_router)
-    application.include_router(ai_quality_router)
-    application.include_router(knowledge_material_admin_router)
-    application.include_router(knowledge_quality_router)
-    application.include_router(customer_knowledge_status_router)
-    application.include_router(product_knowledge_router)
-    application.include_router(knowledge_publishing_router)
-    application.include_router(product_knowledge_import_router)
-    application.include_router(operation_management_router)
-    application.include_router(customer_catalog_customer_router)
-    application.include_router(customer_catalog_admin_router)
-    application.include_router(customer_feedback_loop_admin_router)
-    application.include_router(admin_router)
+    operations_dependencies = [Depends(require_operations_access)]
+    workspace_dependencies = [Depends(require_workspace_access)]
+    feedback_dependencies = [Depends(require_feedback_submit)]
+
+    application.include_router(auth_router)
+    application.include_router(iam_admin_router)
+    application.include_router(workspace_router)
+    application.include_router(import_router, dependencies=operations_dependencies)
+    application.include_router(test_catalog_router, dependencies=operations_dependencies)
+    # Frozen A RAG bootstrap reads these two loopback-only legacy projections.
+    # They remain isolated from browser import/management routes so RAG logic is
+    # not changed by R016.
+    application.include_router(test_knowledge_internal_router)
+    application.include_router(customer_suggestion_router, dependencies=feedback_dependencies)
+    application.include_router(admin_suggestion_router, dependencies=operations_dependencies)
+    application.include_router(customer_experience_case_router, dependencies=feedback_dependencies)
+    application.include_router(customer_ai_feedback_router, dependencies=feedback_dependencies)
+    application.include_router(customer_feedback_loop_customer_router, dependencies=feedback_dependencies)
+    application.include_router(admin_experience_case_router, dependencies=operations_dependencies)
+    application.include_router(ai_optimization_router, dependencies=operations_dependencies)
+    application.include_router(admin_ai_feedback_router, dependencies=operations_dependencies)
+    application.include_router(ai_quality_router, dependencies=operations_dependencies)
+    application.include_router(knowledge_material_admin_router, dependencies=operations_dependencies)
+    application.include_router(knowledge_quality_router, dependencies=operations_dependencies)
+    application.include_router(customer_knowledge_status_router, dependencies=workspace_dependencies)
+    application.include_router(product_knowledge_router, dependencies=operations_dependencies)
+    application.include_router(knowledge_publishing_router, dependencies=operations_dependencies)
+    application.include_router(product_knowledge_import_router, dependencies=operations_dependencies)
+    application.include_router(operation_management_router, dependencies=operations_dependencies)
+    application.include_router(customer_catalog_customer_router, dependencies=workspace_dependencies)
+    application.include_router(customer_catalog_admin_router, dependencies=operations_dependencies)
+    application.include_router(customer_feedback_loop_admin_router, dependencies=operations_dependencies)
+    application.include_router(admin_router, dependencies=operations_dependencies)
 
     @application.get("/health")
     async def health(request: Request) -> dict[str, str]:

@@ -14,6 +14,10 @@ from app.experience_cases.schemas import (
     ExperienceCaseFeedbackType,
     ExperienceCaseReviewStatus,
 )
+from app.iam.dependencies import (
+    Principal, effective_user_reference, ensure_store_code_access,
+    get_current_principal,
+)
 
 router = APIRouter(prefix="/api/v1/customer-experience-cases", tags=["customer-experience-cases"])
 
@@ -45,8 +49,10 @@ def _projection(item: CustomerExperienceCase) -> CustomerExperienceCaseProjectio
 @router.post("", response_model=CustomerExperienceCaseCreated, status_code=201)
 def create_customer_experience_case(
     payload: CustomerExperienceCaseCreate,
+    principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_db),
 ) -> CustomerExperienceCaseCreated:
+    ensure_store_code_access(session, principal, payload.store_code)
     item = CustomerExperienceCase(
         source_type="CUSTOMER_SERVICE_SUBMITTED",
         store_code=payload.store_code,
@@ -56,7 +62,7 @@ def create_customer_experience_case(
         ai_answer=payload.ai_answer,
         final_answer=payload.final_answer,
         feedback_type=payload.feedback_type,
-        created_by=payload.created_by,
+        created_by=effective_user_reference(principal, payload.created_by),
         review_status="NEW",
         redaction_version="v1-reminder-only",
         evaluation_status="NOT_EXPORTED",
@@ -74,7 +80,9 @@ def list_customer_experience_cases(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     session: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> CustomerExperienceCaseListResponse:
+    created_by = effective_user_reference(principal, created_by)
     statement = select(CustomerExperienceCase).where(CustomerExperienceCase.created_by == created_by)
     if review_status is not None:
         statement = statement.where(CustomerExperienceCase.review_status == review_status)

@@ -1,6 +1,6 @@
 # AI-CS V1.0.0
 
-AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R008 运行收敛、R009 商品知识导入、R006 客服目录激活、R006.1 AI 知识发布与 R006.2 客服体验优化，运行状态为 `INTERNAL_PRODUCTION_READY`。
+AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R008 运行收敛、R009 商品知识导入、R006 客服目录激活、R006.1 AI 知识发布、R006.2 客服体验优化、R016 用户身份/RBAC/店铺绑定以及 R018 内部账号初始化策略，当前源码 Gate 为 `AI_CS_ACCOUNT_POLICY_READY`。该 Gate 不表示正式数据库已经迁移或三个生产账号已经创建。
 
 ## 正式运行基线
 
@@ -10,8 +10,8 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 - 正式文案补丁：`9911ba67cef330a7a1b4f03f82de227cbee6982d`
 - 防复发测试：`0f230c6f50f8b6162c4e52f3b167053e6592c656`
 - 正式稳定标签：`ai-cs-v1.0.0`；精确 SHA 从 Git 与 Runtime 记录解析
-- Contracts：`0.5.0`
-- 数据库：`0012_internal_production_finalization_v1`
+- Contracts 源码候选：`0.10.0` coordinated（Gateway wire 仍冻结为 `1.0`）
+- 数据库源码迁移目标：`0013_user_management_v1`；当前受控 Runtime 仍为 `0012_internal_production_finalization_v1`，待另行授权部署
 - 运行方式：`runtimeMode=standard`、`networkMode=LAN`
 
 本地 `origin` 是历史保护仓库，本版本没有声明已经推送到远端或完成远端发布。
@@ -30,6 +30,14 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 | C Platform API | `platform_backend/` | 8011 | 业务数据、审核、投影、收据与知识生命周期 |
 
 共享契约位于 `contracts/`，集成测试位于 `tests/`，Windows 运维入口位于 `scripts/windows/`。
+
+## 用户与访问控制
+
+- B 客服工作台和 C Admin 都从 `/api/v1/auth/login` 获取短期 opaque Bearer session，并通过 `/api/v1/auth/me` 恢复服务端身份。
+- `CUSTOMER_SERVICE` 拥有 Workspace、AI 建议、Feedback 提交和客服管理权限；首次改密后可选择并绑定一个或多个已启用客服店铺，不再要求固定默认店铺。
+- `OPERATOR` 拥有商品、SKU、知识、FAQ、AI 质量、店铺数据和 Feedback 查看权限；`ADMIN` 拥有全部权限。两者都由角色获得全店铺范围。
+- 新建和重置账号使用临时口令并强制首次改密；业务 API 在改密前返回 `PASSWORD_CHANGE_REQUIRED`。长期口令不写入代码、命令行、配置或 Git。
+- `bootstrap_ai_cs_admin.ps1`保留单管理员入口；`bootstrap_ai_cs_initial_users.ps1`在同一受控 Runtime 配置下检查重复并交互创建批准的三类初始账号，已存在账号只跳过、不覆盖。详细步骤见[`platform_backend/README.md`](platform_backend/README.md)。
 
 ## Windows 日常运行
 

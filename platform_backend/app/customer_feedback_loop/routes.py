@@ -37,6 +37,10 @@ from app.customer_feedback_loop.service import (
 )
 from app.database import get_db
 from app.errors import AppError
+from app.iam.dependencies import (
+    Principal, effective_user_reference, ensure_store_code_access,
+    get_current_principal,
+)
 
 
 customer_router = APIRouter(
@@ -52,6 +56,7 @@ def record_interaction_event(
     payload: InteractionEventCreate,
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=255),
     session: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> InteractionEventReceipt:
     key = idempotency_key.strip()
     if not key:
@@ -60,6 +65,10 @@ def record_interaction_event(
             "Idempotency-Key must not be blank.",
             status_code=422,
         )
+    ensure_store_code_access(session, principal, payload.store_code)
+    payload = payload.model_copy(update={
+        "created_by": effective_user_reference(principal, payload.created_by)
+    })
     event = create_interaction_event(session, payload, key)
     try:
         session.commit()

@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.config.settings import Settings
 from app.main import create_app
 from app.service.rag_service import MODEL_NOT_CONFIGURED_MESSAGE, REFUSAL_MESSAGE
+from app.service.iam_authorization import require_operations_identity
 
 
 ADMIN_TEST_CONTEXT = {
@@ -49,6 +50,9 @@ def test_browser_visible_initialization_failure_is_stable_and_safe(tmp_path: Pat
         raise RuntimeError(private_failure)
 
     app = create_app(settings=settings, rag_factory=failing_factory)
+    app.dependency_overrides[require_operations_identity] = lambda: {
+        "permissions": ["user.manage"]
+    }
     with TestClient(app) as client:
         for _ in range(100):
             payload = client.get("/api/status").json()
@@ -561,6 +565,9 @@ def test_ai_control_center_overview_returns_stable_not_ready_code(tmp_path: Path
         raise RuntimeError(private_failure)
 
     app = create_app(settings=settings, rag_factory=failing_factory)
+    app.dependency_overrides[require_operations_identity] = lambda: {
+        "permissions": ["user.manage"]
+    }
     with TestClient(app) as client:
         for _ in range(100):
             if client.get("/api/status").json()["data"]["initialization_error"]:

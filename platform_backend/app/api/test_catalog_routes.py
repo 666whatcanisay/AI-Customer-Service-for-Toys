@@ -19,6 +19,7 @@ from app.test_catalog.schemas import (
 from app.test_catalog.service import TestPackageService
 
 router = APIRouter(prefix="/api/v1", tags=["test-catalog"])
+internal_router = APIRouter(prefix="/api/v1", tags=["test-knowledge-internal"])
 
 
 def _repository(session: Session) -> TestCatalogRepository:
@@ -106,7 +107,7 @@ def list_test_product_skus(
     return SkuListResponse(items=items, total=len(items))
 
 
-@router.get(
+@internal_router.get(
     "/test-knowledge-packages/{package_id}/rag-export",
     response_model=RagExportResponse,
 )
@@ -117,7 +118,7 @@ def export_test_rag_package(
     return _repository(session).rag_export(package_id)
 
 
-@router.get(
+@internal_router.get(
     "/test-knowledge-packages/{package_id}/evaluations",
     response_model=EvaluationResponse,
 )
