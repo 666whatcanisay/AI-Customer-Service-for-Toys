@@ -4,7 +4,7 @@
 - Date：`2026-08-06`
 - Owner：AI-CS Product Experience QA Lead
 - Target：`AI_CS_USER_EXPERIENCE_ACCEPTANCE_READY`
-- Status：`IN_PROGRESS`
+- Status：`COMPLETE / GATE_BLOCKED`
 
 ## Baseline
 
@@ -41,3 +41,10 @@
 3. 问题按P0/P1/P2/P3分级，并明确上线前必须修复项。
 4. 输出《AI-CS User Experience Acceptance Report V1》并同步状态、变更、交接和machine-context。
 5. 最终状态只表示体验验收完成，不自动表示产品通过上线Gate。
+
+## Outcome
+
+- 独立 Edge、隔离 Runtime、四角色核心路径审查、最小 UX 修复和全量回归已完成。
+- 代码层 P0/P1 已关闭；管理员凭据不匹配、AI 知识集合为空和普通客服账号缺失仍为 3 项环境 P0。
+- Gate：`BLOCKED / AI_CS_USER_EXPERIENCE_ACCEPTANCE_BLOCKED`。
+- Report：[`AI-CS User Experience Acceptance Gate V1`](./AI-CS-User-Experience-Acceptance-Gate-V1.md)。
