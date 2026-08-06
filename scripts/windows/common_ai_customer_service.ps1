@@ -2219,8 +2219,17 @@ function Invoke-TestPackageUpload([string]$Url, [string]$Path, [string]$Label) {
 }
 
 function Get-TestDataPackage($Config) {
-    $packages = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort '/api/v1/test-data-packages') 'C 测试包列表'
-    return @($packages.items | Where-Object { [string]$_.package_id -eq [string]$Config.TestKnowledgePackageId } | Select-Object -First 1)
+    # R016 protects browser-facing test-catalog management with OPERATOR/ADMIN
+    # authentication. Startup must not bypass that boundary or depend on a user
+    # credential, so it verifies the frozen loopback-only A export projection.
+    $packageId = [uri]::EscapeDataString([string]$Config.TestKnowledgePackageId)
+    try {
+        $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C internal knowledge package'
+        if ([string]$package.package_id -ne [string]$Config.TestKnowledgePackageId) { return @() }
+        return @($package)
+    } catch {
+        return @()
+    }
 }
 
 function Import-TestDataPackage($Config) {
@@ -2392,13 +2401,10 @@ function Invoke-RagChatSmoke($Config) {
     # smoke context so an unrelated unpublished product cannot fail startup.
     $packageId = [uri]::EscapeDataString([string]$Config.TestKnowledgePackageId)
     $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C active knowledge package'
-    $catalogStores = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort '/api/v1/test-catalog/stores') 'C 店铺列表'
-    $catalogStore = @($catalogStores.items | Where-Object { [string]$_.store_code -eq [string]$package.store_code } | Select-Object -First 1)[0]
-    if ($null -eq $catalogStore) { throw 'C active knowledge package 没有对应的目录店铺。' }
     $productItem = @($package.items | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.product_id) } | Select-Object -First 1)[0]
     if ($null -eq $productItem) { throw 'C active knowledge package 没有可供聊天 smoke 使用的商品。' }
     $skuItem = @($package.items | Where-Object { [string]$_.product_id -eq [string]$productItem.product_id -and -not [string]::IsNullOrWhiteSpace([string]$_.sku_id) } | Select-Object -First 1)[0]
-    $payload = @{ question='请根据当前商品资料介绍适用年龄和安全注意事项。'; context=@{ tenant_id=[string]$catalogStore.tenant_id; platform=[string]$catalogStore.platform; store_code=[string]$catalogStore.store_code; product_id=[string]$productItem.product_id; sku_id=if ($skuItem) { [string]$skuItem.sku_id } else { $null } } } | ConvertTo-Json -Depth 5
+    $payload = @{ question='请根据当前商品资料介绍适用年龄和安全注意事项。'; context=@{ tenant_id=[string]$package.tenant_id; platform=[string]$package.platform; store_code=[string]$package.store_code; product_id=[string]$productItem.product_id; sku_id=if ($skuItem) { [string]$skuItem.sku_id } else { $null } } } | ConvertTo-Json -Depth 5
     try { $response = Invoke-RestMethod -UseBasicParsing -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload -Uri (Get-ServiceUrl $Config $Config.RagPort '/api/chat') -TimeoutSec 120 } catch { throw "A 真实聊天 smoke 失败：$($_.Exception.Message)" }
     $data = if ($response.data) { $response.data } else { $response }
     $answer = [string]$data.answer
