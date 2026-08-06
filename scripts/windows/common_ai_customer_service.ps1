@@ -2226,6 +2226,7 @@ function Get-TestDataPackage($Config) {
     try {
         $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C internal knowledge package'
         if ([string]$package.package_id -ne [string]$Config.TestKnowledgePackageId) { return @() }
+        $package | Add-Member -NotePropertyName import_status -NotePropertyValue 'INTERNAL_EXPORT_AVAILABLE' -Force
         return @($package)
     } catch {
         return @()

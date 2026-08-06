@@ -18,6 +18,9 @@ if ([string]::IsNullOrWhiteSpace($getPackageBlock) -or $getPackageBlock -match '
 if ($common -notmatch '/api/v1/test-knowledge-packages/\$packageId/rag-export') {
     throw 'Runtime startup does not use the frozen loopback-only knowledge export.'
 }
+if ($getPackageBlock -notmatch "import_status.+INTERNAL_EXPORT_AVAILABLE") {
+    throw 'Runtime status does not project a safe internal package availability state.'
+}
 if ([string]::IsNullOrWhiteSpace($chatSmokeBlock) -or $chatSmokeBlock -match '/api/v1/test-catalog/stores') {
     throw 'RAG chat smoke still depends on the authenticated test catalog.'
 }
