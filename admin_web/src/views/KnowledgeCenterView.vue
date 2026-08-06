@@ -67,6 +67,10 @@ function aiKnowledgeLabel(status: AiKnowledgePublicationStatus): string {
   }[status]
 }
 
+function businessBoundary(value: string): string {
+  return value.replace(/\bRAG\b/g, 'AI 知识库')
+}
+
 function productDataStatusLabel(status: ProductKnowledgeListItem['data_status']): string {
   return {
     APPROVED: '已审核',
@@ -190,7 +194,7 @@ async function publishKnowledge(product: ProductKnowledgeListItem): Promise<void
       `publish-${id}-${crypto.randomUUID()}`,
     )
     actionMessage.value = result.publication_receipt
-      ? `AI 知识已增量发布，收据：${result.publication_receipt.publication_receipt_id}`
+      ? 'AI 知识已更新，发布记录已保存。'
       : '当前审核版本已发布，无需重复生成向量。'
     await selectStore(activeStoreCode.value)
   } catch (reason: unknown) {
@@ -440,18 +444,6 @@ onMounted(load)
                 </div>
               </details>
 
-              <details class="product-technical-details">
-                <summary>查看技术证据</summary>
-                <dl>
-                  <div><dt>知识片段</dt><dd>{{ product.ai_knowledge.chunk_count }}</dd></div>
-                  <div><dt>向量记录</dt><dd>{{ product.ai_knowledge.embedding_count }}</dd></div>
-                  <div><dt>知识集合</dt><dd>{{ product.ai_knowledge.active_collection || '暂未生成' }}</dd></div>
-                  <div><dt>当前内容校验</dt><dd>{{ product.ai_knowledge.current_fingerprint || '暂未生成' }}</dd></div>
-                  <div><dt>已发布内容校验</dt><dd>{{ product.ai_knowledge.indexed_fingerprint || '暂未生成' }}</dd></div>
-                  <div><dt>最近同步异常</dt><dd>{{ product.ai_knowledge.last_error_code || '无' }}</dd></div>
-                </dl>
-                <p>Activation receipt 和 AI 发布收据继续在商品详情中查看。</p>
-              </details>
               <RouterLink
                 v-if="product.technical_details.product_id"
                 class="button secondary"
@@ -461,7 +453,7 @@ onMounted(load)
           </div>
         </section>
 
-        <p class="notice boundary">{{ overview.boundary_note }}资料不完整时仍可提供有依据的基础回答；缺失信息必须提示人工确认。</p>
+        <p class="notice boundary">{{ businessBoundary(overview.boundary_note) }}资料不完整时仍可提供有依据的基础回答；缺失信息必须提示人工确认。</p>
       </template>
     </template>
   </main>

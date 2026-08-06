@@ -102,7 +102,9 @@ const responseCode = (value: unknown): string | null => {
 
 export const toRagClientError = (error: unknown): RagClientError => {
   if (error instanceof RagClientError) return error
-  if (error instanceof RagAdapterError) return new RagClientError('contract', error.message)
+  if (error instanceof RagAdapterError) {
+    return new RagClientError('contract', 'AI 服务返回的数据无法识别，请联系管理员')
+  }
   if (axios.isCancel(error)) return new RagClientError('canceled', '请求已取消，可重新提交')
 
   if (axios.isAxiosError(error)) {
@@ -111,18 +113,18 @@ export const toRagClientError = (error: unknown): RagClientError => {
     const detail = responseMessage(error.response?.data)
 
     if (error.code === 'ECONNABORTED') {
-      return new RagClientError('timeout', '请求超时，请确认 RAG 服务状态后重试', status)
+      return new RagClientError('timeout', 'AI 服务请求超时，请稍后重试', status)
     }
     if (code === 'INVALID_REQUEST' || status === 422) {
-      return new RagClientError('invalid_request', detail ?? '请求参数不符合 RAG API 要求', status)
+      return new RagClientError('invalid_request', '当前问题无法处理，请补充商品信息后重试', status)
     }
     if (code === 'RISK_REVIEW_REQUIRED') {
       return new RagClientError('risk_review', detail ?? '该回答需要人工风险复核', status)
     }
     if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
-      return new RagClientError('unavailable', detail ?? 'RAG API 当前不可用，请稍后重试', status)
+      return new RagClientError('unavailable', 'AI 服务暂时不可用，请稍后重试；如持续失败，请联系管理员', status)
     }
-    return new RagClientError('unknown', detail ?? error.message ?? 'RAG API 请求失败', status)
+    return new RagClientError('unknown', detail ?? 'AI 服务请求失败，请稍后重试', status)
   }
 
   return new RagClientError('unknown', error instanceof Error ? error.message : '未知错误')
@@ -131,7 +133,7 @@ export const toRagClientError = (error: unknown): RagClientError => {
 export const toPlatformClientError = (error: unknown): PlatformClientError => {
   if (error instanceof PlatformClientError) return error
   if (error instanceof PlatformAdapterError) {
-    return new PlatformClientError('contract', error.message)
+    return new PlatformClientError('contract', '店铺与商品数据无法识别，请联系管理员')
   }
   if (axios.isCancel(error)) {
     return new PlatformClientError('canceled', '目录请求已取消')
@@ -141,25 +143,25 @@ export const toPlatformClientError = (error: unknown): PlatformClientError => {
     const status = error.response?.status ?? null
     const detail = responseMessage(error.response?.data)
     if (error.code === 'ECONNABORTED') {
-      return new PlatformClientError('timeout', 'C 目录服务请求超时，请稍后重试', status)
+      return new PlatformClientError('timeout', '店铺与商品服务请求超时，请稍后重试', status)
     }
     if (status === 503 || status === 500 || error.code === 'ERR_NETWORK') {
       return new PlatformClientError(
         'unavailable',
-        detail ?? 'C 目录服务当前不可用，请联系中台维护人员',
+        '店铺与商品服务暂时不可用，请联系管理员',
         status
       )
     }
     return new PlatformClientError(
       'unknown',
-      detail ?? error.message ?? 'C 目录服务请求失败',
+      detail ?? '店铺与商品服务请求失败，请稍后重试',
       status
     )
   }
 
   return new PlatformClientError(
     'unknown',
-    error instanceof Error ? error.message : 'C 目录服务发生未知错误'
+    error instanceof Error ? error.message : '店铺与商品服务发生未知错误'
   )
 }
 

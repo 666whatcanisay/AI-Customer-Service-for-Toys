@@ -55,8 +55,10 @@ describe('KnowledgeCenterView', () => {
     expect(wrapper.text()).toContain('AI知识：未发布')
     expect(wrapper.text()).toContain('下一步发布 AI 知识')
     expect(wrapper.find('.product-business-details').attributes('open')).toBeUndefined()
-    expect(wrapper.find('.product-technical-details').attributes('open')).toBeUndefined()
-    expect(wrapper.find('.product-technical-details').text()).toContain('知识片段0')
+    expect(wrapper.find('.product-technical-details').exists()).toBe(false)
+    expect(wrapper.text()).toContain('不代表知识已发布到 AI 知识库')
+    expect(wrapper.text()).not.toContain('fingerprint')
+    expect(wrapper.text()).not.toContain('Activation receipt')
     expect(wrapper.text()).not.toContain('tenant_id')
   })
 
