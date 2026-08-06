@@ -49,3 +49,15 @@ npm --prefix tests/e2e run test:r003:acceptance
 写入仅由 Admin 页面的商品选择、人工确认对话框和批量启用按钮产生；
 脚本只通过 GET 读取 Catalog、商品状态和 receipt 作验证，不使用 API
 替代页面操作。证据保存在已忽略的 `.runtime/phase-4-1/evidence/P41-R003-browser/`。
+
+Human-in-the-loop 客服工作台隔离演示：
+
+```powershell
+$env:AI_CS_WORKSPACE_URL='http://127.0.0.1:15183'
+npm --prefix tests/e2e run test:human-loop
+```
+
+该脚本由 Playwright 控制系统 Chrome，浏览器中完整执行模拟客户消息、AI
+建议、三类知识依据、人工修改采用和新消息使旧草稿失效。现有 A/C API 路径
+由去标识化演示响应拦截，不连接真实渠道、不创建业务数据、不发送客户消息。
+证据写入已忽略的 `.runtime/human-loop-workspace-v1/evidence/`。

@@ -13,7 +13,7 @@ const mountLayout = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      '/', '/ai-chat', '/experience-cases', '/feedback', '/suggestions', '/suggestions/mine'
+      '/', '/workspace', '/ai-chat', '/experience-cases', '/feedback', '/suggestions', '/suggestions/mine'
     ].map((path) => ({ path, component: { template: '<div>页面内容</div>' } }))
   })
   await router.push('/')

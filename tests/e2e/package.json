@@ -6,6 +6,7 @@
     "test": "node run.cjs",
     "test:r006": "node workflows/r006-customer-available-catalog.cjs",
     "test:r006-envelope": "node customer/catalog-envelope-states.cjs",
+    "test:human-loop": "node customer/human-in-loop-workspace.cjs",
     "test:r003:smoke": "node workflows/r003-production-acceptance.cjs --mode=smoke",
     "test:r003:acceptance": "node workflows/r003-production-acceptance.cjs --mode=acceptance"
   },

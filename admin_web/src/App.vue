@@ -41,6 +41,8 @@ const advancedNavigationGroups: NavigationGroup[] = [
     label: '运营复盘',
     items: [
       { label: 'AI问题中心', to: '/ai-issues' },
+      { label: '反馈分析', to: '/ai-feedback-optimization-pool' },
+      { label: '回复质量', to: '/experience-cases' },
     ],
   },
   {

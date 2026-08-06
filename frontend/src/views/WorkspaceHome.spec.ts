@@ -67,6 +67,6 @@ describe('WorkspaceHome', () => {
     expect(wrapper.get('[data-testid="work-rhythm-guide"]').text()).toContain('处理下一条咨询')
     expect(wrapper.text()).toContain('售后助手')
     expect(wrapper.text()).toContain('规划中')
-    expect(wrapper.get('[data-testid="enter-ai-chat"]').attributes('href')).toBe('/ai-chat')
+    expect(wrapper.get('[data-testid="enter-ai-chat"]').attributes('href')).toBe('/workspace')
   })
 })

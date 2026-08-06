@@ -13,8 +13,8 @@
         <RouterLink to="/" class="nav-link" exact-active-class="active" @click="closeMobileMenu">
           <span>⌂</span><span>首页</span>
         </RouterLink>
-        <RouterLink to="/ai-chat" class="nav-link" active-class="active" @click="closeMobileMenu">
-          <span>AI</span><span>AI 客服</span>
+        <RouterLink to="/workspace" class="nav-link" active-class="active" @click="closeMobileMenu">
+          <span>AI</span><span>AI 客服副驾驶</span>
         </RouterLink>
         <RouterLink to="/experience-cases" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>☆</span><span>我的案例</span>

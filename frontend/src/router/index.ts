@@ -3,6 +3,7 @@ import AiChat from '@/views/AiChat.vue'
 import CustomerWorkbenchLayout from '@/layouts/CustomerWorkbenchLayout.vue'
 import ExperienceCases from '@/views/ExperienceCases.vue'
 import FeedbackGuide from '@/views/FeedbackGuide.vue'
+import HumanInLoopWorkspace from '@/views/HumanInLoopWorkspace.vue'
 import ModuleInfo from '@/views/ModuleInfo.vue'
 import MySuggestions from '@/views/MySuggestions.vue'
 import SuggestionForm from '@/views/SuggestionForm.vue'
@@ -17,6 +18,7 @@ export const createCustomerRouter = (history: RouterHistory = createWebHistory()
         component: CustomerWorkbenchLayout,
         children: [
           { path: '', name: 'WorkspaceHome', component: WorkspaceHome, meta: { title: '工作台首页' } },
+          { path: 'workspace', name: 'HumanInLoopWorkspace', component: HumanInLoopWorkspace, meta: { title: 'AI 客服副驾驶' } },
           { path: 'ai-chat', name: 'AiChat', component: AiChat, meta: { title: 'AI 客服' } },
           { path: 'suggestions', name: 'SuggestionForm', component: SuggestionForm, meta: { title: '提交意见建议' } },
           { path: 'suggestions/mine', name: 'MySuggestions', component: MySuggestions, meta: { title: '我的建议' } },

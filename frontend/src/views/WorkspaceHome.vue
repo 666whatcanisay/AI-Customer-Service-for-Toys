@@ -6,7 +6,7 @@
         <h1>{{ identity.reporterName ? `${identity.reporterName}，从一条咨询开始` : '从一条咨询开始' }}</h1>
         <p>选择商品和 SKU，获取 AI 建议，再由你核对、编辑和复制。系统不会自动向客户发送消息。</p>
         <div class="hero-actions">
-          <RouterLink to="/ai-chat" class="primary-link" data-testid="enter-ai-chat">开始 AI 客服</RouterLink>
+          <RouterLink to="/workspace" class="primary-link" data-testid="enter-ai-chat">进入 AI 客服副驾驶</RouterLink>
           <RouterLink to="/experience-cases" class="secondary-link">查看我的案例</RouterLink>
         </div>
       </div>
@@ -22,7 +22,7 @@
           <p class="eyebrow">首次使用</p>
           <h2 id="start-checklist-title">完成一条咨询，只需三步</h2>
         </div>
-        <RouterLink to="/ai-chat" class="text-link">去处理咨询</RouterLink>
+        <RouterLink to="/workspace" class="text-link">去处理咨询</RouterLink>
       </div>
       <ol class="start-grid">
         <li>
@@ -92,7 +92,7 @@
         </div>
       </div>
       <div class="quick-grid">
-        <RouterLink to="/ai-chat" class="quick-card available"><span>AI</span><div><h3>AI 客服</h3><p>选择商品、生成建议、人工核对后复制。</p></div><b>可使用</b></RouterLink>
+        <RouterLink to="/workspace" class="quick-card available"><span>AI</span><div><h3>AI 客服副驾驶</h3><p>查看客户消息、生成建议、核对依据并人工确认。</p></div><b>可使用</b></RouterLink>
         <RouterLink to="/experience-cases" class="quick-card available"><span>☆</span><div><h3>我的案例</h3><p>查看已提交的优秀回复案例与审核状态。</p></div><b>可使用</b></RouterLink>
         <RouterLink to="/feedback" class="quick-card available"><span>!</span><div><h3>问题反馈</h3><p>记录未采用 AI 建议的原因，帮助后续改进。</p></div><b>可使用</b></RouterLink>
         <article class="quick-card planned" data-testid="planned-module-card"><span>⌁</span><div><h3>常用回复</h3><p>规划中；不会在当前版本伪造模板或自动发送。</p></div><b>规划中</b></article>
