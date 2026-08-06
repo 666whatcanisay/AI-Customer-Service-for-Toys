@@ -3,8 +3,8 @@
 ## 任务身份
 
 - Requirement ID：`R019`
-- 状态：`IN_PROGRESS`
-- 当前 Gate：`AI_CS_ACCOUNT_POLICY_READY / AI_CS_INITIAL_ACCOUNTS_BLOCKED`
+- 状态：`DONE`
+- 当前 Gate：`AI_CS_INITIAL_ACCOUNTS_READY`
 - Owner：Control / OPS / C IAM / QA
 - 创建日期：2026-08-06
 
@@ -34,3 +34,14 @@
 - 账号创建前迁移失败：停止服务并用已校验备份恢复数据库，保持源SHA不变后重新启动0012兼容版本。
 - 账号创建后回滚：先停止服务并保留失败库审计副本，再恢复迁移前备份；恢复会整体撤销0013表、账号、Session和绑定。
 - 禁止直接SQL修补账号、复制测试库、删除Store/商品/知识、清空向量或自动重建RAG。
+
+## 执行记录
+
+- 精确提交R016/R018/R019源码为`ed12da9`；IAM-safe Runtime修复为`dda708b`、`fc4f6d9`。数据库、runtime、secret、日志、依赖、构建产物均未进入Git。
+- 迁移前备份：`.runtime/phase-e/green-standard/pilot-backups/platform-20260806-161922.sqlite3`，revision 0012、完整性ok、逐表逻辑核对通过。
+- 正式数据库已迁移0013；7个IAM表、3角色、12权限、23条映射存在，迁移前37个业务表计数保持一致。
+- 三个批准账号创建成功；登录、首次改密、Session撤销、RBAC、客服2店多选并恢复空绑定、运营/管理员全店通过。
+- 最终为3 users、3 user_roles、0 Store bindings、0 active sessions；数据库完整性ok；RAG仍为56 chunks，未重建。
+- Task Gate：`PASS`。完整证据见[Deployment Report](../AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md)。
+
+Final Status: `AI_CS_INITIAL_ACCOUNTS_READY`

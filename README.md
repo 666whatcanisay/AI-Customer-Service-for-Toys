@@ -1,6 +1,6 @@
 # AI-CS V1.0.0
 
-AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R008 运行收敛、R009 商品知识导入、R006 客服目录激活、R006.1 AI 知识发布、R006.2 客服体验优化、R016 用户身份/RBAC/店铺绑定以及 R018 内部账号初始化策略，当前源码 Gate 为 `AI_CS_ACCOUNT_POLICY_READY`。该 Gate 不表示正式数据库已经迁移或三个生产账号已经创建。
+AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R008 运行收敛、R009 商品知识导入、R006 客服目录激活、R006.1 AI 知识发布、R006.2 客服体验优化、R016 用户身份/RBAC/店铺绑定、R018 内部账号策略以及 R019 Production IAM 部署。正式数据库已迁移到0013，三个批准的初始账号已经创建并通过真实登录、首次改密、RBAC和店铺范围验收，当前 Gate 为 `AI_CS_INITIAL_ACCOUNTS_READY`。
 
 ## 正式运行基线
 
@@ -11,12 +11,12 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 - 防复发测试：`0f230c6f50f8b6162c4e52f3b167053e6592c656`
 - 正式稳定标签：`ai-cs-v1.0.0`；精确 SHA 从 Git 与 Runtime 记录解析
 - Contracts 源码候选：`0.10.0` coordinated（Gateway wire 仍冻结为 `1.0`）
-- 数据库源码迁移目标：`0013_user_management_v1`；当前受控 Runtime 仍为 `0012_internal_production_finalization_v1`，待另行授权部署
-- 运行方式：`runtimeMode=standard`、`networkMode=LAN`
+- 当前受控 Runtime 数据库：`0013_user_management_v1`，完整性 `ok`
+- 运行方式：`runtimeMode=standard`；本次 IAM 部署以安全默认 `networkMode=LOCAL` 验收
 
 本地 `origin` 是历史保护仓库，本版本没有声明已经推送到远端或完成远端发布。
 
-## 当前 Release Candidate：R014 Production Server Stabilization
+## Server RC 基线：R014 Production Server Stabilization
 
 当前分支已将 R011–R013 Server Candidate 固化为 clean Release Candidate `4b6c0bd09de2cca25ae1cb2ca2af76da4455217b`。Gateway wire 保持 `1.0`，repository contracts 为 additive `0.7.0`；Windows `start_ai_cs_server.bat` 已在同一 clean SHA 上完成 Core、Gateway、B、Operations Console 与 C API 的 start/status/Decision/stop 验证。B 客服继续使用 `/api/chat`，未连接生产 Channel Engine/PDD。详见 [`AI-CS Server Release Candidate Stabilization Report V1`](docs/rag/AI-CS-Server-Release-Candidate-Stabilization-Report-V1.md)。
 
@@ -38,6 +38,7 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 - `OPERATOR` 拥有商品、SKU、知识、FAQ、AI 质量、店铺数据和 Feedback 查看权限；`ADMIN` 拥有全部权限。两者都由角色获得全店铺范围。
 - 新建和重置账号使用临时口令并强制首次改密；业务 API 在改密前返回 `PASSWORD_CHANGE_REQUIRED`。长期口令不写入代码、命令行、配置或 Git。
 - `bootstrap_ai_cs_admin.ps1`保留单管理员入口；`bootstrap_ai_cs_initial_users.ps1`在同一受控 Runtime 配置下检查重复并交互创建批准的三类初始账号，已存在账号只跳过、不覆盖。详细步骤见[`platform_backend/README.md`](platform_backend/README.md)。
+- 初始账号已创建且保持 `must_change_password=true`：管理员和运营由角色获得全店范围；客服初始为0条固定绑定，首次使用在改密后进入多店选择流程。部署证据见[Initial Production Accounts Deployment Report V1](docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md)。
 
 ## Windows 日常运行
 
@@ -61,7 +62,7 @@ Gateway Production Server RC 使用独立 wrapper；正式 config 必须显式�
 
 ## 已验证状态
 
-- 四服务正式版本在 5173/5174/8000/8011 以 standard/LAN 模式通过健康检查。
+- 四服务在 5173/5174/8000/8011 以 standard/LOCAL 模式通过 IAM 部署后的启动、健康和身份一致性检查；LAN仍由现有独立网络 Gate 管理。
 - 数据库 `integrity_check=ok`，现有商品、知识、发布收据、activation receipt 和迁移历史均保留。
 - RAG 活动集合仍为内部物理名 `test_knowledge_v031`，共 56 chunks；该名称不作为用户可见环境标识，也不要求重建向量。
 - 模型 `qwen3.5:9b` 为 ready。

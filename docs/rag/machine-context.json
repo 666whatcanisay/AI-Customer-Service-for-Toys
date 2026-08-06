@@ -4,18 +4,27 @@
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
   "version": "AI-CS V1.0.0",
-  "status": "account_policy_ready",
-  "current_task": "R018 AI-CS Account Policy Adjustment V1",
-  "current_gate": "AI_CS_ACCOUNT_POLICY_READY / AI_CS_INITIAL_ACCOUNTS_BLOCKED / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY",
-  "current_stage": "A business semantics remain unchanged. The browser-reachable management authorization bridge now also fails closed while C projects must_change_password=true. Gateway wire 1.0, /api/chat, RAG, Prompt and model behavior are unchanged.",
-  "next_recommended_task": "Stabilize the coordinated R016/R018 source, back up and migrate the controlled Runtime to 0013, bootstrap initial users interactively, and perform real first-login/role/store acceptance before enabling staff access.",
+  "status": "initial_accounts_ready",
+  "current_task": "R019 AI-CS Production IAM Deployment & Initial Accounts V1",
+  "current_gate": "AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY",
+  "current_stage": "Coordinated IAM Runtime is deployed on C revision 0013 and real account acceptance passed. A business semantics, Gateway wire 1.0, /api/chat, RAG, Prompt and model behavior remain unchanged; the active collection remains at 56 chunks with no sync or rebuild.",
+  "next_recommended_task": "Keep IAM operations separate from RAG assets; proceed with R003 business acceptance and the independent R007 network gate.",
   "checked_at": "2026-08-06",
+  "production_iam_deployment_v1": {
+    "requirement": "R019",
+    "a_scope": "IAM-safe authorization/startup integration only; A stores no users, roles, credentials or Store bindings",
+    "runtime": "standard/LOCAL four-service acceptance passed with C revision 0013",
+    "rag": "test_knowledge_v031=56 chunks and model ready; no knowledge sync, publication, collection rename, clear or rebuild",
+    "compatibility": "Gateway wire 1.0, /api/chat, R006/R009, Prompt, model and PDD adapter unchanged",
+    "security": "No credential, hash or token recorded; all verification sessions revoked",
+    "report": "docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md"
+  },
   "account_policy_adjustment_v1": {
     "requirement": "R018",
     "a_scope": "Only the existing C /auth/me authorization bridge consumes must_change_password and fails closed; A stores no users, roles, credentials or Store bindings",
     "tests": "A 147 passed and 3 opt-in real E2E skipped; shared contracts 10 passed",
     "compatibility": "Gateway Contract V1 canonical schema, /api/chat semantics, RAG, Prompt, model, R006/R009 and PDD adapter unchanged",
-    "production_state": "Runtime remains 0012/pre-IAM; no production account or session was created",
+    "production_state": "Historical source-only state; R019 subsequently deployed C revision 0013 and completed real account acceptance",
     "report": "docs/control/AI-CS-Account-Policy-Adjustment-V1-Completion-Report.md"
   },
   "user_management_v1": {
@@ -207,7 +216,8 @@
     "Knowledge degradation warning policy",
     "Partial-start managed cleanup",
     "Target pilot standard-entry correction",
-    "Real standard runtime acceptance"
+    "Real standard runtime acceptance",
+    "R019 IAM-safe startup and four-service production account acceptance with RAG preservation"
   ],
   "blockers": [],
   "known_risks": [

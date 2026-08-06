@@ -4,10 +4,22 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "R018 AI-CS Account Policy Adjustment V1",
-  "current_stage": "C IAM, Admin, contract and controlled initial-user source are ready for coordinated deployment. The controlled production Runtime remains pre-IAM on database revision 0012 and no account/session/binding writes were made.",
-  "current_gate": "AI_CS_ACCOUNT_POLICY_READY / AI_CS_INITIAL_ACCOUNTS_BLOCKED / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY",
-  "status": "account_policy_ready",
+  "current_task": "R019 AI-CS Production IAM Deployment & Initial Accounts V1",
+  "current_stage": "Formal C Runtime is on 0013 with the persistent permission catalog and three approved initial accounts. Real login, mandatory password replacement, session revocation, RBAC and Store scope passed; zero active sessions and zero explicit Store bindings remain.",
+  "current_gate": "AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY",
+  "status": "initial_accounts_ready",
+  "production_iam_deployment_v1": {
+    "requirement": "R019",
+    "database_revision": "0013_user_management_v1",
+    "tables": ["users", "roles", "permissions", "role_permissions", "user_roles", "user_store_bindings", "user_sessions"],
+    "catalog": "3 roles, 12 permissions and 23 fixed mappings",
+    "accounts": "Three approved ACTIVE accounts with ADMIN, CUSTOMER_SERVICE and OPERATOR roles; mandatory first password change retained",
+    "store_scope": "CUSTOMER_SERVICE multi-Store acceptance passed and was restored to zero bindings; OPERATOR and ADMIN have role-derived all-Store",
+    "sessions": "Zero active sessions after real login/change/relogin/logout acceptance",
+    "runtime": "standard/LOCAL C 8011 coordinated with A/B/Admin on controlled source",
+    "security": "No plaintext password, hash or token in Git, logs or report; database and backup remain ignored runtime assets",
+    "report": "docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md"
+  },
   "account_policy_adjustment_v1": {
     "requirement": "R018",
     "contract": "Repository contracts 0.10.0 coordinated; Gateway wire 1.0 unchanged",
@@ -17,19 +29,19 @@
     "routes": ["POST /api/v1/auth/change-password", "GET /api/v1/auth/store-options", "PUT /api/v1/auth/store-bindings"],
     "initialization": "bootstrap_ai_cs_admin.ps1 retained; bootstrap_ai_cs_initial_users.ps1 added with getpass and duplicate skip/no overwrite",
     "tests": "C 130 passed; Admin 33 files / 84 tests plus typecheck/build; contracts 10; Windows bootstrap policy PASS",
-    "production_state": "Database remains 0012/pre-IAM and no production account or binding exists",
+    "production_state": "Historical source-only state; R019 subsequently deployed revision 0013 and three approved accounts",
     "report": "docs/control/AI-CS-Account-Policy-Adjustment-V1-Completion-Report.md"
   },
   "initial_production_accounts_v1": {
     "requirement": "R017",
-    "gate": "FAIL / ZERO_WRITE",
-    "runtime_database_revision": "0012_internal_production_finalization_v1",
-    "runtime_auth_endpoint": "HTTP 404",
-    "iam_tables": "absent",
+    "gate": "PASS / CLOSED_BY_R019",
+    "runtime_database_revision": "0013_user_management_v1",
+    "runtime_auth_endpoint": "available and accepted",
+    "iam_tables": "present, including persistent permission catalog",
     "database_integrity": "ok",
-    "result": "No accounts, roles, sessions or store bindings created",
-    "next": "Controlled R016/R018 source stabilization and authorized backup/coordinated migration/runtime switch, followed by interactive bootstrap and real role/store acceptance",
-    "report": "docs/control/AI-CS-Initial-Production-Accounts-Initialization-Report-V1.md"
+    "result": "Three accounts and role assignments created; zero active sessions and zero explicit Store bindings at handoff",
+    "next": "First formal password change by each user and routine IAM operations",
+    "report": "docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md"
   },
   "user_management_v1": {
     "requirement": "R016",
@@ -258,6 +270,6 @@
     "database_revision": "0009_product_knowledge_import_v1",
     "formal_runtime_unchanged": true
   },
-  "next_recommended_task": "Assemble a separately authorized R006.1 production release, back up formal 0010, migrate to 0011, deploy all four services on one SHA and run publish/activation smoke. Do not copy isolated data or change R009/Import Center/Prompt.",
-  "last_updated": "2026-07-31"
+  "next_recommended_task": "Require first-use password replacement, operate user disable/reset/audit through C IAM, and proceed with R003/R007 as independent gates. Do not change R006/R009, Gateway wire or RAG for IAM operations.",
+  "last_updated": "2026-08-06"
 }

@@ -3,8 +3,8 @@
 ## 任务身份
 
 - Requirement ID：`R017`
-- 状态：`BLOCKED`
-- 当前 Gate：`AI_CS_INITIAL_ACCOUNTS_BLOCKED`
+- 状态：`DONE`
+- 当前 Gate：`AI_CS_INITIAL_ACCOUNTS_READY`
 - Owner：Control / OPS / C IAM
 - 创建日期：2026-08-06
 
@@ -47,3 +47,5 @@ R018已关闭旧策略阻塞：批准的账号格式和临时初始化值可用�
 2026-08-06：完成只读前置审计；数据库和账号零写入。详见 [Initialization Report](../AI-CS-Initial-Production-Accounts-Initialization-Report-V1.md)。
 
 2026-08-06：R018完成账号策略源码调整并通过自动化Gate；未迁移正式数据库或创建账号。R017继续等待受控部署与Production Runtime验收。
+
+2026-08-06：R019完成受控源码固化、0012备份、0013迁移、三账号交互初始化和正式Runtime验收。三账号角色正确，客服保持0固定绑定并可多店选择，运营/管理员为角色级全店，最终0 active sessions。R017阻塞关闭，详见[Deployment Report](../AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md)。

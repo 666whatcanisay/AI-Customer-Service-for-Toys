@@ -3,10 +3,25 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "1.0.0",
-  "status": "account_policy_ready",
-  "current_task": "R018 AI-CS Account Policy Adjustment V1",
-  "current_stage": "Contracts 0.10, IAM policy, B/Admin flows, A authorization bridge and controlled initial-user wrapper are source-ready and fully regressed. Production runtime remains revision 0012/pre-IAM and no production account, session, binding or database write was made.",
-  "current_gate": "AI_CS_ACCOUNT_POLICY_READY / AI_CS_INITIAL_ACCOUNTS_BLOCKED / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING",
+  "status": "initial_accounts_ready",
+  "current_task": "R019 AI-CS Production IAM Deployment & Initial Accounts V1",
+  "current_stage": "Controlled source, recoverable 0012 backup, formal 0013 migration, three approved accounts, real login/password-change/RBAC/Store acceptance and rollback evidence are complete. All verification sessions are revoked and customer-service bindings are restored to empty.",
+  "current_gate": "AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING",
+  "production_iam_deployment_v1": {
+    "date": "2026-08-06",
+    "requirement": "R019",
+    "gate": "PASS / AI_CS_INITIAL_ACCOUNTS_READY",
+    "source": "ed12da9 IAM baseline; dda708b and fc4f6d9 IAM-safe Runtime startup compatibility",
+    "database": "Formal standard-platform.sqlite3 migrated from 0012 to 0013_user_management_v1 after recoverable backup; integrity ok",
+    "iam_catalog": "7 IAM tables; 3 roles; 12 permissions; 23 role-permission mappings",
+    "accounts": "Three approved ACTIVE accounts with expected ADMIN, CUSTOMER_SERVICE and OPERATOR roles; must_change_password=true",
+    "store_scope": "CUSTOMER_SERVICE selected two enabled Stores in acceptance then was restored to zero explicit bindings; ADMIN and OPERATOR are role-derived all-Store",
+    "sessions": "Real login/change/relogin/logout passed; zero active sessions at handoff; no password hash or token recorded",
+    "runtime": "standard/LOCAL four-service start/status passed on coordinated source; C revision 0013",
+    "rag": "test_knowledge_v031 remains 56 chunks; model ready; no sync, clear or rebuild",
+    "report": "docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md",
+    "task_card": "docs/control/product-management/AI-CS-Production-IAM-Deployment-Initial-Accounts-V1-Task-Card.md"
+  },
   "account_policy_adjustment_v1": {
     "date": "2026-08-06",
     "requirement": "R018",
@@ -17,22 +32,22 @@
     "store_policy": "CUSTOMER_SERVICE may self-bind one or more enabled customer Stores after password replacement; OPERATOR and ADMIN have role-derived all-Store scope",
     "initialization": "bootstrap_ai_cs_initial_users.ps1 uses controlled Runtime configuration, getpass and duplicate-skip/no-overwrite behavior",
     "tests": "A 147 passed and 3 skipped; C 130; B 34 files/143 plus typecheck/build; Admin 33 files/84 plus typecheck/build; contracts 10; Windows bootstrap policy PASS",
-    "production_state": "Runtime database remains 0012/pre-IAM; zero production accounts, sessions, bindings or database writes; R017 remains blocked pending controlled deployment and real acceptance",
+    "production_state": "Historical source-only gate; R019 subsequently deployed coordinated source, revision 0013 and three approved accounts",
     "report": "docs/control/AI-CS-Account-Policy-Adjustment-V1-Completion-Report.md"
   },
   "initial_production_accounts_v1": {
     "date": "2026-08-06",
     "requirement": "R017",
-    "gate": "FAIL / ZERO_WRITE",
-    "runtime_database_revision": "0012_internal_production_finalization_v1",
+    "gate": "PASS / CLOSED_BY_R019",
+    "runtime_database_revision": "0013_user_management_v1",
     "target_database_revision": "0013_user_management_v1",
-    "runtime_iam": "Unavailable: IAM tables absent and /api/v1/auth/me returns HTTP 404",
-    "source_state": "80 dirty entries; controlled deployment identity not available",
-    "stores": "Two enabled existing stores; no fake store and no new binding created",
-    "account_result": "Three requested account targets NOT_CREATED; no duplicate overwrite attempted",
+    "runtime_iam": "Available and accepted through real login/password-change/RBAC/Store flows",
+    "source_state": "Controlled clean IAM source established by R019",
+    "stores": "Two enabled existing Stores preserved; customer-service account can multi-select and is handed off with zero fixed bindings; no fake Store",
+    "account_result": "Three approved accounts created without overwrite; expected roles and mandatory first change verified",
     "security": "No plaintext password, password hash, session token or authentication material persisted in report/log/Git",
-    "next": "Explicit authorization for controlled source stabilization, backup, coordinated 0013 migration and runtime switch, then interactive initial-user bootstrap and real first-login/role/store acceptance",
-    "report": "docs/control/AI-CS-Initial-Production-Accounts-Initialization-Report-V1.md",
+    "next": "Each user performs first formal password change; continue routine IAM rotation, disable and audit operations",
+    "report": "docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md",
     "task_card": "docs/control/product-management/AI-CS-Initial-Production-Accounts-Remediation-V1-Task-Card.md"
   },
   "user_management_v1": {
@@ -42,7 +57,7 @@
     "contract": "Repository contracts 0.9.0 additive identity-access-management.v1; Gateway wire 1.0 unchanged",
     "rbac": "CUSTOMER_SERVICE=workspace/AI/feedback submit; OPERATOR=product/knowledge/feedback view; ADMIN=all plus user management",
     "tests": "A 147/3 skipped; C 127; B 139 plus typecheck/build; Admin 82 plus typecheck/build; contracts 9",
-    "deployment_next": "Controlled migration, interactive first-ADMIN bootstrap, backup/rollback readiness and role-specific browser acceptance",
+    "deployment_next": "Completed by R019; continue first-use password changes and routine IAM operations",
     "report": "docs/control/AI-CS-User-Management-Store-Binding-V1-Completion-Report.md"
   },
   "gateway_lan_mode_enablement_v1": {
@@ -460,7 +475,8 @@
     "CONTROL_PILOT_BASELINE_MERGE": "After merging PR #49 and #51, an isolated SQLite verification completed Alembic, original-test-package import, 47-item sync, real qwen3.5:9b chat, 5173 /rag-api and /platform-api HTTP 200, one de-identified experience case NEW->REVIEWING->APPROVED, one de-identified feedback NEW->ANALYZING->ANALYZED, Admin HTTP 200, and managed stop with all four ports released. The readiness state correctly remained FIREWALL_CONFIGURATION_REQUIRED because no current-subnet Private TCP 5173 rule exists.",
     "CONTROL_BASELINE_MERGE_V2": "Reviewed candidates were squash merged in the frozen order Interface #58, C #55, B #57, A 2ac537f and OPS #56 to develop@d1d2ba2. Backend 77 passed/3 skipped, C Admin 33 Vitest passed, B 100 Vitest passed and selected OPS lifecycle suites exited 0. Official scripts in an isolated worktree verified migration 0006, package import, 47/47 sync, four verified runtime records, fixed proxy health, sourced real qwen3.5:9b answer, case approval/evaluation, feedback analysis and Admin visibility. External firewall and second-computer gates remain.",
     "PRODUCT_STABILIZATION_V1": "Formal AI-CS@42bafcf passed three LAN lifecycle cycles, A/C failure recovery, database and vector protection, and real qwen3.5:9b chat. A 105 passed/3 skipped; C full suite and R009 targeted 8 passed; B 115 and Admin 55 Vitest passed with typecheck/build. Isolated R009 browser acceptance uploaded the real workbook, parsed four sheets, approved 19 products, and passed idempotency and negative cases. B browser daily flow remains blocked on the unchanged formal Runtime until the verified R006 candidate is released.",
-    "R006_CUSTOMER_AVAILABLE_CATALOG": "Contracts 0.3.0, 0010, C provider/Admin, B consumer and isolated E2E completed. Contracts 4, C 110, B 117 and Admin 58 tests passed; both frontend typechecks/builds passed. Bad Store/Product/SKU records were isolated without clearing valid TEST data; PILOT activation and receipt history passed. Formal AI-CS@42bafcf/0008 was not changed."
+    "R006_CUSTOMER_AVAILABLE_CATALOG": "Contracts 0.3.0, 0010, C provider/Admin, B consumer and isolated E2E completed. Contracts 4, C 110, B 117 and Admin 58 tests passed; both frontend typechecks/builds passed. Bad Store/Product/SKU records were isolated without clearing valid TEST data; PILOT activation and receipt history passed. Formal AI-CS@42bafcf/0008 was not changed.",
+    "R019_PRODUCTION_IAM_DEPLOYMENT": "Controlled source ed12da9 plus IAM-safe Runtime fixes dda708b/fc4f6d9; recoverable 0012 backup; formal 0013 migration with 7 IAM tables, 3 roles, 12 permissions and 23 mappings; three approved accounts; real login/password-change/session/RBAC/multi-Store acceptance; zero active sessions and zero explicit bindings at handoff. A 147/3 skipped, C 130, B 143, Admin 84, contracts 10. RAG remained 56 chunks without sync or rebuild."
   },
   "agent_worktrees": {
     "A": {
@@ -507,21 +523,23 @@
     "R008 physical migration, target validation and standard-port runtime cutover",
     "Runtime Identity Alignment and Runtime Startup Alignment",
     "R009 Product Knowledge Import V1 implementation and isolated browser acceptance",
-    "R006 Customer Available Catalog implementation and isolated browser acceptance"
+    "R006 Customer Available Catalog implementation and isolated browser acceptance",
+    "R016 User Management & Store Binding V1 source and automated acceptance",
+    "R017 Initial Production Accounts V1 closed by R019 deployment",
+    "R018 Account Policy Adjustment V1 coordinated source",
+    "R019 Production IAM Deployment & Initial Accounts V1"
   ],
   "next_tasks": {
     "CONTROL": "Run R003 full business acceptance without expanding R006: manually activate one PILOT Store/Product, verify receipt and B visibility, then disable and verify rollback.",
-    "OPS": "Keep release b66506a/0010 running and preserve the offline 0008 backup. Do not delete the Recovery anchor.",
-    "A": "No changes. Preserve A fix commit 18a20f7, Prompt, model and RAG data.",
-    "B_C": "Preserve C ownership and the B consume-only boundary; do not reintroduce legacy field checks or local allowlists.",
-    "QA": "Use the formal browser and API paths for R003. Do not treat the release smoke as the complete activation acceptance."
+    "OPS": "Preserve the R019 0012 backup and current 0013 database as ignored Runtime assets; use standard wrappers and never overwrite SQLite while services are running.",
+    "A": "No business changes. Preserve /api/chat, Gateway wire 1.0, Prompt, model and the 56-chunk RAG collection.",
+    "B_C": "Require each initial user to replace the temporary credential at first formal use; keep C as the authorization and Store-scope authority.",
+    "QA": "Use formal browser/API paths for R003 and the independent R007 network gate; do not treat R019 IAM acceptance as business or second-terminal acceptance."
   },
   "t02_executed": false,
   "blockers": [
-    "BUG-B-001 is FIXED_VERIFIED_CANDIDATE but remains unverified on the unchanged formal AI-CS@42bafcf/0008 Runtime.",
-    "R003 remains open until C creation, explicit activation, B visibility and unchanged A-context use are verified after deploying one approved runtime SHA.",
-    "R009 is accepted only in an isolated 0009 runtime. Formal production remains at 0008 and no RAG publication or B consumption is implied.",
+    "R003 remains open pending full business-result acceptance; R019 IAM acceptance does not close it.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
   ],
-  "last_updated": "2026-08-05"
+  "last_updated": "2026-08-06"
 }

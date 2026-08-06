@@ -4,11 +4,20 @@
   "line": "B",
   "version": "AI-CS V1.0.0",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-  "current_task": "R018 AI-CS Account Policy Adjustment V1",
-  "current_stage": "B now enforces the server-projected first-login password replacement flow and routes unbound customer-service users to enabled-Store multi-selection. Workspace human review semantics remain unchanged.",
-  "current_gate": "AI_CS_ACCOUNT_POLICY_READY / AI_CS_INITIAL_ACCOUNTS_BLOCKED / AI_CS_USER_MANAGEMENT_READY / AI_CS_INTERNAL_PRODUCTION_READY",
-  "status": "account_policy_ready",
+  "current_task": "R019 AI-CS Production IAM Deployment & Initial Accounts V1",
+  "current_stage": "Coordinated IAM Runtime is deployed. Real login and mandatory password-change gates passed; the customer-service account can select both enabled Stores and is handed off unbound for first-use selection. Workspace human review semantics remain unchanged.",
+  "current_gate": "AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / AI_CS_INTERNAL_PRODUCTION_READY",
+  "status": "initial_accounts_ready",
   "last_updated": "2026-08-06",
+  "production_iam_deployment_v1": {
+    "requirement": "R019",
+    "runtime": "B 5173 on coordinated contracts 0.10 source with C revision 0013 in standard/LOCAL acceptance",
+    "login": "Real C login and mandatory first-password-change flow passed for the approved customer-service account",
+    "stores": "Two enabled Store options and multi-select passed; explicit bindings restored to empty for first-use selection",
+    "security": "C remains the authorization authority; zero active verification sessions at handoff; no credential or token recorded",
+    "compatibility": "Workspace human review, no-auto-send and A /api/chat semantics unchanged",
+    "report": "docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md"
+  },
   "account_policy_adjustment_v1": {
     "requirement": "R018",
     "routes": ["/login", "/change-password", "/store-selection", "/workspace", "/forbidden"],
@@ -132,7 +141,7 @@
   "blockers": [],
   "known_risks": [
     "Production JavaScript chunk exceeds 500 kB warning threshold",
-    "Tester identity is local browser state and is not authentication or authorization",
+    "Production browser transport still requires trusted TLS/reverse-proxy and login-failure rate limiting before untrusted-network use",
     "Experience-case session summaries disappear on refresh until C publishes the GET contract",
     "Pilot-guide dismissal is a local browser boolean, not authentication or training evidence",
     "AI feedback is limited to synthetic or manually de-identified test data; automatic redaction and formal authorization are not implemented",
@@ -158,7 +167,9 @@
     "TARGET MODE V2 customer knowledge-status consumer: strict same-origin client, compact Chinese status indicator and non-blocking fallback implemented against knowledge-quality-loop.v1",
     "TARGET MODE V5 customer usability: visible consultation scope, AI reference readiness actions, and human review-to-copy path implemented without adding API consumption",
     "R006 Customer Available Catalog consume-only adaptation and isolated browser verification",
-    "R006 Customer Available Catalog formal deployment and production read-only browser smoke"
+    "R006 Customer Available Catalog formal deployment and production read-only browser smoke",
+    "R016/R018 coordinated IAM client and policy flows",
+    "R019 real login, first-password-change and customer-service multi-Store acceptance"
   ],
   "out_of_scope": [
     "Automatic customer message sending",

@@ -5,6 +5,8 @@
 > 执行结论：`FAIL / ZERO_WRITE`
 > 当前状态：`AI_CS_INITIAL_ACCOUNTS_BLOCKED`
 
+> **历史报告 / 已被取代：** 本文记录R017最初的只读前置审计，`FAIL / ZERO_WRITE`只代表当时状态。R019已在2026-08-06完成受控备份、0013迁移、账号初始化与真实验收，当前权威结论为`AI_CS_INITIAL_ACCOUNTS_READY`。请使用[AI-CS Initial Production Accounts Deployment Report V1](AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md)。
+
 > R018 后续更新：账号格式、临时口令首次改密、客服多 Store、运营/管理员全 Store和客服管理权限策略已经由 `AI_CS_ACCOUNT_POLICY_READY` 关闭；下文关于旧 R016 规则冲突的描述仅保留为本次只读审计发生时的历史证据。正式 Runtime 仍为0012/pre-IAM，三个账号仍未创建，因此本报告的`FAIL / ZERO_WRITE`结论不变。
 
 ## 1. 结论
