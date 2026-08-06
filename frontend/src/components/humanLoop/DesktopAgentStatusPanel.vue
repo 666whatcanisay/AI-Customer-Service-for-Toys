@@ -3,7 +3,7 @@
     <div class="desktop-heading">
       <div>
         <small>客服电脑接入</small>
-        <strong>Channel Agent</strong>
+        <strong>客服连接程序</strong>
       </div>
       <span class="status-pill" :class="statusClass" data-testid="desktop-agent-online-status">
         {{ statusLabel }}
@@ -17,7 +17,7 @@
       <div><small>当前客服</small><strong>{{ userName || '身份未加载' }}</strong></div>
       <div><small>当前设备</small><strong>{{ deviceLabel }}</strong></div>
       <div><small>当前店铺</small><strong>{{ storeName || '店铺未加载' }}</strong></div>
-      <div><small>Agent 版本</small><strong>{{ status?.agent?.agentVersion || '—' }}</strong></div>
+      <div><small>程序版本</small><strong>{{ status?.agent?.agentVersion || '—' }}</strong></div>
       <div><small>最后心跳</small><strong>{{ heartbeatLabel }}</strong></div>
     </div>
 
@@ -31,18 +31,18 @@
       data-testid="desktop-binding-form"
       @submit.prevent="submitBinding"
     >
-      <label>Agent ID<input v-model.trim="agentId" maxlength="128" autocomplete="off" /></label>
-      <label>Device ID<input v-model.trim="deviceId" maxlength="128" autocomplete="off" /></label>
+      <label>连接程序编号<input v-model.trim="agentId" maxlength="128" autocomplete="off" /></label>
+      <label>设备编号<input v-model.trim="deviceId" maxlength="128" autocomplete="off" /></label>
       <button type="submit" :disabled="bindingBusy || !agentId || !deviceId">
         {{ bindingBusy ? '申请中' : '生成一次性绑定码' }}
       </button>
-      <p>请从本机 Channel Agent 状态页核对两个标识。授权只覆盖当前账号的已授权店铺。</p>
+      <p>请从本机客服连接程序的状态页核对两个编号。授权只覆盖当前账号负责的店铺。</p>
     </form>
 
     <div v-if="bindingGrant" class="binding-grant" data-testid="desktop-binding-grant">
       <strong>一次性绑定码</strong>
       <code>{{ bindingGrant.bindingCode }}</code>
-      <p>在本机运行 <code>ChannelAgent.exe enroll --binding-code-stdin</code> 并通过隐藏输入粘贴。绑定码不会保存在 AI-CS 页面；有效至 {{ formatTime(bindingGrant.expiresAt) }}，完成后仍需管理员独立激活。</p>
+      <p>请在本机客服连接程序的“设备绑定”页面输入。绑定码不会保存在此页面；有效至 {{ formatTime(bindingGrant.expiresAt) }}。如看不到设备绑定页面，请联系管理员。</p>
       <button type="button" @click="$emit('clear-grant')">我已完成本机录入</button>
     </div>
   </section>
@@ -83,7 +83,7 @@ const statusLabel = computed(() => {
     BINDING_REQUIRED: '待绑定', ACTIVATION_REQUIRED: '待激活', STORE_MISMATCH: '店铺不匹配',
     MULTIPLE_MATCHES: '多设备冲突', DISABLED: '已停用'
   }[props.status.associationState] ?? '状态异常'
-  return { ONLINE: '设备在线', DEGRADED: '连接降级', OFFLINE: 'Agent 离线' }[props.status.agent?.onlineStatus ?? 'OFFLINE']
+  return { ONLINE: '设备在线', DEGRADED: '连接降级', OFFLINE: '设备离线' }[props.status.agent?.onlineStatus ?? 'OFFLINE']
 })
 
 const statusClass = computed(() => {
@@ -95,7 +95,7 @@ const statusClass = computed(() => {
 const deviceLabel = computed(() => {
   const agent = props.status?.agent
   if (!agent) return '未关联'
-  return agent.deviceName ? `${agent.deviceName} · ${agent.deviceId}` : agent.deviceId
+  return agent.deviceName || '已关联设备'
 })
 
 const formatTime = (value: string): string => {
@@ -112,13 +112,13 @@ const notice = computed(() => {
   if (props.error) return props.error
   if (!props.status) return '正在核对当前账号、设备与店铺关联。'
   const state = props.status.associationState
-  if (state === 'BINDING_REQUIRED') return '当前账号尚未关联客服电脑。请启动本机 Channel Agent，核对标识后申请一次性绑定码。'
-  if (state === 'ACTIVATION_REQUIRED') return '设备已绑定，等待管理员在 Channel Agent 中独立核验并激活。'
-  if (state === 'STORE_MISMATCH') return '该账号已有设备，但没有覆盖当前店铺；请联系管理员调整 Agent 店铺范围。'
+  if (state === 'BINDING_REQUIRED') return '当前账号尚未关联客服电脑。请启动本机客服连接程序，核对编号后申请一次性绑定码。'
+  if (state === 'ACTIVATION_REQUIRED') return '设备已绑定，等待管理员核验并激活。'
+  if (state === 'STORE_MISMATCH') return '该账号已有设备，但没有覆盖当前店铺；请联系管理员调整设备的店铺范围。'
   if (state === 'MULTIPLE_MATCHES') return '发现多个设备同时匹配当前账号与店铺，已停止自动选择。'
   if (state === 'DISABLED') return '该设备绑定已停用，不能继续作为当前客服电脑。'
-  if (props.status.agent?.onlineStatus === 'OFFLINE') return 'Agent 已离线。AI 建议仍只供人工参考，渠道侧能力当前不可用。'
-  if (props.status.agent?.onlineStatus === 'DEGRADED') return 'Agent 与服务器连接降级，请检查网络后刷新。'
+  if (props.status.agent?.onlineStatus === 'OFFLINE') return '客服连接程序已离线。AI 建议仍只供人工参考，当前无法使用渠道连接能力。'
+  if (props.status.agent?.onlineStatus === 'DEGRADED') return '客服连接程序与服务器连接不稳定，请检查网络后刷新。'
   return '设备、客服身份与当前店铺关联正常。AI 只生成建议，系统不会自动发送。'
 })
 

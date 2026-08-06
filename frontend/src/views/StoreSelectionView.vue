@@ -8,7 +8,7 @@
       <form v-else @submit.prevent="save">
         <div v-for="store in options" :key="store.store_id" class="store-option">
           <label class="store-main"><input v-model="selected" type="checkbox" :value="store.store_id" />
-            <span><strong>{{ store.store_name }}</strong><small>{{ store.platform }} · {{ store.store_code }}</small></span>
+            <span><strong>{{ store.store_name }}</strong><small>{{ platformLabel(store.platform) }}</small></span>
           </label>
           <label v-if="selected.includes(store.store_id)" class="default-choice">
             <input v-model="defaultStoreId" type="radio" name="default-store" :value="store.store_id" /> 默认进入
@@ -35,6 +35,16 @@ const defaultStoreId = ref<number | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
+
+const platformLabel = (platform: string): string => ({
+  pdd: '拼多多',
+  pinduoduo: '拼多多',
+  taobao: '淘宝',
+  tmall: '天猫',
+  jd: '京东',
+  douyin: '抖音',
+  offline: '线下',
+}[platform.toLowerCase()] ?? '其他平台')
 
 onMounted(async () => {
   try {

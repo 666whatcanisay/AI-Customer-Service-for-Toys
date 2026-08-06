@@ -22,7 +22,7 @@ const auth = useAdminSession()
 
 const simpleNavigationItems: NavigationItem[] = [
   { label: '运营工作台', to: '/overview' },
-  { label: '商品', to: '/store-management' },
+  { label: '店铺与商品', to: '/store-management' },
   { label: '知识', to: '/knowledge-center' },
   { label: '导入', to: '/import-center' },
   { label: '客服运营', to: '/customer-operations' },

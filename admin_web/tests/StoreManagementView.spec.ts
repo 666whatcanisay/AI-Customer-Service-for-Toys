@@ -64,7 +64,7 @@ describe('StoreManagementView', () => {
     const wrapper = mount(StoreManagementView)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('店铺管理')
+    expect(wrapper.text()).toContain('店铺与商品管理')
     expect(wrapper.text()).toContain('木木小栈拼多多旗舰店')
     expect(wrapper.text()).toContain('商品数量')
     expect(wrapper.text()).toContain('创建时间')

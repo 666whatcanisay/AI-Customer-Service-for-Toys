@@ -2,12 +2,12 @@
   <main class="reply-assistant" aria-label="AI 回复助手" data-testid="reply-assistant">
     <header class="assistant-header">
       <div>
-        <p>AI REPLY ASSISTANT</p>
-        <h1>回复副驾驶</h1>
+        <p>AI 回复建议</p>
+        <h1>回复助手</h1>
       </div>
       <div class="mode-stack">
-        <span>SUGGEST</span>
-        <strong>HUMAN_CONFIRM_SEND</strong>
+        <span>仅供建议</span>
+        <strong>人工确认后使用</strong>
       </div>
     </header>
 
@@ -99,7 +99,7 @@
           @input="$emit('edit', ($event.target as HTMLTextAreaElement).value)"
         />
         <p v-if="draft.state === 'EDITED'" class="edited-note">已修改：提交时将记录 AI 原稿与人工最终稿。</p>
-        <p v-if="draft.warnings.length" class="warning-note">{{ draft.warnings.join('；') }}</p>
+        <p v-if="draft.warnings.length" class="warning-note">{{ draft.warnings.map(warningLabel).join('；') }}</p>
       </div>
 
       <div v-else class="draft-empty">
@@ -143,12 +143,12 @@
           {{ feedbackBusy ? '记录中…' : feedbackMode === 'REJECT' ? '确认拒绝并记录' : '提交问题标记' }}
         </button>
       </form>
-      <p v-if="feedbackReceiptId" class="feedback-receipt" data-testid="feedback-receipt">问题反馈已记录：{{ feedbackReceiptId }}</p>
+      <p v-if="feedbackReceiptId" class="feedback-receipt" data-testid="feedback-receipt">问题反馈已记录。</p>
     </section>
 
     <section class="evidence-section" data-testid="knowledge-evidence">
       <div class="evidence-heading">
-        <div><span>KNOWLEDGE EVIDENCE</span><h2>为什么这样回答</h2></div>
+        <div><span>商品与知识依据</span><h2>为什么这样回答</h2></div>
         <strong>{{ draft?.citations.length ?? 0 }} 条依据</strong>
       </div>
       <div v-if="draft?.citations.length" class="evidence-grid">
@@ -156,7 +156,7 @@
           <div><span :class="`source-${sourceKind(citation).code}`">{{ sourceKind(citation).label }}</span><small>#{{ index + 1 }}</small></div>
           <strong>{{ citation.file }}</strong>
           <p>{{ citation.summary }}</p>
-          <footer><span>商品 {{ citation.productId ?? '未标注' }}</span><span>SKU {{ citation.skuId ?? '通用' }}</span></footer>
+          <footer><span>{{ citation.productId ? '已匹配当前商品' : '通用知识' }}</span><span>{{ citation.skuId ? '已匹配当前规格' : '适用全部规格' }}</span></footer>
         </article>
       </div>
       <div v-else class="evidence-empty">生成建议后，这里会展示商品知识、FAQ 与安全规则依据。</div>
@@ -217,16 +217,16 @@ const feedbackType = ref<AiResponseFeedbackType>('FACT_ERROR')
 const feedbackNote = ref('')
 
 const draftStateLabels: Record<string, string> = {
-  MESSAGE_RECEIVED: 'Message Received',
-  UNDERSTANDING: 'Understanding',
-  GENERATING: 'Generating',
-  DRAFT_READY: 'Draft Ready',
-  HUMAN_REVIEW: 'Waiting Human',
-  EDITED: 'Edited',
-  ACCEPTED: 'Accepted',
-  EXPIRED: 'Expired'
+  MESSAGE_RECEIVED: '已收到客户消息',
+  UNDERSTANDING: '正在理解问题',
+  GENERATING: '正在生成建议',
+  DRAFT_READY: '建议已生成',
+  HUMAN_REVIEW: '等待人工确认',
+  EDITED: '人工已修改',
+  ACCEPTED: '已采用',
+  EXPIRED: '建议已失效'
 }
-const draftStateLabel = computed(() => draftStateLabels[props.draft?.state ?? ''] ?? 'Idle')
+const draftStateLabel = computed(() => draftStateLabels[props.draft?.state ?? ''] ?? '等待客户消息')
 
 const canGenerate = computed(() => props.draft?.state === 'MESSAGE_RECEIVED')
 const canRegenerate = computed(() => ['HUMAN_REVIEW', 'EDITED', 'EXPIRED'].includes(props.draft?.state ?? ''))
@@ -274,8 +274,17 @@ watch(() => props.feedbackReceiptId, (value, previous) => {
 const sourceLabel = (source: ChannelMessageSource): string => {
   if (source === 'MANUAL') return '人工录入 · 当前页面内存'
   if (source === 'VALIDATION_FIXTURE') return '验收数据 · 不含真实客户数据'
-  return 'Channel Agent'
+  return '客服连接程序'
 }
+
+const warningLabel = (warning: string): string => ({
+  SUGGESTION_ONLY: 'AI 内容仅供建议，请人工核对',
+  AUTO_SEND_DISABLED: '系统不会自动发送',
+  NO_SCOPED_KNOWLEDGE: '未找到与当前商品直接相关的可靠知识',
+  KNOWLEDGE_NOT_PUBLISHED: '该商品的 AI 知识尚未发布',
+  LLM_REQUEST_FAILED: 'AI 回复生成失败',
+  RAG_RUNTIME_ERROR: 'AI 服务暂时异常',
+}[warning] ?? '存在需要人工核对的风险提示')
 
 const formatTime = (value: string): string => {
   const date = new Date(value)

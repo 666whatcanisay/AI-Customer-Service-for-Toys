@@ -243,8 +243,8 @@ const selectStore = async (storeId: number): Promise<void> => {
     resetResolution()
     desktopBindingGrant.value = null
     await loadDesktopAgentStatus()
-  } catch (error) {
-    contextError.value = error instanceof Error ? error.message : '默认店铺切换失败。'
+  } catch {
+    contextError.value = '店铺切换失败，请稍后重试；如持续失败，请联系管理员。'
   } finally {
     contextLoading.value = false
   }
@@ -380,6 +380,15 @@ const generateDraft = async (): Promise<void> => {
       question: message.content,
       resolution_id: resolved.resolutionId
     })
+    if (result.warnings.includes('KNOWLEDGE_NOT_PUBLISHED')) {
+      throw new Error('该商品的 AI 知识尚未发布，请联系运营完成知识发布后重试。')
+    }
+    if (result.warnings.includes('RAG_RUNTIME_ERROR')) {
+      throw new Error('AI 服务暂时异常，请稍后重试；如持续失败，请联系管理员。')
+    }
+    if (result.warnings.includes('LLM_REQUEST_FAILED')) {
+      throw new Error('AI 回复生成失败，请检查服务状态后重试。')
+    }
     workspace.setDraftReady({
       answer: result.answer, requestId: result.requestId, action: result.action,
       riskLevel: result.riskLevel, citations: result.citations,

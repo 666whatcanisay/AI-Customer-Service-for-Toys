@@ -58,6 +58,15 @@ const authenticatedUser = (): AuthUser => ({
   must_change_password: false, all_store_access: false,
   created_at: '2026-08-06T00:00:00Z', updated_at: '2026-08-06T00:00:00Z'
 })
+const chatResult = {
+  requestId: 'request-1', model: 'local-model', answer: '您好，这款积木建议 5 岁以上使用。',
+  action: 'CONTROLLED_ANSWER', riskLevel: 'LOW', warnings: [], requiredFields: [],
+  context: { tenant_id: 'TENANT-1', platform: 'pinduoduo', store_code: 'STORE-1', product_id: 'PRODUCT-1', sku_id: null },
+  citations: [{
+    file: '商品知识.md', page: null, chunkId: 'chunk-1', summary: '建议年龄 5 岁以上', distance: 0.1,
+    knowledgeVersion: 'v1', sourceIds: ['source-1'], productId: 'PRODUCT-1', skuId: null
+  }], latencyMs: 120
+}
 
 describe('HumanInLoopWorkspace', () => {
   beforeEach(() => {
@@ -74,15 +83,7 @@ describe('HumanInLoopWorkspace', () => {
       store, product, sku: null, productCandidates: [product], skuCandidates: [],
       reasonCode: 'PRODUCT_RESOLVED_NO_SKU', createdAt: '2026-08-06T08:00:00Z'
     })
-    apiMocks.chat.mockResolvedValue({
-      requestId: 'request-1', model: 'local-model', answer: '您好，这款积木建议 5 岁以上使用。',
-      action: 'CONTROLLED_ANSWER', riskLevel: 'LOW', warnings: [], requiredFields: [],
-      context: { tenant_id: 'TENANT-1', platform: 'pinduoduo', store_code: 'STORE-1', product_id: 'PRODUCT-1', sku_id: null },
-      citations: [{
-        file: '商品知识.md', page: null, chunkId: 'chunk-1', summary: '建议年龄 5 岁以上', distance: 0.1,
-        knowledgeVersion: 'v1', sourceIds: ['source-1'], productId: 'PRODUCT-1', skuId: null
-      }], latencyMs: 120
-    })
+    apiMocks.chat.mockResolvedValue(chatResult)
     apiMocks.submitInteraction.mockResolvedValue({
       eventId: 'AIE-001', interactionId: 'request-1', status: 'RECORDED', occurredAt: '2026-08-06T08:02:00Z'
     })
@@ -139,8 +140,9 @@ describe('HumanInLoopWorkspace', () => {
       finalAnswerSummary: '您好，这款积木建议 5 岁以上使用，并请家长陪同。',
       createdBy: '11111111-1111-4111-8111-111111111111'
     }), 'interaction-key-1')
-    expect(wrapper.get('[data-testid="interaction-receipt"]').text()).toContain('AIE-001')
-    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('Approved')
+    expect(wrapper.get('[data-testid="interaction-receipt"]').text()).toContain('采用结果已记录')
+    expect(wrapper.get('[data-testid="interaction-receipt"]').text()).not.toContain('AIE-001')
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('已采用')
     expect(wrapper.text()).toContain('系统不自动发送')
   })
 
@@ -154,7 +156,7 @@ describe('HumanInLoopWorkspace', () => {
     await wrapper.get('[data-testid="manual-message-form"]').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="draft-card"]').text()).toContain('Message Received')
+    expect(wrapper.get('[data-testid="draft-card"]').text()).toContain('已收到客户消息')
     expect(wrapper.get('[data-testid="message-timeline"]').text()).toContain('还有其他注意事项吗？')
   })
 
@@ -210,7 +212,7 @@ describe('HumanInLoopWorkspace', () => {
       actionType: 'DIRECT_ACCEPT',
       finalAnswerSummary: '您好，这款积木建议 5 岁以上使用。'
     }), 'interaction-key-1')
-    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('Approved')
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('已采用')
   })
 
   it('records rejection reason with the linked interaction before rejecting the draft', async () => {
@@ -231,7 +233,7 @@ describe('HumanInLoopWorkspace', () => {
       feedbackType: 'RISK_ISSUE', feedbackNote: '安全限制未突出',
       interactionId: 'request-1', createdBy: '11111111-1111-4111-8111-111111111111'
     }), 'feedback-key-1')
-    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('Rejected')
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('已拒绝')
     expect(wrapper.text()).toContain('反馈已沉淀')
   })
 
@@ -244,11 +246,11 @@ describe('HumanInLoopWorkspace', () => {
     await wrapper.get('[data-testid="reject-draft"]').trigger('click')
     await wrapper.get('[data-testid="feedback-form"]').trigger('submit'); await flushPromises()
 
-    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('Waiting Human')
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('等待人工确认')
     expect(wrapper.get('[data-testid="workspace-action-error"]').text()).toContain('反馈服务暂时不可用')
 
     await wrapper.get('[data-testid="feedback-form"]').trigger('submit'); await flushPromises()
-    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('Rejected')
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('已拒绝')
     expect(apiMocks.submitInteraction).toHaveBeenNthCalledWith(1, expect.any(Object), 'interaction-key-1')
     expect(apiMocks.submitInteraction).toHaveBeenNthCalledWith(2, expect.any(Object), 'interaction-key-1')
     expect(apiMocks.submitFeedback).toHaveBeenNthCalledWith(1, expect.any(Object), 'feedback-key-1')
@@ -268,8 +270,8 @@ describe('HumanInLoopWorkspace', () => {
     expect(apiMocks.submitFeedback).toHaveBeenCalledWith(expect.objectContaining({
       feedbackType: 'MISSING_INFO'
     }), 'feedback-key-1')
-    expect(wrapper.get('[data-testid="feedback-receipt"]').text()).toContain('ARF-001')
-    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('Waiting Human')
+    expect(wrapper.get('[data-testid="feedback-receipt"]').text()).toBe('问题反馈已记录。')
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('等待人工确认')
   })
 
   it('moves an accepted conversation to waiting and requires explicit completion', async () => {
@@ -300,8 +302,8 @@ describe('HumanInLoopWorkspace', () => {
       }, checkedAt: '2026-08-06T08:00:01Z'
     })
     const wrapper = mountWorkspace(); await flushPromises()
-    expect(wrapper.get('[data-testid="desktop-agent-online-status"]').text()).toContain('Agent 离线')
-    expect(wrapper.get('[data-testid="desktop-agent-notice"]').text()).toContain('渠道侧能力当前不可用')
+    expect(wrapper.get('[data-testid="desktop-agent-online-status"]').text()).toContain('设备离线')
+    expect(wrapper.get('[data-testid="desktop-agent-notice"]').text()).toContain('当前无法使用渠道连接能力')
     expect((wrapper.get('[data-testid="generate-draft"]').element as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -330,7 +332,23 @@ describe('HumanInLoopWorkspace', () => {
       agentId: 'agent-1', deviceId: 'device-1', storeId: 8
     })
     expect(wrapper.get('[data-testid="desktop-binding-grant"]').text()).toContain('ABCDEF0123456789')
-    expect(wrapper.get('[data-testid="desktop-binding-grant"]').text()).toContain('仍需管理员独立激活')
+    expect(wrapper.get('[data-testid="desktop-binding-grant"]').text()).toContain('如看不到设备绑定页面，请联系管理员')
+  })
+
+  it('blocks review when the selected product knowledge is not published', async () => {
+    apiMocks.chat.mockResolvedValueOnce({
+      ...chatResult,
+      answer: '该商品已进入客服目录，但AI知识尚未同步，请人工核对商品资料。',
+      action: 'REFUSE', riskLevel: 'HIGH', citations: [],
+      warnings: ['KNOWLEDGE_NOT_PUBLISHED']
+    })
+    const wrapper = mountWorkspace(); await flushPromises()
+    await wrapper.get('[data-testid="generate-draft"]').trigger('click'); await flushPromises()
+
+    expect(wrapper.get('[data-testid="workspace-action-error"]').text())
+      .toContain('该商品的 AI 知识尚未发布，请联系运营完成知识发布后重试')
+    expect(wrapper.find('[data-testid="direct-accept"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('KNOWLEDGE_NOT_PUBLISHED')
   })
 
   it('keeps feedback controls disabled when the authenticated user lacks feedback permission', async () => {

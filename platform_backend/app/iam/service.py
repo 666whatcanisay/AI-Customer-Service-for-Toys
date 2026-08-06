@@ -328,8 +328,13 @@ class UserService:
                 "The requested Store is not bound to this account.",
                 status_code=403,
             )
+        # The production schema enforces one default Store per user with a
+        # partial unique index. SQLite may apply a batched UPDATE in an order
+        # that temporarily creates two defaults, so clear and flush first.
         for binding in bindings:
-            binding.is_default = binding.store_id == store_id
+            binding.is_default = False
+        self.session.flush()
+        next(binding for binding in bindings if binding.store_id == store_id).is_default = True
         user.updated_at = utc_now()
         self.session.commit()
         return project_user(self.session, user)

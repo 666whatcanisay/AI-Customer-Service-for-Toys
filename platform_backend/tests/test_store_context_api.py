@@ -119,6 +119,13 @@ def test_workspace_context_loads_default_and_switches_only_authorized_store(
     )
     assert switched.status_code == 200
     assert next(item for item in switched.json()["stores"] if item["is_default"])["store_id"] == second.id
+    switched_back = auth_client.put(
+        "/api/v1/auth/default-store", headers=headers, json={"store_id": first.id}
+    )
+    assert switched_back.status_code == 200
+    assert [
+        item["store_id"] for item in switched_back.json()["stores"] if item["is_default"]
+    ] == [first.id]
     assert auth_client.put(
         "/api/v1/auth/default-store", headers=headers, json={"store_id": third.id}
     ).status_code == 403

@@ -78,6 +78,12 @@ function formatOptionalDate(value: string | null): string {
   return value ? formatDate(value) : '尚未人工变更'
 }
 
+function updatedByLabel(value: string | null): string {
+  if (!value) return '—'
+  if (value === 'SYSTEM_MIGRATION') return '系统初始化'
+  return value
+}
+
 function dataSourceLabel(value: StoreOperationItem['data_source']): string {
   return { INITIAL_IMPORT: '初始化导入', TEST: '历史导入', PILOT: '运营创建', UNKNOWN: '待确认' }[value]
 }
@@ -302,7 +308,7 @@ onMounted(load)
     <div class="page-header">
       <div>
         <p class="eyebrow">店铺业务范围</p>
-        <h1>店铺管理</h1>
+        <h1>店铺与商品管理</h1>
         <p>使用中文业务名称维护商品知识所属店铺；内部标识由系统生成，不需要运营填写。</p>
       </div>
       <div class="page-actions">
@@ -358,7 +364,7 @@ onMounted(load)
       <div v-else class="table-wrap">
         <table class="data-table">
           <thead><tr><th>店铺名称</th><th>平台</th><th>数据来源</th><th>客服状态</th><th>商品数量</th><th>创建时间</th><th>最后变更</th><th>操作</th></tr></thead>
-          <tbody><tr v-for="item in stores" :key="item.store_ref"><td><strong>{{ item.store_name }}</strong><small>{{ item.status_name }}</small></td><td>{{ item.platform_name }}</td><td>{{ dataSourceLabel(item.data_source) }}</td><td><span class="badge">{{ item.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span></td><td>{{ item.product_count }}</td><td>{{ formatDate(item.created_at) }}</td><td>{{ formatOptionalDate(item.customer_service_status_updated_at) }}<small>{{ item.customer_service_status_updated_by || '—' }}</small></td><td><div class="row-actions"><button class="text-button" type="button" @click="viewStore(item)">查看</button><button class="text-button" type="button" @click="beginEdit(item)">编辑</button><button class="text-button" type="button" :disabled="item.status !== 'ACTIVE'" @click="beginCreateProduct(item)">新增商品</button><button class="text-button" type="button" :disabled="activationBusyRef === item.store_ref || item.data_source === 'UNKNOWN'" @click="changeCustomerServiceStatus(item, item.customer_service_status === 'ENABLED' ? 'DISABLED' : 'ENABLED')">{{ item.customer_service_status === 'ENABLED' ? '关闭客服使用' : '启用客服使用' }}</button><button class="text-button" type="button" @click="viewReceipts(item)">查看收据</button></div></td></tr></tbody>
+          <tbody><tr v-for="item in stores" :key="item.store_ref"><td><strong>{{ item.store_name }}</strong><small>{{ item.status_name }}</small></td><td>{{ item.platform_name }}</td><td>{{ dataSourceLabel(item.data_source) }}</td><td><span class="badge">{{ item.customer_service_status === 'ENABLED' ? '已启用' : '已禁用' }}</span></td><td>{{ item.product_count }}</td><td>{{ formatDate(item.created_at) }}</td><td>{{ formatOptionalDate(item.customer_service_status_updated_at) }}<small>{{ updatedByLabel(item.customer_service_status_updated_by) }}</small></td><td><div class="row-actions"><button class="text-button" type="button" @click="viewStore(item)">查看</button><button class="text-button" type="button" @click="beginEdit(item)">编辑</button><button class="text-button" type="button" :disabled="item.status !== 'ACTIVE'" @click="beginCreateProduct(item)">新增商品</button><button class="text-button" type="button" :disabled="activationBusyRef === item.store_ref || item.data_source === 'UNKNOWN'" @click="changeCustomerServiceStatus(item, item.customer_service_status === 'ENABLED' ? 'DISABLED' : 'ENABLED')">{{ item.customer_service_status === 'ENABLED' ? '关闭客服使用' : '启用客服使用' }}</button><button class="text-button" type="button" @click="viewReceipts(item)">查看收据</button></div></td></tr></tbody>
         </table>
       </div>
     </section>

@@ -1,8 +1,8 @@
 <template>
   <aside class="decision-center" aria-label="决策中心" data-testid="decision-center">
     <header>
-      <p>DECISION CENTER</p>
-      <h2>人工决策</h2>
+      <p>回复确认</p>
+      <h2>人工确认</h2>
     </header>
 
     <section class="decision-status" :class="decisionTone">
@@ -24,7 +24,7 @@
       <article>
         <span>置信度</span>
         <strong>未提供</strong>
-        <small>A 当前不返回置信度，不显示推测数值。</small>
+        <small>系统不提供可靠置信度，请结合商品依据和风险提示判断。</small>
       </article>
       <article>
         <span>知识覆盖</span>
@@ -39,14 +39,14 @@
 
     <section v-if="receiptId" class="receipt-card" data-testid="interaction-receipt">
       <span>反馈回执</span>
-      <code>{{ receiptId }}</code>
-      <small>已进入 Customer Feedback Loop。</small>
+      <strong>采用结果已记录</strong>
+      <small>可在客服反馈记录中查看。</small>
     </section>
 
     <section v-if="feedbackReceiptId" class="receipt-card issue-receipt" data-testid="decision-feedback-receipt">
       <span>问题反馈回执</span>
-      <code>{{ feedbackReceiptId }}</code>
-      <small>拒绝原因或问题标记已进入Badcase分析队列。</small>
+      <strong>问题反馈已记录</strong>
+      <small>运营可在 AI 问题中心查看。</small>
     </section>
 
     <section v-if="conversation" class="conversation-actions">
@@ -108,9 +108,9 @@ const conversationNextStep = computed(() => {
 })
 
 const decisionLabel = computed(() => {
-  if (props.draft?.decisionState === 'APPROVED') return 'Approved'
-  if (props.draft?.decisionState === 'REJECTED') return 'Rejected'
-  return 'Waiting Human'
+  if (props.draft?.decisionState === 'APPROVED') return '已采用'
+  if (props.draft?.decisionState === 'REJECTED') return '已拒绝'
+  return '等待人工确认'
 })
 
 const decisionTone = computed(() => ({

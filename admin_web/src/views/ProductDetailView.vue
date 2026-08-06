@@ -70,6 +70,21 @@ function aiKnowledgeLabel(status: AiKnowledgePublicationStatus): string {
   }[status]
 }
 
+function embeddingStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    NOT_GENERATED: '尚未建立检索索引',
+    GENERATING: '正在建立检索索引',
+    COMPLETE: '检索索引已就绪',
+    FAILED: '检索索引失败',
+    STALE: '检索索引待更新',
+  }
+  return labels[status] ?? '状态待确认'
+}
+
+function businessText(value: string): string {
+  return value.replace(/\bRAG\b/g, 'AI 知识库').replace(/\bPrompt\b/g, '回答规则')
+}
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -123,7 +138,7 @@ async function saveBasicInfo(): Promise<void> {
     detail.value = await updateProductBasicInfo(props.productId, basicInfo)
     resetBasicInfoForm()
     editingBasicInfo.value = false
-    saveReceipt.value = '基础信息已保存并同步显示；商品知识发生变化时会进入待审核，不会自动发布到 AI 或 RAG。'
+    saveReceipt.value = '基础信息已保存并同步显示；商品知识发生变化时会进入待审核，不会自动发布到 AI 知识库。'
   } catch (reason: unknown) {
     saveError.value = apiErrorMessage(reason)
   } finally {
@@ -148,7 +163,7 @@ async function changeCustomerServiceStatus(status: CustomerServiceStatus): Promi
       `product-${props.productId}-${status}-${crypto.randomUUID()}`,
     )
     activationMessage.value = result.changed && result.activation_receipt
-      ? `客服状态已更新，收据：${result.activation_receipt.activation_receipt_id}`
+      ? '客服使用状态已更新，操作记录已保存。'
       : '商品已经是目标客服状态，没有重复生成收据。'
     await load()
     await viewActivationReceipts()
@@ -187,7 +202,7 @@ async function publishAiKnowledge(): Promise<void> {
       `publish-${props.productId}-${crypto.randomUUID()}`,
     )
     publicationMessage.value = result.publication_receipt
-      ? `AI 知识已增量发布，收据：${result.publication_receipt.publication_receipt_id}`
+      ? 'AI 知识已更新，发布记录已保存。'
       : '当前审核版本已发布，无需重复生成向量。'
     await load()
     await viewPublicationReceipts()
@@ -209,7 +224,7 @@ async function checkAiKnowledge(): Promise<void> {
   publicationMessage.value = ''
   try {
     const result = await checkProductAiKnowledge(props.productId, operator)
-    publicationMessage.value = `AI 知识检查完成：${aiKnowledgeLabel(result.ai_knowledge.status)}，chunks ${result.ai_knowledge.chunk_count}，embeddings ${result.ai_knowledge.embedding_count}。`
+    publicationMessage.value = `AI 知识检查完成：${aiKnowledgeLabel(result.ai_knowledge.status)}，知识片段 ${result.ai_knowledge.chunk_count} 条，已建立索引 ${result.ai_knowledge.embedding_count} 条。`
     await load()
   } catch (reason: unknown) {
     publicationError.value = apiErrorMessage(reason)
@@ -313,7 +328,7 @@ onMounted(load)
           <label>本次操作人<input v-model.trim="activationOperator" maxlength="128" placeholder="填写姓名或运营账号"></label>
           <div class="form-actions">
             <button class="button secondary" type="button" :disabled="activationBusy || detail.product.data_source === 'UNKNOWN' || (detail.product.customer_service_status === 'DISABLED' && detail.data_status !== 'APPROVED')" @click="changeCustomerServiceStatus(detail.product.customer_service_status === 'ENABLED' ? 'DISABLED' : 'ENABLED')">{{ detail.product.customer_service_status === 'ENABLED' ? '关闭客服使用' : '启用客服使用' }}</button>
-            <button class="text-button" type="button" @click="viewActivationReceipts">查看 activation receipt</button>
+            <button class="text-button" type="button" @click="viewActivationReceipts">查看操作记录</button>
           </div>
           <p v-if="activationMessage" class="notice success" role="status">{{ activationMessage }}</p>
           <p v-if="activationError" class="notice error" role="alert">{{ activationError }}</p>
@@ -322,7 +337,6 @@ onMounted(load)
             <article v-for="item in activationReceipts" v-else :key="item.activation_receipt_id">
               <strong>{{ item.customer_service_status === 'ENABLED' ? '启用客服使用' : '关闭客服使用' }}</strong>
               <span>{{ formatDate(item.confirmed_at) }} · {{ item.confirmed_by }}</span>
-              <code>{{ item.activation_receipt_id }}</code>
               <p>{{ item.confirmation_note }}</p>
             </article>
           </div>
@@ -330,21 +344,18 @@ onMounted(load)
         <section class="activation-panel ai-publication-panel" aria-label="商品AI知识发布状态">
           <div>
             <strong>AI 知识发布</strong>
-            <p>仅将已审核商品的当前版本增量发布到 RAG。不会全量重建，不会自动启用客服，也不会修改 Prompt。</p>
+            <p>仅将已审核商品的当前版本更新到 AI 知识库。不会自动启用客服，也不会改变回答规则。</p>
           </div>
           <dl class="publication-evidence">
             <div><dt>发布状态</dt><dd>{{ aiKnowledgeLabel(detail.ai_knowledge.status) }}</dd></div>
-            <div><dt>向量状态</dt><dd>{{ detail.ai_knowledge.embedding_status }}</dd></div>
-            <div><dt>Chunks</dt><dd>{{ detail.ai_knowledge.chunk_count }}</dd></div>
-            <div><dt>Embeddings</dt><dd>{{ detail.ai_knowledge.embedding_count }}</dd></div>
-            <div><dt>Collection</dt><dd><code>{{ detail.ai_knowledge.active_collection || '尚未发布' }}</code></dd></div>
-            <div><dt>当前 fingerprint</dt><dd><code>{{ detail.ai_knowledge.current_fingerprint || '—' }}</code></dd></div>
-            <div><dt>已发布 fingerprint</dt><dd><code>{{ detail.ai_knowledge.indexed_fingerprint || '—' }}</code></dd></div>
+            <div><dt>检索准备</dt><dd>{{ embeddingStatusLabel(detail.ai_knowledge.embedding_status) }}</dd></div>
+            <div><dt>知识片段</dt><dd>{{ detail.ai_knowledge.chunk_count }} 条</dd></div>
+            <div><dt>已建立索引</dt><dd>{{ detail.ai_knowledge.embedding_count }} 条</dd></div>
             <div><dt>更新时间</dt><dd>{{ detail.ai_knowledge.updated_at ? formatDate(detail.ai_knowledge.updated_at) : '尚未检查' }}</dd></div>
           </dl>
           <div class="form-actions">
             <button class="button" type="button" :disabled="publicationBusy || detail.data_status !== 'APPROVED' || detail.product.data_source === 'UNKNOWN' || detail.ai_knowledge.status === 'GENERATING'" data-testid="publish-ai-knowledge" @click="publishAiKnowledge">{{ detail.ai_knowledge.status === 'NEED_RESYNC' ? '重新同步AI知识' : '同步AI知识' }}</button>
-            <button class="button secondary" type="button" :disabled="publicationBusy" data-testid="check-ai-knowledge" @click="checkAiKnowledge">检查RAG状态</button>
+            <button class="button secondary" type="button" :disabled="publicationBusy" data-testid="check-ai-knowledge" @click="checkAiKnowledge">检查知识库状态</button>
             <button class="text-button" type="button" @click="viewPublicationReceipts">查看发布收据</button>
           </div>
           <p v-if="detail.data_status !== 'APPROVED'" class="notice boundary">资料审核通过后才能发布 AI 知识。</p>
@@ -354,9 +365,7 @@ onMounted(load)
             <p v-if="publicationReceipts.length === 0" class="notice">该商品尚无 AI 知识发布收据。</p>
             <article v-for="item in publicationReceipts" v-else :key="item.publication_receipt_id">
               <strong>AI 知识已发布</strong>
-              <span>{{ formatDate(item.created_at) }} · {{ item.operator }} · {{ item.chunk_count }} chunks</span>
-              <code>{{ item.publication_receipt_id }}</code>
-              <p>Collection：{{ item.active_collection }}</p>
+              <span>{{ formatDate(item.created_at) }} · {{ item.operator }} · {{ item.chunk_count }} 条知识片段</span>
             </article>
           </div>
         </section>
@@ -379,7 +388,7 @@ onMounted(load)
             <p><strong>差异结论：</strong>{{ sku.specification_difference || '当前资料未说明与其他 SKU 的差异。' }}</p>
             <p><strong>颜色款式：</strong>{{ sku.color_style || '当前资料未提供' }}</p>
             <p><strong>包装差异：</strong>{{ sku.package_difference || '当前资料未提供' }}</p>
-            <p><strong>SKU专属FAQ：</strong>{{ sku.faq_count }} 条</p>
+            <p><strong>该规格专属问答：</strong>{{ sku.faq_count }} 条</p>
             <p v-if="sku.specification_difference === '已确认无差异'" class="confirmed">✓ 已确认无差异</p>
             <div class="topic-chips"><span v-for="attribute in sku.attributes" :key="attribute">{{ attribute }}</span></div>
           </article>
@@ -449,7 +458,7 @@ onMounted(load)
         </div>
       </section>
 
-      <p class="notice boundary">{{ detail.boundary_note }}页面只显示有来源的现有事实；缺失字段不会自动补全或编造。</p>
+      <p class="notice boundary">{{ businessText(detail.boundary_note) }}页面只显示有来源的现有事实；缺失字段不会自动补全或编造。</p>
     </template>
   </main>
 </template>

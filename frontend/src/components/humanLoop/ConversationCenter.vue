@@ -2,8 +2,8 @@
   <aside class="conversation-center" aria-label="会话中心" data-testid="conversation-center">
     <header>
       <div>
-        <p>CONVERSATION CENTER</p>
-        <h2>客户会话</h2>
+        <p>客户消息</p>
+        <h2>会话列表</h2>
       </div>
       <span class="agent-status" :class="`status-${agentStatus.toLowerCase()}`" data-testid="agent-status">
         {{ AGENT_STATUS_LABELS[agentStatus] }}
@@ -28,7 +28,7 @@
 
     <div class="source-notice">
       <strong>受控人工会话</strong>
-      <span>未连接PDD或Channel Engine；请使用客户代号，消息只保留在当前页面内存。</span>
+      <span>当前未连接电商平台消息通道；请使用客户代号，消息只保留在当前页面内存。</span>
     </div>
 
     <section class="queue-toolbar">
@@ -159,7 +159,7 @@ const submitManualMessage = () => {
 const sourceLabel = (source: ChannelMessageSource): string => {
   if (source === 'MANUAL') return '人工录入'
   if (source === 'VALIDATION_FIXTURE') return '验收数据'
-  return 'Channel Agent'
+  return '客服连接程序'
 }
 
 const timeLabel = (value?: string): string => {
