@@ -160,6 +160,7 @@ class ChangePasswordRequest(StrictModel):
 
 class SelfStoreBindingRequest(StrictModel):
     store_ids: list[int] = Field(min_length=1)
+    default_store_id: int | None = Field(default=None, ge=1)
 
     @field_validator("store_ids")
     @classmethod
@@ -167,6 +168,16 @@ class SelfStoreBindingRequest(StrictModel):
         if any(value < 1 for value in values) or len(set(values)) != len(values):
             raise ValueError("store_ids must contain unique positive identifiers")
         return values
+
+    @model_validator(mode="after")
+    def default_must_be_selected(self) -> "SelfStoreBindingRequest":
+        if self.default_store_id is not None and self.default_store_id not in self.store_ids:
+            raise ValueError("default_store_id must be included in store_ids")
+        return self
+
+
+class DefaultStoreRequest(StrictModel):
+    store_id: int = Field(ge=1)
 
 
 class StoreOptionListResponse(StrictModel):

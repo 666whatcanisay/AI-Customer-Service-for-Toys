@@ -51,17 +51,10 @@ function Write-AiCsStartupPreflight($Config, [string]$ResolvedConfigPath) {
     if ($LASTEXITCODE -ne 0) { throw "A Python环境不可用：$($Config.RagPythonPath)" }
     $platformVersion = [string](& $Config.PlatformPythonPath --version 2>&1 | Select-Object -Last 1)
     if ($LASTEXITCODE -ne 0) { throw "C Python环境不可用：$($Config.PlatformPythonPath)" }
-    $nodeCommand = Get-Command node.exe -ErrorAction Stop
-    $nodeVersion = [string](& $nodeCommand.Source --version 2>&1 | Select-Object -Last 1)
-    if ($LASTEXITCODE -ne 0) { throw 'Node.js版本检查失败。' }
-    $pnpmCommand = Get-Command $Config.PnpmCommand -ErrorAction Stop
-    $pnpmVersion = [string](& $pnpmCommand.Source --version 2>&1 | Select-Object -Last 1)
-    if ($LASTEXITCODE -ne 0) { throw 'pnpm版本检查失败。' }
-
     Write-Host "启动预检：Repository=$($identity.RepositoryRoot)" -ForegroundColor Cyan
     Write-Host "启动预检：SHA=$($identity.GitSha)；Source=$($identity.SourceState)"
     Write-Host "启动预检：Config=$([IO.Path]::GetFullPath($ResolvedConfigPath))"
-    Write-Host "启动预检：A Python=$ragVersion；C Python=$platformVersion；Node=$nodeVersion；pnpm=$pnpmVersion"
+    Write-Host "启动预检：A Python=$ragVersion；C Python=$platformVersion；Web=prebuilt-static"
 }
 
 function Get-LocalConfig([string]$ConfigPath) {
@@ -79,6 +72,11 @@ function Get-LocalConfig([string]$ConfigPath) {
         GatewayClientId = 'channel-engine'
         GatewayKeyId = 'gateway-key-v1'
         GatewaySecretReference = ''
+        # Independent A/C service credential. Never reuse the Gateway HMAC key.
+        InternalServiceSecretReference = ''
+        # LAN customer Web must terminate TLS with runtime-managed file references.
+        CustomerWebTlsCertificateReference = ''
+        CustomerWebTlsKeyReference = ''
         GatewayStatePath = ''
         GatewayClockSkewSeconds = 300
         GatewayNonceTtlSeconds = 600
@@ -89,6 +87,12 @@ function Get-LocalConfig([string]$ConfigPath) {
         GatewayLanPort = 18080
         GatewayAllowedNetworks = @('auto')
         GatewayUpstreamTimeoutSeconds = 180
+        # Customer Desktop Workflow is opt-in. C reads only an external opaque
+        # Channel Engine operator session reference; never place it in config.
+        ChannelAgentIntegrationEnabled = $false
+        ChannelAgentServerUrl = ''
+        ChannelAgentOperatorSessionReference = ''
+        ChannelAgentTimeoutSeconds = 5
         OllamaBaseUrl = 'http://127.0.0.1:11434'
         PlatformDatabaseUrl = 'sqlite:///./platform.db'
         TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
@@ -118,7 +122,7 @@ function Get-LocalConfig([string]$ConfigPath) {
             $config[$entry.Key] = $entry.Value
         }
     }
-    foreach ($key in @('RepositoryRoot','RagPythonPath','PlatformPythonPath','PnpmCommand','RagPort','CustomerWebPort','PlatformPort','BindAddress','CustomerWebUrl','RagHealthPath','PlatformHealthPath','OllamaModel','CorsAllowedOrigins','OpenBrowser','RuntimeDirectory','AutoImportTestData')) {
+    foreach ($key in @('RepositoryRoot','RagPythonPath','PlatformPythonPath','RagPort','CustomerWebPort','PlatformPort','BindAddress','CustomerWebUrl','RagHealthPath','PlatformHealthPath','OllamaModel','CorsAllowedOrigins','OpenBrowser','RuntimeDirectory','AutoImportTestData')) {
         if (-not $config.ContainsKey($key) -or $null -eq $config[$key] -or [string]::IsNullOrWhiteSpace([string]$config[$key])) { throw "配置项 $key 缺失或为空。" }
     }
     try { $root = (Resolve-Path -LiteralPath $config.RepositoryRoot -ErrorAction Stop).Path } catch { throw "RepositoryRoot 不存在：$($config.RepositoryRoot)" }
@@ -155,7 +159,6 @@ function Get-LocalConfig([string]$ConfigPath) {
     }
     if ((@($config.RagPort,$config.CustomerWebPort,$config.PlatformPort,$config.AdminWebPort,$config.GatewayLanPort) | Select-Object -Unique).Count -ne 5) { throw '五个受管服务端口必须不同。' }
     foreach ($pathKey in @('RagPythonPath','PlatformPythonPath')) { if (-not (Test-Path -LiteralPath $config[$pathKey])) { throw "$pathKey 不存在：$($config[$pathKey])" } }
-    if (-not (Get-Command $config.PnpmCommand -ErrorAction SilentlyContinue) -and -not (Test-Path -LiteralPath $config.PnpmCommand)) { throw "PnpmCommand 不可用：$($config.PnpmCommand)" }
     if (@($config.CorsAllowedOrigins).Count -eq 0) { throw 'CorsAllowedOrigins 至少要有一个来源。' }
     try {
         $ollamaUri = [uri]$config.OllamaBaseUrl
@@ -179,7 +182,7 @@ function Get-LocalConfig([string]$ConfigPath) {
         throw "AdminWebUrl 必须是与 AdminWebPort 一致的有效 http(s) 地址：$($config.AdminWebUrl)"
     }
     if ([string]::IsNullOrWhiteSpace([string]$config.AdminWebBindAddress)) { throw 'AdminWebBindAddress 不能为空。' }
-    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser', 'GatewayEnabled')) {
+    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser', 'GatewayEnabled', 'ChannelAgentIntegrationEnabled')) {
         if ($config[$key] -isnot [bool]) {
             $parsed = $false
             if (-not [bool]::TryParse([string]$config[$key], [ref]$parsed)) { throw "配置项 $key 必须为 true 或 false。" }
@@ -234,6 +237,51 @@ function Get-LocalConfig([string]$ConfigPath) {
         $secretPath = if ([IO.Path]::IsPathRooted($secretReference)) { [IO.Path]::GetFullPath($secretReference) } else { [IO.Path]::GetFullPath((Join-Path $runtimeDirectory $secretReference)) }
         if (-not (Test-Path -LiteralPath $secretPath -PathType Leaf)) { throw "GatewaySecretReference 不存在：$secretPath" }
         $config.GatewaySecretReference = $secretPath
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$config.InternalServiceSecretReference)) {
+        throw 'Production Runtime 必须配置 InternalServiceSecretReference；禁止匿名 A/C 内部调用或明文 secret。'
+    }
+    $internalSecretReference = [string]$config.InternalServiceSecretReference
+    $internalSecretPath = if ([IO.Path]::IsPathRooted($internalSecretReference)) { [IO.Path]::GetFullPath($internalSecretReference) } else { [IO.Path]::GetFullPath((Join-Path $runtimeDirectory $internalSecretReference)) }
+    if (-not $internalSecretPath.StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase)) { throw "InternalServiceSecretReference 必须位于 RuntimeDirectory 内：$internalSecretPath" }
+    $config.InternalServiceSecretReference = $internalSecretPath
+    $tlsCertificateReference = [string]$config.CustomerWebTlsCertificateReference
+    $tlsKeyReference = [string]$config.CustomerWebTlsKeyReference
+    if ([string]::IsNullOrWhiteSpace($tlsCertificateReference) -xor [string]::IsNullOrWhiteSpace($tlsKeyReference)) {
+        throw 'Customer Web TLS certificate 与 key 必须同时配置或同时留空。'
+    }
+    foreach ($tlsKey in @('CustomerWebTlsCertificateReference','CustomerWebTlsKeyReference')) {
+        $tlsReference = [string]$config[$tlsKey]
+        if ([string]::IsNullOrWhiteSpace($tlsReference)) { continue }
+        $tlsPath = if ([IO.Path]::IsPathRooted($tlsReference)) { [IO.Path]::GetFullPath($tlsReference) } else { [IO.Path]::GetFullPath((Join-Path $runtimeDirectory $tlsReference)) }
+        if (-not $tlsPath.StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase)) { throw "$tlsKey 必须位于 RuntimeDirectory 内：$tlsPath" }
+        $config[$tlsKey] = $tlsPath
+    }
+    $channelAgentTimeout = 0
+    if (-not [int]::TryParse([string]$config.ChannelAgentTimeoutSeconds, [ref]$channelAgentTimeout) -or $channelAgentTimeout -lt 1 -or $channelAgentTimeout -gt 60) {
+        throw 'ChannelAgentTimeoutSeconds 必须为 1-60 的整数。'
+    }
+    $config.ChannelAgentTimeoutSeconds = $channelAgentTimeout
+    if ([bool]$config.ChannelAgentIntegrationEnabled) {
+        if ([string]::IsNullOrWhiteSpace([string]$config.ChannelAgentServerUrl)) {
+            throw 'ChannelAgentIntegrationEnabled=true 时必须配置 ChannelAgentServerUrl。'
+        }
+        try {
+            $channelAgentUri = [uri]$config.ChannelAgentServerUrl
+            if (-not $channelAgentUri.IsAbsoluteUri -or $channelAgentUri.Scheme -notin @('http','https') -or [string]::IsNullOrWhiteSpace($channelAgentUri.Host) -or $channelAgentUri.UserInfo -or $channelAgentUri.AbsolutePath -ne '/') { throw 'invalid' }
+            if ($channelAgentUri.Scheme -eq 'http' -and $channelAgentUri.Host -notin @('127.0.0.1','localhost','::1')) { throw 'remote-http' }
+            $config.ChannelAgentServerUrl = $channelAgentUri.AbsoluteUri.TrimEnd('/')
+        } catch {
+            throw 'ChannelAgentServerUrl 必须是回环 HTTP 或 HTTPS 根地址；禁止用户信息、子路径和远程明文 HTTP。'
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$config.ChannelAgentOperatorSessionReference)) {
+            throw '启用 Channel Agent 时必须配置外部会话引用文件；禁止在配置中填写会话值。'
+        }
+        $agentReference = [string]$config.ChannelAgentOperatorSessionReference
+        $agentReferencePath = if ([IO.Path]::IsPathRooted($agentReference)) { [IO.Path]::GetFullPath($agentReference) } else { [IO.Path]::GetFullPath((Join-Path $runtimeDirectory $agentReference)) }
+        if (-not $agentReferencePath.StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'ChannelAgentOperatorSessionReference 必须位于 RuntimeDirectory 内。' }
+        if (-not (Test-Path -LiteralPath $agentReferencePath -PathType Leaf)) { throw "ChannelAgentOperatorSessionReference 不存在：$agentReferencePath" }
+        $config.ChannelAgentOperatorSessionReference = $agentReferencePath
     }
     return $config
 }
@@ -360,6 +408,21 @@ function Get-AiCsGatewaySecretBytes($Config) {
     return $secretBytes
 }
 
+function Get-AiCsInternalServiceToken($Config) {
+    $secretPath = [string]$Config.InternalServiceSecretReference
+    if ([string]::IsNullOrWhiteSpace($secretPath) -or -not (Test-Path -LiteralPath $secretPath -PathType Leaf)) {
+        throw 'Internal Service secret reference 不可用。'
+    }
+    $token = [IO.File]::ReadAllText($secretPath, [Text.Encoding]::UTF8).TrimEnd("`r", "`n")
+    if ($token -match "[`r`n]" -or $token -match '[^\x20-\x7E]') { throw 'Internal Service secret 必须是单行 ASCII。' }
+    if ([Text.Encoding]::ASCII.GetByteCount($token) -lt 32) { throw 'Internal Service secret 至少需要 32 bytes。' }
+    return $token
+}
+
+function Get-AiCsInternalServiceHeaders($Config) {
+    return @{ 'X-AI-CS-Service-Token' = Get-AiCsInternalServiceToken $Config }
+}
+
 function ConvertTo-AiCsBase64Url([byte[]]$Bytes) {
     return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
@@ -463,7 +526,7 @@ function Wait-AiCsGatewayRuntimeReady($Config, [int]$Seconds = 120) {
 }
 
 function Get-AiCsServerRuntimeConsole($Config) {
-    return Get-Json (Get-ServiceUrl $Config ([int]$Config.RagPort) '/api/admin/server-runtime') 'Server Runtime Console'
+    return Get-Json (Get-ServiceUrl $Config ([int]$Config.RagPort) '/api/admin/server-runtime') 'Server Runtime Console' (Get-AiCsInternalServiceHeaders $Config)
 }
 
 function Test-PrivateLanIpv4([string]$Address) {
@@ -723,11 +786,12 @@ function Assert-LanNetworkSafety($Config, $NetworkProfile) {
 }
 
 function Get-LanCorsAllowedOrigins($Config) {
-    $lanOrigin = "http://$($Config.LanAdvertisedHost):$($Config.CustomerWebPort)"
+    $customerScheme = if ([string]::IsNullOrWhiteSpace([string]$Config.CustomerWebTlsCertificateReference)) { 'http' } else { 'https' }
+    $lanOrigin = "${customerScheme}://$($Config.LanAdvertisedHost):$($Config.CustomerWebPort)"
     $origins = @(
         $lanOrigin,
-        "http://127.0.0.1:$($Config.CustomerWebPort)",
-        "http://localhost:$($Config.CustomerWebPort)",
+        "${customerScheme}://127.0.0.1:$($Config.CustomerWebPort)",
+        "${customerScheme}://localhost:$($Config.CustomerWebPort)",
         "http://127.0.0.1:$($Config.AdminWebPort)",
         "http://localhost:$($Config.AdminWebPort)"
     ) | Select-Object -Unique
@@ -775,6 +839,12 @@ function Select-LanIpv4Candidate([object[]]$Candidates, [string]$LanAddress, [st
 }
 
 function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfile, [switch]$SkipPublicNetworkGuard) {
+    if (
+        [string]::IsNullOrWhiteSpace([string]$Config.CustomerWebTlsCertificateReference) -or
+        [string]::IsNullOrWhiteSpace([string]$Config.CustomerWebTlsKeyReference)
+    ) {
+        throw 'LAN Runtime 必须配置 Customer Web TLS certificate/key 文件引用；禁止通过明文 HTTP 暴露登录与 Bearer。'
+    }
     if ($null -eq $Candidates) { $Candidates = @(Get-LanIpv4Candidates) }
     $selected = Select-LanIpv4Candidate $Candidates ([string]$Config.LanAddress) ([string]$Config.PreferredInterfaceAlias)
     if ($null -eq $NetworkProfile) { $NetworkProfile = Get-LanNetworkProfile $selected }
@@ -786,13 +856,13 @@ function Resolve-LanRuntimeConfig($Config, [object[]]$Candidates, $NetworkProfil
     $lanConfig.LanMode = $true
     $lanConfig.LanAddress = [string]$selected.IPAddress
     $lanConfig.LanAdvertisedHost = [string]$selected.IPAddress
-    # Only Vite accepts the LAN connection. A and C stay loopback-only and are
-    # reached through Vite's two fixed same-origin proxy prefixes.
+    # Only the production TLS static server accepts the LAN connection. A and C
+    # stay loopback-only and are reached through two fixed same-origin prefixes.
     $lanConfig.BindAddress = '127.0.0.1'
     $lanConfig.RagBindAddress = '127.0.0.1'
     $lanConfig.PlatformBindAddress = '127.0.0.1'
     $lanConfig.CustomerWebBindAddress = [string]$selected.IPAddress
-    $lanConfig.CustomerWebUrl = "http://$($lanConfig.LanAdvertisedHost):$($lanConfig.CustomerWebPort)/"
+    $lanConfig.CustomerWebUrl = "https://$($lanConfig.LanAdvertisedHost):$($lanConfig.CustomerWebPort)/"
     $lanConfig.LocalCustomerWebUrl = $lanConfig.CustomerWebUrl
     $lanConfig.LanNetworkProfile = $NetworkProfile
     $lanConfig.LanSelection = $selected
@@ -906,6 +976,11 @@ function Get-LanPlatformEnvironment($Config) {
         CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
         AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
+        CHANNEL_AGENT_INTEGRATION_ENABLED = ([bool]$Config.ChannelAgentIntegrationEnabled).ToString().ToLowerInvariant()
+        CHANNEL_AGENT_SERVER_URL = [string]$Config.ChannelAgentServerUrl
+        CHANNEL_AGENT_OPERATOR_SESSION_FILE = [string]$Config.ChannelAgentOperatorSessionReference
+        CHANNEL_AGENT_TIMEOUT_SECONDS = [string]$Config.ChannelAgentTimeoutSeconds
+        INTERNAL_SERVICE_SECRET_FILE = [string]$Config.InternalServiceSecretReference
     }
 }
 
@@ -915,6 +990,11 @@ function Get-LocalPlatformEnvironment($Config) {
         CORS_ALLOWED_ORIGINS = (@($Config.CorsAllowedOrigins) -join ',')
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
         AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
+        CHANNEL_AGENT_INTEGRATION_ENABLED = ([bool]$Config.ChannelAgentIntegrationEnabled).ToString().ToLowerInvariant()
+        CHANNEL_AGENT_SERVER_URL = [string]$Config.ChannelAgentServerUrl
+        CHANNEL_AGENT_OPERATOR_SESSION_FILE = [string]$Config.ChannelAgentOperatorSessionReference
+        CHANNEL_AGENT_TIMEOUT_SECONDS = [string]$Config.ChannelAgentTimeoutSeconds
+        INTERNAL_SERVICE_SECRET_FILE = [string]$Config.InternalServiceSecretReference
     }
 }
 
@@ -941,6 +1021,7 @@ function Get-RagRuntimeEnvironment($Config, [string]$CorsAllowedOrigins) {
         GATEWAY_NONCE_TTL_SECONDS = [string]$Config.GatewayNonceTtlSeconds
         GATEWAY_DECISION_RETENTION_SECONDS = [string]$Config.GatewayDecisionRetentionSeconds
         GATEWAY_DECISION_LEASE_SECONDS = [string]$Config.GatewayDecisionLeaseSeconds
+        INTERNAL_SERVICE_SECRET_FILE = [string]$Config.InternalServiceSecretReference
     }
     if ([bool]$Config.GatewayEnabled) {
         $environment.GATEWAY_HMAC_SECRET_FILE = [string]$Config.GatewaySecretReference
@@ -1489,13 +1570,26 @@ function Test-RecordedProcess($Config, [string]$Name, [switch]$Detailed) {
 
 function Save-ServiceRecord($Config, [string]$Name, $Process, [string]$ExecutablePath, [string]$WorkingDirectory, [string]$CommandSummary, [string]$CommandFeature, [int]$Port) {
     New-Item -ItemType Directory -Force -Path $Config.RuntimeDirectory, (Get-ServiceLogDirectory $Config) | Out-Null
+    $startedUtc = $null
+    foreach ($attempt in 1..3) {
+        try {
+            $Process.Refresh()
+            $startedUtc = $Process.StartTime.ToUniversalTime().ToString('o')
+        } catch {
+            $Process = Get-Process -Id $Process.Id -ErrorAction SilentlyContinue
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$startedUtc)) { break }
+        if ($null -eq $Process) { break }
+        Start-Sleep -Milliseconds 50
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$startedUtc)) { throw "$Name 启动进程身份尚不可用，拒绝建立运行记录。" }
     $metadata = Get-ProcessMetadata $Process.Id
     $parentProcessId = if ($metadata) { [int]$metadata.ParentProcessId } else { 0 }
     $repositoryRoot = if ($Config.ContainsKey('RepositoryRoot')) { [string]$Config.RepositoryRoot } else { '' }
     $runtimeIdentity = Get-RepositoryRuntimeIdentity $repositoryRoot
     $runtimeMode = Get-ConfiguredRuntimeMode $Config
     $networkMode = Get-ConfiguredNetworkMode $Config
-    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$Process.StartTime.ToUniversalTime().ToString('o'); commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config); repository_root=$runtimeIdentity.RepositoryRoot; repository_git_sha=$runtimeIdentity.GitSha; repository_source_state=$runtimeIdentity.SourceState; repository_source_fingerprint=$runtimeIdentity.SourceFingerprint; runtime_mode=$runtimeMode; network_mode=$networkMode }
+    $record = [ordered]@{ name=$Name; pid=$Process.Id; parentProcessId=$parentProcessId; managed_pid=$Process.Id; executablePath=[IO.Path]::GetFullPath($ExecutablePath); workingDirectory=[IO.Path]::GetFullPath($WorkingDirectory); startedUtc=$startedUtc; commandSummary=$CommandSummary; commandFeature=$CommandFeature; commandFeatureSha256=(Get-CommandFeatureSha256 $CommandFeature); port=$Port; healthUrl=(Get-ManagedServiceHealthUrl $Config $Name $Port); logDirectory=(Get-ServiceLogDirectory $Config); repository_root=$runtimeIdentity.RepositoryRoot; repository_git_sha=$runtimeIdentity.GitSha; repository_source_state=$runtimeIdentity.SourceState; repository_source_fingerprint=$runtimeIdentity.SourceFingerprint; runtime_mode=$runtimeMode; network_mode=$networkMode }
     $record | ConvertTo-Json | Set-Content -LiteralPath (Get-ServiceRecordPath $Config $Name) -Encoding UTF8
 }
 
@@ -1676,7 +1770,7 @@ function Get-ParallelHttpHealth([object[]]$Endpoints, [int]$TimeoutMilliseconds 
 }
 function Wait-HttpOk([string]$Url, [int]$Seconds, [string]$Label) { for ($i=0; $i -lt $Seconds; $i++) { if (Test-HttpOk $Url) { return }; Start-Sleep -Seconds 1 }; throw "$Label 未在 $Seconds 秒内就绪：$Url。请查看运行日志。" }
 
-function Assert-AdminWebDependencies($Config) {
+function Assert-AdminWebDependenciesLegacy($Config) {
     $adminDirectory = Join-Path $Config.RepositoryRoot 'admin_web'
     $packagePath = Join-Path $adminDirectory 'package.json'
     $lockPath = Join-Path $adminDirectory 'pnpm-lock.yaml'
@@ -1697,13 +1791,55 @@ function Assert-AdminWebDependencies($Config) {
     return [pscustomobject]@{ Directory=$adminDirectory; PackagePath=$packagePath; PnpmExecutable=(Get-Command $Config.PnpmCommand -ErrorAction Stop).Source }
 }
 
+function Assert-ProductionWebDependencies($Config, [ValidateSet('frontend','admin_web')] [string]$DirectoryName) {
+    $directory = Join-Path $Config.RepositoryRoot $DirectoryName
+    $distDirectory = Join-Path $directory 'dist'
+    $indexPath = Join-Path $distDirectory 'index.html'
+    $serverPath = Join-Path $PSScriptRoot 'serve_ai_cs_web.py'
+    if (-not (Test-Path -LiteralPath $directory -PathType Container)) { throw "缺少 $DirectoryName 目录：$directory" }
+    if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) { throw "$DirectoryName 缺少生产构建产物 dist/index.html；请在发布流水线执行 build，Runtime 禁止启动 Vite dev server。" }
+    if (-not (Test-Path -LiteralPath $serverPath -PathType Leaf)) { throw "缺少生产 Web Server：$serverPath" }
+    & $Config.PlatformPythonPath $serverPath --help | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Production Web Server 无法由 Platform Python 执行。' }
+    return [pscustomobject]@{ Directory=$directory; DistDirectory=$distDirectory; ServerPath=$serverPath }
+}
+
+function Assert-AdminWebDependencies($Config) {
+    return Assert-ProductionWebDependencies $Config 'admin_web'
+}
+
+function Start-ProductionWebService($Config, [string]$Name, [string]$DirectoryName, [string]$BindAddress, [int]$Port, [string]$Url, [string[]]$ProxyMappings) {
+    $dependency = Assert-ProductionWebDependencies $Config $DirectoryName
+    Assert-PortAvailable $Config $Name $Port
+    $arguments = @($dependency.ServerPath, '--root', $dependency.DistDirectory, '--bind-address', $BindAddress, '--port', [string]$Port, '--allowed-host', ([uri]$Url).Host)
+    if (([uri]$Url).Scheme -eq 'https') {
+        $certificatePath = [string]$Config.CustomerWebTlsCertificateReference
+        $keyPath = [string]$Config.CustomerWebTlsKeyReference
+        foreach ($path in @($certificatePath, $keyPath)) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Customer Web TLS 文件不存在：$path" } }
+        $arguments += @('--tls-cert', $certificatePath, '--tls-key', $keyPath)
+    }
+    foreach ($mapping in $ProxyMappings) { $arguments += @('--proxy', $mapping) }
+    return Start-ManagedServiceWithEnvironment $Config $Name $Config.PlatformPythonPath $arguments $dependency.Directory 'serve_ai_cs_web.py' $Port @{}
+}
+
+function Start-CustomerWebService($Config) {
+    $bindAddress = if ($Config.ContainsKey('CustomerWebBindAddress')) { [string]$Config.CustomerWebBindAddress } else { [string]$Config.BindAddress }
+    $process = Start-ProductionWebService $Config 'customer-web' 'frontend' $bindAddress ([int]$Config.CustomerWebPort) ([string]$Config.CustomerWebUrl) @(
+        "/platform-api=http://127.0.0.1:$($Config.PlatformPort)",
+        "/rag-api=http://127.0.0.1:$($Config.RagPort)"
+    )
+    Wait-HttpOk ([string]$Config.CustomerWebUrl) 45 '客服页面'
+    return Update-ManagedServiceListenerRecord $Config 'customer-web'
+}
+
 function Start-AdminWebService($Config) {
-    $dependency = Assert-AdminWebDependencies $Config
-    Assert-PortAvailable $Config 'admin-web' ([int]$Config.AdminWebPort)
     if ([bool]$Config.AdminEnableLanMode) {
         Write-Warning "AdminEnableLanMode=true：管理后台将使用 $($Config.AdminWebUrl)。本轮不会创建或修改任何防火墙规则。"
     }
-    $process = Start-ManagedServiceWithEnvironment $Config 'admin-web' $dependency.PnpmExecutable @('dev','--host',$Config.AdminWebBindAddress,'--port',$Config.AdminWebPort,'--strictPort') $dependency.Directory 'pnpm' ([int]$Config.AdminWebPort) (Get-AdminWebEnvironment $Config)
+    $process = Start-ProductionWebService $Config 'admin-web' 'admin_web' ([string]$Config.AdminWebBindAddress) ([int]$Config.AdminWebPort) ([string]$Config.AdminWebUrl) @(
+        "/platform-api=http://127.0.0.1:$($Config.PlatformPort)",
+        "/ai-api=http://127.0.0.1:$($Config.RagPort)"
+    )
     Wait-HttpOk ([string]$Config.AdminWebUrl) 45 '管理后台'
     return Update-AdminWebServiceRecord $Config $process
 }
@@ -1714,8 +1850,8 @@ function Open-AdminWeb($Config, [switch]$NoLaunch) {
     return [string]$Config.AdminWebUrl
 }
 
-function Get-Json([string]$Url, [string]$Label) {
-    try { return Invoke-RestMethod -UseBasicParsing -Uri $Url -TimeoutSec 10 } catch { throw "$Label 请求失败：$Url。$($_.Exception.Message)" }
+function Get-Json([string]$Url, [string]$Label, [hashtable]$Headers = @{}) {
+    try { return Invoke-RestMethod -UseBasicParsing -Uri $Url -Headers $Headers -TimeoutSec 10 } catch { throw "$Label 请求失败：$Url。$($_.Exception.Message)" }
 }
 
 function Assert-OllamaReady($Config) {
@@ -2037,11 +2173,10 @@ function Write-TargetPilotReadiness($Readiness, [string]$ReportPath = '') {
 
 function Assert-Dependencies($Config) {
     foreach ($item in @(@{Name='RAG Python';Path=$Config.RagPythonPath}, @{Name='平台 Python';Path=$Config.PlatformPythonPath})) { & $item.Path --version | Out-Null; if ($LASTEXITCODE -ne 0) { throw "$($item.Name) 无法执行：$($item.Path)" } }
-    $node = Get-Command node.exe -ErrorAction SilentlyContinue; if (-not $node) { throw '缺少 Node.js（node.exe）。脚本不会自动安装。' }
-    & $Config.PnpmCommand --version | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'pnpm 无法执行。脚本不会自动安装依赖。' }
+    Get-AiCsInternalServiceToken $Config | Out-Null
     Assert-OllamaReady $Config | Out-Null
-    foreach ($path in @((Join-Path $Config.RepositoryRoot 'backend\.venv\Scripts\python.exe'), (Join-Path $Config.RepositoryRoot 'platform_backend\.venv\Scripts\python.exe'), (Join-Path $Config.RepositoryRoot 'frontend\node_modules'))) { if (-not (Test-Path -LiteralPath $path)) { throw "缺少预先安装的运行依赖：$path" } }
-    if (-not (Test-Path -LiteralPath (Join-Path $Config.RepositoryRoot 'frontend\node_modules\vite\bin\vite.js'))) { throw 'frontend node_modules 中缺少 Vite。请人工安装依赖。' }
+    foreach ($path in @((Join-Path $Config.RepositoryRoot 'backend\.venv\Scripts\python.exe'), (Join-Path $Config.RepositoryRoot 'platform_backend\.venv\Scripts\python.exe'))) { if (-not (Test-Path -LiteralPath $path)) { throw "缺少预先安装的运行依赖：$path" } }
+    Assert-ProductionWebDependencies $Config 'frontend' | Out-Null
 }
 
 function Assert-RagVirtualEnvironment($Config) {
@@ -2224,7 +2359,7 @@ function Get-TestDataPackage($Config) {
     # credential, so it verifies the frozen loopback-only A export projection.
     $packageId = [uri]::EscapeDataString([string]$Config.TestKnowledgePackageId)
     try {
-        $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C internal knowledge package'
+        $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C internal knowledge package' (Get-AiCsInternalServiceHeaders $Config)
         if ([string]$package.package_id -ne [string]$Config.TestKnowledgePackageId) { return @() }
         $package | Add-Member -NotePropertyName import_status -NotePropertyValue 'INTERNAL_EXPORT_AVAILABLE' -Force
         return @($package)
@@ -2294,7 +2429,7 @@ function Get-TestKnowledgeSyncHistory($Config) {
 function Get-RagKnowledgeRuntimeStatistics($Config) {
     $runtimeUrl = Get-ServiceUrl $Config $Config.RagPort '/api/knowledge/statistics'
     try {
-        $response = Get-Json $runtimeUrl 'A 运行时知识统计'
+        $response = Get-Json $runtimeUrl 'A 运行时知识统计' (Get-AiCsInternalServiceHeaders $Config)
         $data = if ($null -ne $response.data) { $response.data } else { $response }
         $activeCollectionName = if ($data.PSObject.Properties.Name -contains 'active_collection_name') { [string]$data.active_collection_name } else { [string]$data.collection_name }
         $activeCollectionChunkCount = if ($data.PSObject.Properties.Name -contains 'active_collection_chunk_count' -and $null -ne $data.active_collection_chunk_count) { [int]$data.active_collection_chunk_count } else { [int]$data.chunk_count }
@@ -2364,7 +2499,7 @@ function Get-RagActiveCollectionStartupState($Config) {
 
 function Sync-TestKnowledge($Config) {
     if (-not [bool]$Config.AutoSyncTestKnowledge) { Write-Host 'AutoSyncTestKnowledge=false，跳过 A 测试知识同步。'; return $null }
-    $response = Invoke-RestMethod -UseBasicParsing -Method Post -Uri (Get-ServiceUrl $Config $Config.RagPort "/api/test-knowledge/sync/$($Config.TestKnowledgePackageId)") -TimeoutSec 120
+    $response = Invoke-RestMethod -UseBasicParsing -Method Post -Headers (Get-AiCsInternalServiceHeaders $Config) -Uri (Get-ServiceUrl $Config $Config.RagPort "/api/test-knowledge/sync/$($Config.TestKnowledgePackageId)") -TimeoutSec 120
     $data = if ($response.data) { $response.data } else { $response }
     if ([int]$data.synced_items -ne 47 -or [int]$data.collection_count -ne 47) { throw "A 测试知识同步数量异常：synced_items=$($data.synced_items)，collection_count=$($data.collection_count)，期望均为 47。" }
     New-Item -ItemType Directory -Force -Path $Config.RuntimeDirectory | Out-Null
@@ -2374,7 +2509,7 @@ function Sync-TestKnowledge($Config) {
 }
 
 function Assert-RagRuntimeReady($Config) {
-    $status = Get-Json (Get-ServiceUrl $Config $Config.RagPort '/api/status') 'A 状态'
+    $status = Get-Json (Get-ServiceUrl $Config $Config.RagPort '/api/status') 'A 状态' (Get-AiCsInternalServiceHeaders $Config)
     if (-not [bool]$status.ready -or -not [bool]$status.model_configured -or $null -ne $status.initialization_error) {
         throw "A 状态校验失败：ready=$($status.ready)，model_configured=$($status.model_configured)，initialization_error=$($status.initialization_error)。不会启动 B。"
     }
@@ -2385,7 +2520,7 @@ function Wait-RagRuntimeReady($Config, [int]$Seconds) {
     $lastStatus = $null
     for ($i = 0; $i -lt $Seconds; $i++) {
         try {
-            $lastStatus = Get-Json (Get-ServiceUrl $Config $Config.RagPort '/api/status') 'A 状态'
+            $lastStatus = Get-Json (Get-ServiceUrl $Config $Config.RagPort '/api/status') 'A 状态' (Get-AiCsInternalServiceHeaders $Config)
             if ([bool]$lastStatus.ready -and [bool]$lastStatus.model_configured -and $null -eq $lastStatus.initialization_error) { return $lastStatus }
         } catch {
             $lastStatus = $null
@@ -2401,7 +2536,7 @@ function Invoke-RagChatSmoke($Config) {
     # have not yet been published. Use the configured package export as the
     # smoke context so an unrelated unpublished product cannot fail startup.
     $packageId = [uri]::EscapeDataString([string]$Config.TestKnowledgePackageId)
-    $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C active knowledge package'
+    $package = Get-Json (Get-ServiceUrl $Config $Config.PlatformPort "/api/v1/test-knowledge-packages/$packageId/rag-export") 'C active knowledge package' (Get-AiCsInternalServiceHeaders $Config)
     $productItem = @($package.items | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.product_id) } | Select-Object -First 1)[0]
     if ($null -eq $productItem) { throw 'C active knowledge package 没有可供聊天 smoke 使用的商品。' }
     $skuItem = @($package.items | Where-Object { [string]$_.product_id -eq [string]$productItem.product_id -and -not [string]::IsNullOrWhiteSpace([string]$_.sku_id) } | Select-Object -First 1)[0]

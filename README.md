@@ -1,6 +1,18 @@
 # AI-CS V1.0.0
 
-AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R008 运行收敛、R009 商品知识导入、R006 客服目录激活、R006.1 AI 知识发布、R006.2 客服体验优化、R016 用户身份/RBAC/店铺绑定、R018 内部账号策略以及 R019 Production IAM 部署。正式数据库已迁移到0013，三个批准的初始账号已经创建并通过真实登录、首次改密、RBAC和店铺范围验收，当前 Gate 为 `AI_CS_INITIAL_ACCOUNTS_READY`。
+AI-CS 是面向玩具业务的内部 AI 客服系统。R020–R022已完成店铺上下文、生产客服Workspace和客服电脑工作流；R024已关闭R023登记的P0/P1生产阻断；R025将协调源码冻结为`ai-cs-production-rc-v1`。当前Gate为`AI_CS_PRODUCTION_RC_READY`：表示clean、可复核、可部署候选已经形成，不表示正式数据库已迁移、LAN TLS已配置或真实PDD/生产Channel Engine已经联通。
+
+## Production RC V1
+
+- Release branch：`release/ai-cs-production-rc-v1`
+- RC reference：`ai-cs-production-rc-v1`（精确SHA从Git tag解析）
+- 产品版本：`AI-CS V1.0.0`
+- Repository contracts：`0.13.0 / coordinated`
+- Gateway wire：`1.0`，canonical schema保持冻结
+- 数据库源码head：`0016_production_hardening_v1`
+- 正式Runtime数据库：仍为`0013_user_management_v1`，部署必须先备份并受控迁移
+- 部署入口：[Production RC V1 Deployment Checklist](docs/control/AI-CS-Production-RC-V1-Deployment-Checklist.md)
+- 冻结证据：[Production Release Candidate Freeze V1](docs/control/AI-CS-Production-Release-Candidate-Freeze-V1.md)
 
 ## 正式运行基线
 
@@ -10,7 +22,7 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 - 正式文案补丁：`9911ba67cef330a7a1b4f03f82de227cbee6982d`
 - 防复发测试：`0f230c6f50f8b6162c4e52f3b167053e6592c656`
 - 正式稳定标签：`ai-cs-v1.0.0`；精确 SHA 从 Git 与 Runtime 记录解析
-- Contracts 源码候选：`0.10.0` coordinated（Gateway wire 仍冻结为 `1.0`）
+- Contracts 源码候选：`0.13.0` coordinated（Gateway wire 仍冻结为 `1.0`）
 - 当前受控 Runtime 数据库：`0013_user_management_v1`，完整性 `ok`
 - 运行方式：`runtimeMode=standard`；本次 IAM 部署以安全默认 `networkMode=LOCAL` 验收
 
@@ -34,11 +46,15 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。当前版本已完成 R00
 ## 用户与访问控制
 
 - B 客服工作台和 C Admin 都从 `/api/v1/auth/login` 获取短期 opaque Bearer session，并通过 `/api/v1/auth/me` 恢复服务端身份。
-- `CUSTOMER_SERVICE` 拥有 Workspace、AI 建议、Feedback 提交和客服管理权限；首次改密后可选择并绑定一个或多个已启用客服店铺，不再要求固定默认店铺。
+- `CUSTOMER_SERVICE` 拥有 Workspace、AI 建议、Feedback 提交和客服管理权限；首次改密后可绑定多个已启用客服店铺并指定唯一默认店铺，进入Workspace后自动加载且可在授权范围内切换。
 - `OPERATOR` 拥有商品、SKU、知识、FAQ、AI 质量、店铺数据和 Feedback 查看权限；`ADMIN` 拥有全部权限。两者都由角色获得全店铺范围。
 - 新建和重置账号使用临时口令并强制首次改密；业务 API 在改密前返回 `PASSWORD_CHANGE_REQUIRED`。长期口令不写入代码、命令行、配置或 Git。
 - `bootstrap_ai_cs_admin.ps1`保留单管理员入口；`bootstrap_ai_cs_initial_users.ps1`在同一受控 Runtime 配置下检查重复并交互创建批准的三类初始账号，已存在账号只跳过、不覆盖。详细步骤见[`platform_backend/README.md`](platform_backend/README.md)。
 - 初始账号已创建且保持 `must_change_password=true`：管理员和运营由角色获得全店范围；客服初始为0条固定绑定，首次使用在改密后进入多店选择流程。部署证据见[Initial Production Accounts Deployment Report V1](docs/control/AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md)。
+- R020由C在有效店铺范围内解析会话商品/SKU：唯一候选自动选择，多候选要求人工确认，未知不猜测；B只提交`resolution_id`让C构造既有A chat context，系统仍不自动发送。源码报告见[Store Context Resolver V1 Completion Report](docs/control/AI-CS-Store-Context-Resolver-V1-Completion-Report.md)。
+- R021把B三栏页面收敛为生产客服工作流：客服状态为ONLINE/BUSY/OFFLINE，会话状态为NEW/PROCESSING/WAITING_REPLY/COMPLETED；采用、修改、拒绝原因和问题标记进入既有幂等Feedback契约。未接渠道时只提供页面内存的去标识化人工输入，production build不预置验收会话，系统仍不自动发送。报告见[Customer Workspace Production V1 Completion Report](docs/control/AI-CS-Customer-Workspace-Production-V1-Completion-Report.md)。
+- R022在Workspace顶部增加当前客服、当前店铺、设备、Agent版本、最后心跳和在线/绑定状态。浏览器只调用C的同源鉴权facade；C按登录用户和授权Store最小投影Channel Agent状态，自助流程只签发已注册未绑定设备的一次性绑定码，独立激活仍由Channel Engine管理员完成。系统不连接PDD、不自动发送，也不修改Channel Engine。报告见[Customer Desktop Workflow Integration V1 Completion Report](docs/control/AI-CS-Customer-Desktop-Workflow-Integration-V1-Completion-Report.md)。
+- R023对Backend、Frontend、Admin、Database、API、RAG和Workspace完成只读生产审计，登记22项问题；R024已关闭全部P0/P1源码阻断，R025已形成clean RC。受控正式迁移、TLS/WMI、远端CI与真实外部联通仍必须独立验收。报告见[Code Quality Audit V1 Report](docs/control/AI-CS-Code-Quality-Audit-V1-Report.md)。
 
 ## Windows 日常运行
 

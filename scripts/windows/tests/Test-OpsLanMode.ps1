@@ -25,6 +25,9 @@ try {
     New-Item -ItemType Directory -Force -Path @((Join-Path $temporaryRepository 'backend'), (Join-Path $temporaryRepository 'frontend'), (Join-Path $temporaryRepository 'platform_backend')) | Out-Null
     $ragPython = Join-Path $temporaryRepository 'rag.exe'; $platformPython = Join-Path $temporaryRepository 'platform.exe'; New-Item -ItemType File -Path $ragPython, $platformPython | Out-Null
     $shellPath = (Get-Command powershell.exe -ErrorAction Stop).Source; $configPath = Join-Path $temporaryRoot 'config.local.ps1'
+    $internalSecretPath = Join-Path $temporaryRoot 'runtime\secrets\internal-service.secret'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $internalSecretPath) | Out-Null
+    [IO.File]::WriteAllText($internalSecretPath, ('i' * 32), [Text.UTF8Encoding]::new($false))
     @"
 @{
 RepositoryRoot = '$($temporaryRepository.Replace("'", "''"))'
@@ -34,6 +37,9 @@ PnpmCommand = '$($shellPath.Replace("'", "''"))'
 RagPort = 18000; CustomerWebPort = 15173; PlatformPort = 18011; BindAddress = '127.0.0.1'; CustomerWebUrl = 'http://127.0.0.1:15173/'
 RagHealthPath = '/api/health'; PlatformHealthPath = '/health'; OllamaModel = 'qwen3.5:9b'; CorsAllowedOrigins = @('http://127.0.0.1:15173'); OpenBrowser = `$false
 RuntimeDirectory = '$((Join-Path $temporaryRoot 'runtime').Replace("'", "''"))'; TestDataPackagePath = ''; AutoImportTestData = `$false
+InternalServiceSecretReference = '$($internalSecretPath.Replace("'", "''"))'
+CustomerWebTlsCertificateReference = 'secrets\customer-web.crt'
+CustomerWebTlsKeyReference = 'secrets\customer-web.key'
 LanAddress = 'auto'; PreferredInterfaceAlias = ''; EnableLanMode = `$false
 }
 "@ | Set-Content -LiteralPath $configPath -Encoding UTF8
@@ -52,13 +58,13 @@ LanAddress = 'auto'; PreferredInterfaceAlias = ''; EnableLanMode = `$false
 
     $wifi = New-LanCandidate '192.168.1.20' 'Wi-Fi' 17; $ethernet = New-LanCandidate '10.20.30.40' 'Ethernet' 9; $privateProfile = New-NetworkProfile 'Private'
     $lanConfig = Resolve-LanRuntimeConfig $config @($wifi, $ethernet) $privateProfile
-    if ($lanConfig.LanSelection.InterfaceAlias -ne 'Ethernet' -or $lanConfig.CustomerWebBindAddress -ne '10.20.30.40') { throw 'Ethernet was not preferred over WLAN.' }
+    if ($lanConfig.LanSelection.InterfaceAlias -ne 'Ethernet' -or $lanConfig.CustomerWebBindAddress -ne '10.20.30.40' -or $lanConfig.CustomerWebUrl -ne 'https://10.20.30.40:15173/') { throw 'Ethernet/TLS LAN endpoint resolution is incorrect.' }
     if ($lanConfig.RagBindAddress -ne '127.0.0.1' -or $lanConfig.PlatformBindAddress -ne '127.0.0.1' -or (Get-LanServiceListenerAddress $lanConfig $lanConfig.CustomerWebPort) -ne '10.20.30.40:15173') { throw 'Listener boundary is incorrect.' }
     if ($lanConfig.LanSubnet -ne '10.20.30.0/24') { throw 'Subnet calculation is incorrect.' }
     $lanCorsOrigins = @([string]$lanConfig.LanCorsAllowedOrigins -split ',')
     foreach ($requiredOrigin in @(
-        'http://10.20.30.40:15173',
-        'http://127.0.0.1:15173',
+        'https://10.20.30.40:15173',
+        'https://127.0.0.1:15173',
         'http://127.0.0.1:5174',
         'http://localhost:5174'
     )) {
@@ -70,12 +76,14 @@ LanAddress = 'auto'; PreferredInterfaceAlias = ''; EnableLanMode = `$false
     Assert-Throws { Resolve-LanRuntimeConfig $config @($ethernet, (New-LanCandidate '10.20.40.40' 'Ethernet 2' 10)) $privateProfile | Out-Null } 'Ambiguous physical adapters'
     $config.PreferredInterfaceAlias = 'Ethernet 2'; if ((Resolve-LanRuntimeConfig $config @($ethernet, (New-LanCandidate '10.20.40.40' 'Ethernet 2' 10)) $privateProfile).LanAdvertisedHost -ne '10.20.40.40') { throw 'PreferredInterfaceAlias was not honored.' }; $config.PreferredInterfaceAlias = ''
     Assert-Throws { Resolve-LanRuntimeConfig $config @($wifi) (New-NetworkProfile 'Public') | Out-Null } 'Public network protection'
+    $missingTls = @{}; foreach ($entry in $config.GetEnumerator()) { $missingTls[$entry.Key] = $entry.Value }; $missingTls.CustomerWebTlsCertificateReference = ''; $missingTls.CustomerWebTlsKeyReference = ''
+    Assert-Throws { Resolve-LanRuntimeConfig $missingTls @($wifi) $privateProfile | Out-Null } 'Missing LAN TLS protection'
 
     $lanConfig = Resolve-LanRuntimeConfig $config @($wifi) $privateProfile; $frontendEnvironment = Get-LanFrontendEnvironment $lanConfig
     if ($frontendEnvironment.VITE_RAG_API_BASE_URL -ne '/rag-api' -or $frontendEnvironment.VITE_PLATFORM_API_BASE_URL -ne '/platform-api' -or $frontendEnvironment.VITE_API_MODE -ne 'SAME_ORIGIN_PROXY') { throw 'Same-origin frontend environment is incorrect.' }
-    $viteConfig = Get-Content -LiteralPath (Join-Path $repositoryRoot 'frontend\vite.config.ts') -Raw
-    foreach ($required in @("'/rag-api'", "'http://127.0.0.1:8000'", "'/platform-api'", "'http://127.0.0.1:8011'")) { if ($viteConfig.IndexOf($required, [StringComparison]::Ordinal) -lt 0) { throw "Vite proxy is missing: $required" } }
-    if ($viteConfig -match 'proxy:\s*\{\s*["'']?/["'']?\s*:') { throw 'Arbitrary Vite proxy is forbidden.' }
+    $runtimeCommon = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1') -Raw
+    foreach ($required in @('"/rag-api=http://127.0.0.1:', '"/platform-api=http://127.0.0.1:', 'serve_ai_cs_web.py')) { if ($runtimeCommon.IndexOf($required, [StringComparison]::Ordinal) -lt 0) { throw "Production web proxy is missing: $required" } }
+    if ($runtimeCommon -match '(?i)pnpm\s+(run\s+)?dev|vite\s+--host') { throw 'Production runtime must not launch Vite dev server.' }
     $ui = Get-Content -LiteralPath (Join-Path $repositoryRoot 'frontend\src\views\AiChat.vue') -Raw
     if ($ui -match '@media \(max-width: 900px\), \(max-height: 740px\)') { throw 'Height must not trigger single column.' }
     if ($ui -notmatch '@media \(min-width: 901px\)') { throw 'Desktop two-column media rule is missing.' }

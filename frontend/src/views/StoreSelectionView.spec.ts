@@ -7,7 +7,7 @@ const listStoreOptions = vi.fn()
 const replaceStoreBindings = vi.fn()
 vi.mock('@/auth/authSession', () => ({
   useAuthSession: () => ({
-    user: ref({ stores: [] }), listStoreOptions, replaceStoreBindings,
+    user: ref({ stores: [] }), defaultStore: ref(null), listStoreOptions, replaceStoreBindings,
   })
 }))
 import StoreSelectionView from './StoreSelectionView.vue'
@@ -29,7 +29,7 @@ describe('customer StoreSelectionView', () => {
     const choices = wrapper.findAll('input[type="checkbox"]')
     await choices[0].setValue(true); await choices[1].setValue(true)
     await wrapper.get('form').trigger('submit'); await flushPromises()
-    expect(replaceStoreBindings).toHaveBeenCalledWith([1, 2])
+    expect(replaceStoreBindings).toHaveBeenCalledWith([1, 2], 1)
     expect(router.currentRoute.value.path).toBe('/workspace')
   })
 })

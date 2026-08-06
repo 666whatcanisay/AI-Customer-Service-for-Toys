@@ -40,7 +40,7 @@ const submit = async () => {
       error.value = '当前账号没有客服工作台权限。'
       return
     }
-    if (user.roles.includes('CUSTOMER_SERVICE') && !user.stores.length) {
+    if (user.roles.includes('CUSTOMER_SERVICE') && !user.stores.some((store) => store.is_default)) {
       await router.replace('/store-selection')
       return
     }
@@ -48,8 +48,12 @@ const submit = async () => {
       ? route.query.redirect
       : '/workspace'
     await router.replace(target)
-  } catch {
-    error.value = '账号或密码不正确，或账号已停用。'
+  } catch (caught) {
+    const code = (caught as { response?: { data?: { error?: { code?: string } } } })
+      ?.response?.data?.error?.code
+    error.value = code === 'AUTHENTICATION_RATE_LIMITED'
+      ? '登录失败次数过多，请在冷却时间结束后重试。'
+      : '账号或密码不正确，或账号已停用。'
   } finally {
     password.value = ''
     busy.value = false

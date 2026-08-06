@@ -11,7 +11,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - name: Run available backend tests
+      - name: Install locked backend inputs
         run: |
-          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
-          if [ -d backend/tests ]; then pytest backend/tests; else echo 'No backend tests imported yet; passing baseline check.'; fi
+          python -m pip install -r backend/requirements.txt
+          python -m pip check
+      - name: Run backend tests
+        run: python -m pytest -q backend/tests

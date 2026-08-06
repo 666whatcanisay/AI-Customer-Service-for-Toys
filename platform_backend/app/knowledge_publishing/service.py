@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.errors import AppError
 from app.knowledge_publishing.ai_client import (
     AiKnowledgePublicationClient,
@@ -42,9 +45,11 @@ class ProductKnowledgePublishingService:
         self,
         session: Session,
         ai_client: AiKnowledgePublicationClient | None = None,
+        lease_seconds: int | None = None,
     ) -> None:
         self.session = session
         self.ai_client = ai_client or AiKnowledgePublicationClient()
+        self.lease_seconds = lease_seconds or get_settings().knowledge_publication_lease_seconds
 
     def summary(self, product: TestProduct) -> AiKnowledgeSummary:
         return publication_summary(self.session, product)
@@ -108,6 +113,7 @@ class ProductKnowledgePublishingService:
             return response, False
 
         now = _now()
+        generation_token = str(uuid4())
         if row is None:
             row = ProductKnowledgePublication(
                 product_id=product_id,
@@ -115,15 +121,49 @@ class ProductKnowledgePublishingService:
                 current_fingerprint=canonical.fingerprint,
                 chunk_count=0,
                 embedding_count=0,
+                generation_token=generation_token,
+                generation_started_at=now,
                 updated_at=now,
             )
             self.session.add(row)
+            try:
+                self.session.commit()
+            except IntegrityError:
+                self.session.rollback()
+                raise AppError(
+                    "AI_KNOWLEDGE_PUBLISH_IN_PROGRESS",
+                    "A publication is already in progress for this product.",
+                    status_code=409,
+                ) from None
         else:
-            row.status = AiKnowledgeStatus.GENERATING
-            row.current_fingerprint = canonical.fingerprint
-            row.last_error_code = None
-            row.updated_at = now
-        self.session.commit()
+            lease_cutoff = now - timedelta(seconds=self.lease_seconds)
+            claimed = self.session.execute(
+                update(ProductKnowledgePublication)
+                .where(
+                    ProductKnowledgePublication.product_id == product_id,
+                    or_(
+                        ProductKnowledgePublication.status != AiKnowledgeStatus.GENERATING,
+                        ProductKnowledgePublication.generation_started_at.is_(None),
+                        ProductKnowledgePublication.generation_started_at <= lease_cutoff,
+                    ),
+                )
+                .values(
+                    status=AiKnowledgeStatus.GENERATING,
+                    current_fingerprint=canonical.fingerprint,
+                    last_error_code=None,
+                    generation_token=generation_token,
+                    generation_started_at=now,
+                    updated_at=now,
+                )
+            ).rowcount
+            if claimed != 1:
+                self.session.rollback()
+                raise AppError(
+                    "AI_KNOWLEDGE_PUBLISH_IN_PROGRESS",
+                    "A publication is already in progress for this product.",
+                    status_code=409,
+                )
+            self.session.commit()
 
         try:
             result = self.ai_client.publish(
@@ -153,12 +193,15 @@ class ProductKnowledgePublishingService:
         except (AiKnowledgePublicationUnavailable, ValueError, TypeError) as exc:
             row = self.session.get(ProductKnowledgePublication, product_id)
             assert row is not None
-            row.status = AiKnowledgeStatus.SYNC_FAILED
-            row.current_fingerprint = canonical.fingerprint
-            row.last_error_code = "AI_KNOWLEDGE_PUBLISH_FAILED"
-            row.checked_at = _now()
-            row.updated_at = row.checked_at
-            self.session.commit()
+            if row.generation_token == generation_token:
+                row.status = AiKnowledgeStatus.SYNC_FAILED
+                row.current_fingerprint = canonical.fingerprint
+                row.last_error_code = "AI_KNOWLEDGE_PUBLISH_FAILED"
+                row.checked_at = _now()
+                row.updated_at = row.checked_at
+                row.generation_token = None
+                row.generation_started_at = None
+                self.session.commit()
             raise AppError(
                 "AI_KNOWLEDGE_PUBLISH_FAILED",
                 "AI知识同步失败，旧版本知识已保留，请稍后重试",
@@ -183,6 +226,12 @@ class ProductKnowledgePublishingService:
             self.session.add(receipt)
         row = self.session.get(ProductKnowledgePublication, product_id)
         assert row is not None
+        if row.generation_token != generation_token:
+            raise AppError(
+                "AI_KNOWLEDGE_PUBLISH_LEASE_LOST",
+                "The publication lease expired before completion.",
+                status_code=409,
+            )
         row.status = AiKnowledgeStatus.PUBLISHED
         row.current_fingerprint = canonical.fingerprint
         row.indexed_fingerprint = canonical.fingerprint
@@ -194,6 +243,8 @@ class ProductKnowledgePublishingService:
         row.published_at = receipt.created_at
         row.checked_at = receipt.created_at
         row.updated_at = _now()
+        row.generation_token = None
+        row.generation_started_at = None
         response = ProductKnowledgePublicationResponse(
             changed=True,
             product_id=product_id,

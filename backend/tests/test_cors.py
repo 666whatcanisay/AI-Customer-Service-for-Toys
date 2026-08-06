@@ -20,14 +20,18 @@ class _NoopRAGService:
 
 
 def _create_cors_client(tmp_path) -> TestClient:
+    internal_secret = tmp_path / "internal-service.secret"
+    internal_token = "test-internal-service-token-32-bytes-minimum"
+    internal_secret.write_text(internal_token, encoding="utf-8")
     settings = replace(
         Settings.from_env(),
         backend_root=tmp_path,
         project_root=tmp_path,
         log_dir=tmp_path / "logs",
+        internal_service_secret_file=internal_secret,
     )
     app = create_app(settings=settings, rag_factory=lambda _: _NoopRAGService())
-    return TestClient(app)
+    return TestClient(app, headers={"X-AI-CS-Service-Token": internal_token})
 
 
 def test_default_cors_origins_are_local_only(monkeypatch):

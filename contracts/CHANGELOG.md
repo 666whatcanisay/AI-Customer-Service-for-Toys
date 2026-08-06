@@ -1,5 +1,47 @@
 # Contract changelog
 
+## 0.13.0 - 2026-08-06
+
+- Added HTTP 429 `AUTHENTICATION_RATE_LIMITED` plus `Retry-After` for persistent,
+  privacy-minimized login failure buckets. Existing successful IAM objects are
+  unchanged.
+- Added non-2xx Workspace failure semantics for RAG/LLM operational errors and
+  bounded product-publication concurrency error codes.
+- Required a file-referenced service identity on every non-health legacy A
+  service route and the existing A/C internal routes. The runtime-console route
+  accepts either an authorized operations session or that service identity.
+  The credential is never browser-readable, logged, or part of a wire schema.
+- Gateway wire `1.0` and its canonical schema, Channel Engine, PDD Adapter,
+  automatic-send, Prompt and successful A `/api/chat` semantics are unchanged.
+
+## 0.12.0 - 2026-08-06
+
+- Added the C-owned authenticated Customer Desktop Workflow projection,
+  one-time self-enrollment grant request and minimized ADMIN audit objects.
+- AI-CS derives the user and Store scope server-side and keeps the Channel
+  Engine operator session reference outside the browser and source tree.
+- Enrollment remains restricted to registered `UNBOUND` devices; independent
+  Channel Agent activation is preserved. Integration is disabled by default
+  and upstream configuration, reachability, permission and contract failures
+  are distinct non-2xx responses.
+- Channel Agent protocol `1.0`, Channel Engine source, Gateway wire `1.0`, PDD,
+  automatic-send, A `/api/chat`, RAG, Prompt and model behavior are unchanged.
+
+## 0.11.0 - 2026-08-06
+
+- Added C-owned default-Store selection, Workspace context, conversation
+  Product/SKU resolution and minimized ADMIN resolution-audit objects.
+- CUSTOMER_SERVICE bindings now converge on exactly one default Store. The
+  existing self-binding request remains compatible: an omitted
+  `default_store_id` retains an authorized default or deterministically chooses
+  the first requested Store.
+- Added resolver-first AI context injection by `resolution_id` while retaining
+  the legacy explicit Workspace chat context. A `/api/chat` and its response
+  remain unchanged; ambiguous matches require human confirmation and no
+  automatic send is introduced.
+- Gateway wire `1.0`, Channel Engine RC1, PDD Adapter, R006/R009 semantics,
+  Prompt, RAG and model behavior are unchanged.
+
 ## 0.10.0 - 2026-08-06
 
 - Coordinated the C IAM provider, B Customer Workspace and C Admin around the

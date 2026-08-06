@@ -17,13 +17,18 @@ class AiKnowledgePublicationClient:
         settings = get_settings()
         self.base_url = (base_url or settings.ai_service_base_url).rstrip("/")
         self.timeout_seconds = timeout_seconds or settings.ai_service_timeout_seconds
+        self.settings = settings
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-AI-CS-Service-Token": self.settings.internal_service_token(),
+            },
             method="POST",
         )
         try:

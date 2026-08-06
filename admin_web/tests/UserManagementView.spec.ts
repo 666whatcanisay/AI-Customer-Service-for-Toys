@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
   apiErrorMessage: vi.fn(() => '请求失败'), assignUserRoles: vi.fn(), assignUserStores: vi.fn(),
-  createUser: vi.fn(), deactivateUser: vi.fn(), listOperationStores: vi.fn(), listUsers: vi.fn(),
+  createUser: vi.fn(), deactivateUser: vi.fn(), listOperationStores: vi.fn(),
+  listStoreContextResolutions: vi.fn(), listUsers: vi.fn(),
 }))
 vi.mock('../src/api/client', () => apiMocks)
 import UserManagementView from '../src/views/UserManagementView.vue'
@@ -12,7 +13,7 @@ const user = {
   id: '11111111-1111-4111-8111-111111111111', username: 'support.one', display_name: '张三',
   status: 'ACTIVE' as const, roles: ['CUSTOMER_SERVICE'] as const,
   permissions: ['workspace.access', 'ai.reply', 'feedback.submit', 'customer_service.manage'],
-  stores: [{ id: 1, store_id: 8, store_code: 'PDD-SM', store_name: '玩趣乐园积木店', platform: 'pdd', is_default: false }],
+  stores: [{ id: 1, store_id: 8, store_code: 'PDD-SM', store_name: '玩趣乐园积木店', platform: 'pdd', is_default: true }],
   must_change_password: true, all_store_access: false,
   created_at: '2026-08-06T00:00:00Z', updated_at: '2026-08-06T00:00:00Z',
 }
@@ -23,6 +24,7 @@ describe('UserManagementView', () => {
     vi.clearAllMocks()
     apiMocks.listUsers.mockResolvedValue({ schema_version: 'ai-cs.iam.v1', items: [user], total: 1 })
     apiMocks.listOperationStores.mockResolvedValue({ items: [store], total: 1 })
+    apiMocks.listStoreContextResolutions.mockResolvedValue({ schema_version: 'ai-cs.store-context.v1', items: [], total: 0 })
     apiMocks.createUser.mockResolvedValue(user)
     apiMocks.assignUserStores.mockResolvedValue(user)
     apiMocks.assignUserRoles.mockResolvedValue(user)
@@ -36,10 +38,12 @@ describe('UserManagementView', () => {
     await inputs[0].setValue('support.two'); await inputs[1].setValue('李四'); await inputs[2].setValue('Long-password-42!')
     const storeChoice = wrapper.findAll('form[data-testid="create-user-form"] input[type="checkbox"]').at(3)!
     await storeChoice.setValue(true)
+    const defaultChoice = wrapper.get('form[data-testid="create-user-form"] input[type="radio"]')
+    await defaultChoice.setValue(true)
     await wrapper.get('form[data-testid="create-user-form"]').trigger('submit'); await flushPromises()
     expect(apiMocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
       username: 'support.two', display_name: '李四', roles: ['CUSTOMER_SERVICE'],
-      store_bindings: [{ store_id: 8, is_default: false }],
+      store_bindings: [{ store_id: 8, is_default: true }],
     }))
     expect(wrapper.text()).toContain('首次登录需修改')
   })

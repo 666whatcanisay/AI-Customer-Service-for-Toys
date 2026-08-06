@@ -1,16 +1,18 @@
-from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 import hashlib
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.database import get_db
-from app.iam.models import User, UserSession
+from app.database import Base, get_db
+from app.errors import AppError
+from app.iam.models import LoginAttemptBucket, User, UserSession
 from app.iam.schemas import RoleName, UserCreateRequest
-from app.iam.service import UserService, ensure_default_roles
+from app.iam.service import AuthenticationService, UserService, ensure_default_roles
 from app.main import app
 from app.test_catalog.models import (
     TestKnowledgePackage as KnowledgePackageModel,
@@ -128,6 +130,124 @@ def test_login_uses_password_hash_and_persists_only_token_digest(
     assert expired.json()["error"]["code"] == "SESSION_EXPIRED"
 
 
+def test_login_throttle_cooldown_and_session_limit_are_server_enforced(
+    auth_client: TestClient, session: Session
+) -> None:
+    created = _create_user(session, "rate.limited", RoleName.ADMIN)
+    for attempt in range(5):
+        response = auth_client.post(
+            "/api/v1/auth/login",
+            json={"username": "rate.limited", "password": f"wrong-{attempt}"},
+        )
+        assert response.status_code == (429 if attempt == 4 else 401)
+    assert response.json()["error"]["code"] == "AUTHENTICATION_RATE_LIMITED"
+    assert int(response.headers["retry-after"]) > 0
+    assert auth_client.post(
+        "/api/v1/auth/login",
+        json={"username": "rate.limited", "password": PASSWORD},
+    ).status_code == 429
+
+    buckets = list(session.scalars(select(LoginAttemptBucket)))
+    assert buckets
+    assert all(row.bucket_key not in {"rate.limited", "testclient"} for row in buckets)
+
+    session.query(LoginAttemptBucket).delete()
+    session.commit()
+    tokens = [_login(auth_client, "rate.limited") for _ in range(6)]
+    assert auth_client.get("/api/v1/auth/me", headers=_headers(tokens[0])).status_code == 401
+    assert auth_client.get("/api/v1/auth/me", headers=_headers(tokens[-1])).status_code == 200
+    active_count = session.query(UserSession).filter(
+        UserSession.user_id == created.id,
+        UserSession.revoked_at.is_(None),
+    ).count()
+    assert active_count == 5
+
+
+def test_concurrent_logins_cannot_exceed_the_active_session_cap(tmp_path) -> None:
+    database_path = tmp_path / "concurrent-login.sqlite3"
+    engine = create_engine(
+        f"sqlite:///{database_path.as_posix()}",
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with factory() as seed_session:
+        created = _create_user(seed_session, "concurrent.login", RoleName.ADMIN)
+
+    def login(attempt: int) -> str:
+        with factory() as worker_session:
+            return AuthenticationService(
+                worker_session, 60, max_active_sessions=3
+            ).login(
+                "concurrent.login", PASSWORD, f"192.0.2.{attempt + 1}"
+            ).access_token
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        tokens = list(executor.map(login, range(8)))
+
+    assert len(set(tokens)) == 8
+    with factory() as verification_session:
+        rows = list(verification_session.scalars(
+            select(UserSession).where(UserSession.user_id == created.id)
+        ))
+        assert len(rows) == 8
+        assert sum(row.revoked_at is None for row in rows) == 3
+    engine.dispose()
+
+
+def test_cooldown_expiry_uses_injected_clock_and_expired_sessions_are_revoked(
+    auth_client: TestClient, session: Session
+) -> None:
+    created = _create_user(session, "clock.safe", RoleName.ADMIN)
+    current = [datetime(2026, 8, 6, 8, 0, tzinfo=timezone.utc)]
+    service = AuthenticationService(
+        session,
+        60,
+        max_failures=2,
+        window_seconds=30,
+        cooldown_seconds=30,
+        clock=lambda: current[0],
+    )
+    with pytest.raises(AppError):
+        service.login("clock.safe", "wrong-one", "192.0.2.10")
+    with pytest.raises(AppError) as limited:
+        service.login("clock.safe", "wrong-two", "192.0.2.10")
+    assert limited.value.code == "AUTHENTICATION_RATE_LIMITED"
+    current[0] += timedelta(seconds=31)
+    token = service.login("clock.safe", PASSWORD, "192.0.2.10").access_token
+
+    row = session.scalar(
+        select(UserSession).where(UserSession.token_hash == hashlib.sha256(token.encode()).hexdigest())
+    )
+    assert row is not None
+    row.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    session.commit()
+    expired = auth_client.get("/api/v1/auth/me", headers=_headers(token))
+    assert expired.status_code == 401
+    assert expired.json()["error"]["code"] == "SESSION_EXPIRED"
+    session.refresh(row)
+    assert row.revoked_at is not None
+
+
+def test_password_reset_revokes_sessions_even_when_status_is_explicitly_active(
+    auth_client: TestClient, session: Session
+) -> None:
+    _create_user(session, "root.reset", RoleName.ADMIN)
+    target = _create_user(session, "target.reset", RoleName.CUSTOMER_SERVICE)
+    root_token = _login(auth_client, "root.reset")
+    target_token = _login(auth_client, "target.reset")
+
+    updated = auth_client.patch(
+        f"/api/v1/admin/users/{target.id}",
+        headers=_headers(root_token),
+        json={"password": "Another-Strong-Password-42!", "status": "ACTIVE"},
+    )
+    assert updated.status_code == 200
+    assert auth_client.get(
+        "/api/v1/auth/me", headers=_headers(target_token)
+    ).status_code == 401
+
+
 def test_admin_user_crud_role_assignment_and_store_binding(
     auth_client: TestClient, session: Session
 ) -> None:
@@ -228,7 +348,8 @@ def test_workspace_proxy_validates_bound_scope_before_unchanged_chat_forward(
     token = _login(auth_client, "support.chat")
     calls: list[tuple[str, str, dict | None]] = []
 
-    def upstream(method: str, url: str, *, json=None, timeout=None):
+    def upstream(method: str, url: str, *, json=None, headers=None, timeout=None):
+        assert headers and headers["X-Request-ID"]
         calls.append((method, url, json))
         return httpx.Response(200, json={
             "success": True, "message": "ok", "data": {
@@ -317,7 +438,14 @@ def test_internal_username_initial_password_first_change_and_multi_store_selecti
     )
     assert selected.status_code == 200
     assert {item["store_id"] for item in selected.json()["stores"]} == {first.id, second.id}
-    assert not any(item["is_default"] for item in selected.json()["stores"])
+    assert [item["store_id"] for item in selected.json()["stores"] if item["is_default"]] == [first.id]
+
+    switched = auth_client.put(
+        "/api/v1/auth/default-store", headers=_headers(current_token),
+        json={"store_id": second.id},
+    )
+    assert switched.status_code == 200
+    assert [item["store_id"] for item in switched.json()["stores"] if item["is_default"]] == [second.id]
 
     visible = auth_client.get(
         "/api/v1/customer-service/catalog/stores", headers=_headers(current_token)

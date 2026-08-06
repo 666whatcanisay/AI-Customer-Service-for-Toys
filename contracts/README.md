@@ -4,9 +4,15 @@ This directory is jointly owned by all three development lines. Schemas are the
 versioned compatibility boundary; do not make breaking changes without updating
 `version.json`, `CHANGELOG.md`, and the compatibility notes in the pull request.
 
-Current coordinated baseline: `0.10.0`. Customer-service catalog consumers must use
+Current coordinated baseline: `0.13.0`. Customer-service catalog consumers must use
 the C-owned `pilot-business-catalog.v1.1` projection and must not derive
 availability from legacy test or publication fields.
+
+`0.13.0` also closes the legacy A exposure boundary: only `/api/health` remains
+unauthenticated. C calls A with a file-referenced service identity, B continues
+to call the authenticated C Workspace facade, and operations-only A routes keep
+their C-validated Bearer authorization. See
+[`production-hardening-v1.md`](compatibility/production-hardening-v1.md).
 
 R006.1 adds C-to-A incremental product-knowledge publication and visibility
 evidence, plus C-owned batch customer-service activation. Publication and
@@ -64,3 +70,27 @@ character password. CUSTOMER_SERVICE selects one or more enabled Stores and no
 longer depends on a unique default; OPERATOR and ADMIN have server-derived
 all-Store scope. B, C and Admin must deploy this revision together. No password
 value is part of the contract or source tree.
+
+`0.11.0` adds the C-owned default-Store workflow and Conversation Context
+Resolver. B obtains the effective Store after login, asks C to resolve
+Product/SKU candidates from transient conversation content, and submits the
+resulting `resolution_id` for AI context injection. Ambiguity requires human
+confirmation. The audit projection contains identifiers and a content hash,
+never customer text. Legacy Workspace chat remains compatible and the frozen
+Gateway wire `1.0` is unchanged.
+
+`0.12.0` adds the authenticated Customer Desktop Workflow facade. B can display
+the current user/Store's Agent identity, version and last heartbeat and can
+request a one-time enrollment grant for an already registered unbound device.
+C retains Store/RBAC authority and isolates the Channel Engine operator session
+reference in a secret file. Binding codes are returned once with `no-store`,
+never audited, and do not bypass the Channel Agent's independent activation.
+The integration is disabled by default and does not modify Channel Engine,
+Gateway, PDD or automatic-send behavior.
+
+`0.13.0` hardens the existing production boundary without changing business
+objects: login may return HTTP 429 with `AUTHENTICATION_RATE_LIMITED` and
+`Retry-After`; Workspace RAG/LLM failures are non-2xx; C-to-A and A-to-C
+internal routes require a shared secret-file service identity; and product
+publication uses a product-scoped lease. Browser sessions, Gateway wire `1.0`,
+Channel Engine, PDD and automatic-send behavior are unchanged.

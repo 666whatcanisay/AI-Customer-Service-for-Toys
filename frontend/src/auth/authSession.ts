@@ -131,9 +131,18 @@ async function listStoreOptions(): Promise<AuthStoreOption[]> {
   return response.data.items
 }
 
-async function replaceStoreBindings(storeIds: number[]): Promise<AuthUser> {
+async function replaceStoreBindings(storeIds: number[], defaultStoreId?: number): Promise<AuthUser> {
   const response = await authHttp.put<AuthUser>('/api/v1/auth/store-bindings', {
-    store_ids: storeIds
+    store_ids: storeIds,
+    default_store_id: defaultStoreId ?? storeIds[0]
+  }, { headers: authorizationHeader() })
+  user.value = response.data
+  return response.data
+}
+
+async function setDefaultStore(storeId: number): Promise<AuthUser> {
+  const response = await authHttp.put<AuthUser>('/api/v1/auth/default-store', {
+    store_id: storeId
   }, { headers: authorizationHeader() })
   user.value = response.data
   return response.data
@@ -142,7 +151,8 @@ async function replaceStoreBindings(storeIds: number[]): Promise<AuthUser> {
 export function useAuthSession() {
   const defaultStore = computed(() => user.value?.stores.find((item) => item.is_default) ?? null)
   const requiresStoreSelection = computed(() =>
-    user.value?.roles.includes('CUSTOMER_SERVICE') === true && !user.value.stores.length
+    user.value?.roles.includes('CUSTOMER_SERVICE') === true
+      && !user.value.stores.some((item) => item.is_default)
   )
   return {
     token: readonly(token),
@@ -155,6 +165,7 @@ export function useAuthSession() {
     changePassword,
     listStoreOptions,
     replaceStoreBindings,
+    setDefaultStore,
     restore,
     hasPermission: (permission: string) => user.value?.permissions.includes(permission) === true
   }

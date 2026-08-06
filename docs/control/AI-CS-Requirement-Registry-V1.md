@@ -8,7 +8,7 @@
 >
 > 首次登记：2026-07-29
 >
-> 当前 Gate：`AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`AI_CS_PRODUCTION_RC_READY / CONTROLLED_DEPLOYMENT_PENDING / R003_PILOT_ACCEPTANCE_PENDING`
 
 ## 1. 台账目标
 
@@ -110,8 +110,11 @@ TODO / IN_PROGRESS / BLOCKED → DEPRECATED
 | R017 | AI-CS Initial Production Accounts V1 | `DONE` | Control、OPS、C IAM | R019已完成正式0012备份、0013迁移、三账号创建以及首次改密、Session、RBAC和Store范围验收。 |
 | R018 | AI-CS Account Policy Adjustment V1 | `DONE` | C、B、A、contracts、OPS、Control、QA | Unicode账号、临时口令首次改密、客服多店、运营/管理员全店和受控三账号脚本已完成并由R019部署。 |
 | R019 | AI-CS Production IAM Deployment & Initial Accounts V1 | `DONE` | Control、OPS、C IAM、QA | 受控clean source、备份、0013、三账号、真实登录/RBAC/Store验收和回滚证据全部完成。 |
+| R020 | AI-CS Store Context Resolver V1 | `DONE` | C Workspace/IAM、B、C Admin、contracts、Control、QA | 唯一默认Store、授权切换、C权威Product/SKU解析、AI context注入和最小审计完成；正式0014部署另行执行。 |
+| R021 | AI-CS Customer Workspace Production V1 | `DONE` | B Customer Workspace、C既有Provider、Control、QA | 三栏会话工作流、客服/会话状态、AI依据/风险、人工决策与幂等问题反馈完成；不接真实渠道、不自动发送。 |
+| R022 | AI-CS Customer Desktop Workflow Integration V1 | `DONE` | B Workspace、C Desktop Agent facade、contracts、OPS、Control、QA | 当前客服/设备/店铺关联、Agent状态、一次性绑定授权、异常提示和最小审计完成；Channel Engine不修改且未接生产。 |
 
-状态数量：`DONE=16`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计19项。
+状态数量：`DONE=19`、`IN_PROGRESS=1`、`TODO=1`、`BLOCKED=1`、`DEPRECATED=0`，合计22项。
 
 ## 6. 需求明细
 
@@ -474,6 +477,105 @@ R006.2不改变R006业务模型，只补齐已经打开页面对激活变化的�
 | 验收证据 | [Deployment Report](AI-CS-Initial-Production-Accounts-Deployment-Report-V1.md)：source `ed12da9`/`dda708b`/`fc4f6d9`；备份与最终DB hash；C130、A147/3 skipped、B143、Admin84、contracts10；正式Runtime实际验收PASS。 |
 | 关联代码/文档 | [Task Card](product-management/AI-CS-Production-IAM-Deployment-Initial-Accounts-V1-Task-Card.md)、0013 migration、Windows Runtime/initial-user wrappers、Deployment Report。 |
 | 防止重复错误规则 | 不得提交数据库/备份/回执/secret，不得打印凭证/hash/token，不得直接SQL初始化，不得在服务运行时覆盖SQLite，不得因IAM迁移重建RAG。 |
+
+### R020 — AI-CS Store Context Resolver V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R020 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Store Context Resolver V1 |
+| 用户原始目标 | 客服登录后自动获得授权/默认店铺，并从客户会话识别Product/SKU后生成有正确业务上下文和知识引用的AI建议。 |
+| 业务背景 | R016/R018已有身份、多店绑定和Workspace，但B仍从tester identity/目录首项选择商品，不能形成正式客服上下文链。 |
+| 当前状态 | `DONE` |
+| 负责模块 | C负责默认Store、授权、目录解析、审计和AI facade；B负责resolver-first交互与人工确认；Admin负责查看；contracts/Control/QA负责协调和验收。 |
+| 影响范围 | Contracts 0.11、C新增0014及Workspace/IAM API、B Workspace和Admin用户页；A、Gateway、Channel Engine、PDD、R006/R009、RAG、Prompt、模型不变。 |
+| 完成标准 | 客服自动进入默认Store并可授权切换；唯一Product/SKU自动、歧义人工确认、未知不猜测；AI由C注入上下文；Admin可查看最小记录；全量回归和迁移往返通过。 |
+| 验收证据 | [Completion Report](AI-CS-Store-Context-Resolver-V1-Completion-Report.md)：C135、B148、Admin84、A147/3 skipped、contracts12、typecheck/build、0014隔离往返与Gateway SHA不变。 |
+| 关联代码/文档 | `platform_backend/app/workspace/`、`platform_backend/app/iam/`、0014 migration、`frontend/src/api/storeContext*`、Human Workspace、Admin用户管理、[Task Card](product-management/AI-CS-Store-Context-Resolver-V1-Task-Card.md)。 |
+| 防止重复错误规则 | 不得跨授权Store猜测，不得把B目录首项当识别结果，不得在审计保存客户原文，不得绕过C确认直接调用AI，不得因0014重建商品/RAG或修改Gateway。 |
+
+### R021 — AI-CS Customer Workspace Production V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R021 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Customer Workspace Production V1 |
+| 用户原始目标 | 基于用户、店铺上下文、Product Resolver和Workspace，实现客服查看会话、AI生成、有依据/风险展示及人工采用、修改、拒绝和问题反馈的生产工作流。 |
+| 业务背景 | R020已建立可信Store/Product/SKU上下文，但B仍缺客服在线状态、四态会话队列、明确的人工作业动作和拒绝原因闭环。 |
+| 当前状态 | `DONE` |
+| 负责模块 | B负责三栏Workspace、会话状态、人工决策和既有Feedback契约消费；C/A只作为冻结Provider；Control/QA负责边界和验收。 |
+| 影响范围 | `frontend/**`和项目文档；无新API、contract版本、数据库迁移或A/C/Admin业务改动。 |
+| 完成标准 | 客服三态、会话四态、授权Store、Product/SKU识别、AI回复/依据/风险、采用/修改/拒绝原因/问题标记、失败幂等重试、权限与全量回归通过。 |
+| 验收证据 | [Completion Report](AI-CS-Customer-Workspace-Production-V1-Completion-Report.md)：B157、C135、Admin84、A147/3 skipped、contracts12、两前端typecheck/build及production fixture隔离通过。 |
+| 关联代码/文档 | `frontend/src/stores/humanLoopWorkspace.ts`、`frontend/src/components/humanLoop/`、`frontend/src/views/HumanInLoopWorkspace.vue`、[Task Card](product-management/AI-CS-Customer-Workspace-Production-V1-Task-Card.md)。 |
+| 防止重复错误规则 | 不得把测试fixture或人工录入冒充真实渠道，不得把复制/COMPLETED冒充发送回执，不得在浏览器持久化客户原文，不得绕过C Store scope，不得因Workspace改动连接PDD/Channel Engine或修改Gateway。 |
+
+### R022 — AI-CS Customer Desktop Workflow Integration V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R022 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Customer Desktop Workflow Integration V1 |
+| 用户原始目标 | 客服登录后绑定自己的设备和店铺，在Workspace看到Agent在线、版本和心跳，明确处理离线、服务器不可达和权限失效，并审计登录/绑定/状态变化。 |
+| 业务背景 | R021已有人工客服工作流，外部Channel Agent也已有注册、心跳、enroll和独立activate能力，但AI-CS浏览器尚无安全的设备关联投影，不能让浏览器直接持有Engine管理员凭证。 |
+| 当前状态 | `DONE` |
+| 负责模块 | C负责真实身份/Store scope、上游facade、授权和最小审计；B负责Workspace状态/绑定UX；contracts/OPS/Control/QA负责协调、配置与验收。Channel Engine保持只读外部依赖。 |
+| 影响范围 | Contracts 0.12、C新增0015和Workspace/Admin API、B Workspace、Windows受控配置与文档；A、Gateway wire、RAG、Prompt、PDD和Channel Engine源码不变。 |
+| 完成标准 | 登录用户只看到自身授权Store关联设备；展示在线/版本/心跳；自助绑定只针对已注册UNBOUND精确设备且必须独立激活；异常fail closed；最小审计和全量回归通过。 |
+| 验收证据 | [Completion Report](AI-CS-Customer-Desktop-Workflow-Integration-V1-Completion-Report.md)：C145、B163、Admin84、A147/3 skipped、contracts15、两前端typecheck/build、专项Windows配置/目标就绪测试及Gateway SHA不变。 |
+| 关联代码/文档 | `platform_backend/app/desktop_agent/`、0015 migration、`frontend/src/api/desktopAgent*`、`frontend/src/components/humanLoop/DesktopAgentStatusPanel.vue`、Human Workspace、[Task Card](product-management/AI-CS-Customer-Desktop-Workflow-Integration-V1-Task-Card.md)。 |
+| 防止重复错误规则 | 不得让浏览器直连Engine或读取operator credential，不得信任B提交的user/store引用，不得自动activate或发送，不得记录绑定码/客户内容/完整上游响应，不得把Source Gate冒充生产联通。 |
+
+### R023 — AI-CS Code Quality Audit V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R023 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Code Quality Audit V1 |
+| 用户原始目标 | 对Backend、Frontend、Admin、Database、API、RAG和Workspace进行生产上线前架构、Bug、安全、性能、维护与测试大审查。 |
+| 当前状态 | `DONE` |
+| 负责模块 | Control/Architecture负责只读跨线审计与Gate；后续修复必须按A/B/C/OPS所有权另立任务卡。 |
+| 影响范围 | 仅任务卡、审计报告和项目上下文文档；没有修改业务代码、API、数据库、RAG、Gateway Contract、Channel Engine或PDD Adapter。 |
+| 完成标准 | 每项问题有严重等级、代码证据、影响、建议和是否上线前修复；全域测试/依赖/DB只读证据齐全；明确发布Gate。 |
+| 验收证据 | [Audit Report](AI-CS-Code-Quality-Audit-V1-Report.md)：22项问题（P0 1/P1 9/P2 10/P3 2）；A147/3 skipped、C145、Admin84、contracts15通过，B162/163且时钟用例不稳定；正式DB0013完整性ok。 |
+| 关联代码/文档 | [Task Card](product-management/AI-CS-Code-Quality-Audit-V1-Task-Card.md)、[Audit Report](AI-CS-Code-Quality-Audit-V1-Report.md)。 |
+| 防止重复错误规则 | `AI_CS_CODE_AUDIT_READY`只表示审计完成；P0/P1、B红灯、dirty source或DB/source版本不一致存在时不得宣称Production Ready。 |
+
+### R024 — AI-CS Production Hardening V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R024 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Production Hardening V1 |
+| 用户原始目标 | 修复R023的P0/P1生产发布阻断，使AI-CS达到真实PDD接入前的生产质量源码基线。 |
+| 当前状态 | `DONE / SOURCE_ONLY` |
+| 负责模块 | A/C/B/Admin/OPS按既有所有权完成最小安全与稳定性修复；Control负责契约协调、回归和Gate。 |
+| 影响范围 | 内部服务鉴权、IAM Session/登录、Workspace错误、知识发布并发、异常日志、生产Web/TLS、CI、测试与0016迁移；不修改Gateway wire、Channel Engine、PDD Adapter或业务流程。 |
+| 完成标准 | P0/P1有代码与负面测试；Backend/Frontend/Admin/Contract/Security/Build全绿；正式DB保持0013；Gateway/RAG指纹不变。 |
+| 验收证据 | [Completion Report](AI-CS-Production-Hardening-V1-Completion-Report.md)：A150/3 skipped、C155、B164、Admin85、contracts15、Windows16/16、build/audit通过；正式DB0013完整性ok。 |
+| 关联代码/文档 | [Task Card](product-management/AI-CS-Production-Hardening-V1-Task-Card.md)、[Completion Report](AI-CS-Production-Hardening-V1-Completion-Report.md)、contracts 0.13兼容说明与0016 migration。 |
+| 防止重复错误规则 | Source Hardening Ready不等于部署完成；dirty candidate不得启动，正式迁移必须在clean SHA、备份、TLS和回滚Gate下执行。 |
+
+### R025 — AI-CS Production Release Candidate Freeze V1
+
+| 字段 | 内容 |
+| --- | --- |
+| 需求 ID | R025 |
+| 提出时间 | 2026-08-06 |
+| 需求名称 | AI-CS Production Release Candidate Freeze V1 |
+| 用户原始目标 | 基于Production Hardening完成干净Release Candidate、迁移冻结、全域质量/安全Gate与部署恢复准备。 |
+| 当前状态 | `DONE` |
+| 负责模块 | Release/Control统筹；A/B/C/Admin/OPS保持原路径所有权，contracts执行跨线兼容冻结。 |
+| 影响范围 | Git branch/commit/tag、0013–0016 migration验证、全域测试/构建/扫描、README/治理上下文、部署清单与恢复方案。 |
+| 完成标准 | worktree clean；Release branch/commit/tag可解析；迁移可升级/回滚；全域Gate通过；Gateway/RAG/Channel/PDD/自动发送边界不变。 |
+| 验收证据 | [Freeze Report](AI-CS-Production-Release-Candidate-Freeze-V1.md)：A150/3 skipped、C155、B164、Admin85、contracts15、Windows16/16；正式DB0013 hash不变。 |
+| 关联代码/文档 | [Task Card](product-management/AI-CS-Production-Release-Candidate-Freeze-V1-Task-Card.md)、[Deployment Checklist](AI-CS-Production-RC-V1-Deployment-Checklist.md)、annotated tag `ai-cs-production-rc-v1`。 |
+| 防止重复错误规则 | RC Ready不是Production Deployed；必须从tag解析clean SHA，先备份再迁移，并在同一SHA完成start/status/stop，禁止绕过TLS/WMI/secret Gate。 |
 
 ## 7. 历史错误防复发规则
 

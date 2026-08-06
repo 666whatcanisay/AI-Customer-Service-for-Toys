@@ -1,26 +1,45 @@
 import { describe, expect, it } from 'vitest'
 
-import { MockChannelMessageAdapter } from './channelMessageAdapter'
+import { InMemoryChannelMessageAdapter } from './channelMessageAdapter'
 
-describe('MockChannelMessageAdapter', () => {
-  it('provides de-identified in-memory conversations without a real channel', async () => {
-    const adapter = new MockChannelMessageAdapter()
+describe('InMemoryChannelMessageAdapter', () => {
+  it('starts empty and does not invent a real channel conversation', async () => {
+    const adapter = new InMemoryChannelMessageAdapter()
     const conversations = await adapter.listConversations()
 
-    expect(conversations).toHaveLength(2)
-    expect(conversations.every((item) => item.source === 'MOCK')).toBe(true)
-    expect(JSON.stringify(conversations)).not.toContain('PDD')
+    expect(conversations).toEqual([])
   })
 
-  it('accepts a simulated new message for the selected conversation', async () => {
-    const adapter = new MockChannelMessageAdapter()
-    const message = await adapter.receiveMockMessage('mock-conversation-age', '还有其他注意事项吗？')
+  it('creates and appends a page-memory manual conversation', async () => {
+    const adapter = new InMemoryChannelMessageAdapter()
+    const conversation = await adapter.createManualConversation('客户 A01', '适合几岁？')
+    const message = await adapter.receiveManualMessage(conversation.conversationId, '还有其他注意事项吗？')
 
     expect(message).toMatchObject({
-      conversationId: 'mock-conversation-age',
+      conversationId: conversation.conversationId,
       content: '还有其他注意事项吗？',
-      source: 'MOCK'
+      source: 'MANUAL'
     })
+    expect(await adapter.listConversations()).toHaveLength(1)
+  })
+
+  it('requires a de-identified customer label for a new manual conversation', async () => {
+    const adapter = new InMemoryChannelMessageAdapter()
+    await expect(adapter.createManualConversation('  ', '适合几岁？'))
+      .rejects.toThrow('请填写去标识化客户代号')
+    await expect(adapter.createManualConversation('客户 13800138000', '适合几岁？'))
+      .rejects.toThrow('客户代号不能包含')
+  })
+
+  it('removes common direct identifiers before keeping a manual message in page memory', async () => {
+    const adapter = new InMemoryChannelMessageAdapter()
+    const conversation = await adapter.createManualConversation(
+      '客户 A01',
+      '手机号13800138000，邮箱 buyer@example.com，订单1234567890'
+    )
+    expect(conversation.messages[0].content).toContain('[手机号已移除]')
+    expect(conversation.messages[0].content).toContain('[邮箱已移除]')
+    expect(conversation.messages[0].content).toContain('[长编号已移除]')
+    expect(conversation.messages[0].content).not.toContain('13800138000')
   })
 })
-

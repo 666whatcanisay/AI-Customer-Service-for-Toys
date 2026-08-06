@@ -14,6 +14,8 @@ from app.test_catalog import models as test_catalog_models  # noqa: F401
 from app.customer_feedback_loop import models as customer_feedback_loop_models  # noqa: F401
 from app.knowledge_publishing import models as knowledge_publishing_models  # noqa: F401
 from app.iam import models as iam_models  # noqa: F401
+from app.workspace import models as workspace_models  # noqa: F401
+from app.desktop_agent import models as desktop_agent_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

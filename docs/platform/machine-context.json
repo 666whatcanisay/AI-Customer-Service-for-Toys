@@ -4,10 +4,68 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "R019 AI-CS Production IAM Deployment & Initial Accounts V1",
-  "current_stage": "Formal C Runtime is on 0013 with the persistent permission catalog and three approved initial accounts. Real login, mandatory password replacement, session revocation, RBAC and Store scope passed; zero active sessions and zero explicit Store bindings remain.",
-  "current_gate": "AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY",
-  "status": "initial_accounts_ready",
+  "current_task": "R025 AI-CS Production Release Candidate Freeze V1",
+  "current_stage": "C/Admin and migrations 0014-0016 are frozen under ai-cs-production-rc-v1 with reversible migration evidence. Formal database remains 0013 pending controlled backup, migration and same-SHA acceptance.",
+  "current_gate": "AI_CS_PRODUCTION_RC_READY / CONTROLLED_DEPLOYMENT_PENDING",
+  "status": "production_rc_ready",
+  "production_rc_freeze_v1": {
+    "requirement": "R025",
+    "gate": "PASS / AI_CS_PRODUCTION_RC_READY",
+    "release": "release/ai-cs-production-rc-v1 and annotated tag ai-cs-production-rc-v1",
+    "migration": "0013 -> 0014 -> 0015 -> 0016 single head; isolated per-step upgrade/downgrade and 0013-head-0013-head passed; formal DB remains 0013",
+    "tests": "C 155; Admin 34 files/85; migration 3; contracts 15; typecheck/build/pip/pnpm audits passed",
+    "security": "Internal service identity, IAM throttle/session controls, server-side RBAC, publication lease and privacy-safe logs frozen",
+    "compatibility": "Gateway, Channel Engine, PDD Adapter and auto-send unchanged",
+    "report": "docs/control/AI-CS-Production-Release-Candidate-Freeze-V1.md"
+  },
+  "production_hardening_v1": {
+    "requirement": "R024",
+    "gate": "PASS / SOURCE_ONLY / AI_CS_PRODUCTION_HARDENING_READY",
+    "authorization": "Internal projections require independent service identity; browser APIs retain Bearer, role, permission and Store scope checks",
+    "iam": "Session revoke/expiry/concurrency and persistent username/source login cooldown implemented; unknown-user fake hash and 429 Retry-After covered",
+    "consistency": "Same-product knowledge generation owner lease and one-default-Store database constraint added",
+    "observability": "A/C error logs contain safe request, route, minimal user and error type context without message, body, token, secret or customer content",
+    "migration": "0016 adds login attempt buckets, publication leases and default-Store unique index; isolated round-trip passed; formal DB restored to 0013 with integrity ok",
+    "tests": "C 155; Admin 34 files/85; contracts 15; migration, security, typecheck, build and dependency audit gates passed",
+    "report": "docs/control/AI-CS-Production-Hardening-V1-Completion-Report.md"
+  },
+  "code_quality_audit_v1": {
+    "requirement": "R023",
+    "gate": "AI_CS_CODE_AUDIT_READY / PRODUCTION_RELEASE_BLOCKED",
+    "c_findings": "Internal route authorization, password-reset session revocation, login throttle/failure audit, exception logging, SQLite concurrency/default-store constraint and N+1 query patterns",
+    "tests": "C 145 passed; Admin 84 plus typecheck; formal DB read-only 0013/integrity ok/zero FK violations; source head 0015",
+    "compatibility": "No C/Admin business code or database write; shared contracts and Gateway wire unchanged",
+    "report": "docs/control/AI-CS-Code-Quality-Audit-V1-Report.md"
+  },
+  "customer_desktop_workflow_v1": {
+    "requirement": "R022",
+    "contract": "ai-cs.customer-desktop-workflow.v1 under repository contracts 0.12.0",
+    "routes": ["GET /api/v1/workspace/desktop-agent", "POST /api/v1/workspace/desktop-agent/binding-grants", "GET /api/v1/admin/desktop-workflow/audit"],
+    "authorization": "Bearer user plus Store Context scope; self-grant only for CUSTOMER_SERVICE and an exact registered UNBOUND Agent/device; C derives user and Store refs",
+    "upstream": "Disabled by default; loopback HTTP or remote HTTPS; operator session read on demand from a Runtime-contained external file",
+    "audit": "0015 additive table contains successful login, grant issuance, first observation and state changes only",
+    "tests": "C 145; Admin 33 files / 84 tests plus typecheck/build; contracts 15; isolated 0015 migration PASS",
+    "production_state": "Formal Runtime remains 0013; no 0014/0015 migration, Runtime start or production Engine connection in R022",
+    "report": "docs/control/AI-CS-Customer-Desktop-Workflow-Integration-V1-Completion-Report.md"
+  },
+  "customer_workspace_production_v1": {
+    "requirement": "R021",
+    "c_scope": "No C source, API, schema or database change; C remains identity, RBAC, Store scope, Product/SKU resolution and feedback receipt authority",
+    "consumed_routes": ["GET /api/v1/auth/me", "GET /api/v1/workspace/context", "POST /api/v1/workspace/context-resolutions", "POST /api/v1/workspace/ai-replies", "POST /api/v1/ai-interaction-events", "POST /api/v1/ai-response-feedback"],
+    "tests": "C 135; Admin 33 files / 84 tests plus typecheck/build; contracts 12",
+    "production_state": "Formal Runtime remains 0013; no 0014 migration or Runtime start in R021",
+    "report": "docs/control/AI-CS-Customer-Workspace-Production-V1-Completion-Report.md"
+  },
+  "store_context_resolver_v1": {
+    "requirement": "R020",
+    "contract": "ai-cs.store-context.v1 under repository contracts 0.11.0",
+    "routes": ["PUT /api/v1/auth/default-store", "GET /api/v1/workspace/context", "POST /api/v1/workspace/context-resolutions", "POST /api/v1/workspace/ai-replies resolution_id", "GET /api/v1/admin/store-context/resolutions"],
+    "resolver": "NFKC/casefold normalized ID/code/name matching within the authorized customer-available Store; unique auto, ambiguous human confirm, zero unknown",
+    "audit": "0014 additive table stores conversation hash, IDs, candidates, state, reason and time only; no raw customer content",
+    "tests": "C 135; Admin 33 files / 84 tests plus typecheck/build; contracts 12; isolated 0014 round-trip PASS",
+    "production_state": "Source-only; formal Runtime database remains 0013_user_management_v1",
+    "report": "docs/control/AI-CS-Store-Context-Resolver-V1-Completion-Report.md"
+  },
   "production_iam_deployment_v1": {
     "requirement": "R019",
     "database_revision": "0013_user_management_v1",

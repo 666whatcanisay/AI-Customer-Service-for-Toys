@@ -31,7 +31,7 @@ export const createCustomerRouter = (
         meta: { requiredPermission: 'workspace.access' },
         children: [
           { path: '', name: 'WorkspaceHome', component: WorkspaceHome, meta: { title: '工作台首页' } },
-          { path: 'workspace', name: 'HumanInLoopWorkspace', component: HumanInLoopWorkspace, meta: { title: 'AI 客服副驾驶' } },
+          { path: 'workspace', name: 'HumanInLoopWorkspace', component: HumanInLoopWorkspace, meta: { title: '客服会话工作台' } },
           { path: 'ai-chat', name: 'AiChat', component: AiChat, meta: { title: 'AI 客服' } },
           { path: 'suggestions', name: 'SuggestionForm', component: SuggestionForm, meta: { title: '提交意见建议' } },
           { path: 'suggestions/mine', name: 'MySuggestions', component: MySuggestions, meta: { title: '我的建议' } },
@@ -56,7 +56,8 @@ export const createCustomerRouter = (
         return '/change-password'
       }
       if (to.path === '/change-password') return true
-      const needsStores = current?.roles.includes('CUSTOMER_SERVICE') === true && !current.stores.length
+      const needsStores = current?.roles.includes('CUSTOMER_SERVICE') === true
+        && !current.stores.some((store) => store.is_default)
       if (needsStores && to.path !== '/store-selection') return '/store-selection'
       if (to.path === '/store-selection') {
         return current?.roles.includes('CUSTOMER_SERVICE') === true ? true : '/forbidden'

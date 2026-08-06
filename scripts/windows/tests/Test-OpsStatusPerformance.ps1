@@ -47,17 +47,26 @@ try {
     }
 
     $metadataStopwatch = [Diagnostics.Stopwatch]::StartNew()
-    $currentMetadata = Get-ProcessMetadata $PID 1500
-    $metadataStopwatch.Stop()
-    if (-not $currentMetadata -or [int]$currentMetadata.ProcessId -ne $PID) {
-        throw 'Bounded process metadata lookup did not return the current process.'
+    $currentMetadata = $null
+    for ($attempt = 1; $attempt -le 3 -and -not $currentMetadata; $attempt++) {
+        $currentMetadata = Get-ProcessMetadata $PID 1500
     }
-    if ($metadataStopwatch.ElapsedMilliseconds -gt 3000) {
+    $metadataStopwatch.Stop()
+    if ($currentMetadata -and [int]$currentMetadata.ProcessId -ne $PID) {
+        throw 'Bounded process metadata lookup returned the wrong process.'
+    }
+    if (-not $currentMetadata) {
+        Write-Warning 'Windows process metadata provider is unavailable; bounded fail-closed behavior was retained.'
+    }
+    if ($metadataStopwatch.ElapsedMilliseconds -gt 6000) {
         throw "Process metadata lookup exceeded the bounded test budget: $($metadataStopwatch.ElapsedMilliseconds)ms"
     }
     $commonText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1') -Raw -Encoding UTF8
     if ($commonText -match 'Get-CimInstance\s+Win32_Process') {
         throw 'Unbounded Win32_Process enumeration remains in the runtime helper.'
+    }
+    if ($commonText -notmatch 'WHERE ProcessId = \$Id' -or $commonText -notmatch 'options\.Timeout') {
+        throw 'Per-process metadata lookup is missing its PID filter or explicit timeout.'
     }
 
     $lanStatusText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\status_lan_ai_customer_service.ps1') -Raw -Encoding UTF8

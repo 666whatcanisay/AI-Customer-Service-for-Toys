@@ -23,6 +23,32 @@ export interface UserCreateInput {
   store_bindings: Array<{ store_id: number; is_default: boolean }>
 }
 
+export type StoreContextResolutionStatus =
+  | 'RESOLVED'
+  | 'STORE_SELECTION_REQUIRED'
+  | 'PRODUCT_CONFIRMATION_REQUIRED'
+  | 'SKU_CONFIRMATION_REQUIRED'
+  | 'UNKNOWN'
+
+export interface StoreContextResolutionAudit {
+  resolution_id: string
+  user_id: string
+  store_id: number | null
+  status: StoreContextResolutionStatus
+  product_id: string | null
+  sku_id: string | null
+  product_candidate_ids: string[]
+  sku_candidate_ids: string[]
+  reason_code: string
+  created_at: string
+}
+
+export interface StoreContextResolutionAuditList {
+  schema_version: 'ai-cs.store-context.v1'
+  items: StoreContextResolutionAudit[]
+  total: number
+}
+
 export interface ServerRuntimeResponse {
   schema_version: 'ai-cs.server-runtime-console.v1'
   server: {
@@ -1675,6 +1701,13 @@ export async function getHealth(): Promise<HealthResponse> {
 
 export async function listUsers(): Promise<UserListResponse> {
   const response = await apiClient.get<UserListResponse>('/api/v1/admin/users')
+  return response.data
+}
+
+export async function listStoreContextResolutions(): Promise<StoreContextResolutionAuditList> {
+  const response = await apiClient.get<StoreContextResolutionAuditList>(
+    '/api/v1/admin/store-context/resolutions'
+  )
   return response.data
 }
 

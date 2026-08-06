@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.knowledge_publishing.ai_client import AiKnowledgePublicationClient
 from app.knowledge_publishing.models import ProductKnowledgePublication
+from app.errors import AppError
+from app.knowledge_publishing.schemas import ProductKnowledgePublishCommand
+from app.knowledge_publishing.service import ProductKnowledgePublishingService
 from tests.test_customer_catalog_api import _seed_product, _seed_scope
 
 
@@ -138,6 +142,43 @@ def test_publish_rejects_unapproved_and_records_sync_failure(
     assert row is not None
     assert row.status == "SYNC_FAILED"
     assert row.chunk_count == 0
+
+
+def test_concurrent_publication_cannot_overwrite_the_product_lease(
+    client: TestClient, session: Session, monkeypatch
+) -> None:
+    product = _approved_product(session, product_id="PRODUCT-CONCURRENT")
+    observed: list[str] = []
+
+    def publish(self, payload):
+        with pytest.raises(AppError) as blocked:
+            ProductKnowledgePublishingService(
+                session, ai_client=self, lease_seconds=300
+            ).publish(
+                product.product_id,
+                ProductKnowledgePublishCommand(
+                    operator="competing-operator",
+                    confirmation_note="并发发布应被阻止",
+                ),
+                "publish-concurrent-second",
+            )
+        observed.append(blocked.value.code)
+        return _publish_result(payload)
+
+    monkeypatch.setattr(AiKnowledgePublicationClient, "publish", publish)
+    response = client.post(
+        f"/api/v1/admin/product-knowledge/products/{product.product_id}/ai-publications",
+        json={"operator": "first-operator", "confirmation_note": "首次发布"},
+        headers={"Idempotency-Key": "publish-concurrent-first"},
+    )
+
+    assert response.status_code == 200
+    assert observed == ["AI_KNOWLEDGE_PUBLISH_IN_PROGRESS"]
+    row = session.get(ProductKnowledgePublication, product.product_id)
+    assert row is not None
+    assert row.status == "PUBLISHED"
+    assert row.generation_token is None
+    assert row.generation_started_at is None
 
 
 def test_visibility_check_reconciles_product_level_evidence(

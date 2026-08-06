@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -67,6 +67,13 @@ class UserStoreBinding(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "store_id", name="uq_user_store_binding"),
         Index("ix_user_store_bindings_user_default", "user_id", "is_default"),
+        Index(
+            "uq_user_store_bindings_single_default",
+            "user_id",
+            unique=True,
+            sqlite_where=text("is_default = 1"),
+            postgresql_where=text("is_default = true"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -92,3 +99,19 @@ class UserSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class LoginAttemptBucket(Base):
+    """Minimized persistent counters; keys are one-way hashes, never usernames/IPs."""
+
+    __tablename__ = "login_attempt_buckets"
+
+    bucket_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    bucket_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    last_failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

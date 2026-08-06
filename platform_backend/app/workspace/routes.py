@@ -1,38 +1,32 @@
-"""Store-scoped facade over the unchanged loopback A chat capability."""
+"""Authenticated Store context and facade over the unchanged loopback A chat."""
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.database import get_db
 from app.errors import AppError
-from app.iam.dependencies import Principal, ensure_store_access, require_ai_reply
+from app.iam.dependencies import (
+    Principal, ensure_store_access, require_ai_reply, require_user_manage,
+    require_workspace_access,
+)
 from app.test_catalog.models import TestProduct, TestSku, TestStore
-
-
-class ChatContext(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    tenant_id: str = Field(min_length=1, max_length=96)
-    platform: str = Field(min_length=1, max_length=32)
-    store_code: str = Field(min_length=1, max_length=96)
-    product_id: str = Field(min_length=1, max_length=128)
-    sku_id: str | None = Field(default=None, max_length=128)
-
-
-class WorkspaceChatRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    question: str = Field(min_length=1, max_length=4000)
-    context: ChatContext
+from app.workspace.schemas import (
+    ContextResolutionRequest, ContextResolutionResponse, ResolutionAuditListResponse,
+    ResolutionStatus, WorkspaceChatRequest, WorkspaceContextResponse,
+)
+from app.workspace.service import StoreContextService
 
 
 router = APIRouter(prefix="/api/v1/workspace", tags=["authenticated-workspace"])
+admin_router = APIRouter(
+    prefix="/api/v1/admin/store-context", tags=["store-context-audit"]
+)
 
 
-def _validate_scope(session: Session, principal: Principal, context: ChatContext) -> None:
+def _validate_scope(session: Session, principal: Principal, context) -> None:
     stores = list(session.scalars(select(TestStore).where(
         TestStore.tenant_id == context.tenant_id,
         TestStore.platform == context.platform,
@@ -52,29 +46,97 @@ def _validate_scope(session: Session, principal: Principal, context: ChatContext
             raise AppError("AUTHORIZATION_DENIED", "The requested SKU is outside the bound Store.", status_code=403)
 
 
-def _proxy(method: str, path: str, payload: dict | None = None) -> JSONResponse:
-    settings = get_settings()
+def _proxy(
+    request: Request, method: str, path: str, payload: dict | None = None
+) -> JSONResponse:
+    settings = request.app.state.settings
     try:
+        service_token = settings.internal_service_token()
         response = httpx.request(
             method, f"{settings.ai_service_base_url}{path}", json=payload,
+            headers={
+                "X-Request-ID": request.state.request_id,
+                "X-AI-CS-Service-Token": service_token,
+            },
             timeout=settings.ai_service_timeout_seconds,
         )
         content = response.json()
     except (httpx.HTTPError, ValueError):
         raise AppError("AI_SERVICE_UNAVAILABLE", "AI service is unavailable.", status_code=503) from None
+    if response.status_code >= 500:
+        raise AppError(
+            "AI_SERVICE_UNAVAILABLE", "AI service is unavailable.", status_code=503
+        )
+    if response.status_code >= 400:
+        raise AppError(
+            "AI_SERVICE_REQUEST_REJECTED",
+            "AI service rejected the request.",
+            status_code=502,
+        )
+    if path == "/api/chat":
+        warnings = content.get("warnings") or (content.get("data") or {}).get("warnings") or []
+        if {"RAG_RUNTIME_ERROR", "LLM_REQUEST_FAILED"}.intersection(warnings):
+            raise AppError(
+                "AI_SERVICE_UNAVAILABLE",
+                "AI reply generation failed.",
+                status_code=503,
+            )
     return JSONResponse(status_code=response.status_code, content=content)
 
 
+@router.get("/context", response_model=WorkspaceContextResponse)
+def workspace_context(
+    principal: Principal = Depends(require_workspace_access),
+    session: Session = Depends(get_db),
+) -> WorkspaceContextResponse:
+    return StoreContextService(session).workspace_context(principal)
+
+
+@router.post("/context-resolutions", response_model=ContextResolutionResponse, status_code=201)
+def resolve_context(
+    request: ContextResolutionRequest,
+    principal: Principal = Depends(require_ai_reply),
+    session: Session = Depends(get_db),
+) -> ContextResolutionResponse:
+    return StoreContextService(session).resolve(principal, request)
+
+
 @router.get("/ai-health")
-def ai_health(_: Principal = Depends(require_ai_reply)) -> JSONResponse:
-    return _proxy("GET", "/api/health")
+def ai_health(
+    request: Request, _: Principal = Depends(require_ai_reply)
+) -> JSONResponse:
+    return _proxy(request, "GET", "/api/health")
 
 
 @router.post("/ai-replies")
 def ai_reply(
-    request: WorkspaceChatRequest,
+    payload: WorkspaceChatRequest,
+    request: Request,
     principal: Principal = Depends(require_ai_reply),
     session: Session = Depends(get_db),
 ) -> JSONResponse:
-    _validate_scope(session, principal, request.context)
-    return _proxy("POST", "/api/chat", request.model_dump())
+    if payload.resolution_id is not None:
+        context = StoreContextService(session).chat_context_for_resolution(
+            principal, payload.resolution_id
+        )
+    else:
+        assert payload.context is not None
+        context = payload.context
+        _validate_scope(session, principal, context)
+    return _proxy(request, "POST", "/api/chat", {
+        "question": payload.question,
+        "context": context.model_dump(),
+    })
+
+
+@admin_router.get("/resolutions", response_model=ResolutionAuditListResponse)
+def list_context_resolutions(
+    user_id: str | None = Query(default=None, max_length=36),
+    status: ResolutionStatus | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    _: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+) -> ResolutionAuditListResponse:
+    return StoreContextService(session).list_audits(
+        user_id=user_id, status=status, limit=limit
+    )

@@ -1,6 +1,7 @@
 """Unified JSON error responses for the platform service."""
 
 from typing import Any
+import logging
 
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
@@ -9,12 +10,23 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
+logger = logging.getLogger(__name__)
+
+
 class AppError(Exception):
-    def __init__(self, code: str, message: str, *, status_code: int = 400) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        status_code: int = 400,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = status_code
+        self.headers = headers
 
 
 def _request_id(request: Request) -> str:
@@ -138,10 +150,19 @@ async def app_exception_handler(request: Request, exc: AppError) -> JSONResponse
     return JSONResponse(
         status_code=exc.status_code,
         content=_error_payload(request, code=exc.code, message=exc.message),
+        headers=exc.headers,
     )
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(
+        "Unhandled request failure request_id=%s method=%s path=%s user_id=%s error_type=%s",
+        _request_id(request),
+        request.method,
+        request.url.path,
+        getattr(request.state, "authenticated_user_id", "anonymous"),
+        type(exc).__name__,
+    )
     return JSONResponse(
         status_code=500,
         content=_error_payload(

@@ -14,28 +14,28 @@
     <section class="context-bar" data-testid="workspace-context">
       <label>
         <span>店铺</span>
-        <select :value="selectedStoreCode" :disabled="contextLoading" @change="emitSelect('store', $event)">
+        <select :value="selectedStoreId ?? ''" :disabled="contextLoading" @change="emitSelect('store', $event)">
           <option value="">选择店铺</option>
-          <option v-for="store in stores" :key="store.storeCode" :value="store.storeCode">{{ store.name }}</option>
+          <option v-for="store in stores" :key="store.storeId" :value="store.storeId">{{ store.storeName }}</option>
         </select>
       </label>
       <label>
-        <span>商品</span>
-        <select :value="selectedProductId" :disabled="contextLoading || !selectedStoreCode" @change="emitSelect('product', $event)">
-          <option value="">选择商品</option>
+        <span>{{ products.length > 1 ? '商品（请确认）' : '商品（自动识别）' }}</span>
+        <select :value="selectedProductId" :disabled="contextLoading || !selectedStoreId || products.length < 2" @change="emitSelect('product', $event)">
+          <option value="">等待识别</option>
           <option v-for="product in products" :key="product.productId" :value="product.productId">{{ product.displayName }}</option>
         </select>
       </label>
       <label>
-        <span>SKU（可选）</span>
-        <select :value="selectedSkuId" :disabled="contextLoading || !selectedProductId" @change="emitSelect('sku', $event)">
-          <option value="">不确定就留空</option>
+        <span>{{ skus.length > 1 ? 'SKU（请确认）' : 'SKU（自动识别）' }}</span>
+        <select :value="selectedSkuId" :disabled="contextLoading || !selectedProductId || skus.length < 2" @change="emitSelect('sku', $event)">
+          <option value="">无需 SKU / 等待识别</option>
           <option v-for="sku in skus" :key="sku.skuId" :value="sku.skuId">{{ sku.displayName }}</option>
         </select>
       </label>
       <div class="context-health" :class="{ warning: Boolean(contextError) }">
-        <span>{{ contextLoading ? '读取中' : contextError ? '目录异常' : '上下文已绑定' }}</span>
-        <small>{{ contextError || 'AI 只按当前店铺、商品和 SKU 检索。' }}</small>
+        <span>{{ contextLoading ? '识别中' : contextError ? '需要处理' : contextStatus }}</span>
+        <small>{{ contextError || '店铺自动加载；商品与 SKU 由消息识别，歧义时人工确认。' }}</small>
       </div>
     </section>
 
@@ -43,15 +43,15 @@
       <div class="timeline-heading">
         <div>
           <strong>{{ conversation?.customerLabel ?? '尚未选择会话' }}</strong>
-          <span>{{ conversation?.source === 'MOCK' ? '模拟渠道消息' : 'Channel Agent' }}</span>
+          <span>{{ conversation ? sourceLabel(conversation.source) : '等待会话' }}</span>
         </div>
-        <span v-if="conversation">{{ conversation.messages.length }} 条消息</span>
+        <span v-if="conversation">{{ conversationStatusLabel }} · {{ conversation.messages.length }} 条消息</span>
       </div>
       <div class="messages">
         <article v-for="message in conversation?.messages ?? []" :key="message.messageId" class="customer-message">
           <div><span>{{ message.customerLabel }}</span><time>{{ formatTime(message.receivedAt) }}</time></div>
           <p>{{ message.content }}</p>
-          <small>{{ message.source === 'MOCK' ? 'Mock Message · 不含真实客户数据' : 'Channel Agent' }}</small>
+          <small>{{ sourceLabel(message.source) }}</small>
         </article>
         <div v-if="!conversation" class="timeline-empty">从左侧选择一条会话。</div>
       </div>
@@ -67,7 +67,7 @@
           v-if="canGenerate"
           type="button"
           class="generate-button"
-          :disabled="busy || !selectedProductId"
+          :disabled="busy || !selectedStoreId || agentStatus === 'OFFLINE' || !canGenerateReply"
           data-testid="generate-draft"
           @click="$emit('generate')"
         >
@@ -92,7 +92,7 @@
       <div v-else-if="draft?.originalAnswer" class="draft-body">
         <textarea
           :value="draft.editedAnswer"
-          :readonly="!canReview"
+          :readonly="!canEditText"
           rows="6"
           aria-label="AI回复草稿"
           data-testid="reply-draft-editor"
@@ -104,15 +104,17 @@
 
       <div v-else class="draft-empty">
         <strong>等待生成建议</strong>
-        <p>选择商品上下文后，AI 会返回草稿、引用和风险；不会自动发送。</p>
+        <p>系统将先识别店铺、商品和 SKU，再生成草稿、引用和风险；不会自动发送。</p>
       </div>
 
       <p v-if="actionError" class="action-error" data-testid="workspace-action-error">{{ actionError }}</p>
 
       <footer v-if="canReview" class="review-actions">
-        <button type="button" class="accept" :disabled="actionBusy || draft?.state === 'EDITED'" data-testid="direct-accept" @click="$emit('accept', 'DIRECT_ACCEPT')">采用原稿</button>
-        <button type="button" class="edit-accept" :disabled="actionBusy || draft?.state !== 'EDITED'" data-testid="edited-accept" @click="$emit('accept', 'EDITED_ACCEPT')">修改后采用</button>
-        <button type="button" class="reject" :disabled="actionBusy" data-testid="reject-draft" @click="$emit('reject')">拒绝并沉淀</button>
+        <button type="button" class="accept" :disabled="actionBusy || draft?.state === 'EDITED' || !canSubmitFeedback" data-testid="direct-accept" @click="$emit('accept', 'DIRECT_ACCEPT')">采用回复</button>
+        <button v-if="draft?.state !== 'EDITED'" type="button" class="edit-accept" :disabled="actionBusy" data-testid="edit-draft" @click="$emit('startEdit')">修改回复</button>
+        <button v-else type="button" class="edit-accept" :disabled="actionBusy || !hasEditedAnswer || !canSubmitFeedback" data-testid="edited-accept" @click="$emit('accept', 'EDITED_ACCEPT')">采用修改</button>
+        <button type="button" class="reject" :disabled="actionBusy || !canSubmitFeedback" data-testid="reject-draft" @click="openFeedback('REJECT')">拒绝回复</button>
+        <button type="button" class="flag" :disabled="actionBusy || !canSubmitFeedback" data-testid="flag-issue" @click="openFeedback('ISSUE')">标记问题</button>
       </footer>
       <footer v-else-if="draft?.decisionState === 'APPROVED'" class="approved-actions">
         <span>采用结果已记录。请人工复制到渠道窗口，并再次核对后发送。</span>
@@ -121,6 +123,27 @@
       <footer v-else-if="draft?.decisionState === 'REJECTED'" class="rejected-actions">
         本草稿已拒绝，反馈已沉淀；可等待客户新消息或重新生成。
       </footer>
+
+      <form v-if="feedbackMode" class="feedback-form" data-testid="feedback-form" @submit.prevent="submitFeedback">
+        <div>
+          <strong>{{ feedbackMode === 'REJECT' ? '拒绝原因' : '标记 AI 问题' }}</strong>
+          <button type="button" aria-label="关闭" @click="feedbackMode = null">×</button>
+        </div>
+        <label for="feedback-type">问题类型</label>
+        <select id="feedback-type" v-model="feedbackType" data-testid="feedback-type">
+          <option value="FACT_ERROR">事实错误</option>
+          <option value="MISSING_INFO">信息缺失</option>
+          <option value="STYLE_ISSUE">表达问题</option>
+          <option value="RISK_ISSUE">风险问题</option>
+          <option value="OTHER">其他</option>
+        </select>
+        <label for="feedback-note">补充说明（请勿填写客户隐私）</label>
+        <textarea id="feedback-note" v-model="feedbackNote" rows="2" maxlength="240" data-testid="feedback-note" />
+        <button type="submit" :disabled="feedbackBusy || (feedbackType === 'OTHER' && !feedbackNote.trim())" data-testid="feedback-submit">
+          {{ feedbackBusy ? '记录中…' : feedbackMode === 'REJECT' ? '确认拒绝并记录' : '提交问题标记' }}
+        </button>
+      </form>
+      <p v-if="feedbackReceiptId" class="feedback-receipt" data-testid="feedback-receipt">问题反馈已记录：{{ feedbackReceiptId }}</p>
     </section>
 
     <section class="evidence-section" data-testid="knowledge-evidence">
@@ -142,39 +165,56 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-import type { CatalogProduct, CatalogSku, CatalogStore } from '@/api/platformTypes'
+import type { AiResponseFeedbackType } from '@/api/aiResponseFeedbackTypes'
+import type { ProductContextCandidate, SkuContextCandidate, WorkspaceStoreContext } from '@/api/storeContextTypes'
 import type { RagCitation } from '@/api/ragTypes'
 import type { ReplyDraft, WorkspaceConversation } from '@/stores/humanLoopWorkspace'
+import {
+  CONVERSATION_STATUS_LABELS,
+  type AgentStatus
+} from '@/workspace/customerSession'
+import type { ChannelMessageSource } from '@/workspace/channelMessageAdapter'
 
 const props = defineProps<{
   conversation: WorkspaceConversation | null
   draft: ReplyDraft | null
-  stores: CatalogStore[]
-  products: CatalogProduct[]
-  skus: CatalogSku[]
-  selectedStoreCode: string
+  stores: WorkspaceStoreContext[]
+  products: ProductContextCandidate[]
+  skus: SkuContextCandidate[]
+  selectedStoreId: number | null
   selectedProductId: string
   selectedSkuId: string
   contextLoading: boolean
   contextError: string
+  contextStatus: string
   busy: boolean
   actionBusy: boolean
   actionError: string
+  agentStatus: AgentStatus
+  canGenerateReply: boolean
+  canSubmitFeedback: boolean
+  feedbackBusy: boolean
+  feedbackReceiptId: string
 }>()
 
 const emit = defineEmits<{
-  selectStore: [value: string]
+  selectStore: [value: number]
   selectProduct: [value: string]
   selectSku: [value: string]
   generate: []
   regenerate: []
+  startEdit: []
   edit: [value: string]
   accept: [type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT']
-  reject: []
+  feedback: [payload: { mode: 'REJECT' | 'ISSUE'; feedbackType: AiResponseFeedbackType; note: string | null }]
   copy: []
 }>()
+
+const feedbackMode = ref<'REJECT' | 'ISSUE' | null>(null)
+const feedbackType = ref<AiResponseFeedbackType>('FACT_ERROR')
+const feedbackNote = ref('')
 
 const draftStateLabels: Record<string, string> = {
   MESSAGE_RECEIVED: 'Message Received',
@@ -191,6 +231,14 @@ const draftStateLabel = computed(() => draftStateLabels[props.draft?.state ?? ''
 const canGenerate = computed(() => props.draft?.state === 'MESSAGE_RECEIVED')
 const canRegenerate = computed(() => ['HUMAN_REVIEW', 'EDITED', 'EXPIRED'].includes(props.draft?.state ?? ''))
 const canReview = computed(() => ['HUMAN_REVIEW', 'EDITED'].includes(props.draft?.state ?? ''))
+const canEditText = computed(() => props.draft?.state === 'EDITED')
+const hasEditedAnswer = computed(() => Boolean(
+  props.draft?.editedAnswer.trim()
+  && props.draft.editedAnswer.trim() !== props.draft.originalAnswer.trim()
+))
+const conversationStatusLabel = computed(() => props.conversation
+  ? CONVERSATION_STATUS_LABELS[props.conversation.status]
+  : '')
 const draftTone = computed(() => ({
   ready: canReview.value,
   accepted: props.draft?.decisionState === 'APPROVED',
@@ -199,9 +247,34 @@ const draftTone = computed(() => ({
 
 const emitSelect = (kind: 'store' | 'product' | 'sku', event: Event) => {
   const value = (event.target as HTMLSelectElement).value
-  if (kind === 'store') emit('selectStore', value)
+  if (kind === 'store') emit('selectStore', Number(value))
   if (kind === 'product') emit('selectProduct', value)
   if (kind === 'sku') emit('selectSku', value)
+}
+
+const openFeedback = (mode: 'REJECT' | 'ISSUE'): void => {
+  feedbackMode.value = mode
+  feedbackType.value = 'FACT_ERROR'
+  feedbackNote.value = ''
+}
+
+const submitFeedback = (): void => {
+  if (!feedbackMode.value) return
+  emit('feedback', {
+    mode: feedbackMode.value,
+    feedbackType: feedbackType.value,
+    note: feedbackNote.value.trim() || null
+  })
+}
+
+watch(() => props.feedbackReceiptId, (value, previous) => {
+  if (value && value !== previous) feedbackMode.value = null
+})
+
+const sourceLabel = (source: ChannelMessageSource): string => {
+  if (source === 'MANUAL') return '人工录入 · 当前页面内存'
+  if (source === 'VALIDATION_FIXTURE') return '验收数据 · 不含真实客户数据'
+  return 'Channel Agent'
 }
 
 const formatTime = (value: string): string => {
@@ -270,9 +343,10 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .draft-empty { display: grid; min-height: 100px; place-content: center; text-align: center; }
 .draft-empty strong { color: #9badc7; font-size: 12px; }.draft-empty p { margin: 7px 0 0; color: #667a99; font-size: 9px; }
 .review-actions { display: flex; gap: 8px; margin-top: 11px; padding-top: 11px; border-top: 1px solid #293a57; }
-.review-actions .accept { background: #2e765d; }.review-actions .edit-accept { background: #8d6a27; }.review-actions .reject { margin-left: auto; background: #7e3945; }
+.review-actions .accept { background: #2e765d; }.review-actions .edit-accept { background: #8d6a27; }.review-actions .reject { margin-left: auto; background: #7e3945; }.review-actions .flag { background: #405f8d; }
 .approved-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 11px; padding-top: 11px; border-top: 1px solid #315244; color: #8fc6ae; font-size: 9px; }
 .approved-actions button { background: #2d725b; }.rejected-actions { margin-top: 11px; color: #d5939c; font-size: 9px; }
+.feedback-form { display: grid; gap: 7px; margin-top: 11px; padding: 11px; border: 1px solid #6d5a31; border-radius: 10px; background: #261f16; }.feedback-form > div { display: flex; align-items: center; justify-content: space-between; }.feedback-form strong { color: #f0cf83; font-size: 11px; }.feedback-form > div button { border: 0; color: #a99c85; background: transparent; cursor: pointer; }.feedback-form label { color: #a99c85; font-size: 9px; }.feedback-form select, .feedback-form textarea { padding: 7px; border: 1px solid #5b4c30; border-radius: 7px; color: #f1eadc; background: #17130e; font-size: 9px; }.feedback-form > button { padding: 8px; border: 0; border-radius: 7px; color: #fff; background: #8b6430; font-size: 9px; font-weight: 800; cursor: pointer; }.feedback-form > button:disabled { opacity: .45; }.feedback-receipt { margin: 9px 0 0; color: #72d0aa; font-size: 9px; }
 .evidence-section { margin-top: 11px; padding: 13px; border: 1px solid #283a56; border-radius: 12px; background: #101a2b; }
 .evidence-heading { display: flex; justify-content: space-between; align-items: end; }
 .evidence-heading h2 { margin: 0; color: #e9f0fb; font-size: 14px; }.evidence-heading strong { color: #7f96b7; font-size: 10px; }

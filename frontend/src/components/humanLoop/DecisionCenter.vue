@@ -13,6 +13,11 @@
 
     <section class="metric-stack">
       <article>
+        <span>会话状态</span>
+        <strong data-testid="active-conversation-status">{{ conversationStatusLabel }}</strong>
+        <small>{{ conversationNextStep }}</small>
+      </article>
+      <article>
         <span>风险等级</span>
         <strong :class="riskTone">{{ riskLabel }}</strong>
       </article>
@@ -38,6 +43,28 @@
       <small>已进入 Customer Feedback Loop。</small>
     </section>
 
+    <section v-if="feedbackReceiptId" class="receipt-card issue-receipt" data-testid="decision-feedback-receipt">
+      <span>问题反馈回执</span>
+      <code>{{ feedbackReceiptId }}</code>
+      <small>拒绝原因或问题标记已进入Badcase分析队列。</small>
+    </section>
+
+    <section v-if="conversation" class="conversation-actions">
+      <button
+        v-if="conversation.status === 'WAITING_REPLY'"
+        type="button"
+        data-testid="complete-conversation"
+        @click="$emit('complete')"
+      >已在渠道处理，标记完成</button>
+      <button
+        v-else-if="conversation.status === 'COMPLETED'"
+        type="button"
+        data-testid="reopen-conversation"
+        @click="$emit('reopen')"
+      >重新打开会话</button>
+      <small v-if="conversation.status === 'WAITING_REPLY'">复制不等于发送；请在外部渠道完成处理后再点击。</small>
+    </section>
+
     <section class="safety-card">
       <strong>发送边界</strong>
       <ul>
@@ -53,14 +80,32 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { ReplyDraft } from '@/stores/humanLoopWorkspace'
+import type { ReplyDraft, WorkspaceConversation } from '@/stores/humanLoopWorkspace'
+import { CONVERSATION_STATUS_LABELS } from '@/workspace/customerSession'
 
 const props = defineProps<{
   draft: ReplyDraft | null
+  conversation: WorkspaceConversation | null
   receiptId: string
+  feedbackReceiptId: string
+}>()
+
+defineEmits<{
+  complete: []
+  reopen: []
 }>()
 
 const evidenceCount = computed(() => props.draft?.citations.length ?? 0)
+const conversationStatusLabel = computed(() => props.conversation
+  ? CONVERSATION_STATUS_LABELS[props.conversation.status]
+  : '未选择')
+const conversationNextStep = computed(() => {
+  if (!props.conversation) return '从左侧选择会话。'
+  if (props.conversation.status === 'NEW') return '打开会话开始处理。'
+  if (props.conversation.status === 'PROCESSING') return '生成并人工审核回复。'
+  if (props.conversation.status === 'WAITING_REPLY') return '等待客服在渠道窗口人工发送。'
+  return '会话已由客服显式完成。'
+})
 
 const decisionLabel = computed(() => {
   if (props.draft?.decisionState === 'APPROVED') return 'Approved'
@@ -121,6 +166,8 @@ header h2 { margin: 0 0 16px; color: #f3f7ff; font-size: 18px; }
 .receipt-card { display: grid; gap: 6px; margin-top: 12px; padding: 12px; border: 1px solid #315d52; border-radius: 10px; background: #142822; }
 .receipt-card code { overflow-wrap: anywhere; color: #76d8b2; font-size: 10px; }
 .receipt-card small { color: #8cae9f; font-size: 9px; }
+.issue-receipt { border-color: #6f5730; background: #2a2115; }.issue-receipt code { color: #edc873; }
+.conversation-actions { display: grid; gap: 7px; margin-top: 12px; }.conversation-actions button { padding: 9px; border: 1px solid #4777b3; border-radius: 8px; color: #e7f0ff; background: #1d3b61; font-size: 9px; font-weight: 800; cursor: pointer; }.conversation-actions small { color: #8091ad; font-size: 8px; line-height: 1.45; }
 .safety-card { margin-top: 12px; padding: 13px; border: 1px solid #32425e; border-radius: 10px; background: #151f33; }
 .safety-card strong { color: #cad7ed; font-size: 11px; }
 .safety-card ul { display: grid; gap: 6px; margin: 9px 0 0; padding-left: 17px; color: #8fa0bc; font-size: 10px; line-height: 1.4; }

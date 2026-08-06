@@ -31,7 +31,7 @@ describe('customer LoginView', () => {
   })
 
   it('logs in with account credentials and enters the permitted workspace', async () => {
-    authMocks.login.mockResolvedValue({ permissions: ['workspace.access'], roles: ['CUSTOMER_SERVICE'], stores: [{ store_id: 1 }], must_change_password: false })
+    authMocks.login.mockResolvedValue({ permissions: ['workspace.access'], roles: ['CUSTOMER_SERVICE'], stores: [{ store_id: 1, is_default: true }], must_change_password: false })
     const { router, wrapper } = await mountView()
     await wrapper.get('input[autocomplete="username"]').setValue('support.one')
     await wrapper.get('input[autocomplete="current-password"]').setValue('secret-password')
@@ -62,5 +62,18 @@ describe('customer LoginView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/change-password')
+  })
+
+  it('renders the server cooldown state without treating it as another password failure', async () => {
+    authMocks.login.mockRejectedValue({
+      response: { data: { error: { code: 'AUTHENTICATION_RATE_LIMITED' } } }
+    })
+    const { wrapper } = await mountView()
+    await wrapper.get('input[autocomplete="username"]').setValue('Wa')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('wrong-password')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('冷却时间结束后重试')
   })
 })

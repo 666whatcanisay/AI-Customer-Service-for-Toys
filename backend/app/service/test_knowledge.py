@@ -245,9 +245,15 @@ def parse_test_knowledge_package(
 
 
 class PlatformTestKnowledgeClient:
-    def __init__(self, base_url: str, timeout_seconds: float = 30):
+    def __init__(
+        self,
+        base_url: str,
+        timeout_seconds: float = 30,
+        service_token: str | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.service_token = service_token
 
     def _get_json(self, path: str) -> dict[str, Any]:
         if not self.base_url:
@@ -256,7 +262,14 @@ class PlatformTestKnowledgeClient:
             )
         request = urllib.request.Request(
             f"{self.base_url}{path}",
-            headers={"Accept": "application/json"},
+            headers={
+                "Accept": "application/json",
+                **(
+                    {"X-AI-CS-Service-Token": self.service_token}
+                    if self.service_token
+                    else {}
+                ),
+            },
             method="GET",
         )
         try:

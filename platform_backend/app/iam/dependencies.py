@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Annotated, Callable
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -44,6 +44,7 @@ def _as_utc(value: datetime) -> datetime:
 
 
 def get_current_principal(
+    request: Request,
     authorization: Annotated[str | None, Header()] = None,
     session: Session = Depends(get_db),
 ) -> Principal:
@@ -54,6 +55,9 @@ def get_current_principal(
     if session_row is None:
         raise AppError("AUTHENTICATION_FAILED", "Bearer credential is invalid.", status_code=401)
     if session_row.revoked_at is not None or _as_utc(session_row.expires_at) <= datetime.now(timezone.utc):
+        if session_row.revoked_at is None:
+            session_row.revoked_at = datetime.now(timezone.utc)
+            session.commit()
         raise AppError("SESSION_EXPIRED", "The session is expired or revoked.", status_code=401)
     user = session.get(User, session_row.user_id)
     if user is None or user.status != UserStatus.ACTIVE.value:
@@ -62,6 +66,7 @@ def get_current_principal(
     store_ids = frozenset(session.scalars(
         select(UserStoreBinding.store_id).where(UserStoreBinding.user_id == user.id)
     ).all())
+    request.state.authenticated_user_id = user.id
     return Principal(
         user_id=user.id, username=user.username, display_name=user.display_name,
         roles=frozenset(roles), permissions=frozenset(permissions_for_roles(roles)),

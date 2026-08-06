@@ -8,6 +8,12 @@
     GatewayKeyId = 'gateway-key-v1'
     # Reference only. Create this ignored runtime file as one UTF-8 line (32+ bytes).
     GatewaySecretReference = 'secrets\gateway-hmac.secret'
+    # Separate service identity for A<->C loopback calls; do not reuse Gateway HMAC.
+    InternalServiceSecretReference = 'secrets\internal-service.secret'
+    # LAN Runtime requires both files and serves Customer Web over HTTPS. Keep
+    # the private key below RuntimeDirectory and outside Git.
+    CustomerWebTlsCertificateReference = 'secrets\customer-web.crt'
+    CustomerWebTlsKeyReference = 'secrets\customer-web.key'
     GatewayStatePath = 'gateway\gateway_state.sqlite3'
     GatewayClockSkewSeconds = 300
     GatewayNonceTtlSeconds = 600
@@ -20,8 +26,15 @@
     # must be canonical RFC1918 CIDRs contained by that subnet.
     GatewayAllowedNetworks = @('auto')
     GatewayUpstreamTimeoutSeconds = 180
+    # 客服电脑接入默认关闭。启用时仅填写 Channel Engine 地址和 RuntimeDirectory
+    # 内的会话引用文件路径；不要把不透明会话值写进此配置。
+    ChannelAgentIntegrationEnabled = $false
+    ChannelAgentServerUrl = ''
+    ChannelAgentOperatorSessionReference = 'secrets\channel-agent-operator.session'
+    ChannelAgentTimeoutSeconds = 5
     RagPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\.venv\Scripts\python.exe')
     PlatformPythonPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'platform_backend\.venv\Scripts\python.exe')
+    # Used only by build/CI tooling. Production Runtime serves prebuilt dist assets.
     PnpmCommand = 'pnpm.cmd'
     RagPort = 8000; CustomerWebPort = 5173; PlatformPort = 8011; BindAddress = '127.0.0.1'
     CustomerWebUrl = 'http://127.0.0.1:5173/'

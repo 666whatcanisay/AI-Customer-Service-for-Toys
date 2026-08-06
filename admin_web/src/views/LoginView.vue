@@ -22,7 +22,12 @@ const submit = async () => {
     if (!allowed) { await auth.logout(); error.value = '当前账号没有运营管理权限。'; return }
     const target = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/') ? route.query.redirect : '/overview'
     await router.replace(target)
-  } catch { error.value = '账号或密码不正确，或账号已停用。' }
+  } catch (caught) {
+    const code = (caught as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+    error.value = code === 'AUTHENTICATION_RATE_LIMITED'
+      ? '登录失败次数过多，请在冷却时间结束后重试。'
+      : '账号或密码不正确，或账号已停用。'
+  }
   finally { password.value = ''; busy.value = false }
 }
 </script>

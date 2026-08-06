@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cs.local/contracts/customer-desktop-workflow.v1.schema.json",
+  "title": "AI-CS Customer Desktop Workflow V1",
+  "description": "C-owned authenticated projection and one-time enrollment facade over the existing Channel Agent V1 boundary.",
+  "$defs": {
+    "AgentIdentityStatus": { "type": "string", "enum": ["UNBOUND", "BOUND", "ACTIVE", "DISABLED"] },
+    "AgentOnlineStatus": { "type": "string", "enum": ["ONLINE", "DEGRADED", "OFFLINE"] },
+    "AssociationState": { "type": "string", "enum": ["READY", "BINDING_REQUIRED", "ACTIVATION_REQUIRED", "STORE_MISMATCH", "MULTIPLE_MATCHES", "DISABLED"] },
+    "DesktopAgent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "device_id", "device_name", "agent_version", "identity_status", "online_status", "runtime_status", "production_eligible", "binding_revision", "last_heartbeat"],
+      "properties": {
+        "agent_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "device_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "device_name": { "type": ["string", "null"], "maxLength": 255 },
+        "agent_version": { "type": ["string", "null"], "maxLength": 64 },
+        "identity_status": { "$ref": "#/$defs/AgentIdentityStatus" },
+        "online_status": { "$ref": "#/$defs/AgentOnlineStatus" },
+        "runtime_status": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "production_eligible": { "type": "boolean" },
+        "binding_revision": { "type": "integer", "minimum": 0 },
+        "last_heartbeat": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "StatusResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "user_id", "store_id", "store_code", "association_state", "agent", "checked_at"],
+      "properties": {
+        "schema_version": { "const": "ai-cs.customer-desktop-workflow.v1" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "store_id": { "type": "integer", "minimum": 1 },
+        "store_code": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "association_state": { "$ref": "#/$defs/AssociationState" },
+        "agent": { "oneOf": [{ "$ref": "#/$defs/DesktopAgent" }, { "type": "null" }] },
+        "checked_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "BindingGrantRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "device_id", "store_id"],
+      "properties": {
+        "agent_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$" },
+        "device_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$" },
+        "store_id": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "BindingGrantResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "grant_id", "agent_id", "device_id", "binding_code", "expires_at"],
+      "properties": {
+        "schema_version": { "const": "ai-cs.customer-desktop-workflow.v1" },
+        "grant_id": { "type": "string", "minLength": 1, "maxLength": 192 },
+        "agent_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "device_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "binding_code": { "type": "string", "pattern": "^[A-F0-9]{32}$" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AuditEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["audit_event_id", "actor_user_id", "event_type", "agent_id", "device_id", "store_id", "previous_state", "current_state", "outcome", "occurred_at"],
+      "properties": {
+        "audit_event_id": { "type": "string", "format": "uuid" },
+        "actor_user_id": { "type": "string", "format": "uuid" },
+        "event_type": { "enum": ["LOGIN", "DEVICE_BINDING_GRANT_ISSUED", "DEVICE_BINDING_OBSERVED", "DEVICE_STATUS_CHANGED"] },
+        "agent_id": { "type": ["string", "null"], "maxLength": 128 },
+        "device_id": { "type": ["string", "null"], "maxLength": 128 },
+        "store_id": { "type": ["integer", "null"], "minimum": 1 },
+        "previous_state": { "type": ["string", "null"], "maxLength": 160 },
+        "current_state": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "outcome": { "const": "SUCCESS" },
+        "occurred_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AuditListResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "items", "total"],
+      "properties": {
+        "schema_version": { "const": "ai-cs.customer-desktop-workflow.v1" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/AuditEvent" } },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ErrorEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error", "request_id"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "enum": ["AUTHENTICATION_REQUIRED", "AUTHENTICATION_FAILED", "SESSION_EXPIRED", "PASSWORD_CHANGE_REQUIRED", "AUTHORIZATION_DENIED", "CHANNEL_AGENT_INTEGRATION_NOT_CONFIGURED", "CHANNEL_AGENT_SERVER_UNREACHABLE", "CHANNEL_AGENT_OPERATOR_PERMISSION_INVALID", "CHANNEL_AGENT_RESPONSE_INVALID", "CHANNEL_AGENT_REQUEST_REJECTED", "CHANNEL_AGENT_NOT_REGISTERED", "CHANNEL_AGENT_BINDING_INVALID"] },
+            "message": { "type": "string", "minLength": 1 }
+          }
+        },
+        "request_id": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/StatusResponse" },
+    { "$ref": "#/$defs/BindingGrantRequest" },
+    { "$ref": "#/$defs/BindingGrantResponse" },
+    { "$ref": "#/$defs/AuditListResponse" },
+    { "$ref": "#/$defs/ErrorEnvelope" }
+  ]
+}

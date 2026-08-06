@@ -745,14 +745,20 @@ def test_missing_material_evidence_refuses_without_model_completion(
     assert result["warnings"] == ["NO_SCOPED_KNOWLEDGE"]
 
 
-def test_chat_and_retrieval_smoke_use_frozen_context(scoped_service):
+def test_chat_and_retrieval_smoke_use_frozen_context(scoped_service, tmp_path):
     service, _ = scoped_service
+    internal_secret = tmp_path / "internal-service.secret"
+    internal_token = "test-internal-service-token-32-bytes-minimum"
+    internal_secret.write_text(internal_token, encoding="utf-8")
+    test_settings = replace(
+        service.settings, internal_service_secret_file=internal_secret
+    )
 
     def factory(active_settings: Settings) -> RAGService:
         return service
 
-    app = create_app(settings=service.settings, rag_factory=factory)
-    with TestClient(app) as client:
+    app = create_app(settings=test_settings, rag_factory=factory)
+    with TestClient(app, headers={"X-AI-CS-Service-Token": internal_token}) as client:
         for _ in range(100):
             if client.get("/api/status").json().get("ready"):
                 break

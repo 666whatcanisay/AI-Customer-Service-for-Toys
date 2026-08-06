@@ -50,7 +50,10 @@ def _request():
         platform_api_base_url="http://platform.test",
         platform_api_timeout_seconds=1,
     )
-    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(settings=settings)))
+    return SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(settings=settings)),
+        state=SimpleNamespace(),
+    )
 
 
 def test_a_admin_endpoint_authentication_is_server_validated_by_c(monkeypatch) -> None:

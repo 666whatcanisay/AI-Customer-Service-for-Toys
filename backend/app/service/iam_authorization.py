@@ -5,6 +5,8 @@ from typing import Any
 import httpx
 from fastapi import Header, HTTPException, Request, status
 
+from app.service.internal_authorization import require_internal_service_identity
+
 
 OPERATIONS_PERMISSIONS = frozenset({
     "product.manage", "sku.manage", "knowledge.manage", "faq.manage",
@@ -75,4 +77,17 @@ def require_operations_identity(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="AUTHORIZATION_DENIED",
         )
+    request.state.authenticated_user_id = str(user.get("id") or "operations-user")
     return user
+
+
+def require_operations_or_internal_identity(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    service_token: str | None = Header(default=None, alias="X-AI-CS-Service-Token"),
+) -> dict[str, Any]:
+    """Authorize either an operations browser session or the trusted C service."""
+    if service_token is not None:
+        service_id = require_internal_service_identity(request, service_token)
+        return {"service_id": service_id}
+    return require_operations_identity(request, authorization)

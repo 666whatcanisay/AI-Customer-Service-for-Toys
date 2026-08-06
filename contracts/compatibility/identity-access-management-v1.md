@@ -2,9 +2,10 @@
 
 ## Scope
 
-Repository contract `0.10.0` coordinates C-owned browser-user identity, Bearer
+Repository contract `0.13.0` coordinates C-owned browser-user identity, Bearer
 sessions, RBAC, first-login password replacement, and Store bindings across B,
-C and Admin. It supersedes the 0.9 unique-default-Store client assumption. A
+C and Admin. It retains 0.10 multi-Store selection and adds the formal unique
+default required by Store Context Resolver V1. A
 answer semantics, Gateway wire `1.0`, Channel Engine, PDD adapters, R006/R009
 data semantics, Prompt, and RAG remain unchanged.
 
@@ -16,6 +17,7 @@ data semantics, Prompt, and RAG remain unchanged.
 - `POST /api/v1/auth/change-password`
 - `GET /api/v1/auth/store-options`
 - `PUT /api/v1/auth/store-bindings`
+- `PUT /api/v1/auth/default-store`
 - `GET|POST /api/v1/admin/users`
 - `GET|PATCH|DELETE /api/v1/admin/users/{user_id}`
 - `PUT /api/v1/admin/users/{user_id}/roles`
@@ -31,7 +33,8 @@ permission and Store scope before forwarding to loopback A.
 ## Role mapping
 
 - `CUSTOMER_SERVICE`: `workspace.access`, `ai.reply`, `feedback.submit`,
-  `customer_service.manage`; may bind one or more enabled customer Stores.
+  `customer_service.manage`; may bind one or more enabled customer Stores and
+  has exactly one default whenever at least one binding exists.
 - `OPERATOR`: `product.manage`, `sku.manage`, `knowledge.manage`, `faq.manage`,
   `ai_quality.view`, `store.view`, `feedback.view`; all-Store scope.
 - `ADMIN`: every V1 permission, including `user.manage`.
@@ -49,6 +52,11 @@ authenticated user's bindings; ADMIN has explicit all-Store scope.
   character password; the replacement revokes existing sessions.
 - Login returns an opaque random Bearer token once. Persistence stores only its
   SHA-256 digest, expiry, revocation state, and user reference.
+- Failed login counters persist only one-way username/source bucket hashes.
+  Repeated failures return HTTP 429 with `AUTHENTICATION_RATE_LIMITED` and
+  `Retry-After`. Successful login clears only its username bucket. Each user is
+  limited to the configured number of active sessions; oldest sessions are
+  revoked first.
 - Browser clients keep the opaque token in `sessionStorage`, attach it to C API
   requests, clear it on logout/401, and never put it in URLs or logs.
 - TLS remains a deployment prerequisite outside loopback or a trusted LAN.
@@ -57,8 +65,9 @@ authenticated user's bindings; ADMIN has explicit all-Store scope.
 
 - B: after login, routes initialization credentials to mandatory password
   replacement and an unbound CUSTOMER_SERVICE user to enabled-Store
-  multi-selection. Workspace Store choice is no longer a fixed default. Chat
-  stays on the authenticated C facade with unchanged AI/human-review fields.
+  multi-selection with one default. Workspace loads that default and persists
+  authorized switches. Chat stays on the authenticated C facade with unchanged
+  AI/human-review fields.
 - C: adds the IAM migration, auth/RBAC enforcement, user administration, and
   Store-scoped catalog access. Existing Store rows are reused. OPERATOR and
   ADMIN obtain all-Store scope from their roles rather than binding rows.
@@ -71,7 +80,9 @@ authenticated user's bindings; ADMIN has explicit all-Store scope.
   RAG behavior, and response fields do not change.
 - Gateway/Channel/PDD: no route, schema, secret, signature, or runtime change.
 
-0.10 requires a coordinated B/C/Admin deployment because the 0.9 B consumer
-cannot operate without a unique default Store. Rollback must restore the 0.9
-provider and clients together. Do not downgrade while user/session rows are
-required for operations.
+0.13 requires a coordinated B/C/Admin deployment so both login surfaces render
+the cooldown state instead of treating HTTP 429 as another password failure.
+The self-binding request remains backward compatible when
+`default_store_id` is omitted. Do not downgrade while user/session rows are
+required for operations; see the Store Context compatibility note for the
+additive 0014 rollback boundary.

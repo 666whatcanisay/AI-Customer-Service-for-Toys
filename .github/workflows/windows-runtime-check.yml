@@ -1,0 +1,18 @@
+name: Windows production runtime checks
+on:
+  pull_request:
+    paths: ['scripts/windows/**', 'frontend/**', 'admin_web/**']
+  push:
+    paths: ['scripts/windows/**', 'frontend/**', 'admin_web/**']
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Parse and inspect production launchers
+        shell: pwsh
+        run: ./scripts/windows/tests/Test-ProductionHardeningRuntime.ps1
+      - name: Exercise production static server and proxy boundary
+        run: python -m unittest scripts.windows.tests.test_production_web_server -v

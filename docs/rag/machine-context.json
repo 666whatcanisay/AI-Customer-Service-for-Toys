@@ -4,12 +4,67 @@
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
   "version": "AI-CS V1.0.0",
-  "status": "initial_accounts_ready",
-  "current_task": "R019 AI-CS Production IAM Deployment & Initial Accounts V1",
-  "current_gate": "AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY",
-  "current_stage": "Coordinated IAM Runtime is deployed on C revision 0013 and real account acceptance passed. A business semantics, Gateway wire 1.0, /api/chat, RAG, Prompt and model behavior remain unchanged; the active collection remains at 56 chunks with no sync or rebuild.",
-  "next_recommended_task": "Keep IAM operations separate from RAG assets; proceed with R003 business acceptance and the independent R007 network gate.",
+  "status": "production_rc_ready",
+  "current_task": "R025 AI-CS Production Release Candidate Freeze V1",
+  "current_gate": "AI_CS_PRODUCTION_RC_READY / CONTROLLED_DEPLOYMENT_PENDING",
+  "current_stage": "A/RAG/OPS source is frozen under ai-cs-production-rc-v1 with Gateway and vector fingerprints preserved. Formal database migration, TLS/WMI inputs and deployment acceptance remain pending.",
+  "next_recommended_task": "Deploy only the clean RC tag after backup and TLS/WMI preflight; migrate 0014-0016 without any RAG sync or rebuild and verify same-SHA start/status/stop.",
   "checked_at": "2026-08-06",
+  "production_rc_freeze_v1": {
+    "requirement": "R025",
+    "gate": "PASS / AI_CS_PRODUCTION_RC_READY",
+    "release": "release/ai-cs-production-rc-v1 and annotated tag ai-cs-production-rc-v1",
+    "tests": "A 150 passed/3 skipped; security 24; Production Web 3; Windows Runtime 16/16",
+    "gateway": "Wire 1.0 canonical SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80 unchanged",
+    "rag": "188416 bytes; SHA-256 0c6ca2e39618dd81ad764e7063ec787cc441316415a3d857de86d4b47fb41417; no sync/clear/rebuild/re-slice/re-embedding",
+    "runtime": "Formal C database remains 0013; real model/PDD/production Engine E2E not executed",
+    "report": "docs/control/AI-CS-Production-Release-Candidate-Freeze-V1.md"
+  },
+  "production_hardening_v1": {
+    "requirement": "R024",
+    "gate": "PASS / SOURCE_ONLY / AI_CS_PRODUCTION_HARDENING_READY",
+    "a_scope": "Non-health service routes require independent internal identity; operations routes retain C IAM Bearer; successful legacy chat and Gateway wire remain compatible",
+    "errors": "A reports runtime warning state and C converts transport, RAG runtime and LLM failures to 502/503 Error Envelopes",
+    "tests": "A 150 passed and 3 opt-in real E2E skipped; security, Production Web and Windows Runtime gates passed",
+    "fingerprints": "Gateway canonical SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80 and RAG vector SHA-256 0c6ca2e39618dd81ad764e7063ec787cc441316415a3d857de86d4b47fb41417 unchanged",
+    "production_state": "Formal C database remains 0013; no RAG sync, clear, rebuild, re-slice, re-embedding or real knowledge publication",
+    "report": "docs/control/AI-CS-Production-Hardening-V1-Completion-Report.md"
+  },
+  "code_quality_audit_v1": {
+    "requirement": "R023",
+    "gate": "AI_CS_CODE_AUDIT_READY / PRODUCTION_RELEASE_BLOCKED",
+    "a_findings": "RAG/LLM failure HTTP semantics, product publication concurrency, loopback management service identity and Python runtime declaration",
+    "tests": "A 147 passed and 3 real opt-in E2E skipped; pip check passed",
+    "compatibility": "Gateway canonical schema SHA-256 unchanged; no A, RAG, Prompt, model, vector or knowledge write",
+    "report": "docs/control/AI-CS-Code-Quality-Audit-V1-Report.md"
+  },
+  "customer_desktop_workflow_v1": {
+    "requirement": "R022",
+    "a_scope": "No A source change; device state, grant and audit are C/B concerns and do not alter AI answer semantics",
+    "tests": "A 147 passed and 3 opt-in real E2E skipped; B 163; C 145; shared contracts 15",
+    "gateway": "Frozen schema SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80 unchanged",
+    "rag": "No sync, publication, clear, rebuild, re-slice, re-embedding or collection rename",
+    "production_state": "Source-only; formal C Runtime remains 0013 and production Channel Agent is not configured",
+    "report": "docs/control/AI-CS-Customer-Desktop-Workflow-Integration-V1-Completion-Report.md"
+  },
+  "customer_workspace_production_v1": {
+    "requirement": "R021",
+    "a_scope": "No A source change; B continues to call the C facade with resolution_id and consumes the unchanged answer, citations, risk and required fields",
+    "tests": "A 147 passed and 3 opt-in real E2E skipped; B 157; contracts 12",
+    "gateway": "Frozen schema SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80 unchanged",
+    "rag": "No sync, publication, clear, rebuild, re-slice, re-embedding or collection rename",
+    "production_state": "Source-only Workspace gate; formal C Runtime remains revision 0013",
+    "report": "docs/control/AI-CS-Customer-Workspace-Production-V1-Completion-Report.md"
+  },
+  "store_context_resolver_v1": {
+    "requirement": "R020",
+    "a_scope": "No A source change; C validates resolution ownership/catalog scope and forwards the unchanged question plus tenant/platform/store/product/sku context",
+    "tests": "A 147 passed and 3 opt-in real E2E skipped; shared contracts 12 passed",
+    "gateway": "Frozen schema SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80 unchanged",
+    "rag": "test_knowledge_v031=56 chunks and model ready; no sync, publication, clear, rebuild, re-slice, re-embedding or collection rename",
+    "production_state": "Source-only Store Context gate; formal C Runtime remains revision 0013",
+    "report": "docs/control/AI-CS-Store-Context-Resolver-V1-Completion-Report.md"
+  },
   "production_iam_deployment_v1": {
     "requirement": "R019",
     "a_scope": "IAM-safe authorization/startup integration only; A stores no users, roles, credentials or Store bindings",

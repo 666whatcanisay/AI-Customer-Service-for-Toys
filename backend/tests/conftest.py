@@ -52,6 +52,9 @@ def api_client(tmp_path: Path):
     knowledge_path = tmp_path / "knowledge_base"
     vector_path = tmp_path / "vector_db"
     log_path = tmp_path / "logs"
+    internal_secret_path = tmp_path / "internal-service.secret"
+    internal_service_token = "test-internal-service-token-32-bytes-minimum"
+    internal_secret_path.write_text(internal_service_token, encoding="utf-8")
     knowledge_path.mkdir()
     (knowledge_path / "synthetic-placeholder.pdf").write_bytes(b"test-only")
 
@@ -68,6 +71,7 @@ def api_client(tmp_path: Path):
         active_collection_name="test_documents",
         rag_distance_threshold=0.35,
         top_k=2,
+        internal_service_secret_file=internal_secret_path,
     )
     store = VectorStore(
         persist_dir=vector_path,
@@ -97,7 +101,9 @@ def api_client(tmp_path: Path):
     app.dependency_overrides[require_operations_identity] = lambda: {
         "permissions": ["user.manage"]
     }
-    with TestClient(app) as client:
+    with TestClient(
+        app, headers={"X-AI-CS-Service-Token": internal_service_token}
+    ) as client:
         for _ in range(100):
             payload = client.get("/api/status").json()
             if payload.get("ready"):

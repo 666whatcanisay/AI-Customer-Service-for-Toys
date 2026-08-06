@@ -17,7 +17,7 @@ $env:CORS_ALLOWED_ORIGINS = "http://127.0.0.1:5173"
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
-The normal Windows production wrapper runs `alembic upgrade head` before it starts this service. After an authorized backup and migration to `0013_user_management_v1`, use a repository wrapper so the CLI reads the same controlled database configuration. Passwords are read by Python `getpass` and must never be supplied on the command line or stored in a script:
+The normal Windows production wrapper runs `alembic upgrade head` before it starts this service. After an authorized backup, IAM requires at least `0013_user_management_v1`; Store Context Resolver V1 adds `0014_store_context_resolver_v1`, and Customer Desktop Workflow V1 adds the minimized `0015_customer_desktop_workflow_v1` audit table. Use a repository wrapper so the CLI reads the same controlled database configuration. Passwords are read by Python `getpass` and must never be supplied on the command line or stored in a script:
 
 ```powershell
 ..\scripts\windows\bootstrap_ai_cs_admin.ps1 -Username admin -DisplayName "系统管理员"
@@ -26,7 +26,20 @@ The normal Windows production wrapper runs `alembic upgrade head` before it star
 
 The initial-users wrapper contains only the approved non-secret identities. It normalizes usernames with NFKC plus casefold for duplicate detection, skips existing accounts without changing their credential, role, status or Store bindings, and prompts only when an account is missing. Direct CLI use is safe only when the process already has the exact production `DATABASE_URL`; otherwise it may target the local default database.
 
-IAM endpoints are under `/api/v1/auth` and ADMIN-only user management is under `/api/v1/admin/users`. Browser-facing business endpoints require a Bearer session and are authorized on the server. New or reset accounts always have `must_change_password=true`; business permissions fail closed until `/api/v1/auth/change-password` succeeds. `CUSTOMER_SERVICE` users may start with no Store, then use `/api/v1/auth/store-options` and `/api/v1/auth/store-bindings` to select one or more enabled customer Stores. `OPERATOR` and `ADMIN` receive all-Store scope from their role. The Customer Workspace derives identity and allowed Store scope from `/api/v1/auth/me`. Session lifetime defaults to 480 minutes and can be changed with `IAM_SESSION_TTL_MINUTES`.
+IAM endpoints are under `/api/v1/auth` and ADMIN-only user management is under `/api/v1/admin/users`. Browser-facing business endpoints require a Bearer session and are authorized on the server. New or reset accounts always have `must_change_password=true`; business permissions fail closed until `/api/v1/auth/change-password` succeeds. `CUSTOMER_SERVICE` users may start with no Store, then use `/api/v1/auth/store-options` and `/api/v1/auth/store-bindings` to select one or more enabled customer Stores plus one default; `/api/v1/auth/default-store` switches only within that authorized set. `OPERATOR` and `ADMIN` receive all-Store scope from their role. The Customer Workspace derives identity and effective Store from `/api/v1/workspace/context`, resolves Product/SKU through `/api/v1/workspace/context-resolutions`, and may pass a ready `resolution_id` to `/api/v1/workspace/ai-replies`. Resolution audit persistence contains a content hash and entity IDs only, never customer text. Session lifetime defaults to 480 minutes and can be changed with `IAM_SESSION_TTL_MINUTES`.
+
+Customer Desktop Workflow V1 exposes authenticated C facades at `GET /api/v1/workspace/desktop-agent` and `POST /api/v1/workspace/desktop-agent/binding-grants`; `GET /api/v1/admin/desktop-workflow/audit` is ADMIN-only. C derives user and Store references from the authenticated session, returns only matching device status, and never sends the Channel Engine operator credential to the browser. Self-service grant creation is limited to a `CUSTOMER_SERVICE` user, an authorized Store and an already registered `UNBOUND` Agent/device; activation remains a separate Channel Engine administrator action.
+
+The integration is disabled by default. Configure it through the production wrapper, using only an external UTF-8 single-line session reference file:
+
+```powershell
+$ChannelAgentIntegrationEnabled = $true
+$ChannelAgentServerUrl = 'https://channel-agent.internal.example'
+$ChannelAgentOperatorSessionReference = 'runtime\secrets\channel-agent-operator-session.txt'
+$ChannelAgentTimeoutSeconds = 5
+```
+
+Non-loopback plain HTTP is rejected; remote use requires HTTPS. The referenced file must resolve inside the controlled Runtime directory and is read on demand, while its content is never copied into Git config, reports or browser responses. When integration is disabled, unreachable, unauthorized or contract-incompatible, C returns a non-2xx Error Envelope with a distinct error code.
 
 `GET /health` returns service status and a request ID. Product/SKU import endpoints are under `/api/v1`; the fixed template is served by `GET /api/v1/import-templates/product-sku`.
 

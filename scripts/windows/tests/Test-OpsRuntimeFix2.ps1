@@ -42,6 +42,9 @@ try {
     $ragPython = Join-Path $temporaryRepository 'rag.exe'
     $platformPython = Join-Path $temporaryRepository 'platform.exe'
     New-Item -ItemType File -Path $ragPython, $platformPython | Out-Null
+    $internalSecretPath = Join-Path $temporaryRoot 'runtime\secrets\internal-service.secret'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $internalSecretPath) | Out-Null
+    [IO.File]::WriteAllText($internalSecretPath, ('i' * 32), [Text.UTF8Encoding]::new($false))
     $legacyConfigPath = Join-Path $temporaryRoot 'legacy-config.ps1'
     @"
 @{
@@ -60,6 +63,7 @@ try {
     CorsAllowedOrigins = @('http://127.0.0.1:15173')
     OpenBrowser = (1 -eq 0)
     RuntimeDirectory = '$temporaryRoot\runtime'
+    InternalServiceSecretReference = '$internalSecretPath'
     TestDataPackagePath = ''
     AutoImportTestData = (1 -eq 0)
 }

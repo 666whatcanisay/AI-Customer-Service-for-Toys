@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 import os
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from app import __version__
@@ -68,6 +69,55 @@ class Settings:
     ai_service_base_url: str
     ai_service_timeout_seconds: float
     iam_session_ttl_minutes: int
+    channel_agent_integration_enabled: bool
+    channel_agent_server_url: str | None
+    channel_agent_operator_session_file: str | None
+    channel_agent_timeout_seconds: float
+    internal_service_secret_file: str | None = None
+    iam_login_max_failures: int = 5
+    iam_login_window_seconds: int = 900
+    iam_login_cooldown_seconds: int = 900
+    iam_max_active_sessions: int = 5
+    knowledge_publication_lease_seconds: int = 300
+
+    def internal_service_token(self) -> str:
+        """Resolve the service credential from a file without exposing its value."""
+        if not self.internal_service_secret_file:
+            raise ValueError("INTERNAL_SERVICE_SECRET_FILE is not configured")
+        try:
+            token = Path(self.internal_service_secret_file).read_text(
+                encoding="utf-8"
+            ).rstrip("\r\n")
+        except (OSError, UnicodeError) as exc:
+            raise ValueError("Internal service secret reference is unreadable") from exc
+        if "\r" in token or "\n" in token:
+            raise ValueError("Internal service secret reference must contain one line")
+        try:
+            token.encode("ascii")
+        except UnicodeEncodeError as exc:
+            raise ValueError("Internal service secret must be ASCII") from exc
+        if len(token.encode("ascii")) < 32:
+            raise ValueError("Internal service secret must contain at least 32 bytes")
+        return token
+
+
+def _environment_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().casefold()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean flag")
+
+
+def _positive_float(name: str, default: str) -> float:
+    value = float(os.getenv(name, default))
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than zero")
+    return value
 
 
 @lru_cache
@@ -106,4 +156,30 @@ def get_settings() -> Settings:
             os.getenv("AI_SERVICE_TIMEOUT_SECONDS", "120")
         ),
         iam_session_ttl_minutes=int(os.getenv("IAM_SESSION_TTL_MINUTES", "480")),
+        channel_agent_integration_enabled=_environment_flag(
+            "CHANNEL_AGENT_INTEGRATION_ENABLED"
+        ),
+        channel_agent_server_url=(
+            os.getenv("CHANNEL_AGENT_SERVER_URL", "").strip().rstrip("/") or None
+        ),
+        channel_agent_operator_session_file=(
+            os.getenv("CHANNEL_AGENT_OPERATOR_SESSION_FILE", "").strip() or None
+        ),
+        channel_agent_timeout_seconds=_positive_float("CHANNEL_AGENT_TIMEOUT_SECONDS", "5"),
+        internal_service_secret_file=(
+            os.getenv("INTERNAL_SERVICE_SECRET_FILE", "").strip() or None
+        ),
+        iam_login_max_failures=max(1, int(os.getenv("IAM_LOGIN_MAX_FAILURES", "5"))),
+        iam_login_window_seconds=max(
+            1, int(os.getenv("IAM_LOGIN_WINDOW_SECONDS", "900"))
+        ),
+        iam_login_cooldown_seconds=max(
+            1, int(os.getenv("IAM_LOGIN_COOLDOWN_SECONDS", "900"))
+        ),
+        iam_max_active_sessions=max(
+            1, int(os.getenv("IAM_MAX_ACTIVE_SESSIONS", "5"))
+        ),
+        knowledge_publication_lease_seconds=max(
+            1, int(os.getenv("KNOWLEDGE_PUBLICATION_LEASE_SECONDS", "300"))
+        ),
     )

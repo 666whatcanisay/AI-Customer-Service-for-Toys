@@ -8,14 +8,14 @@ const seed: ChannelConversationSeed = {
   conversationId: 'conversation-1',
   customerLabel: '客户 A01',
   unreadCount: 1,
-  source: 'MOCK',
+  source: 'MANUAL',
   messages: [{
     messageId: 'message-1',
     conversationId: 'conversation-1',
     customerLabel: '客户 A01',
     content: '适合多大年龄？',
     receivedAt: '2026-08-06T08:00:00Z',
-    source: 'MOCK'
+    source: 'MANUAL'
   }]
 }
 
@@ -27,6 +27,8 @@ describe('human-in-loop reply draft state machine', () => {
     store.installConversations([seed])
 
     expect(store.activeDraft?.state).toBe('MESSAGE_RECEIVED')
+    expect(store.agentStatus).toBe('BUSY')
+    expect(store.activeConversation?.status).toBe('PROCESSING')
     store.beginUnderstanding()
     store.beginGenerating()
     store.setDraftReady({
@@ -40,6 +42,7 @@ describe('human-in-loop reply draft state machine', () => {
     })
     expect(store.activeDraft?.state).toBe('DRAFT_READY')
     store.beginHumanReview()
+    store.beginEditing()
     store.editDraft('建议 5 岁以上使用，并由家长陪同。')
     store.acceptDraft()
 
@@ -48,6 +51,11 @@ describe('human-in-loop reply draft state machine', () => {
       decisionState: 'APPROVED',
       editedAnswer: '建议 5 岁以上使用，并由家长陪同。'
     })
+    expect(store.activeConversation?.status).toBe('WAITING_REPLY')
+    store.completeConversation()
+    expect(store.activeConversation?.status).toBe('COMPLETED')
+    store.reopenConversation()
+    expect(store.activeConversation?.status).toBe('PROCESSING')
   })
 
   it('expires the old draft as soon as a new customer message arrives', () => {
@@ -62,7 +70,7 @@ describe('human-in-loop reply draft state machine', () => {
       customerLabel: '客户 A01',
       content: '材质是什么？',
       receivedAt: '2026-08-06T08:01:00Z',
-      source: 'MOCK'
+      source: 'MANUAL'
     })
 
     expect(store.draftHistory.at(-1)?.state).toBe('EXPIRED')
@@ -84,5 +92,17 @@ describe('human-in-loop reply draft state machine', () => {
     store.rejectDraft()
 
     expect(store.activeDraft).toMatchObject({ state: 'EXPIRED', decisionState: 'REJECTED' })
+    expect(store.activeConversation?.status).toBe('PROCESSING')
+  })
+
+  it('derives ONLINE, BUSY and OFFLINE from availability and processing work', () => {
+    const store = useHumanLoopWorkspaceStore()
+    expect(store.agentStatus).toBe('ONLINE')
+    store.installConversations([seed])
+    expect(store.agentStatus).toBe('BUSY')
+    store.setAgentAvailability(false)
+    expect(store.agentStatus).toBe('OFFLINE')
+    store.setAgentAvailability(true)
+    expect(store.agentStatus).toBe('BUSY')
   })
 })

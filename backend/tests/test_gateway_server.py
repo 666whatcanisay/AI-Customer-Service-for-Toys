@@ -608,6 +608,9 @@ def test_enabled_runtime_builds_gateway_without_changing_legacy_routes(
 
     secret_path = tmp_path / "gateway-hmac.secret"
     secret_path.write_text(SECRET.decode("ascii") + "\n", encoding="utf-8")
+    internal_secret_path = tmp_path / "internal-service.secret"
+    internal_token = "test-internal-service-token-32-bytes-minimum"
+    internal_secret_path.write_text(internal_token, encoding="utf-8")
     settings = replace(
         Settings.from_env(),
         backend_root=tmp_path,
@@ -621,10 +624,11 @@ def test_enabled_runtime_builds_gateway_without_changing_legacy_routes(
         gateway_hmac_secret="",
         gateway_hmac_secret_file=secret_path,
         gateway_state_path=tmp_path / "gateway-state.sqlite3",
+        internal_service_secret_file=internal_secret_path,
     )
     app = create_app(settings=settings, rag_factory=lambda active: StubRag())
 
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-AI-CS-Service-Token": internal_token}) as client:
         payload = _request_payload()
         decision = _post_decision(client, payload)
         runtime = client.get("/api/admin/server-runtime")

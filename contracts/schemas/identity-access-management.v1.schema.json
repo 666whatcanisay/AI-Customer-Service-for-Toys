@@ -202,7 +202,8 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "type": "integer", "minimum": 1 }
-        }
+        },
+        "default_store_id": { "type": ["integer", "null"], "minimum": 1 }
       }
     },
     "RoleAssignmentRequest": {
@@ -260,7 +261,7 @@
             "code": {
               "type": "string",
               "enum": [
-                "AUTHENTICATION_REQUIRED", "AUTHENTICATION_FAILED", "SESSION_EXPIRED",
+                "AUTHENTICATION_REQUIRED", "AUTHENTICATION_FAILED", "AUTHENTICATION_RATE_LIMITED", "SESSION_EXPIRED",
                 "PASSWORD_CHANGE_REQUIRED", "AUTHORIZATION_DENIED", "USER_NOT_FOUND", "USERNAME_CONFLICT",
                 "ROLE_INVALID", "STORE_BINDING_INVALID", "DEFAULT_STORE_REQUIRED",
                 "VALIDATION_ERROR", "INTERNAL_ERROR"

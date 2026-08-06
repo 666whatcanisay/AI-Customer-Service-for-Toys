@@ -4,7 +4,7 @@
 >
 > 唯一需求事实来源：[AI-CS Requirement Registry V1](AI-CS-Requirement-Registry-V1.md)
 >
-> 当前 Gate：`AI_CS_INITIAL_ACCOUNTS_READY / AI_CS_ACCOUNT_POLICY_READY / AI_CS_USER_MANAGEMENT_READY / GATEWAY_LAN_MODE_READY / AI_CS_INTERNAL_PRODUCTION_READY / R003_PILOT_ACCEPTANCE_PENDING`
+> 当前 Gate：`AI_CS_PRODUCTION_RC_READY / CONTROLLED_DEPLOYMENT_PENDING / R003_PILOT_ACCEPTANCE_PENDING`
 
 本文件是状态快照，不是第二份需求台账。
 
@@ -12,12 +12,12 @@
 
 | 状态 | 数量 | 需求 |
 | --- | ---: | --- |
-| `DONE` | 16 | R001、R002、R004、R006、R008、R009、R010、R011、R012、R013、R014、R015、R016、R017、R018、R019 |
+| `DONE` | 22 | R001、R002、R004、R006、R008、R009、R010、R011、R012、R013、R014、R015、R016、R017、R018、R019、R020、R021、R022、R023、R024、R025 |
 | `IN_PROGRESS` | 1 | R003 |
 | `TODO` | 1 | R005 |
 | `BLOCKED` | 1 | R007 |
 | `DEPRECATED` | 0 | 无 |
-| 合计 | 19 | R001–R019 |
+| 合计 | 25 | R001–R025 |
 
 ## 2. 当前需求状态
 
@@ -42,6 +42,12 @@
 | R017 | AI-CS Initial Production Accounts V1 | `DONE` | 三个批准账号已创建，真实登录、首次改密、Session、RBAC与Store范围通过。 | 三人首次正式使用立即设置各自长期口令。 |
 | R018 | AI-CS Account Policy Adjustment V1 | `DONE` | Contracts 0.10、C IAM、B/Admin流程、A鉴权桥和Windows初始化脚本已实现、回归并部署。 | 保持协调版本，不回退到0.9单默认店策略。 |
 | R019 | AI-CS Production IAM Deployment & Initial Accounts V1 | `DONE` | clean source、正式备份、0013、三账号、0 active sessions、0客服固定绑定与回滚证据全部通过。 | 日常密码轮换/停用/审计；R003/R007仍独立。 |
+| R020 | AI-CS Store Context Resolver V1 | `DONE` | 默认Store、C权威Product/SKU解析、`resolution_id`上下文注入和最小Admin审计完成；0014仅隔离验证。 | 另行备份并部署0014与协调B/C/Admin；不得把Source Ready冒充Runtime已部署。 |
+| R021 | AI-CS Customer Workspace Production V1 | `DONE` | B三栏生产工作流、客服/会话状态、AI依据/风险、采用/修改/拒绝原因/问题标记及幂等失败恢复完成；不接真实渠道。 | 随R020协调部署0014/C/B；真实渠道会话持久化必须另立授权任务。 |
+| R022 | AI-CS Customer Desktop Workflow Integration V1 | `DONE` | B显示真实客服/店铺/设备及Agent在线、版本、心跳；C提供鉴权facade、一次性绑定授权和最小审计，Engine保持不变。 | 备份后协调部署0014/0015、contracts/C/B并配置非生产Engine；第二台客服电脑E2E后再决定生产启用。 |
+| R023 | AI-CS Code Quality Audit V1 | `DONE` | 只读审计登记22项；审计Gate就绪，但存在P0/P1、B测试红灯、dirty source与0013/0015不一致。 | 按报告拆分Remediation任务卡；全部P0/P1关闭并形成clean RC前禁止生产发布。 |
+| R024 | AI-CS Production Hardening V1 | `DONE / SOURCE_ONLY` | R023 P0/P1源码关闭；全域回归全绿，正式DB保持0013，Gateway/RAG指纹不变。 | 精确形成clean RC，配置TLS并受控迁移0014–0016后做同SHA部署验收。 |
+| R025 | AI-CS Production Release Candidate Freeze V1 | `DONE` | R020–R024形成clean Release branch/commit/tag；迁移可逆、全域Gate通过、正式DB保持0013。 | 按Deployment Checklist配置TLS/secret/WMI，备份并迁移0014–0016，执行同SHA部署验收。 |
 
 ## 3. 当前主阻塞
 
@@ -56,6 +62,18 @@ R012当时只整理并验证dirty Candidate，没有修改Gateway实现或contra
 R014已关闭上述dirty source阻塞：保护锚点成为source commit `6ae8d407...`的直接父提交，Windows PowerShell 5.1修复后的代码RC为`4b6c0bd0...`。四服务从该clean SHA启动并完成Gateway/Console/Decision/stop验证；该事实仍不表示远端发布、TLS、正式secret manager或生产Channel Engine联通。
 
 R016/R018协调源码已经由R019部署：正式数据库在迁移前完成可恢复备份，当前为0013且完整性ok。三个批准账号已创建并通过真实登录、强制首次改密、Session撤销和服务端RBAC；客服可选择两个启用Store并已恢复0固定绑定，运营/管理员为角色级全Store。最终0 active sessions，未记录凭证、hash或token。
+
+R020源码在该基础上建立唯一默认Store和C权威Conversation Context Resolver。正式Runtime仍为0013；0014只完成隔离往返验证，因此下一次标准启动前必须先做正式SQLite备份并按协调版本部署B/C/Admin。Gateway与RAG基线未变。
+
+R021在不增加接口或连接渠道的边界内，把B收敛为三栏连续客服工作流。Production build不预置验收会话；人工输入仅留页面内存，客服采用后仍需在外部渠道人工处理并显式完成。该Source Gate依赖R020的0014 Provider，不能冒充当前正式Runtime已部署。
+
+R022在上述人工工作流上增加受控设备关联：浏览器只访问C同源facade，C以真实session和Store scope关联Engine投影；自助grant仅用于已注册`UNBOUND`精确设备，独立activation仍为强制步骤。正式Runtime仍为0013，0014/0015和Channel Agent生产配置均未部署，因此该Gate只表示源码、契约与隔离回归就绪。
+
+R023已完成全仓生产上线前审计。审计本身为DONE，但生产发布判定为`FAIL / PRODUCTION_RELEASE_BLOCKED`：内部知识投影鉴权、TLS/生产Web承载、Session撤销、登录限流、RAG失败语义、发布并发、C日志、B红灯和CI覆盖等P1以及dirty source/P0尚未关闭。
+
+R024已关闭上述P0/P1源码阻断：内部服务鉴权、Session/登录防护、生产TLS静态Web、RAG非2xx、发布租约、去敏日志、CI和时钟稳定性均有回归证据。当前Gate是Source Hardening Ready；仓库仍dirty且正式Runtime保持0013，因此clean RC、正式迁移与同SHA部署仍是后续独立Gate。
+
+R025已将R020–R024候选精确固化为`ai-cs-production-rc-v1`：工作树clean、迁移链线性可逆、全域测试/构建/安全Gate通过，Gateway/RAG/Channel/PDD边界保持。当前可以进入受控Deployment Gate，但正式数据库、TLS、防火墙和真实外部联通尚未改变。
 
 历史初始化Store已按审计规则从TEST正式化为`INITIAL_IMPORT`，当前Store矩阵为`INITIAL_IMPORT + ENABLED=1`、`PILOT + ENABLED=1`；Product状态、activation receipt、发布记录、chunks和embeddings均未删除或重建。浏览器验证Admin正式页面与六模板入口，B已发布商品显示3 chunks/3 citations并保持人工确认、不自动发送/退款/改订单边界。
 
@@ -86,9 +104,21 @@ R018 Account Policy DONE（0.10协调源码与初始化脚本已部署）
   ↓
 R019 Production IAM Deployment DONE（备份/0013/三账号/真实验收）
   ↓
-R003业务结果验收
+R020 Store Context Resolver DONE（源码/契约/隔离0014；待部署）
   ↓
-R005真实Pilot验证
+R021 Customer Workspace Production DONE（B源码工作流；待随R020协调部署）
+  ↓
+R022 Customer Desktop Workflow Integration DONE（B/C/contracts/OPS源码；生产Engine未连接）
+  ↓
+R023 Code Quality Audit DONE（审计完成；Production Release BLOCKED）
+  ↓
+R024 Production Hardening DONE / SOURCE_ONLY（P0/P1源码关闭）
+  ↓
+R025 Production RC Freeze DONE（clean branch/commit/tag）
+  ↓
+controlled migration/deployment validation
+  ↓
+R003业务结果验收 / R005真实Pilot验证
 ```
 
 Prompt、R009导入逻辑、Import Center和B客服核心业务流程未修改。本次正式化和浏览器Smoke不能替代R003全量业务验收或R005真实运行验证；R007继续由网络侧处理。当前`origin`为本地历史保护仓库，没有远端发布声明。

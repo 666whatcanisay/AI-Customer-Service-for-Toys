@@ -61,12 +61,8 @@ try {
     Sync-TestKnowledge $config | Out-Null
     Invoke-RagChatSmoke $config | Out-Null
 
-    $vite = Join-Path $config.RepositoryRoot 'frontend\node_modules\vite\bin\vite.js'
-    $frontendEnvironment = Get-LanFrontendEnvironment $config
-    Start-ManagedServiceWithEnvironment $config 'customer-web' (Get-Command node.exe).Source @($vite,'--host',$config.CustomerWebBindAddress,'--port',$config.CustomerWebPort,'--strictPort') (Join-Path $config.RepositoryRoot 'frontend') 'vite.js' $config.CustomerWebPort $frontendEnvironment | Out-Null
     $startedServices += 'customer-web'
-    Wait-HttpOk $config.CustomerWebUrl 45 '客服页面'
-    Update-ManagedServiceListenerRecord $config 'customer-web' | Out-Null
+    Start-CustomerWebService $config | Out-Null
     Start-AdminWebService $config | Out-Null
     $startedServices += 'admin-web'
     try { Save-StandardRuntimeNetworkModePreference $config 'LAN' } catch { Write-Warning "无法保存 LAN Runtime 偏好：$($_.Exception.Message)" }
@@ -74,8 +70,8 @@ try {
     Write-Host '局域网 AI 客服已启动。' -ForegroundColor Green
     Write-Host "局域网页面：$($config.CustomerWebUrl)"
     Write-Host "运营后台（默认仅服务器本机）：$($config.AdminWebUrl)"
-    Write-Host "前端 API：RAG=$($frontendEnvironment.VITE_RAG_API_BASE_URL)；平台=$($frontendEnvironment.VITE_PLATFORM_API_BASE_URL)"
-    Write-Host 'API 模式：SAME_ORIGIN_PROXY（浏览器仅连接 5173；A/C 只监听 127.0.0.1）'
+    Write-Host '前端 API：/platform-api 与 /rag-api 受限同源代理'
+    Write-Host 'API 模式：PRODUCTION_SAME_ORIGIN_PROXY（静态构建；浏览器仅连接 5173；A/C 只监听 127.0.0.1）'
     Write-Host "日志目录：$(Get-ServiceLogDirectory $config)"
     if (-not $NoBrowser -and [bool]$config.OpenBrowser) { Start-Process $config.CustomerWebUrl }
     if (-not $NoBrowser -and [bool]$config.AdminOpenBrowser) { Start-Process $config.AdminWebUrl }

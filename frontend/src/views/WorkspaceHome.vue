@@ -4,9 +4,9 @@
       <div>
         <p class="eyebrow">AI客服平台 · 客服工作台</p>
         <h1>{{ identity.reporterName ? `${identity.reporterName}，从一条咨询开始` : '从一条咨询开始' }}</h1>
-        <p>选择商品和 SKU，获取 AI 建议，再由你核对、编辑和复制。系统不会自动向客户发送消息。</p>
+        <p>进入授权店铺会话，系统识别商品和 SKU、生成 AI 建议，再由你核对、编辑和复制。系统不会自动向客户发送消息。</p>
         <div class="hero-actions">
-          <RouterLink to="/workspace" class="primary-link" data-testid="enter-ai-chat">进入 AI 客服副驾驶</RouterLink>
+          <RouterLink to="/workspace" class="primary-link" data-testid="enter-ai-chat">进入客服会话工作台</RouterLink>
           <RouterLink to="/experience-cases" class="secondary-link">查看我的案例</RouterLink>
         </div>
       </div>
@@ -27,7 +27,7 @@
       <ol class="start-grid">
         <li>
           <span>1</span>
-          <div><strong>确认商品上下文</strong><p>选择当前店铺和商品；不确定 SKU 时可以留空。</p></div>
+          <div><strong>确认会话与商品上下文</strong><p>默认店铺自动加载，商品和 SKU 自动识别；只有歧义时需要确认。</p></div>
         </li>
         <li>
           <span>2</span>
@@ -35,7 +35,7 @@
         </li>
         <li>
           <span>3</span>
-          <div><strong>复制并沉淀结果</strong><p>人工确认后复制；优秀回复收藏，未采用则反馈原因。</p></div>
+          <div><strong>人工处理并沉淀结果</strong><p>采用后复制到渠道人工发送；拒绝或发现问题时记录原因。</p></div>
         </li>
       </ol>
     </section>
@@ -49,9 +49,9 @@
         <RouterLink to="/ai-chat" class="text-link">开始一条咨询</RouterLink>
       </div>
       <div class="work-rhythm-grid">
-        <article><strong>第一次使用</strong><p>按上方三步走，不确定 SKU 时留空，不要猜款式。</p></article>
-        <article><strong>熟练使用</strong><p>先看 AI 处理等级和来源，再决定直接采用、修改或未采用。</p></article>
-        <article><strong>高频使用</strong><p>同一商品连续咨询时，使用“处理下一条咨询”保留商品上下文并清空旧回答。</p></article>
+        <article><strong>第一次使用</strong><p>先上线并打开新会话；商品或 SKU 有歧义时不要猜测。</p></article>
+        <article><strong>熟练使用</strong><p>先看商品依据、知识引用和风险，再决定采用、修改、拒绝或标记问题。</p></article>
+        <article><strong>高频使用</strong><p>使用新建、处理中、待人工发送和已完成队列，避免遗漏客户会话。</p></article>
       </div>
     </section>
 
@@ -92,7 +92,7 @@
         </div>
       </div>
       <div class="quick-grid">
-        <RouterLink to="/workspace" class="quick-card available"><span>AI</span><div><h3>AI 客服副驾驶</h3><p>查看客户消息、生成建议、核对依据并人工确认。</p></div><b>可使用</b></RouterLink>
+        <RouterLink to="/workspace" class="quick-card available"><span>AI</span><div><h3>客服会话工作台</h3><p>查看客户会话、生成建议、核对依据并完成人工决策。</p></div><b>可使用</b></RouterLink>
         <RouterLink to="/experience-cases" class="quick-card available"><span>☆</span><div><h3>我的案例</h3><p>查看已提交的优秀回复案例与审核状态。</p></div><b>可使用</b></RouterLink>
         <RouterLink to="/feedback" class="quick-card available"><span>!</span><div><h3>问题反馈</h3><p>记录未采用 AI 建议的原因，帮助后续改进。</p></div><b>可使用</b></RouterLink>
         <article class="quick-card planned" data-testid="planned-module-card"><span>⌁</span><div><h3>常用回复</h3><p>规划中；不会在当前版本伪造模板或自动发送。</p></div><b>规划中</b></article>

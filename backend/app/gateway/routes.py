@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -25,6 +25,7 @@ from app.gateway.runtime import (
     ServerRuntimeConsoleSnapshot,
     server_runtime_console_snapshot,
 )
+from app.service.iam_authorization import require_operations_or_internal_identity
 
 
 gateway_router = APIRouter(prefix=GATEWAY_PREFIX, tags=["channel-gateway"])
@@ -35,6 +36,7 @@ _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 @server_runtime_router.get(
     "/api/admin/server-runtime",
     response_model=ServerRuntimeConsoleSnapshot,
+    dependencies=[Depends(require_operations_or_internal_identity)],
 )
 def server_runtime_console(request: Request) -> ServerRuntimeConsoleSnapshot:
     return server_runtime_console_snapshot(request.app)

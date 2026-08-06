@@ -1,5 +1,7 @@
 from collections.abc import Iterator
+from dataclasses import replace
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,6 +15,7 @@ from app.ingestion.parsers.product_sku_xlsx import DATA_SHEET, EXPECTED_HEADERS
 from app.main import app
 from app.iam.dependencies import Principal, get_current_principal
 from app.iam.schemas import RoleName
+from app.internal_auth import require_internal_service_identity
 
 
 LEGACY_TEST_ADMIN = Principal(
@@ -29,6 +32,21 @@ LEGACY_TEST_ADMIN = Principal(
     all_store_access=True,
     must_change_password=False,
 )
+
+
+@pytest.fixture(autouse=True)
+def configure_internal_service_secret(tmp_path: Path) -> Iterator[None]:
+    """Give global-app integration tests the same file-backed service auth as production."""
+    secret_path = tmp_path / "internal-service.secret"
+    secret_path.write_text("pytest-internal-service-token-32-bytes-minimum", encoding="utf-8")
+    previous = app.state.settings
+    app.state.settings = replace(
+        previous, internal_service_secret_file=str(secret_path)
+    )
+    try:
+        yield
+    finally:
+        app.state.settings = previous
 
 
 @pytest.fixture
@@ -54,6 +72,7 @@ def client(session: Session) -> Iterator[TestClient]:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_principal] = lambda: LEGACY_TEST_ADMIN
+    app.dependency_overrides[require_internal_service_identity] = lambda: "pytest-ai-core"
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

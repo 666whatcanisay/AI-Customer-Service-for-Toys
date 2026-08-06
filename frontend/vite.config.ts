@@ -1,17 +1,19 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
 
-const frontendPackage = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as {
+const rootDirectory = fileURLToPath(new URL('.', import.meta.url))
+const frontendPackage = JSON.parse(readFileSync(resolve(rootDirectory, 'package.json'), 'utf8')) as {
   version: string
 }
 
 function getGitShortSha() {
   try {
     return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-      cwd: __dirname,
+      cwd: rootDirectory,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore']
     }).trim()
@@ -29,7 +31,7 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
+      '@': resolve(rootDirectory, 'src')
     }
   },
   server: {

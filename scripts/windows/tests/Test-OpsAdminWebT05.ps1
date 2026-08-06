@@ -37,6 +37,7 @@ function Write-TestConfig([string]$Path, [string]$Repository, [string]$RagPython
     RagHealthPath = '/api/health'; PlatformHealthPath = '/health'
     OllamaModel = 'qwen3.5:9b'; CorsAllowedOrigins = @('http://127.0.0.1:15173'); OpenBrowser = `$false
     RuntimeDirectory = '$((Join-Path $temporaryRoot 'runtime').Replace("'", "''"))'; TestDataPackagePath = ''; AutoImportTestData = `$false
+    InternalServiceSecretReference = '$((Join-Path $temporaryRoot 'runtime\secrets\internal-service.secret').Replace("'", "''"))'
     AdminWebPort = $AdminPort
     AdminWebBindAddress = '127.0.0.1'
     AdminWebUrl = 'http://127.0.0.1:$AdminPort/'
@@ -73,8 +74,11 @@ try {
         (Join-Path $temporaryRepository 'platform_backend')
     ) | Out-Null
     $ragPython = Join-Path $temporaryRepository 'rag.exe'
-    $platformPython = Join-Path $temporaryRepository 'platform.exe'
-    New-Item -ItemType File -Path $ragPython, $platformPython | Out-Null
+    New-Item -ItemType File -Path $ragPython | Out-Null
+    $platformPython = (Get-Command python.exe -ErrorAction Stop).Source
+    $internalSecretPath = Join-Path $temporaryRoot 'runtime\secrets\internal-service.secret'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $internalSecretPath) | Out-Null
+    [IO.File]::WriteAllText($internalSecretPath, ('i' * 32), [Text.UTF8Encoding]::new($false))
     $configPath = Join-Path $temporaryRoot 'config.local.ps1'
     $adminPort = Get-AvailableLoopbackPort
     Write-TestConfig $configPath $temporaryRepository $ragPython $platformPython $adminPort
@@ -86,33 +90,9 @@ try {
     Assert-Throws { Assert-AdminWebDependencies $config | Out-Null } 'Missing admin_web preflight'
 
     $adminDirectory = Join-Path $temporaryRepository 'admin_web'
-    New-Item -ItemType Directory -Force -Path (Join-Path $adminDirectory 'node_modules') | Out-Null
-    $packageJson = @'
-{
-  "name": "admin-web-runtime-test",
-  "private": true,
-  "version": "0.0.0",
-  "scripts": { "dev": "node server.mjs" }
-}
-'@
-    $packageJson | Set-Content -LiteralPath (Join-Path $adminDirectory 'package.json') -Encoding UTF8
-    Set-Content -LiteralPath (Join-Path $adminDirectory 'pnpm-lock.yaml') -Value 'lockfileVersion: 9.0' -Encoding UTF8
-    $serverSource = @'
-import http from 'node:http';
-const args = process.argv.slice(2);
-const read = (name, fallback) => {
-  const index = args.indexOf(name);
-  return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
-};
-const host = read('--host', '127.0.0.1');
-const port = Number(read('--port', '5174'));
-http.createServer((_request, response) => {
-  response.writeHead(200, { 'Content-Type': 'text/plain' });
-  response.end('admin runtime test');
-}).listen(port, host);
-'@
-    $serverSource | Set-Content -LiteralPath (Join-Path $adminDirectory 'server.mjs') -Encoding UTF8
-    Set-Content -LiteralPath (Join-Path $temporaryRepository '.gitignore') -Value 'admin_web/node_modules/' -Encoding UTF8
+    $adminDist = Join-Path $adminDirectory 'dist'
+    New-Item -ItemType Directory -Force -Path $adminDist | Out-Null
+    Set-Content -LiteralPath (Join-Path $adminDist 'index.html') -Value '<html>admin production runtime test</html>' -Encoding UTF8
     & git -C $temporaryRepository init --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the isolated test repository.' }
     & git -C $temporaryRepository config user.email 'ops-test@example.invalid'
@@ -120,14 +100,9 @@ http.createServer((_request, response) => {
     & git -C $temporaryRepository add --all
     & git -C $temporaryRepository commit --quiet -m 'test fixture'
     if ($LASTEXITCODE -ne 0) { throw 'Could not commit the isolated test repository fixture.' }
-    # pnpm may rewrite this deliberately minimal fixture lockfile. It is not
-    # source under test, so exclude that tool mutation from the source snapshot.
-    & git -C $temporaryRepository update-index --assume-unchanged admin_web/pnpm-lock.yaml
-
-    $nodeModulesPath = Join-Path $adminDirectory 'node_modules'
-    Rename-Item -LiteralPath $nodeModulesPath -NewName 'node_modules.missing'
-    Assert-Throws { Assert-AdminWebDependencies $config | Out-Null } 'Missing admin node_modules preflight'
-    Rename-Item -LiteralPath (Join-Path $adminDirectory 'node_modules.missing') -NewName 'node_modules'
+    Rename-Item -LiteralPath $adminDist -NewName 'dist.missing'
+    Assert-Throws { Assert-AdminWebDependencies $config | Out-Null } 'Missing admin dist preflight'
+    Rename-Item -LiteralPath (Join-Path $adminDirectory 'dist.missing') -NewName 'dist'
     Assert-AdminWebDependencies $config | Out-Null
 
     $unknownPort = Get-AvailableLoopbackPort

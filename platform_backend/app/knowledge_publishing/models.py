@@ -27,6 +27,10 @@ class ProductKnowledgePublication(Base):
     publication_receipt_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )
+    generation_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    generation_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     published_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

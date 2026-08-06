@@ -1,6 +1,6 @@
 """Login/session and ADMIN-only user-management endpoints."""
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -10,7 +10,7 @@ from app.iam.dependencies import (
     require_user_manage,
 )
 from app.iam.schemas import (
-    ChangePasswordRequest, CurrentUserResponse, LoginRequest, LoginResponse,
+    ChangePasswordRequest, CurrentUserResponse, DefaultStoreRequest, LoginRequest, LoginResponse,
     RoleAssignmentRequest, RoleListResponse, SelfStoreBindingRequest,
     StoreBindingAssignmentRequest, StoreOptionListResponse, UserCreateRequest,
     UserListResponse, UserProjection, UserUpdateRequest,
@@ -24,9 +24,19 @@ admin_router = APIRouter(prefix="/api/v1/admin/users", tags=["user-management"])
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-def login(request: LoginRequest, response: Response, session: Session = Depends(get_db)) -> LoginResponse:
-    result = AuthenticationService(session, get_settings().iam_session_ttl_minutes).login(
-        request.username, request.password
+def login(payload: LoginRequest, request: Request, response: Response, session: Session = Depends(get_db)) -> LoginResponse:
+    settings = get_settings()
+    result = AuthenticationService(
+        session,
+        settings.iam_session_ttl_minutes,
+        max_failures=settings.iam_login_max_failures,
+        window_seconds=settings.iam_login_window_seconds,
+        cooldown_seconds=settings.iam_login_cooldown_seconds,
+        max_active_sessions=settings.iam_max_active_sessions,
+    ).login(
+        payload.username,
+        payload.password,
+        request.client.host if request.client is not None else "unknown",
     )
     response.headers["Cache-Control"] = "no-store"
     return result
@@ -85,8 +95,17 @@ def replace_own_store_bindings(
     session: Session = Depends(get_db),
 ) -> UserProjection:
     return UserService(session).assign_own_customer_service_stores(
-        principal.user_id, request.store_ids
+        principal.user_id, request.store_ids, request.default_store_id
     )
+
+
+@auth_router.put("/default-store", response_model=UserProjection)
+def set_default_store(
+    request: DefaultStoreRequest,
+    principal: Principal = Depends(require_customer_service_manage),
+    session: Session = Depends(get_db),
+) -> UserProjection:
+    return UserService(session).set_default_store(principal.user_id, request.store_id)
 
 
 @admin_router.get("/roles", response_model=RoleListResponse)

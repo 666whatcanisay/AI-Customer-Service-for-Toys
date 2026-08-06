@@ -1,0 +1,26 @@
+name: Admin tests and build
+on:
+  pull_request:
+    paths: ['admin_web/**', 'contracts/**']
+  push:
+    paths: ['admin_web/**', 'contracts/**']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'pnpm', cache-dependency-path: 'admin_web/pnpm-lock.yaml' }
+      - run: corepack enable
+      - name: Install exact Admin dependencies
+        working-directory: admin_web
+        run: pnpm install --frozen-lockfile
+      - name: Admin security gate
+        working-directory: admin_web
+        run: pnpm audit --audit-level high
+      - name: Admin tests, types, and production build
+        working-directory: admin_web
+        run: |
+          pnpm test
+          pnpm typecheck
+          pnpm build

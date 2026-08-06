@@ -8,12 +8,12 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "contracts" / "schemas" / "identity-access-management.v1.schema.json"
 
 
-def test_iam_contract_is_coordinated_0_10_0_and_valid_json_schema() -> None:
+def test_iam_contract_is_coordinated_0_13_0_and_valid_json_schema() -> None:
     version = json.loads((ROOT / "contracts" / "version.json").read_text(encoding="utf-8"))
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
     assert version == {
-        "contract_version": "0.10.0",
+        "contract_version": "0.13.0",
         "status": "coordinated",
         "updated_at": "2026-08-06",
     }
@@ -46,5 +46,8 @@ def test_iam_contract_freezes_internal_initialization_and_store_selection_policy
     assert definitions["UserCreateRequest"]["properties"]["password"]["minLength"] == 8
     assert definitions["ChangePasswordRequest"]["properties"]["new_password"]["minLength"] == 12
     assert definitions["SelfStoreBindingRequest"]["properties"]["store_ids"]["minItems"] == 1
+    assert definitions["SelfStoreBindingRequest"]["properties"]["default_store_id"] == {
+        "type": ["integer", "null"], "minimum": 1,
+    }
     error_codes = definitions["ErrorEnvelope"]["properties"]["error"]["properties"]["code"]["enum"]
     assert "PASSWORD_CHANGE_REQUIRED" in error_codes

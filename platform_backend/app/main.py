@@ -49,13 +49,18 @@ from app.errors import (
     validation_exception_handler,
 )
 from app.middleware import request_id_middleware
+from app.internal_auth import require_internal_service_identity
 from app.iam.dependencies import (
     require_feedback_submit,
     require_operations_access,
     require_workspace_access,
 )
 from app.iam.routes import admin_router as iam_admin_router, auth_router
-from app.workspace.routes import router as workspace_router
+from app.workspace.routes import admin_router as workspace_admin_router, router as workspace_router
+from app.desktop_agent.routes import (
+    admin_router as desktop_workflow_admin_router,
+    router as desktop_agent_router,
+)
 
 def create_app(settings_override: Settings | None = None) -> FastAPI:
     settings = settings_override or get_settings()
@@ -65,6 +70,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         docs_url=None,
         redoc_url=None,
     )
+    application.state.settings = settings
     application.middleware("http")(request_id_middleware)
     application.add_middleware(
         CORSMiddleware,
@@ -91,12 +97,18 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(auth_router)
     application.include_router(iam_admin_router)
     application.include_router(workspace_router)
+    application.include_router(workspace_admin_router)
+    application.include_router(desktop_agent_router)
+    application.include_router(desktop_workflow_admin_router)
     application.include_router(import_router, dependencies=operations_dependencies)
     application.include_router(test_catalog_router, dependencies=operations_dependencies)
     # Frozen A RAG bootstrap reads these two loopback-only legacy projections.
     # They remain isolated from browser import/management routes so RAG logic is
     # not changed by R016.
-    application.include_router(test_knowledge_internal_router)
+    application.include_router(
+        test_knowledge_internal_router,
+        dependencies=[Depends(require_internal_service_identity)],
+    )
     application.include_router(customer_suggestion_router, dependencies=feedback_dependencies)
     application.include_router(admin_suggestion_router, dependencies=operations_dependencies)
     application.include_router(customer_experience_case_router, dependencies=feedback_dependencies)

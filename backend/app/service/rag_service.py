@@ -83,6 +83,11 @@ class RAGService:
         self.platform_client = PlatformTestKnowledgeClient(
             settings.platform_api_base_url,
             settings.platform_api_timeout_seconds,
+            (
+                settings.internal_service_token()
+                if settings.internal_service_secret_file is not None
+                else None
+            ),
         )
         self._configuration_lock = RLock()
         self.runtime_metrics = RuntimeMetrics()
@@ -1012,6 +1017,9 @@ class RAGService:
             result = self._query(question, context=context)
             if result.get("answer") == LLM_REQUEST_FAILED_MESSAGE:
                 error_summary = "LLM_REQUEST_FAILED"
+                warnings = result.setdefault("warnings", [])
+                if "LLM_REQUEST_FAILED" not in warnings:
+                    warnings.append("LLM_REQUEST_FAILED")
             return result
         except Exception as exc:
             error_summary = type(exc).__name__

@@ -62,7 +62,7 @@ describe('customer workbench router', () => {
       id: '33333333-3333-4333-8333-333333333333', username: 'support.one',
       display_name: '客服一号', status: 'ACTIVE', roles: ['CUSTOMER_SERVICE'],
       permissions: ['workspace.access'],
-      stores: [{ id: 1, store_id: 1, store_code: 'STORE-1', store_name: '一店', platform: 'pdd', is_default: false }],
+      stores: [{ id: 1, store_id: 1, store_code: 'STORE-1', store_name: '一店', platform: 'pdd', is_default: true }],
       must_change_password: false, all_store_access: false,
       created_at: '2026-08-06T00:00:00Z', updated_at: '2026-08-06T00:00:00Z'
     })

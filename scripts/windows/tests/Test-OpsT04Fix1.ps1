@@ -30,6 +30,9 @@ function Invoke-StatusFixture {
 
 try {
     New-Item -ItemType Directory -Force -Path @($testRoot, (Join-Path $testRoot 'backend'), (Join-Path $testRoot 'frontend'), (Join-Path $testRoot 'platform_backend')) | Out-Null
+    $internalSecretPath = Join-Path $testRoot 'runtime\secrets\internal-service.secret'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $internalSecretPath) | Out-Null
+    [IO.File]::WriteAllText($internalSecretPath, ('i' * 32), [Text.UTF8Encoding]::new($false))
     @"
 @{
     RepositoryRoot = '$($testRoot.Replace("'", "''"))'
@@ -43,6 +46,7 @@ try {
     RagHealthPath = '/api/health'; PlatformHealthPath = '/health'; OllamaModel = 'qwen3.5:9b'
     CorsAllowedOrigins = @('http://127.0.0.1:65402'); OpenBrowser = `$false
     RuntimeDirectory = '$((Join-Path $testRoot 'runtime').Replace("'", "''"))'
+    InternalServiceSecretReference = '$($internalSecretPath.Replace("'", "''"))'
     TestDataPackagePath = ''; AutoImportTestData = `$false
 }
 "@ | Set-Content -LiteralPath $configPath -Encoding UTF8

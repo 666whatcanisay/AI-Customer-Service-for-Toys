@@ -16,11 +16,17 @@ def build_engine(database_url: str) -> Engine:
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     engine = create_engine(database_url, connect_args=connect_args)
     if database_url.startswith("sqlite"):
-        event.listen(
-            engine,
-            "connect",
-            lambda connection, _: connection.execute("PRAGMA foreign_keys=ON"),
-        )
+        def configure_sqlite(connection, _) -> None:
+            cursor = connection.cursor()
+            try:
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA busy_timeout=5000")
+                if database_url.startswith("sqlite:///") and ":memory:" not in database_url:
+                    cursor.execute("PRAGMA journal_mode=WAL")
+            finally:
+                cursor.close()
+
+        event.listen(engine, "connect", configure_sqlite)
     return engine
 
 

@@ -1,9 +1,9 @@
 name: Contract check
 on:
   pull_request:
-    paths: ['contracts/**']
+    paths: ['contracts/**', 'tests/contract/**']
   push:
-    paths: ['contracts/**']
+    paths: ['contracts/**', 'tests/contract/**']
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -12,7 +12,7 @@ jobs:
         with: { fetch-depth: 2 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - run: pip install jsonschema
+      - run: pip install jsonschema pytest
       - name: Validate JSON schema syntax
         run: |
           python -c "import glob,json; from jsonschema.validators import validator_for; [validator_for(json.load(open(p))).check_schema(json.load(open(p))) for p in glob.glob('contracts/schemas/*.json')]"
@@ -21,3 +21,5 @@ jobs:
         run: |
           git diff --name-only HEAD^ HEAD | grep '^contracts/' | grep -v '^contracts/CHANGELOG.md' > changed.txt || true
           test ! -s changed.txt || git diff --name-only HEAD^ HEAD | grep -q '^contracts/CHANGELOG.md'
+      - name: Run coordinated contract tests
+        run: python -m pytest -q tests/contract

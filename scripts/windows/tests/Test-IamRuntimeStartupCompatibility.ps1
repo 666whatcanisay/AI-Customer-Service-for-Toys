@@ -27,8 +27,11 @@ if ([string]::IsNullOrWhiteSpace($chatSmokeBlock) -or $chatSmokeBlock -match '/a
 if ($main -notmatch 'include_router\(test_catalog_router, dependencies=operations_dependencies\)') {
     throw 'Browser-facing test catalog is not protected by operations authorization.'
 }
-if ($main -notmatch 'include_router\(test_knowledge_internal_router\)') {
-    throw 'Frozen loopback knowledge export is not separately registered.'
+if ($main -notmatch 'test_knowledge_internal_router,[\s\S]*?require_internal_service_identity') {
+    throw 'Frozen loopback knowledge export is not protected by the service identity.'
+}
+if ($getPackageBlock -notmatch 'Get-AiCsInternalServiceHeaders') {
+    throw 'Runtime startup does not authenticate its internal knowledge export call.'
 }
 
 Write-Host 'PASS: IAM runtime startup uses only the frozen loopback knowledge projection and keeps browser management authenticated.' -ForegroundColor Green

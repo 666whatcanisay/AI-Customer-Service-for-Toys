@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 
 from app.config.settings import Settings
 from app.main import create_app
-from app.service.rag_service import MODEL_NOT_CONFIGURED_MESSAGE, REFUSAL_MESSAGE
+from app.service.rag_service import (
+    LLM_REQUEST_FAILED_MESSAGE,
+    MODEL_NOT_CONFIGURED_MESSAGE,
+    REFUSAL_MESSAGE,
+)
 from app.service.iam_authorization import require_operations_identity
 
 
@@ -28,6 +32,26 @@ def test_health_check_returns_success(api_client):
     assert response.json()["data"]["status"] == "ok"
 
 
+def test_all_non_health_legacy_service_routes_reject_anonymous_calls(api_client):
+    client, _ = api_client
+    anonymous = {"X-AI-CS-Service-Token": ""}
+    responses = [
+        client.get("/api/status", headers=anonymous),
+        client.get("/api/knowledge/statistics", headers=anonymous),
+        client.get("/api/stats", headers=anonymous),
+        client.get("/api/questions/recommended", headers=anonymous),
+        client.post("/api/retrieval/search", json={}, headers=anonymous),
+        client.post("/api/chat", json={}, headers=anonymous),
+        client.get("/api/ai/status", headers=anonymous),
+        client.get("/api/ai/stats", headers=anonymous),
+        client.post("/api/ai/chat", json={}, headers=anonymous),
+        client.get("/api/admin/server-runtime", headers=anonymous),
+    ]
+
+    assert client.get("/api/health", headers=anonymous).status_code == 200
+    assert {response.status_code for response in responses} == {401}
+
+
 def test_status_reports_ready(api_client):
     client, _ = api_client
     response = client.get("/api/status")
@@ -36,6 +60,9 @@ def test_status_reports_ready(api_client):
 
 
 def test_browser_visible_initialization_failure_is_stable_and_safe(tmp_path: Path):
+    internal_secret = tmp_path / "internal-service.secret"
+    internal_token = "test-internal-service-token-32-bytes-minimum"
+    internal_secret.write_text(internal_token, encoding="utf-8")
     settings = replace(
         Settings.from_env(),
         backend_root=tmp_path,
@@ -43,6 +70,7 @@ def test_browser_visible_initialization_failure_is_stable_and_safe(tmp_path: Pat
         knowledge_base_path=tmp_path / "knowledge_base",
         vector_db_path=tmp_path / "vector_db",
         log_dir=tmp_path / "logs",
+        internal_service_secret_file=internal_secret,
     )
     private_failure = r"C:\\private-runtime\\model-cache\\failure-token"
 
@@ -53,7 +81,7 @@ def test_browser_visible_initialization_failure_is_stable_and_safe(tmp_path: Pat
     app.dependency_overrides[require_operations_identity] = lambda: {
         "permissions": ["user.manage"]
     }
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-AI-CS-Service-Token": internal_token}) as client:
         for _ in range(100):
             payload = client.get("/api/status").json()
             if payload["data"]["initialization_error"]:
@@ -164,6 +192,21 @@ def test_chat_response_shape_without_cloud_key(api_client):
     assert data["action"] == "ANSWER"
     assert data["sources"]
     assert {"answer", "action", "sources", "model", "latency_ms", "request_id"} <= data.keys()
+
+
+def test_llm_failure_is_explicitly_machine_readable_for_the_workspace_facade(
+    api_client, monkeypatch
+):
+    client, _ = api_client
+    rag = client.app.state.rag_service
+    monkeypatch.setattr(rag, "call_llm", lambda *args, **kwargs: LLM_REQUEST_FAILED_MESSAGE)
+
+    response = client.post(
+        "/api/chat", json={"message": "星云狐狸玩具的指示灯是紫色"}
+    )
+
+    assert response.status_code == 200  # legacy A contract remains compatible
+    assert "LLM_REQUEST_FAILED" in response.json()["warnings"]
 
 
 def test_unrelated_question_is_controlled_refusal(api_client):
@@ -551,6 +594,9 @@ def test_ai_control_center_overview_selects_safe_latest_evaluation_fields(
 
 
 def test_ai_control_center_overview_returns_stable_not_ready_code(tmp_path: Path):
+    internal_secret = tmp_path / "internal-service.secret"
+    internal_token = "test-internal-service-token-32-bytes-minimum"
+    internal_secret.write_text(internal_token, encoding="utf-8")
     settings = replace(
         Settings.from_env(),
         backend_root=tmp_path,
@@ -558,6 +604,7 @@ def test_ai_control_center_overview_returns_stable_not_ready_code(tmp_path: Path
         knowledge_base_path=tmp_path / "knowledge_base",
         vector_db_path=tmp_path / "vector_db",
         log_dir=tmp_path / "logs",
+        internal_service_secret_file=internal_secret,
     )
     private_failure = r"C:\\private-runtime\\control-center-token"
 
@@ -568,7 +615,7 @@ def test_ai_control_center_overview_returns_stable_not_ready_code(tmp_path: Path
     app.dependency_overrides[require_operations_identity] = lambda: {
         "permissions": ["user.manage"]
     }
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-AI-CS-Service-Token": internal_token}) as client:
         for _ in range(100):
             if client.get("/api/status").json()["data"]["initialization_error"]:
                 break

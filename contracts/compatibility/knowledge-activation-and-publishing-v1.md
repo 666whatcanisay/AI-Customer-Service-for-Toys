@@ -31,6 +31,9 @@ Only approved products may be enabled or published.
   intact. Content changes after publication report `NEED_RESYNC`.
 - All write requests are idempotent. Each successful state change produces an
   immutable receipt.
+- C acquires a bounded, product-scoped publication lease before calling A.
+  Concurrent publishers receive HTTP 409 and cannot overwrite a newer owner's
+  success or failure state. Expired leases are recoverable by a later caller.
 
 ## Compatibility, deployment and rollback
 

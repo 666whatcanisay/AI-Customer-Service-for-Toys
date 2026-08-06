@@ -1,6 +1,7 @@
 """User lifecycle, fixed-role assignment, Store binding, and session service."""
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 import unicodedata
 from uuid import uuid4
 
@@ -10,7 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from app.iam.models import (
-    Permission, Role, RolePermission, User, UserRole, UserSession, UserStoreBinding,
+    LoginAttemptBucket, Permission, Role, RolePermission, User, UserRole, UserSession,
+    UserStoreBinding,
 )
 from app.iam.schemas import (
     LoginResponse, RoleName, StoreBindingInput, StoreBindingProjection,
@@ -19,6 +21,7 @@ from app.iam.schemas import (
 )
 from app.iam.security import create_session_token, hash_password, hash_session_token, verify_password
 from app.test_catalog.models import TestStore
+from app.desktop_agent.models import DesktopWorkflowAuditEvent
 
 
 PERMISSIONS_BY_ROLE: dict[RoleName, frozenset[str]] = {
@@ -124,6 +127,16 @@ def _validate_default_store(roles: list[RoleName], bindings: list[StoreBindingIn
     defaults = sum(1 for item in bindings if item.is_default)
     if defaults > 1:
         raise AppError("STORE_BINDING_INVALID", "Only one default Store is allowed.", status_code=422)
+    store_bound_customer_service = (
+        RoleName.CUSTOMER_SERVICE in roles
+        and not {RoleName.ADMIN, RoleName.OPERATOR}.intersection(roles)
+    )
+    if store_bound_customer_service and bindings and defaults != 1:
+        raise AppError(
+            "DEFAULT_STORE_REQUIRED",
+            "A CUSTOMER_SERVICE account with Store bindings requires one default Store.",
+            status_code=422,
+        )
 
 
 def _validate_stores(session: Session, bindings: list[StoreBindingInput]) -> None:
@@ -212,7 +225,7 @@ class UserService:
             revoke = True
         if request.status is not None:
             user.status = request.status.value
-            revoke = request.status == UserStatus.DISABLED
+            revoke = revoke or request.status == UserStatus.DISABLED
         user.updated_at = utc_now()
         if revoke:
             self._revoke_user_sessions(user.id)
@@ -262,7 +275,7 @@ class UserService:
         ]
 
     def assign_own_customer_service_stores(
-        self, user_id: str, store_ids: list[int]
+        self, user_id: str, store_ids: list[int], default_store_id: int | None = None
     ) -> UserProjection:
         allowed = {item.store_id for item in self.list_customer_service_store_options(user_id)}
         requested = set(store_ids)
@@ -272,10 +285,54 @@ class UserService:
                 "Customer Store selection must contain enabled Store options only.",
                 status_code=422,
             )
+        current_default = self.session.scalar(
+            select(UserStoreBinding.store_id).where(
+                UserStoreBinding.user_id == user_id,
+                UserStoreBinding.is_default.is_(True),
+            )
+        )
+        effective_default = (
+            default_store_id
+            if default_store_id is not None
+            else current_default
+            if current_default in requested
+            else store_ids[0]
+        )
         return self.assign_store_bindings(
             user_id,
-            [StoreBindingInput(store_id=store_id, is_default=False) for store_id in store_ids],
+            [
+                StoreBindingInput(
+                    store_id=store_id, is_default=store_id == effective_default
+                )
+                for store_id in store_ids
+            ],
         )
+
+    def set_default_store(self, user_id: str, store_id: int) -> UserProjection:
+        user = user_or_404(self.session, user_id)
+        roles = role_names(self.session, user.id)
+        if RoleName.CUSTOMER_SERVICE not in roles:
+            raise AppError(
+                "AUTHORIZATION_DENIED",
+                "Only CUSTOMER_SERVICE accounts select a default Store.",
+                status_code=403,
+            )
+        bindings = list(
+            self.session.scalars(
+                select(UserStoreBinding).where(UserStoreBinding.user_id == user.id)
+            )
+        )
+        if store_id not in {binding.store_id for binding in bindings}:
+            raise AppError(
+                "AUTHORIZATION_DENIED",
+                "The requested Store is not bound to this account.",
+                status_code=403,
+            )
+        for binding in bindings:
+            binding.is_default = binding.store_id == store_id
+        user.updated_at = utc_now()
+        self.session.commit()
+        return project_user(self.session, user)
 
     def deactivate_user(self, user_id: str) -> UserProjection:
         return self.update_user(user_id, UserUpdateRequest(status=UserStatus.DISABLED))
@@ -289,26 +346,144 @@ class UserService:
 
 
 class AuthenticationService:
-    def __init__(self, session: Session, ttl_minutes: int) -> None:
+    def __init__(
+        self,
+        session: Session,
+        ttl_minutes: int,
+        *,
+        max_failures: int = 5,
+        window_seconds: int = 900,
+        cooldown_seconds: int = 900,
+        max_active_sessions: int = 5,
+        clock=utc_now,
+    ) -> None:
         self.session = session
         self.ttl_minutes = ttl_minutes
+        self.max_failures = max(1, max_failures)
+        self.window_seconds = max(1, window_seconds)
+        self.cooldown_seconds = max(1, cooldown_seconds)
+        self.max_active_sessions = max(1, max_active_sessions)
+        self.clock = clock
 
-    def login(self, username: str, password: str) -> LoginResponse:
+    @staticmethod
+    def _bucket_key(bucket_type: str, value: str) -> str:
+        material = f"{bucket_type}\0{value}".encode("utf-8")
+        return hashlib.sha256(material).hexdigest()
+
+    def _attempt_buckets(self, username: str, source_ip: str) -> list[tuple[str, str]]:
+        return [
+            ("USERNAME", self._bucket_key("USERNAME", normalize_username(username))),
+            ("SOURCE", self._bucket_key("SOURCE", source_ip.strip()[:128] or "unknown")),
+        ]
+
+    @staticmethod
+    def _as_utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+    def _enforce_login_cooldown(
+        self, buckets: list[tuple[str, str]], now: datetime
+    ) -> None:
+        retry_after = 0
+        for _, key in buckets:
+            row = self.session.get(LoginAttemptBucket, key)
+            if row is not None and row.locked_until is not None:
+                remaining = int((self._as_utc(row.locked_until) - now).total_seconds())
+                retry_after = max(retry_after, remaining)
+        if retry_after > 0:
+            raise AppError(
+                "AUTHENTICATION_RATE_LIMITED",
+                "Too many failed login attempts. Try again later.",
+                status_code=429,
+                headers={"Retry-After": str(max(1, retry_after))},
+            )
+
+    def _record_login_failure(
+        self, buckets: list[tuple[str, str]], now: datetime
+    ) -> None:
+        locked = False
+        for bucket_type, key in buckets:
+            row = self.session.get(LoginAttemptBucket, key)
+            if row is None:
+                row = LoginAttemptBucket(
+                    bucket_key=key,
+                    bucket_type=bucket_type,
+                    failure_count=0,
+                    window_started_at=now,
+                    updated_at=now,
+                )
+                self.session.add(row)
+            elif (now - self._as_utc(row.window_started_at)).total_seconds() >= self.window_seconds:
+                row.failure_count = 0
+                row.window_started_at = now
+                row.locked_until = None
+            row.failure_count += 1
+            row.last_failed_at = now
+            row.updated_at = now
+            threshold = self.max_failures if bucket_type == "USERNAME" else self.max_failures * 5
+            if row.failure_count >= threshold:
+                row.locked_until = now + timedelta(seconds=self.cooldown_seconds)
+                locked = True
+        self.session.commit()
+        if locked:
+            raise AppError(
+                "AUTHENTICATION_RATE_LIMITED",
+                "Too many failed login attempts. Try again later.",
+                status_code=429,
+                headers={"Retry-After": str(self.cooldown_seconds)},
+            )
+
+    def _limit_active_sessions(self, user_id: str, now: datetime) -> None:
+        rows = list(self.session.scalars(
+            select(UserSession).where(
+                UserSession.user_id == user_id,
+                UserSession.revoked_at.is_(None),
+            ).order_by(UserSession.created_at.desc(), UserSession.id.desc())
+        ))
+        active: list[UserSession] = []
+        for row in rows:
+            if self._as_utc(row.expires_at) <= now:
+                row.revoked_at = now
+            else:
+                active.append(row)
+        for row in active[self.max_active_sessions - 1:]:
+            row.revoked_at = now
+
+    def login(self, username: str, password: str, source_ip: str = "unknown") -> LoginResponse:
+        bind = self.session.get_bind()
+        if bind.dialect.name == "sqlite" and not self.session.in_transaction():
+            # Serialize the short read/update/insert sequence so concurrent attempts cannot
+            # lose throttle increments or exceed the active-session cap on SQLite.
+            self.session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        now = self.clock()
+        buckets = self._attempt_buckets(username, source_ip)
+        self._enforce_login_cooldown(buckets, now)
         user = self.session.scalar(
             select(User).where(User.username_normalized == normalize_username(username))
         )
         encoded = user.password_hash if user is not None else _FAKE_PASSWORD_HASH
         valid = verify_password(password, encoded)
         if user is None or not valid or user.status != UserStatus.ACTIVE.value:
+            self._record_login_failure(buckets, now)
             raise AppError(
                 "AUTHENTICATION_FAILED", "Username or password is invalid.", status_code=401
             )
         token = create_session_token()
-        now = utc_now()
         expires_at = now + timedelta(minutes=self.ttl_minutes)
+        username_bucket = buckets[0][1]
+        self.session.execute(
+            delete(LoginAttemptBucket).where(LoginAttemptBucket.bucket_key == username_bucket)
+        )
+        self._limit_active_sessions(user.id, now)
         self.session.add(UserSession(
             id=str(uuid4()), user_id=user.id, token_hash=hash_session_token(token),
             created_at=now, expires_at=expires_at,
+        ))
+        self.session.add(DesktopWorkflowAuditEvent(
+            actor_user_id=user.id,
+            event_type="LOGIN",
+            current_state="AUTHENTICATED",
+            outcome="SUCCESS",
+            occurred_at=now,
         ))
         self.session.commit()
         return LoginResponse(
@@ -321,7 +496,7 @@ class AuthenticationService:
             select(UserSession).where(UserSession.token_hash == hash_session_token(token))
         )
         if row is not None and row.revoked_at is None:
-            row.revoked_at = utc_now()
+            row.revoked_at = self.clock()
             self.session.commit()
 
     def change_password(

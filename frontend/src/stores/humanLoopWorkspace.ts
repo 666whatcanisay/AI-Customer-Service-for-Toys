@@ -7,6 +7,7 @@ import type {
   ChannelMessageEnvelope,
   ChannelMessageSource
 } from '@/workspace/channelMessageAdapter'
+import type { AgentStatus, ConversationStatus } from '@/workspace/customerSession'
 
 export const REPLY_DRAFT_STATES = [
   'MESSAGE_RECEIVED',
@@ -31,6 +32,7 @@ export interface WorkspaceConversation {
   customerLabel: string
   unreadCount: number
   source: ChannelMessageSource
+  status: ConversationStatus
   messages: WorkspaceMessage[]
 }
 
@@ -77,6 +79,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
   const activeConversationId = ref('')
   const activeDraft = ref<ReplyDraft | null>(null)
   const draftHistory = ref<ReplyDraft[]>([])
+  const agentAvailable = ref(true)
 
   const activeConversation = computed(() =>
     conversations.value.find((item) => item.conversationId === activeConversationId.value) ?? null
@@ -87,18 +90,46 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     return [...messages].reverse().find((message) => message.direction === 'INBOUND') ?? null
   })
 
+  const agentStatus = computed<AgentStatus>(() => {
+    if (!agentAvailable.value) return 'OFFLINE'
+    return conversations.value.some((item) => item.status === 'PROCESSING') ? 'BUSY' : 'ONLINE'
+  })
+
+  const conversationCounts = computed<Record<ConversationStatus, number>>(() => ({
+    NEW: conversations.value.filter((item) => item.status === 'NEW').length,
+    PROCESSING: conversations.value.filter((item) => item.status === 'PROCESSING').length,
+    WAITING_REPLY: conversations.value.filter((item) => item.status === 'WAITING_REPLY').length,
+    COMPLETED: conversations.value.filter((item) => item.status === 'COMPLETED').length
+  }))
+
   function installConversations(seeds: ChannelConversationSeed[]): void {
     conversations.value = seeds.map((seed) => ({
       conversationId: seed.conversationId,
       customerLabel: seed.customerLabel,
       unreadCount: seed.unreadCount,
       source: seed.source,
+      status: 'NEW',
       messages: seed.messages.map((message) => ({ ...message, direction: 'INBOUND' }))
     }))
     if (!activeConversationId.value && conversations.value.length > 0) {
       activeConversationId.value = conversations.value[0].conversationId
+      conversations.value[0].status = 'PROCESSING'
+      conversations.value[0].unreadCount = 0
       createDraftForLatestMessage()
     }
+  }
+
+  function addConversation(seed: ChannelConversationSeed): void {
+    const conversation: WorkspaceConversation = {
+      conversationId: seed.conversationId,
+      customerLabel: seed.customerLabel,
+      unreadCount: seed.unreadCount,
+      source: seed.source,
+      status: 'NEW',
+      messages: seed.messages.map((message) => ({ ...message, direction: 'INBOUND' }))
+    }
+    conversations.value.unshift(conversation)
+    selectConversation(conversation.conversationId)
   }
 
   function selectConversation(conversationId: string): void {
@@ -107,6 +138,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     if (activeConversationId.value !== conversationId) archiveActiveDraft()
     activeConversationId.value = conversationId
     conversation.unreadCount = 0
+    if (conversation.status === 'NEW') conversation.status = 'PROCESSING'
     createDraftForLatestMessage()
   }
 
@@ -119,9 +151,15 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     if (activeDraft.value?.conversationId === message.conversationId) archiveActiveDraft()
     conversation.messages.push({ ...message, direction: 'INBOUND' })
     conversation.unreadCount += 1
+    conversation.status = 'NEW'
     activeConversationId.value = message.conversationId
     conversation.unreadCount = 0
+    conversation.status = 'PROCESSING'
     createDraftForMessage(message)
+  }
+
+  function setAgentAvailability(online: boolean): void {
+    agentAvailable.value = online
   }
 
   function beginUnderstanding(): void {
@@ -158,10 +196,15 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     transition('HUMAN_REVIEW')
   }
 
+  function beginEditing(): void {
+    if (!activeDraft.value) throw new Error('当前没有可编辑的草稿')
+    if (activeDraft.value.state !== 'HUMAN_REVIEW') throw new Error('当前草稿不允许进入修改')
+    transition('EDITED')
+  }
+
   function editDraft(answer: string): void {
     if (!activeDraft.value) throw new Error('当前没有可编辑的草稿')
-    if (activeDraft.value.state === 'HUMAN_REVIEW') transition('EDITED')
-    else if (activeDraft.value.state !== 'EDITED') throw new Error('当前草稿不允许编辑')
+    if (activeDraft.value.state !== 'EDITED') throw new Error('请先选择修改回复')
     activeDraft.value.editedAnswer = answer
     activeDraft.value.updatedAt = nowIso()
   }
@@ -171,6 +214,8 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     transition('ACCEPTED')
     activeDraft.value.decisionState = 'APPROVED'
     activeDraft.value.updatedAt = nowIso()
+    const conversation = activeConversation.value
+    if (conversation) conversation.status = 'WAITING_REPLY'
   }
 
   function rejectDraft(): void {
@@ -180,6 +225,25 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     }
     activeDraft.value.decisionState = 'REJECTED'
     transition('EXPIRED')
+    const conversation = activeConversation.value
+    if (conversation) conversation.status = 'PROCESSING'
+  }
+
+  function completeConversation(): void {
+    const conversation = activeConversation.value
+    if (!conversation) throw new Error('当前没有会话')
+    if (conversation.status !== 'WAITING_REPLY') {
+      throw new Error('只有待人工发送的会话可以标记完成')
+    }
+    conversation.status = 'COMPLETED'
+  }
+
+  function reopenConversation(): void {
+    const conversation = activeConversation.value
+    if (!conversation) throw new Error('当前没有会话')
+    if (conversation.status !== 'COMPLETED') throw new Error('当前会话尚未完成')
+    conversation.status = 'PROCESSING'
+    if (!activeDraft.value || activeDraft.value.state === 'EXPIRED') createDraftForLatestMessage()
   }
 
   function restartDraft(): void {
@@ -261,16 +325,23 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     activeDraft,
     draftHistory,
     latestInboundMessage,
+    agentStatus,
+    conversationCounts,
     installConversations,
+    addConversation,
     selectConversation,
     receiveMessage,
+    setAgentAvailability,
     beginUnderstanding,
     beginGenerating,
     setDraftReady,
     beginHumanReview,
+    beginEditing,
     editDraft,
     acceptDraft,
     rejectDraft,
+    completeConversation,
+    reopenConversation,
     restartDraft,
     expireDraft,
     markDraftExpired

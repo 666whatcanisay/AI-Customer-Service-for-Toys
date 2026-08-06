@@ -42,7 +42,7 @@ describe('CustomerWorkbenchLayout', () => {
     const wrapper = await mountLayout()
     await flushPromises()
     expect(wrapper.get('nav').text()).toContain('首页')
-    expect(wrapper.get('nav').text()).toContain('AI 客服')
+    expect(wrapper.get('nav').text()).toContain('客服会话工作台')
     expect(wrapper.get('nav').text()).toContain('我的案例')
     expect(wrapper.get('nav').text()).toContain('问题反馈')
     expect(wrapper.text()).toContain('AI客服平台')
@@ -76,8 +76,8 @@ describe('CustomerWorkbenchLayout', () => {
     await flushPromises()
 
     expect(document.body.textContent).toContain('AI客服助手')
-    expect(document.body.textContent).toContain('选择商品 / SKU')
-    expect(document.body.textContent).toContain('人工确认后复制发送')
+    expect(document.body.textContent).toContain('系统识别商品 / SKU')
+    expect(document.body.textContent).toContain('标记会话完成')
     expect(document.body.textContent).toContain('AI 建议需要人工确认')
 
     await wrapper.get('[data-testid="pilot-guide-start"]').trigger('click')

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Callable
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -25,6 +27,9 @@ from app.gateway.service import GatewayRuntimeConfig, GatewayServer
 from app.models.chat import FrozenChatContext
 from app.service.ai_capability import INITIALIZATION_FAILED_CODE
 from app.service.rag_service import RAGService
+
+
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
 def configure_logging(settings: Settings) -> None:
@@ -117,7 +122,10 @@ def create_app(
                 application.state.loading_message = "系统已就绪"
                 logger.info("RAG 服务初始化完成")
             except Exception as exc:
-                logger.exception("RAG 服务初始化失败")
+                logger.error(
+                    "RAG service initialization failed error_type=%s",
+                    type(exc).__name__,
+                )
                 application.state.initialization_error = INITIALIZATION_FAILED_CODE
                 application.state.loading_message = (
                     "AI service initialization failed. Check service logs."
@@ -154,10 +162,18 @@ def create_app(
 
     @application.middleware("http")
     async def add_json_charset(request: Request, call_next):
+        submitted_request_id = request.headers.get("X-Request-ID", "")
+        request_id = (
+            submitted_request_id
+            if _REQUEST_ID_PATTERN.fullmatch(submitted_request_id)
+            else str(uuid4())
+        )
+        request.state.request_id = request_id
         response = await call_next(request)
         content_type = response.headers.get("content-type", "")
         if content_type.startswith("application/json") and "charset=" not in content_type:
             response.headers["content-type"] = "application/json; charset=utf-8"
+        response.headers["X-Request-ID"] = request_id
         return response
 
     application.include_router(router, prefix="/api")
@@ -242,8 +258,14 @@ def create_app(
                     message="Gateway Server encountered an internal error.",
                 )
             )
-        del request
-        logger.exception("未处理的服务异常", exc_info=exc)
+        logger.error(
+            "Unhandled request failure request_id=%s method=%s path=%s user_id=%s error_type=%s",
+            getattr(request.state, "request_id", "unknown"),
+            request.method,
+            request.url.path,
+            getattr(request.state, "authenticated_user_id", "anonymous"),
+            type(exc).__name__,
+        )
         return JSONResponse(
             status_code=500,
             content={

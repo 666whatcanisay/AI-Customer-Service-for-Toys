@@ -14,7 +14,7 @@
           <span>⌂</span><span>首页</span>
         </RouterLink>
         <RouterLink to="/workspace" class="nav-link" active-class="active" @click="closeMobileMenu">
-          <span>AI</span><span>AI 客服副驾驶</span>
+          <span>AI</span><span>客服会话工作台</span>
         </RouterLink>
         <RouterLink to="/experience-cases" class="nav-link" active-class="active" @click="closeMobileMenu">
           <span>☆</span><span>我的案例</span>
@@ -127,11 +127,11 @@
     >
       <p class="pilot-guide-intro">这是辅助客服工具，请按以下流程完成一条建议回复。</p>
       <ol class="pilot-guide-steps">
-        <li>选择商品 / SKU</li>
-        <li>输入客户问题</li>
-        <li>查看 AI 建议</li>
-        <li>人工确认后复制发送</li>
-        <li>好回复可以收藏为优秀案例</li>
+        <li>上线并打开授权店铺会话</li>
+        <li>由系统识别商品 / SKU，歧义时人工确认</li>
+        <li>查看 AI 建议、依据和风险</li>
+        <li>采用、修改、拒绝或标记问题</li>
+        <li>人工复制到渠道处理后，再标记会话完成</li>
       </ol>
       <el-alert
         title="AI 建议需要人工确认"

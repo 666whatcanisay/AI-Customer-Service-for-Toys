@@ -42,6 +42,7 @@ try {
         GatewayClientId = 'channel-engine'
         GatewayKeyId = 'gateway-key-v1'
         GatewaySecretReference = $secretPath
+        InternalServiceSecretReference = $secretPath
         GatewayStatePath = (Join-Path $temporaryRoot 'gateway-state.sqlite3')
         GatewayClockSkewSeconds = 300
         GatewayNonceTtlSeconds = 600

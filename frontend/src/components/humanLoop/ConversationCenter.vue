@@ -5,17 +5,45 @@
         <p>CONVERSATION CENTER</p>
         <h2>客户会话</h2>
       </div>
-      <span class="observe-badge">OBSERVE</span>
+      <span class="agent-status" :class="`status-${agentStatus.toLowerCase()}`" data-testid="agent-status">
+        {{ AGENT_STATUS_LABELS[agentStatus] }}
+      </span>
     </header>
 
+    <section class="presence-controls" aria-label="客服状态">
+      <button
+        type="button"
+        :class="{ active: agentStatus !== 'OFFLINE' }"
+        data-testid="agent-online"
+        @click="$emit('availability', true)"
+      >上线</button>
+      <button
+        type="button"
+        :class="{ active: agentStatus === 'OFFLINE' }"
+        data-testid="agent-offline"
+        @click="$emit('availability', false)"
+      >离线</button>
+      <small>处理中状态由当前会话自动计算。</small>
+    </section>
+
     <div class="source-notice">
-      <strong>模拟渠道</strong>
-      <span>当前不连接真实 PDD，不读取真实客户消息。</span>
+      <strong>受控人工会话</strong>
+      <span>未连接PDD或Channel Engine；请使用客户代号，消息只保留在当前页面内存。</span>
     </div>
+
+    <section class="queue-toolbar">
+      <label for="conversation-status-filter">队列</label>
+      <select id="conversation-status-filter" v-model="statusFilter" data-testid="conversation-status-filter">
+        <option value="ALL">全部（{{ conversations.length }}）</option>
+        <option v-for="status in CONVERSATION_STATUSES" :key="status" :value="status">
+          {{ CONVERSATION_STATUS_LABELS[status] }}（{{ conversationCounts[status] }}）
+        </option>
+      </select>
+    </section>
 
     <div class="conversation-list">
       <button
-        v-for="conversation in conversations"
+        v-for="conversation in filteredConversations"
         :key="conversation.conversationId"
         type="button"
         class="conversation-item"
@@ -31,51 +59,107 @@
           </span>
           <span class="message-preview">{{ conversation.messages.at(-1)?.content }}</span>
           <span class="conversation-meta">
-            <em>{{ conversation.source === 'MOCK' ? 'Mock Message' : 'Channel Agent' }}</em>
+            <em>{{ sourceLabel(conversation.source) }}</em>
+            <b :class="`conversation-${conversation.status.toLowerCase()}`">
+              {{ CONVERSATION_STATUS_LABELS[conversation.status] }}
+            </b>
             <i v-if="conversation.unreadCount > 0">{{ conversation.unreadCount }}</i>
           </span>
         </span>
       </button>
+      <div v-if="filteredConversations.length === 0" class="conversation-empty" data-testid="conversation-empty">
+        当前队列没有会话。可在下方人工录入一条去标识化消息。
+      </div>
     </div>
 
-    <form class="mock-message-form" data-testid="mock-message-form" @submit.prevent="submitMockMessage">
-      <label for="mock-message">模拟一条新客户消息</label>
+    <form class="manual-message-form" data-testid="manual-message-form" @submit.prevent="submitManualMessage">
+      <div class="intake-mode">
+        <button type="button" :class="{ active: intakeMode === 'APPEND' }" :disabled="!activeConversationId" @click="intakeMode = 'APPEND'">追加当前</button>
+        <button type="button" :class="{ active: intakeMode === 'NEW' }" @click="intakeMode = 'NEW'">新建会话</button>
+      </div>
+      <label v-if="intakeMode === 'NEW'" for="manual-customer-label">客户代号</label>
+      <input
+        v-if="intakeMode === 'NEW'"
+        id="manual-customer-label"
+        v-model="customerLabel"
+        maxlength="32"
+        placeholder="例如：客户 A01（不要填写姓名）"
+      />
+      <label for="manual-message">人工录入客户消息</label>
       <textarea
-        id="mock-message"
-        v-model="mockMessage"
+        id="manual-message"
+        v-model="manualMessage"
         rows="3"
         maxlength="300"
         placeholder="新消息会让当前回复草稿自动失效"
       />
-      <button type="submit" :disabled="!activeConversationId || !mockMessage.trim()">
-        接收模拟消息
+      <button
+        type="submit"
+        :disabled="agentStatus === 'OFFLINE' || !manualMessage.trim() || (intakeMode === 'APPEND' ? !activeConversationId : !customerLabel.trim())"
+      >
+        {{ intakeMode === 'NEW' ? '创建并接收' : '接收新消息' }}
       </button>
     </form>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import type { WorkspaceConversation } from '@/stores/humanLoopWorkspace'
+import type { ChannelMessageSource } from '@/workspace/channelMessageAdapter'
+import {
+  AGENT_STATUS_LABELS,
+  CONVERSATION_STATUSES,
+  CONVERSATION_STATUS_LABELS,
+  type AgentStatus,
+  type ConversationStatus
+} from '@/workspace/customerSession'
 
-defineProps<{
+const props = defineProps<{
   conversations: WorkspaceConversation[]
   activeConversationId: string
+  agentStatus: AgentStatus
+  conversationCounts: Record<ConversationStatus, number>
 }>()
 
 const emit = defineEmits<{
   select: [conversationId: string]
-  mockMessage: [content: string]
+  availability: [online: boolean]
+  manualMessage: [payload: { conversationId: string | null; customerLabel: string; content: string }]
 }>()
 
-const mockMessage = ref('')
+const statusFilter = ref<'ALL' | ConversationStatus>('ALL')
+const intakeMode = ref<'APPEND' | 'NEW'>(props.activeConversationId ? 'APPEND' : 'NEW')
+const customerLabel = ref('')
+const manualMessage = ref('')
 
-const submitMockMessage = () => {
-  const content = mockMessage.value.trim()
-  if (!content) return
-  emit('mockMessage', content)
-  mockMessage.value = ''
+const filteredConversations = computed(() => statusFilter.value === 'ALL'
+  ? props.conversations
+  : props.conversations.filter((item) => item.status === statusFilter.value))
+
+watch(() => props.activeConversationId, (value) => {
+  intakeMode.value = value ? 'APPEND' : 'NEW'
+})
+
+const submitManualMessage = () => {
+  const content = manualMessage.value.trim()
+  const label = customerLabel.value.trim()
+  if (!content || props.agentStatus === 'OFFLINE') return
+  if (intakeMode.value === 'NEW' && !label) return
+  emit('manualMessage', {
+    conversationId: intakeMode.value === 'APPEND' ? props.activeConversationId : null,
+    customerLabel: label,
+    content
+  })
+  manualMessage.value = ''
+  if (intakeMode.value === 'NEW') customerLabel.value = ''
+}
+
+const sourceLabel = (source: ChannelMessageSource): string => {
+  if (source === 'MANUAL') return '人工录入'
+  if (source === 'VALIDATION_FIXTURE') return '验收数据'
+  return 'Channel Agent'
 }
 
 const timeLabel = (value?: string): string => {
@@ -87,40 +171,16 @@ const timeLabel = (value?: string): string => {
 </script>
 
 <style scoped>
-.conversation-center {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  min-width: 0;
-  min-height: 0;
-  border-right: 1px solid #263653;
-  background: #111a2c;
-}
-
-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 18px 14px; }
+.conversation-center { display: grid; grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; border-right: 1px solid #263653; background: #111a2c; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px 10px; }
 header p { margin: 0 0 5px; color: #6f83a8; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
 header h2 { margin: 0; color: #f3f7ff; font-size: 18px; }
-.observe-badge { padding: 5px 8px; border: 1px solid #3c557e; border-radius: 999px; color: #8db5ff; font-size: 9px; font-weight: 900; }
-.source-notice { display: grid; gap: 3px; margin: 0 12px 12px; padding: 10px 11px; border: 1px solid #34527b; border-radius: 10px; background: #172640; }
-.source-notice strong { color: #83b1ff; font-size: 11px; }
-.source-notice span { color: #91a2bd; font-size: 10px; line-height: 1.45; }
-.conversation-list { min-height: 0; padding: 0 8px; overflow: auto; }
-.conversation-item { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; width: 100%; margin-bottom: 5px; padding: 11px 10px; border: 1px solid transparent; border-radius: 11px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
-.conversation-item:hover { background: #18243a; }
-.conversation-item.active { border-color: #365f9d; background: linear-gradient(135deg, #1c3152, #18253c); }
-.avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; background: #263a5a; color: #a9c8ff; font-size: 11px; font-weight: 900; }
-.conversation-copy { display: grid; min-width: 0; gap: 5px; }
-.conversation-title { display: flex; justify-content: space-between; gap: 8px; }
-.conversation-title strong { color: #eaf1ff; font-size: 12px; }
-.conversation-title time { color: #657897; font-size: 9px; }
-.message-preview { overflow: hidden; color: #8fa0bb; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.conversation-meta { display: flex; align-items: center; justify-content: space-between; }
-.conversation-meta em { color: #657b9d; font-size: 9px; font-style: normal; }
-.conversation-meta i { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 999px; background: #4e8cff; color: #fff; font-size: 9px; font-style: normal; }
-.mock-message-form { display: grid; gap: 8px; margin: 10px 12px 12px; padding: 12px; border: 1px solid #2a3b58; border-radius: 11px; background: #152036; }
-.mock-message-form label { color: #b8c6dc; font-size: 10px; font-weight: 800; }
-.mock-message-form textarea { resize: none; padding: 9px; border: 1px solid #344765; border-radius: 8px; outline: none; color: #e8effb; background: #0e1829; font-size: 10px; line-height: 1.5; }
-.mock-message-form textarea:focus { border-color: #5a92e9; }
-.mock-message-form button { padding: 8px; border: 0; border-radius: 8px; background: #315d9f; color: #fff; font-size: 10px; font-weight: 800; cursor: pointer; }
-.mock-message-form button:disabled { opacity: .45; cursor: not-allowed; }
+.agent-status { padding: 6px 9px; border: 1px solid #39755f; border-radius: 999px; color: #75d7ae; font-size: 9px; font-weight: 900; }
+.agent-status.status-busy { border-color: #7a622e; color: #eccb77; }.agent-status.status-offline { border-color: #5d6573; color: #9aa6b8; }
+.presence-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 12px 8px; }.presence-controls button, .intake-mode button { padding: 6px; border: 1px solid #344765; border-radius: 7px; color: #91a4c2; background: #101a2b; font-size: 9px; cursor: pointer; }.presence-controls button.active, .intake-mode button.active { border-color: #4c82cc; color: #dceaff; background: #1b3151; }.presence-controls small { grid-column: 1 / -1; color: #72829c; font-size: 8px; text-align: center; }
+.source-notice { display: grid; gap: 3px; margin: 0 12px 8px; padding: 9px 10px; border: 1px solid #34527b; border-radius: 10px; background: #172640; }.source-notice strong { color: #83b1ff; font-size: 10px; }.source-notice span { color: #91a2bd; font-size: 9px; line-height: 1.45; }
+.queue-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 12px 8px; }.queue-toolbar label { color: #8496b2; font-size: 9px; font-weight: 800; }.queue-toolbar select { flex: 1; min-width: 0; padding: 6px 7px; border: 1px solid #344765; border-radius: 7px; color: #dce6f5; background: #0e1829; font-size: 9px; }
+.conversation-list { min-height: 0; padding: 0 8px; overflow: auto; }.conversation-item { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; width: 100%; margin-bottom: 5px; padding: 10px; border: 1px solid transparent; border-radius: 11px; color: inherit; background: transparent; text-align: left; cursor: pointer; }.conversation-item:hover { background: #18243a; }.conversation-item.active { border-color: #365f9d; background: linear-gradient(135deg, #1c3152, #18253c); }
+.avatar { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; background: #263a5a; color: #a9c8ff; font-size: 11px; font-weight: 900; }.conversation-copy { display: grid; min-width: 0; gap: 5px; }.conversation-title { display: flex; justify-content: space-between; gap: 8px; }.conversation-title strong { color: #eaf1ff; font-size: 12px; }.conversation-title time { color: #657897; font-size: 9px; }.message-preview { overflow: hidden; color: #8fa0bb; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }.conversation-meta { display: flex; align-items: center; gap: 5px; }.conversation-meta em { margin-right: auto; color: #657b9d; font-size: 8px; font-style: normal; }.conversation-meta b { padding: 2px 5px; border-radius: 999px; color: #87abd9; background: #1d304c; font-size: 8px; }.conversation-meta b.conversation-waiting_reply { color: #e8c878; background: #372f1c; }.conversation-meta b.conversation-completed { color: #76cba8; background: #18342b; }.conversation-meta i { display: grid; min-width: 17px; height: 17px; place-items: center; border-radius: 999px; color: #fff; background: #4e8cff; font-size: 8px; font-style: normal; }.conversation-empty { margin: 8px; padding: 14px; border: 1px dashed #344765; border-radius: 10px; color: #7f91ad; font-size: 9px; line-height: 1.5; text-align: center; }
+.manual-message-form { display: grid; gap: 7px; margin: 8px 12px 12px; padding: 10px; border: 1px solid #2a3b58; border-radius: 11px; background: #152036; }.intake-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }.manual-message-form label { color: #b8c6dc; font-size: 9px; font-weight: 800; }.manual-message-form input, .manual-message-form textarea { resize: none; padding: 8px; border: 1px solid #344765; border-radius: 8px; outline: none; color: #e8effb; background: #0e1829; font-size: 9px; line-height: 1.45; }.manual-message-form input:focus, .manual-message-form textarea:focus { border-color: #5a92e9; }.manual-message-form > button { padding: 8px; border: 0; border-radius: 8px; color: #fff; background: #315d9f; font-size: 9px; font-weight: 800; cursor: pointer; }.manual-message-form button:disabled { opacity: .42; cursor: not-allowed; }
 </style>
-

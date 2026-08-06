@@ -36,6 +36,7 @@ from app.service.knowledge_quality import (
     KnowledgeQualityService,
 )
 from app.service.iam_authorization import require_operations_identity
+from app.service.internal_authorization import require_internal_service_identity
 from app.service.ai_capability import (
     INITIALIZATION_FAILED_CODE,
     MODULE_DEFINITIONS,
@@ -234,19 +235,28 @@ def health(request: Request) -> dict[str, Any]:
     return {**envelope(data), "状态": "正常"}
 
 
-@router.get("/status", tags=["system"])
+@router.get(
+    "/status", tags=["system"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def service_status(request: Request) -> dict[str, Any]:
     data = status_data(request)
     return {**envelope(data), **data}
 
 
-@router.get("/knowledge/statistics", tags=["knowledge"])
+@router.get(
+    "/knowledge/statistics", tags=["knowledge"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def knowledge_statistics(request: Request) -> dict[str, Any]:
     data = statistics_data(request)
     return envelope(data)
 
 
-@router.get("/stats", tags=["knowledge"])
+@router.get(
+    "/stats", tags=["knowledge"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def legacy_statistics(request: Request) -> dict[str, Any]:
     data = statistics_data(request)
     return {
@@ -258,19 +268,30 @@ def legacy_statistics(request: Request) -> dict[str, Any]:
     }
 
 
-@router.get("/questions/recommended", tags=["chat"])
+@router.get(
+    "/questions/recommended", tags=["chat"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def recommended_questions() -> dict[str, Any]:
     data = {"questions": RECOMMENDED_QUESTIONS}
     return {**envelope(data), "questions": RECOMMENDED_QUESTIONS}
 
 
-@router.get("/config/model", tags=["configuration"])
+@router.get(
+    "/config/model",
+    tags=["configuration"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def get_model_config(request: Request) -> dict[str, Any]:
     require_loopback_client(request)
     return envelope(model_config_data(get_rag(request)))
 
 
-@router.put("/config/model", tags=["configuration"])
+@router.put(
+    "/config/model",
+    tags=["configuration"],
+    dependencies=[Depends(require_operations_identity)],
+)
 def update_model_config(
     request: Request, config: ModelConfigUpdate
 ) -> dict[str, Any]:
@@ -313,7 +334,10 @@ def update_model_config(
     return envelope(model_config_data(rag), message="大模型配置已保存并即时生效")
 
 
-@router.post("/retrieval/search", tags=["knowledge"])
+@router.post(
+    "/retrieval/search", tags=["knowledge"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def retrieval_search(request: Request, search_request: SearchRequest) -> dict[str, Any]:
     rag = get_rag(request)
     result = rag.retrieve(
@@ -325,7 +349,10 @@ def retrieval_search(request: Request, search_request: SearchRequest) -> dict[st
     return envelope(result)
 
 
-@router.post("/chat", tags=["chat"])
+@router.post(
+    "/chat", tags=["chat"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def chat(request: Request, chat_request: ChatRequest) -> dict[str, Any]:
     rag = get_rag(request)
     result = rag.query(
@@ -334,7 +361,11 @@ def chat(request: Request, chat_request: ChatRequest) -> dict[str, Any]:
     return {**envelope(result), **result}
 
 
-@router.post("/test-knowledge/sync/{package_id}", tags=["test-knowledge"])
+@router.post(
+    "/test-knowledge/sync/{package_id}",
+    tags=["test-knowledge"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def sync_test_knowledge(request: Request, package_id: str) -> dict[str, Any]:
     require_loopback_client(request)
     try:
@@ -356,6 +387,7 @@ def sync_test_knowledge(request: Request, package_id: str) -> dict[str, Any]:
     "/admin/ai/knowledge-publications/products",
     tags=["knowledge-publishing"],
     response_model=ProductKnowledgePublishReceipt,
+    dependencies=[Depends(require_internal_service_identity)],
 )
 def publish_product_knowledge(
     request: Request, publication: ProductKnowledgePublishRequest
@@ -368,6 +400,7 @@ def publish_product_knowledge(
     "/admin/ai/knowledge-publications/visibility",
     tags=["knowledge-publishing"],
     response_model=ProductKnowledgeVisibilityBatchResponse,
+    dependencies=[Depends(require_internal_service_identity)],
 )
 def get_product_knowledge_visibility(
     request: Request, query: ProductKnowledgeVisibilityBatchRequest
@@ -594,19 +627,28 @@ def get_ai_control_center_product_overview(request: Request) -> dict[str, Any]:
     )
 
 
-@router.get("/ai/status", tags=["compatibility"])
+@router.get(
+    "/ai/status", tags=["compatibility"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def java_proxy_status_compatibility(request: Request) -> dict[str, Any]:
     data = status_data(request)
     data["aiUrl"] = str(request.base_url).rstrip("/")
     return {"code": 200, "message": "success", "data": data}
 
 
-@router.get("/ai/stats", tags=["compatibility"])
+@router.get(
+    "/ai/stats", tags=["compatibility"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def java_proxy_stats_compatibility(request: Request) -> dict[str, Any]:
     return {"code": 200, "message": "success", "data": statistics_data(request)}
 
 
-@router.post("/ai/chat", tags=["compatibility"])
+@router.post(
+    "/ai/chat", tags=["compatibility"],
+    dependencies=[Depends(require_internal_service_identity)],
+)
 def java_proxy_chat_compatibility(
     request: Request, chat_request: ChatRequest
 ) -> dict[str, Any]:

@@ -26,10 +26,9 @@ export interface RagChatContext {
   sku_id: string | null
 }
 
-export interface RagChatRequest {
-  question: string
-  context: RagChatContext
-}
+export type RagChatRequest =
+  | { question: string; context: RagChatContext; resolution_id?: never }
+  | { question: string; resolution_id: string; context?: never }
 
 export interface RagCitation {
   file: string

@@ -237,6 +237,19 @@ class Settings:
     gateway_nonce_ttl_seconds: int = 600
     gateway_decision_retention_seconds: int = 7 * 24 * 60 * 60
     gateway_decision_lease_seconds: int = 30
+    internal_service_secret_file: Path | None = field(default=None, repr=False)
+
+    def internal_service_token(self) -> str:
+        """Resolve the shared internal credential from its file reference."""
+        if self.internal_service_secret_file is None:
+            raise ValueError("INTERNAL_SERVICE_SECRET_FILE is not configured")
+        token_bytes = _read_single_line_secret(self.internal_service_secret_file)
+        if len(token_bytes) < 32:
+            raise ValueError("Internal service secret must contain at least 32 bytes")
+        try:
+            return token_bytes.decode("ascii")
+        except UnicodeDecodeError as exc:
+            raise ValueError("Internal service secret must be ASCII") from exc
 
     def gateway_secret_bytes(self) -> bytes:
         """Resolve the Gateway credential without exposing it in server config."""
@@ -371,6 +384,9 @@ class Settings:
             ),
             gateway_decision_lease_seconds=max(
                 1, int(os.getenv("GATEWAY_DECISION_LEASE_SECONDS", "30"))
+            ),
+            internal_service_secret_file=_resolve_optional_backend_path(
+                os.getenv("INTERNAL_SERVICE_SECRET_FILE")
             ),
         )
 

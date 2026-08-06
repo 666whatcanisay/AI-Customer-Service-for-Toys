@@ -60,18 +60,14 @@ try {
     $activeCollectionState = Get-RagActiveCollectionStartupState $config
     if ($activeCollectionState.Ready) { Invoke-RagChatSmoke $config | Out-Null }
 
-    $vite = Join-Path $config.RepositoryRoot 'frontend\node_modules\vite\bin\vite.js'
-    $frontendEnvironment = Get-LocalFrontendEnvironment $config
     $startedServices += 'customer-web'
-    Start-ManagedServiceWithEnvironment $config 'customer-web' (Get-Command node.exe).Source @($vite,'--host',$config.BindAddress,'--port',$config.CustomerWebPort,'--strictPort') (Join-Path $config.RepositoryRoot 'frontend') 'vite.js' $config.CustomerWebPort $frontendEnvironment | Out-Null
-    Wait-HttpOk $config.CustomerWebUrl 45 '客服页面'
-    Update-ManagedServiceListenerRecord $config 'customer-web' | Out-Null
+    Start-CustomerWebService $config | Out-Null
     $startedServices += 'admin-web'
     Start-AdminWebService $config | Out-Null
     try { Save-StandardRuntimeNetworkModePreference $config 'LOCAL' } catch { Write-Warning "无法保存 LOCAL Runtime 偏好：$($_.Exception.Message)" }
     Write-Host "AI 客服已启动：$($config.CustomerWebUrl)" -ForegroundColor Green
     Write-Host "运营后台：$($config.AdminWebUrl)"
-    Write-Host 'API 模式：DIRECT（本机排错模式）'
+    Write-Host 'API 模式：PRODUCTION_SAME_ORIGIN_PROXY（静态构建；禁止 Vite dev server）'
     Write-Host "日志目录：$(Get-ServiceLogDirectory $config)"
     if (-not $NoBrowser -and [bool]$config.OpenBrowser) { Start-Process $config.CustomerWebUrl }
     if (-not $NoBrowser -and [bool]$config.AdminOpenBrowser) { Start-Process $config.AdminWebUrl }
