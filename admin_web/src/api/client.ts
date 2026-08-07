@@ -23,6 +23,11 @@ export interface UserCreateInput {
   store_bindings: Array<{ store_id: number; is_default: boolean }>
 }
 
+export interface UserUpdateInput {
+  display_name?: string
+  password?: string
+}
+
 export type StoreContextResolutionStatus =
   | 'RESOLVED'
   | 'STORE_SELECTION_REQUIRED'
@@ -1713,6 +1718,13 @@ export async function listStoreContextResolutions(): Promise<StoreContextResolut
 
 export async function createUser(input: UserCreateInput): Promise<AuthUser> {
   const response = await apiClient.post<AuthUser>('/api/v1/admin/users', input)
+  return response.data
+}
+
+export async function updateUser(userId: string, input: UserUpdateInput): Promise<AuthUser> {
+  const response = await apiClient.patch<AuthUser>(
+    `/api/v1/admin/users/${encodeURIComponent(userId)}`, input,
+  )
   return response.data
 }
 
