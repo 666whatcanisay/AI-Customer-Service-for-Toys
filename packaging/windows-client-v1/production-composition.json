@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "release": "AI-CS Channel Agent Windows Client 1.1.1",
+  "source_allowlist": [
+    "src/channel_agent/__init__.py",
+    "src/channel_agent/version.py",
+    "src/channel_agent/config.py",
+    "src/channel_agent/contract.py",
+    "src/channel_agent/identity.py",
+    "src/channel_agent/binding.py",
+    "src/channel_agent/logger.py",
+    "src/channel_agent/heartbeat.py",
+    "src/channel_agent/client.py",
+    "src/channel_agent/runtime.py",
+    "src/channel_agent/windows.py",
+    "src/channel_agent/windows_app.py"
+  ],
+  "dependency_allowlist": [
+    "annotated_types",
+    "anyio",
+    "certifi",
+    "h11",
+    "httpcore",
+    "httpx",
+    "idna",
+    "pydantic",
+    "pydantic_core",
+    "typing_extensions.py",
+    "typing_inspection"
+  ],
+  "excluded": [
+    "ai_cs_agent",
+    "channel_engine",
+    "pdd",
+    "browser-automation",
+    "message-read",
+    "message-send",
+    "cookie",
+    "password",
+    "plaintext-token"
+  ]
+}

@@ -575,6 +575,24 @@ class PDDWebSocketInboxRow(Base):
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ChannelAgentIdentityRow(Base):
+    __tablename__ = "channel_agent_identities"
+
+    agent_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    user_id: Mapped[str | None] = mapped_column(String(160))
+    store_id: Mapped[str | None] = mapped_column(String(160))
+    store_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    binding_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+
 class PDDProductionSafetyStateRow(Base):
     __tablename__ = "pdd_production_safety_state"
 

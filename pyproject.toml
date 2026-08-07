@@ -28,6 +28,8 @@ dev = [
 [project.scripts]
 channel-engine = "channel_engine.app:run"
 channel-agent = "channel_engine.app:run_agent"
+channel-agent-foundation = "channel_agent.app:main"
+channel-agent-windows = "channel_agent.windows_app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -24,6 +24,11 @@ from channel_engine.agent import (
     default_channel_agent_config,
     load_channel_agent_config,
 )
+from channel_engine.agent.node_api import (
+    ChannelAgentNodeRegistry,
+    create_channel_agent_node_router,
+)
+from channel_engine.agent.binding_repository import SqlAlchemyAgentIdentityRepository
 from channel_engine.channel import (
     AdapterRegistry,
     ChannelManager,
@@ -134,6 +139,7 @@ from channel_engine.session import (
     SessionHeartbeatScheduler,
     create_channel_session_router,
 )
+from channel_engine.security.rbac import OperatorIdentityProvider
 from channel_engine.storage import (
     RecordNotFound,
     SqlAlchemyUnitOfWork,
@@ -168,6 +174,8 @@ def create_app(
     agent_config: ChannelAgentConfig | None = None,
     agent_service: ChannelAgentService | None = None,
     first_launch_service: ChannelAgentFirstLaunchService | None = None,
+    agent_node_registry: ChannelAgentNodeRegistry | None = None,
+    agent_operator_identity_provider: OperatorIdentityProvider | None = None,
     pilot_config: PilotStoreConfig | None = None,
     pilot_runtime: PDDPilotRuntime | None = None,
     pilot_live_capabilities: PilotLiveCapabilitySnapshot | None = None,
@@ -557,6 +565,16 @@ def create_app(
     )
     application.include_router(
         create_agent_router(active_agent, first_launch_service)
+    )
+    active_agent_node_registry = agent_node_registry or ChannelAgentNodeRegistry(
+        identity_repository=SqlAlchemyAgentIdentityRepository(session_factory)
+    )
+    application.state.channel_agent_node_registry = active_agent_node_registry
+    application.include_router(
+        create_channel_agent_node_router(
+            active_agent_node_registry,
+            identity_provider=agent_operator_identity_provider,
+        )
     )
     application.include_router(create_pilot_router(active_pilot, pilot_live))
     application.include_router(create_runtime_reliability_router(channel_runtime))

@@ -1,0 +1,12 @@
+{
+  "config_version": "1.0",
+  "server_url": "http://127.0.0.1:8000",
+  "agent_id": "customer-service-agent-001",
+  "device_id": "customer-service-pc-001",
+  "user_reference": null,
+  "store_reference": null,
+  "store_references": [],
+  "connect_timeout_seconds": 5.0,
+  "heartbeat_interval_seconds": 30.0,
+  "log_directory": "logs"
+}
