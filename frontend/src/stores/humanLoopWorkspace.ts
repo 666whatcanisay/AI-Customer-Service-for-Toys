@@ -22,6 +22,7 @@ export const REPLY_DRAFT_STATES = [
 
 export type ReplyDraftState = (typeof REPLY_DRAFT_STATES)[number]
 export type DecisionReviewState = 'WAITING_HUMAN' | 'APPROVED' | 'REJECTED'
+export type ReplyDraftSource = 'AI' | 'MANUAL'
 
 export interface WorkspaceMessage extends ChannelMessageEnvelope {
   direction: 'INBOUND' | 'OUTBOUND_DRAFT'
@@ -42,6 +43,7 @@ export interface ReplyDraft {
   messageId: string
   state: ReplyDraftState
   decisionState: DecisionReviewState
+  replySource: ReplyDraftSource | null
   originalAnswer: string
   editedAnswer: string
   requestId: string | null
@@ -55,14 +57,14 @@ export interface ReplyDraft {
 }
 
 const TRANSITIONS: Record<ReplyDraftState, readonly ReplyDraftState[]> = {
-  MESSAGE_RECEIVED: ['UNDERSTANDING', 'EXPIRED'],
+  MESSAGE_RECEIVED: ['UNDERSTANDING', 'EDITED', 'EXPIRED'],
   UNDERSTANDING: ['GENERATING', 'EXPIRED'],
   GENERATING: ['DRAFT_READY', 'EXPIRED'],
   DRAFT_READY: ['HUMAN_REVIEW', 'EXPIRED'],
   HUMAN_REVIEW: ['EDITED', 'ACCEPTED', 'EXPIRED'],
   EDITED: ['EDITED', 'ACCEPTED', 'EXPIRED'],
   ACCEPTED: ['EXPIRED'],
-  EXPIRED: []
+  EXPIRED: ['EDITED']
 }
 
 const createDraftId = (): string => {
@@ -183,6 +185,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     if (!activeDraft.value) return
     activeDraft.value.originalAnswer = payload.answer
     activeDraft.value.editedAnswer = payload.answer
+    activeDraft.value.replySource = 'AI'
     activeDraft.value.requestId = payload.requestId
     activeDraft.value.action = payload.action
     activeDraft.value.riskLevel = payload.riskLevel
@@ -200,6 +203,24 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     if (!activeDraft.value) throw new Error('当前没有可编辑的草稿')
     if (activeDraft.value.state !== 'HUMAN_REVIEW') throw new Error('当前草稿不允许进入修改')
     transition('EDITED')
+  }
+
+  function beginManualReply(answer: string): void {
+    if (!activeDraft.value) throw new Error('当前没有可编辑的回复草稿')
+    if (!['MESSAGE_RECEIVED', 'EXPIRED'].includes(activeDraft.value.state)) {
+      throw new Error('当前草稿不允许切换为人工回复')
+    }
+    transition('EDITED')
+    activeDraft.value.replySource = 'MANUAL'
+    activeDraft.value.originalAnswer = ''
+    activeDraft.value.editedAnswer = answer
+    activeDraft.value.requestId = null
+    activeDraft.value.action = null
+    activeDraft.value.riskLevel = null
+    activeDraft.value.citations = []
+    activeDraft.value.warnings = []
+    activeDraft.value.requiredFields = []
+    activeDraft.value.updatedAt = nowIso()
   }
 
   function editDraft(answer: string): void {
@@ -274,6 +295,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       messageId: message.messageId,
       state: 'MESSAGE_RECEIVED',
       decisionState: 'WAITING_HUMAN',
+      replySource: null,
       originalAnswer: '',
       editedAnswer: '',
       requestId: null,
@@ -337,6 +359,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     setDraftReady,
     beginHumanReview,
     beginEditing,
+    beginManualReply,
     editDraft,
     acceptDraft,
     rejectDraft,

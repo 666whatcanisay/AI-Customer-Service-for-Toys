@@ -23,8 +23,8 @@
       </article>
       <article>
         <span>置信度</span>
-        <strong>未提供</strong>
-        <small>系统不提供可靠置信度，请结合商品依据和风险提示判断。</small>
+        <strong>{{ isManualReply ? '不适用' : '未提供' }}</strong>
+        <small>{{ isManualReply ? '本次内容由客服人工输入，请按业务规范自行核对。' : '系统不提供可靠置信度，请结合商品依据和风险提示判断。' }}</small>
       </article>
       <article>
         <span>知识覆盖</span>
@@ -96,6 +96,7 @@ defineEmits<{
 }>()
 
 const evidenceCount = computed(() => props.draft?.citations.length ?? 0)
+const isManualReply = computed(() => props.draft?.replySource === 'MANUAL')
 const conversationStatusLabel = computed(() => props.conversation
   ? CONVERSATION_STATUS_LABELS[props.conversation.status]
   : '未选择')
@@ -108,7 +109,7 @@ const conversationNextStep = computed(() => {
 })
 
 const decisionLabel = computed(() => {
-  if (props.draft?.decisionState === 'APPROVED') return '已采用'
+  if (props.draft?.decisionState === 'APPROVED') return isManualReply.value ? '人工回复已确认' : '已采用'
   if (props.draft?.decisionState === 'REJECTED') return '已拒绝'
   return '等待人工确认'
 })
@@ -120,9 +121,11 @@ const decisionTone = computed(() => ({
 
 const nextStep = computed(() => {
   if (!props.draft) return '选择一条会话开始处理。'
-  if (props.draft.decisionState === 'APPROVED') return '已记录采用；请人工复制到渠道发送。'
+  if (props.draft.decisionState === 'APPROVED') return isManualReply.value
+    ? '请复制到渠道窗口，再次核对后发送。'
+    : '已记录采用；请人工复制到渠道发送。'
   if (props.draft.decisionState === 'REJECTED') return '已记录拒绝；问题进入反馈闭环。'
-  if (props.draft.state === 'MESSAGE_RECEIVED') return '生成 AI 回复建议。'
+  if (props.draft.state === 'MESSAGE_RECEIVED') return '可生成 AI 建议，也可直接输入人工回复。'
   if (['UNDERSTANDING', 'GENERATING'].includes(props.draft.state)) return 'AI 正在处理，请等待。'
   return '核对事实、引用和风险后再决定。'
 })
@@ -136,39 +139,39 @@ const actionLabels: Record<string, string> = {
   TRANSFER_HUMAN: '转人工判断',
   REFUSE: '礼貌拒绝'
 }
-const riskLabel = computed(() => riskLabels[props.draft?.riskLevel ?? ''] ?? '待判断')
+const riskLabel = computed(() => isManualReply.value ? '人工判断' : riskLabels[props.draft?.riskLevel ?? ''] ?? '待判断')
 const riskTone = computed(() => `risk-${(props.draft?.riskLevel ?? 'unknown').toLowerCase()}`)
-const actionLabel = computed(() => actionLabels[props.draft?.action ?? ''] ?? '等待 AI 建议')
+const actionLabel = computed(() => isManualReply.value ? '人工直接回复' : actionLabels[props.draft?.action ?? ''] ?? '等待 AI 建议')
 const requiredFieldText = computed(() => props.draft?.requiredFields.length
   ? `仍需补充：${props.draft.requiredFields.join('、')}`
-  : '没有返回待补充字段。')
+  : isManualReply.value ? '人工回复未调用 AI 知识检索。' : '没有返回待补充字段。')
 </script>
 
 <style scoped>
-.decision-center { min-width: 0; min-height: 0; padding: 20px 16px; overflow: auto; border-left: 1px solid #263653; background: #111a2c; }
-header p { margin: 0 0 5px; color: #6f83a8; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
-header h2 { margin: 0 0 16px; color: #f3f7ff; font-size: 18px; }
-.decision-status { display: grid; gap: 6px; padding: 15px; border: 1px solid #7b6229; border-radius: 12px; background: #2a2419; }
-.decision-status.approved { border-color: #2e735c; background: #172c27; }
-.decision-status.rejected { border-color: #7d424c; background: #301d25; }
-.decision-status span, .metric-stack span, .receipt-card span { color: #8e9db7; font-size: 10px; }
-.decision-status strong { color: #f2c96d; font-size: 17px; }
-.decision-status.approved strong { color: #75d8b0; }
-.decision-status.rejected strong { color: #ef8e9a; }
-.decision-status small { color: #aeb9ca; font-size: 10px; line-height: 1.5; }
+.decision-center { min-width: 0; min-height: 0; padding: 20px 16px; overflow: auto; border-left: 1px solid var(--workspace-border); color: var(--workspace-text); background: var(--workspace-panel-soft); }
+header p { margin: 0 0 5px; color: var(--workspace-accent); font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+header h2 { margin: 0 0 16px; color: var(--workspace-text); font-size: 18px; }
+.decision-status { display: grid; gap: 6px; padding: 15px; border: 1px solid #dfbd71; border-radius: 12px; background: var(--workspace-warning-soft); }
+.decision-status.approved { border-color: #8fbea0; background: #e3f3e7; }
+.decision-status.rejected { border-color: #dfa8ae; background: var(--workspace-danger-soft); }
+.decision-status span, .metric-stack span, .receipt-card span { color: var(--workspace-muted); font-size: 10px; }
+.decision-status strong { color: #8d6117; font-size: 17px; }
+.decision-status.approved strong { color: var(--workspace-accent-strong); }
+.decision-status.rejected strong { color: var(--workspace-danger); }
+.decision-status small { color: var(--workspace-text-soft); font-size: 10px; line-height: 1.5; }
 .metric-stack { display: grid; gap: 9px; margin-top: 12px; }
-.metric-stack article { display: grid; gap: 5px; padding: 12px; border: 1px solid #293a57; border-radius: 10px; background: #151f34; }
-.metric-stack strong { color: #e7eefb; font-size: 12px; line-height: 1.45; }
-.metric-stack small { color: #7285a4; font-size: 9px; line-height: 1.45; }
-.metric-stack .risk-low { color: #71d4ad; }
-.metric-stack .risk-medium { color: #efca70; }
-.metric-stack .risk-high { color: #f18a96; }
-.receipt-card { display: grid; gap: 6px; margin-top: 12px; padding: 12px; border: 1px solid #315d52; border-radius: 10px; background: #142822; }
-.receipt-card code { overflow-wrap: anywhere; color: #76d8b2; font-size: 10px; }
-.receipt-card small { color: #8cae9f; font-size: 9px; }
-.issue-receipt { border-color: #6f5730; background: #2a2115; }.issue-receipt code { color: #edc873; }
-.conversation-actions { display: grid; gap: 7px; margin-top: 12px; }.conversation-actions button { padding: 9px; border: 1px solid #4777b3; border-radius: 8px; color: #e7f0ff; background: #1d3b61; font-size: 9px; font-weight: 800; cursor: pointer; }.conversation-actions small { color: #8091ad; font-size: 8px; line-height: 1.45; }
-.safety-card { margin-top: 12px; padding: 13px; border: 1px solid #32425e; border-radius: 10px; background: #151f33; }
-.safety-card strong { color: #cad7ed; font-size: 11px; }
-.safety-card ul { display: grid; gap: 6px; margin: 9px 0 0; padding-left: 17px; color: #8fa0bc; font-size: 10px; line-height: 1.4; }
+.metric-stack article { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--workspace-border); border-radius: 10px; background: #fff; }
+.metric-stack strong { color: var(--workspace-text); font-size: 12px; line-height: 1.45; }
+.metric-stack small { color: var(--workspace-muted); font-size: 9px; line-height: 1.45; }
+.metric-stack .risk-low { color: var(--workspace-accent); }
+.metric-stack .risk-medium { color: var(--workspace-warning); }
+.metric-stack .risk-high { color: var(--workspace-danger); }
+.receipt-card { display: grid; gap: 6px; margin-top: 12px; padding: 12px; border: 1px solid #9fc3aa; border-radius: 10px; background: #e8f5eb; }
+.receipt-card code { overflow-wrap: anywhere; color: var(--workspace-accent); font-size: 10px; }
+.receipt-card small { color: var(--workspace-text-soft); font-size: 9px; }
+.issue-receipt { border-color: #dfc17d; background: #fff7e4; }.issue-receipt code { color: var(--workspace-warning); }
+.conversation-actions { display: grid; gap: 7px; margin-top: 12px; }.conversation-actions button { padding: 9px; border: 1px solid var(--workspace-accent); border-radius: 8px; color: #fff; background: var(--workspace-accent); font-size: 9px; font-weight: 800; cursor: pointer; }.conversation-actions small { color: var(--workspace-muted); font-size: 8px; line-height: 1.45; }
+.safety-card { margin-top: 12px; padding: 13px; border: 1px solid var(--workspace-border); border-radius: 10px; background: #eaf5ec; }
+.safety-card strong { color: var(--workspace-text); font-size: 11px; }
+.safety-card ul { display: grid; gap: 6px; margin: 9px 0 0; padding-left: 17px; color: var(--workspace-text-soft); font-size: 10px; line-height: 1.4; }
 </style>

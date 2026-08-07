@@ -50,6 +50,7 @@
       @generate="generateDraft"
       @regenerate="regenerateDraft"
       @start-edit="beginEditing"
+      @manual-edit="editManualReply"
       @edit="editDraft"
       @accept="acceptDraft"
       @feedback="submitFeedback"
@@ -336,7 +337,7 @@ const resolveConversation = async (): Promise<ContextResolution | null> => {
     }
     if (result.status !== 'RESOLVED') {
       actionError.value = result.status === 'UNKNOWN'
-        ? '暂时无法识别商品，请补充商品名称或编号。'
+        ? '暂时无法识别商品。你可以补充商品名称后重新生成，或直接在回复草稿中输入人工回复。'
         : '请先完成默认店铺选择。'
       return null
     }
@@ -415,6 +416,16 @@ const editDraft = (value: string): void => {
   catch (error) { actionError.value = error instanceof Error ? error.message : '草稿当前不可编辑。' }
 }
 
+const editManualReply = (value: string): void => {
+  try {
+    if (activeDraft.value?.replySource !== 'MANUAL') workspace.beginManualReply(value)
+    else workspace.editDraft(value)
+    actionError.value = ''
+  } catch (error) {
+    actionError.value = error instanceof Error ? error.message : '人工回复当前不可编辑。'
+  }
+}
+
 const beginEditing = (): void => {
   try { workspace.beginEditing(); actionError.value = '' }
   catch (error) { actionError.value = error instanceof Error ? error.message : '草稿当前不可修改。' }
@@ -473,7 +484,18 @@ const recordInteraction = async (actionType: AdoptionType): Promise<string> => {
   return receipt.eventId
 }
 
-const acceptDraft = async (type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT'): Promise<void> => {
+const acceptDraft = async (type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT' | 'MANUAL_ACCEPT'): Promise<void> => {
+  if (type === 'MANUAL_ACCEPT') {
+    if (activeDraft.value?.replySource !== 'MANUAL' || !activeDraft.value.editedAnswer.trim()) {
+      actionError.value = '请先输入人工回复内容。'
+      return
+    }
+    workspace.acceptDraft()
+    actionError.value = ''
+    interactionReceiptId.value = ''
+    ElMessage.success('人工回复已确认；请复制到渠道窗口核对后发送')
+    return
+  }
   if (!canSubmitFeedback.value) {
     actionError.value = '当前账号没有反馈提交权限。'
     return
@@ -592,9 +614,29 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .desktop-workspace-shell {
+  --workspace-canvas: #edf7ef;
+  --workspace-panel: #fbfefb;
+  --workspace-panel-soft: #f2f9f3;
+  --workspace-panel-strong: #e4f2e7;
+  --workspace-border: #c9ddcd;
+  --workspace-border-strong: #9fc3a7;
+  --workspace-text: #183d29;
+  --workspace-text-soft: #466451;
+  --workspace-muted: #708678;
+  --workspace-accent: #2f7d57;
+  --workspace-accent-strong: #236545;
+  --workspace-accent-soft: #dcefe1;
+  --workspace-blue: #356f8b;
+  --workspace-warning: #a36c18;
+  --workspace-warning-soft: #fff4d9;
+  --workspace-danger: #b44b55;
+  --workspace-danger-soft: #fff0f1;
   display: grid;
   gap: 10px;
   min-width: 980px;
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--workspace-canvas);
 }
 
 .human-loop-workspace-grid {
@@ -605,10 +647,10 @@ onBeforeUnmount(() => {
   height: calc(100vh - 154px);
   min-height: 650px;
   overflow: hidden;
-  border: 1px solid #283956;
+  border: 1px solid var(--workspace-border);
   border-radius: 15px;
-  background: #0c1422;
-  box-shadow: 0 24px 60px rgb(13 27 52 / 18%);
+  background: var(--workspace-panel);
+  box-shadow: 0 18px 45px rgb(51 91 61 / 12%);
 }
 
 @media (max-width: 1280px) {

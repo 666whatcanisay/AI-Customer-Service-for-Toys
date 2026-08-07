@@ -200,6 +200,30 @@ describe('HumanInLoopWorkspace', () => {
     }))
   })
 
+  it('keeps manual reply available when the product cannot be identified', async () => {
+    apiMocks.resolve.mockResolvedValueOnce({
+      resolutionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', status: 'UNKNOWN',
+      store, product: null, sku: null, productCandidates: [], skuCandidates: [],
+      reasonCode: 'PRODUCT_UNKNOWN', createdAt: '2026-08-06T08:00:00Z'
+    })
+    const wrapper = mountWorkspace(); await flushPromises()
+
+    await wrapper.get('[data-testid="generate-draft"]').trigger('click'); await flushPromises()
+    expect(apiMocks.chat).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="workspace-action-error"]').text()).toContain('直接在回复草稿中输入人工回复')
+
+    const editor = wrapper.get('[data-testid="reply-draft-editor"]')
+    await editor.setValue('您好，请提供商品照片，我们马上为您人工核对。')
+    expect(wrapper.get('[data-testid="draft-card"]').text()).toContain('人工输入')
+    expect(wrapper.get('[data-testid="knowledge-evidence"]').text()).toContain('未调用 AI')
+
+    await wrapper.get('[data-testid="manual-accept"]').trigger('click'); await flushPromises()
+    expect(apiMocks.submitInteraction).not.toHaveBeenCalled()
+    expect(apiMocks.submitFeedback).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('人工回复已确认')
+    expect(wrapper.get('[data-testid="active-conversation-status"]').text()).toContain('待人工发送')
+  })
+
   it('records a direct acceptance without changing the AI answer', async () => {
     const wrapper = mountWorkspace()
     await flushPromises()

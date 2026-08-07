@@ -49,6 +49,7 @@ describe('human-in-loop reply draft state machine', () => {
     expect(store.activeDraft).toMatchObject({
       state: 'ACCEPTED',
       decisionState: 'APPROVED',
+      replySource: 'AI',
       editedAnswer: '建议 5 岁以上使用，并由家长陪同。'
     })
     expect(store.activeConversation?.status).toBe('WAITING_REPLY')
@@ -56,6 +57,25 @@ describe('human-in-loop reply draft state machine', () => {
     expect(store.activeConversation?.status).toBe('COMPLETED')
     store.reopenConversation()
     expect(store.activeConversation?.status).toBe('PROCESSING')
+  })
+
+  it('allows a manual reply without pretending that AI generated it', () => {
+    const store = useHumanLoopWorkspaceStore()
+    store.installConversations([seed])
+
+    store.beginManualReply('您好，请提供商品图片，我们马上人工核对。')
+    expect(store.activeDraft).toMatchObject({
+      state: 'EDITED',
+      replySource: 'MANUAL',
+      originalAnswer: '',
+      editedAnswer: '您好，请提供商品图片，我们马上人工核对。',
+      requestId: null,
+      citations: []
+    })
+    store.acceptDraft()
+
+    expect(store.activeDraft).toMatchObject({ state: 'ACCEPTED', decisionState: 'APPROVED' })
+    expect(store.activeConversation?.status).toBe('WAITING_REPLY')
   })
 
   it('expires the old draft as soon as a new customer message arrives', () => {
