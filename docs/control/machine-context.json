@@ -3,10 +3,28 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "1.0.0",
-  "status": "customer_pc_deployment_blocked_baseline_identity_mismatch",
+  "status": "customer_pc_deployment_ready_local_controlled",
   "current_task": "R030 AI-CS Customer PC Deployment Preparation V1",
-  "current_stage": "Phase 1 hard gate failed because the AI-CS Git HEAD and all four live Runtime records have different SHAs. Agent clean-candidate preparation, installation and binding were not started.",
-  "current_gate": "FAIL / AI_CS_CUSTOMER_PC_DEPLOYMENT_BLOCKED_BASELINE_IDENTITY_MISMATCH / PDD_NOT_CONNECTED",
+  "current_stage": "Local controlled customer-PC deployment completed: clean Client installed, ux_kefu manually enrolled, Agent ACTIVE/ONLINE, heartbeat projected through C and Workspace online status confirmed by the user.",
+  "current_gate": "PASS / AI_CS_CUSTOMER_PC_DEPLOYMENT_READY / LOCAL_CONTROLLED_DEPLOYMENT / PDD_NOT_CONNECTED",
+  "customer_pc_deployment_v1": {
+    "date": "2026-08-07",
+    "requirement": "R030",
+    "gate": "PASS / AI_CS_CUSTOMER_PC_DEPLOYMENT_READY / LOCAL_CONTROLLED_DEPLOYMENT",
+    "ai_cs_runtime": "Four standard/LOCAL services restarted from one clean final documentation commit; R027 isolated database revision 0016 integrity ok and test_knowledge_v031 has 70 embeddings",
+    "engine_source": "Agent candidate 0a5a041e72bb9daec9813d5d4b7f7907eb8ce86f plus service-identity commit 5c105dbe855c09dfe31c9d2bbf5d18caec40b32b; clean",
+    "package": "Channel Agent 1.1.1 ZIP FD2D37746030584DC5EF34EFB7001E752B71FD4C9EC04FD25DD82F8943CD6138; EXE 92252395A70B7415A524934A5661CB95C25F2ADB7B1CF69AA38E575AF392DF33; 1626-file manifest matched",
+    "install": "Installed through the Windows package flow under the current user; Agent autostart enabled; unsigned EXE approved only for this local controlled installation",
+    "identity": "agent-desktop-0345200/device-desktop-0345200 ACTIVE and ONLINE with heartbeat; ux_kefu manually enrolled and independently activated",
+    "authorization": "ux_kefu is ACTIVE and CUSTOMER_SERVICE only; exactly one default AI-CS Store binding and exact Engine Store set PDD-SM",
+    "human_evidence": "User confirmed that Workspace displays the device online",
+    "ai_cs_regression": "C desktop security/API 9 passed; B desktop adapter/Workspace 19 passed plus typecheck/build; desktop workflow contract 3 passed",
+    "safety": "Anonymous API remains 401; bad service identity 403; message reading, browser automation and sending are disabled; no PDD or real customer message",
+    "recovery": "An incompatible RNG call produced a failed candidate that was rotated and removed before any service start or use; a compatible CSPRNG value and restricted ACL were verified without recording the value or digest",
+    "remaining": "EXE signing and Engine Windows-service/autostart recovery are required before multi-PC production rollout; PDD Adapter, Browser Control, Message Listener and Send Executor remain separate gates",
+    "report": "docs/control/product-management/AI-CS-Customer-PC-Deployment-Preparation-V1.md",
+    "task_card": "docs/control/product-management/AI-CS-Customer-PC-Deployment-Preparation-V1-Task-Card.md"
+  },
   "customer_pc_deployment_baseline_v1": {
     "date": "2026-08-07",
     "requirement": "R030",
@@ -652,19 +670,20 @@
     "R016 User Management & Store Binding V1 source and automated acceptance",
     "R017 Initial Production Accounts V1 closed by R019 deployment",
     "R018 Account Policy Adjustment V1 coordinated source",
-    "R019 Production IAM Deployment & Initial Accounts V1"
+    "R019 Production IAM Deployment & Initial Accounts V1",
+    "R030 Customer PC Deployment Preparation V1 local controlled deployment"
   ],
   "next_tasks": {
-    "CONTROL": "Run R003 full business acceptance without expanding R006: manually activate one PILOT Store/Product, verify receipt and B visibility, then disable and verify rollback.",
-    "OPS": "Preserve the R019 0012 backup and current 0013 database as ignored Runtime assets; use standard wrappers and never overwrite SQLite while services are running.",
-    "A": "No business changes. Preserve /api/chat, Gateway wire 1.0, Prompt, model and the 56-chunk RAG collection.",
-    "B_C": "Require each initial user to replace the temporary credential at first formal use; keep C as the authorization and Store-scope authority.",
-    "QA": "Use formal browser/API paths for R003 and the independent R007 network gate; do not treat R019 IAM acceptance as business or second-terminal acceptance."
+    "CONTROL": "Open a separate PDD integration gate only after Client signing and Engine Windows-service recovery are complete.",
+    "OPS": "Keep the service identity in a restricted Runtime file, coordinate Engine/C restart on rotation, and add a managed Engine start/status/stop wrapper before reboot acceptance.",
+    "A": "No business changes. Preserve /api/chat, Gateway wire 1.0, Prompt, model and the R027 isolated RAG assets.",
+    "B_C": "Preserve C as the authorization and Store-scope authority; B must continue using only the authenticated C facade.",
+    "QA": "Validate a signed package and reboot recovery on a second isolated customer PC before production rollout; do not treat Agent online as PDD message readiness."
   },
   "t02_executed": false,
   "blockers": [
-    "R003 remains open pending full business-result acceptance; R019 IAM acceptance does not close it.",
-    "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
+    "Real PDD integration remains blocked until PDD Adapter, Browser Control, Message Listener and Send Executor pass independent gates.",
+    "Multi-PC production rollout remains blocked by unsigned Client and lack of a managed Engine Windows service/reboot recovery gate."
   ],
   "last_updated": "2026-08-07"
 }

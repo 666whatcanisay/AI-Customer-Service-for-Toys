@@ -4,11 +4,21 @@
   "line": "B",
   "version": "AI-CS V1.0.0",
   "root_path": "C:\\Users\\EDY\\Documents\\Codex\\2026-07-21\\AI-CS",
-  "current_task": "R028 AI-CS User Experience Acceptance Final V1",
-  "current_stage": "Human-assisted acceptance is in progress. Admin, operator and customer-service supervisor core flows passed. The supervisor accepted Store switching, the light-green Workspace, unknown-Product manual reply and the retained manual-copy send boundary; ordinary customer-service and final AI reply browser acceptance remain pending.",
-  "current_gate": "AI_CS_USER_EXPERIENCE_ACCEPTANCE_IN_PROGRESS",
-  "status": "ux_acceptance_in_progress",
+  "current_task": "R030 AI-CS Customer PC Deployment Preparation V1",
+  "current_stage": "The packaged Windows Client was installed locally; ux_kefu completed manual enrollment and the user confirmed that Workspace displays the ACTIVE/ONLINE device.",
+  "current_gate": "PASS / AI_CS_CUSTOMER_PC_DEPLOYMENT_READY / LOCAL_CONTROLLED_DEPLOYMENT",
+  "status": "customer_pc_deployment_ready_local_controlled",
   "last_updated": "2026-08-07",
+  "customer_pc_deployment_v1": {
+    "requirement": "R030",
+    "gate": "PASS / AI_CS_CUSTOMER_PC_DEPLOYMENT_READY",
+    "client": "Windows Client 1.1.1 installed through its package flow; Agent autostart enabled; unsigned approval is local-only",
+    "workspace": "ux_kefu manually enrolled; Agent ACTIVE/ONLINE; heartbeat projected through C; user confirmed device online in Workspace",
+    "authorization": "CUSTOMER_SERVICE only with exactly one default Store PDD-SM; B consumes only the authenticated C facade",
+    "safety": "No B source change; message reading, browser automation and sending remain disabled; no PDD connection",
+    "remaining": "Signed Client, managed Engine Windows service, reboot recovery and second-PC validation are required before production rollout",
+    "report": "docs/control/product-management/AI-CS-Customer-PC-Deployment-Preparation-V1.md"
+  },
   "ux_workspace_manual_reply_v1": {
     "requirement": "R028",
     "state": "SOURCE_VERIFIED / SUPERVISOR_BROWSER_ACCEPTED",
@@ -259,7 +269,8 @@
     "R006 Customer Available Catalog consume-only adaptation and isolated browser verification",
     "R006 Customer Available Catalog formal deployment and production read-only browser smoke",
     "R016/R018 coordinated IAM client and policy flows",
-    "R019 real login, first-password-change and customer-service multi-Store acceptance"
+    "R019 real login, first-password-change and customer-service multi-Store acceptance",
+    "R030 local packaged Client enrollment and Workspace online validation"
   ],
   "out_of_scope": [
     "Automatic customer message sending",

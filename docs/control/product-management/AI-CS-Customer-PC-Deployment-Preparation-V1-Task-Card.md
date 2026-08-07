@@ -4,7 +4,7 @@
 - Date: `2026-08-07`
 - Owner: AI-CS Customer PC Deployment Engineer
 - Target: `AI_CS_CUSTOMER_PC_DEPLOYMENT_READY`
-- Status: `BLOCKED_AT_PHASE_1`
+- Status: `COMPLETE / PASS`
 
 ## Objective
 
@@ -55,3 +55,13 @@
 2. 在独立执行轮次使用R027受管配置安全停止四服务，从该同一clean SHA重建B/Admin并重启A/B/C/Admin；四条Runtime记录必须完全一致。
 3. 身份对齐通过后，按精确清单审计并固化Channel Agent 1.1.1 dirty候选；禁止`git add .`，先完成测试、包重建、hash和签名/风险批准。
 4. 重新执行Phase 1。只有AI-CS与Agent两侧均通过，才允许安装、配置、授权、绑定和Heartbeat验证。
+
+## Final execution result
+
+- 初始Phase 1失败已按补救入口关闭：AI-CS四服务从同一clean提交重启并通过Runtime身份核对；R027隔离数据库保持`0016_production_hardening_v1`，RAG保持`test_knowledge_v031` 512维/70 embeddings。
+- Channel Agent 1.1.1候选已精确固化为clean提交`0a5a041e72bb9daec9813d5d4b7f7907eb8ce86f`；生产服务身份补齐提交为`5c105dbe855c09dfe31c9d2bbf5d18caec40b32b`，未修改Gateway Contract、PDD Adapter或渠道执行语义。
+- 重建包`AI-CS-Channel-Agent-1.1.1-windows-x64.zip` SHA-256为`FD2D37746030584DC5EF34EFB7001E752B71FD4C9EC04FD25DD82F8943CD6138`；EXE SHA-256为`92252395A70B7415A524934A5661CB95C25F2ADB7B1CF69AA38E575AF392DF33`。EXE未签名，仅在用户明确批准后用于本机受控安装。
+- Windows Client通过包内安装流程安装到当前用户目录，Agent自启动已启用；Agent `agent-desktop-0345200` / device `device-desktop-0345200`为`ACTIVE / ONLINE`，服务端收到Heartbeat。
+- `ux_kefu`通过人工一次性授权流程绑定既有测试店铺`PDD-SM`；角色严格为`CUSTOMER_SERVICE`，只有一个默认Store绑定，Engine与AI-CS授权Store集合一致。
+- 用户已人工确认Workspace显示设备在线。消息读取、浏览器自动化与发送能力均保持关闭；未连接PDD、未读取或发送真实客户消息。
+- Final Gate：`PASS / AI_CS_CUSTOMER_PC_DEPLOYMENT_READY / LOCAL_CONTROLLED_DEPLOYMENT / PDD_NOT_CONNECTED`。
