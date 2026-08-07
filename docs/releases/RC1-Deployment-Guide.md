@@ -32,6 +32,11 @@ python -m venv .venv
 - Runtime 默认使用 Mock/Staging。
 - SQLite 文件放入受控 runtime 目录，并纳入备份。
 - Credential 仅配置 provider reference。
+- AI-CS客服设备Facade需要访问Agent管理接口时，使用
+  `CHANNEL_ENGINE_AGENT_OPERATOR_SESSION_FILE`指向Runtime外部UTF-8单行引用文件；
+  禁止把引用值写入环境变量、源码、命令行或日志。
+- 未配置上述文件时Agent管理接口保持Deny-All。文件缺失、格式错误或引用不匹配时
+  必须启动失败或返回403，禁止回退到测试身份提供方。
 - `manual_approval=true`。
 - `auto_reply=false`。
 - 首次启动保持 Kill Switch ENABLED。
@@ -44,6 +49,10 @@ python -m venv .venv
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn channel_engine.app:app --host 127.0.0.1 --port 18020
 ```
+
+客服设备服务身份只注入`/channel-agent/v1/admin/*`所在的Agent Router。部署时应为引用文件
+设置仅运行账号与SYSTEM可读的ACL；轮换引用后需要受控重启Channel Engine与AI-CS Platform
+Runtime。普通浏览器、Agent配置和API响应不得获得该引用。
 
 ## 5. 验证
 

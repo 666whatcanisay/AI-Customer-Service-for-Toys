@@ -206,3 +206,50 @@ def test_channel_engine_app_injects_operator_identity_provider(tmp_path: Path) -
     assert registered.status_code == 201
     assert listed.status_code == 200
     assert listed.json()["items"][0]["identity"]["status"] == "UNBOUND"
+
+
+def test_channel_engine_app_loads_agent_service_identity_from_external_file(
+    tmp_path: Path,
+) -> None:
+    reference = "r030-integration-reference-0123456789-abcdef"
+    reference_file = tmp_path / "agent-operator.session"
+    reference_file.write_text(reference, encoding="utf-8")
+    registry = ChannelAgentNodeRegistry(clock=lambda: NOW)
+    application = create_app(
+        settings=Settings(
+            database_url=f"sqlite:///{(tmp_path / 'service-app.sqlite3').as_posix()}",
+            agent_operator_session_file=str(reference_file),
+            agent_operator_principal_id="ai-cs-agent-service-integration",
+        ),
+        agent_node_registry=registry,
+    )
+
+    with TestClient(application) as transport:
+        registered = transport.post(
+            "/channel-agent/v1/agents/register",
+            json={
+                "protocol_version": "1.0",
+                "agent_id": "agent-service-identity-001",
+                "device_id": "device-service-identity-001",
+                "agent_version": "1.1.1",
+                "hostname": "service-pc-identity-001",
+                "status": "STARTING",
+                "timestamp": NOW.isoformat(),
+            },
+        )
+        allowed = transport.get(
+            "/channel-agent/v1/admin/agents",
+            headers={"X-Operator-Session-Reference": reference},
+        )
+        rejected = transport.get(
+            "/channel-agent/v1/admin/agents",
+            headers={"X-Operator-Session-Reference": f"{reference}-wrong"},
+        )
+
+    assert registered.status_code == 201
+    assert allowed.status_code == 200
+    assert allowed.json()["items"][0]["identity"]["agent_id"] == (
+        "agent-service-identity-001"
+    )
+    assert rejected.status_code == 403
+    assert rejected.json()["detail"]["code"] == "OPERATOR_PERMISSION_DENIED"

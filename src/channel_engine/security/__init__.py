@@ -2,6 +2,7 @@ from .pdd import PDDRBACApprovalExecutionService
 from .rbac import (
     RBAC_CONTRACT_VERSION,
     DenyAllOperatorIdentityProvider,
+    FileBackedAgentOperatorIdentityProvider,
     OperatorAccessDenied,
     OperatorIdentityProvider,
     OperatorPermission,
@@ -12,6 +13,7 @@ from .rbac import (
 
 __all__ = [
     "DenyAllOperatorIdentityProvider",
+    "FileBackedAgentOperatorIdentityProvider",
     "OperatorAccessDenied",
     "OperatorIdentityProvider",
     "OperatorPermission",

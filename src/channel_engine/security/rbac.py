@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import secrets
 from enum import StrEnum
+from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
@@ -114,8 +117,70 @@ class DenyAllOperatorIdentityProvider:
         raise OperatorAccessDenied(OperatorPermission.APPROVAL_READ)
 
 
+class FileBackedAgentOperatorIdentityProvider:
+    """Authenticate the AI-CS Agent facade with an external opaque reference.
+
+    The provider is injected only into the Channel Agent router.  The reference
+    is read once during startup, reduced to a digest, and never retained or
+    returned in an API model.
+    """
+
+    _MIN_REFERENCE_LENGTH = 32
+    _MAX_REFERENCE_BYTES = 4096
+
+    def __init__(
+        self,
+        session_reference_file: str | Path,
+        *,
+        principal_id: str = "ai-cs-desktop-agent-service",
+    ) -> None:
+        path = Path(session_reference_file).expanduser()
+        if not path.is_absolute():
+            raise ValueError("agent operator session reference path must be absolute")
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise ValueError(
+                "agent operator session reference file is unavailable"
+            ) from exc
+        if len(raw) > self._MAX_REFERENCE_BYTES:
+            raise ValueError("agent operator session reference file is invalid")
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(
+                "agent operator session reference file is invalid"
+            ) from exc
+        reference = text.strip()
+        if (
+            len(reference) < self._MIN_REFERENCE_LENGTH
+            or "\n" in reference
+            or "\r" in reference
+        ):
+            raise ValueError("agent operator session reference file is invalid")
+        self._reference_digest = hashlib.sha256(reference.encode("utf-8")).digest()
+        self._principal_template = OperatorPrincipal(
+            principal_id=principal_id,
+            roles=frozenset({OperatorRole.ADMIN}),
+            identity_provider="agent-service-file",
+        )
+
+    def authenticate(self, session_reference: str) -> OperatorPrincipal:
+        if not isinstance(session_reference, str) or len(
+            session_reference.encode("utf-8")
+        ) > self._MAX_REFERENCE_BYTES:
+            raise OperatorAccessDenied(OperatorPermission.AGENT_IDENTITY_READ)
+        candidate = hashlib.sha256(session_reference.encode("utf-8")).digest()
+        if not secrets.compare_digest(candidate, self._reference_digest):
+            raise OperatorAccessDenied(OperatorPermission.AGENT_IDENTITY_READ)
+        return self._principal_template.model_copy(
+            update={"authenticated_at": utc_now()},
+        )
+
+
 __all__ = [
     "DenyAllOperatorIdentityProvider",
+    "FileBackedAgentOperatorIdentityProvider",
     "OperatorAccessDenied",
     "OperatorIdentityProvider",
     "OperatorPermission",

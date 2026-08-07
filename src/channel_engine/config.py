@@ -26,6 +26,8 @@ class Settings:
     worker_ownership_lease_seconds: int = 90
     outbox_publisher_id: str = "foundation-outbox-publisher"
     outbox_max_attempts: int = 5
+    agent_operator_session_file: str | None = None
+    agent_operator_principal_id: str = "ai-cs-desktop-agent-service"
 
     def __post_init__(self) -> None:
         if self.browser_execution_enabled:
@@ -69,5 +71,13 @@ class Settings:
             outbox_max_attempts=int(
                 os.getenv("CHANNEL_ENGINE_OUTBOX_MAX_ATTEMPTS", "5")
             ),
+            agent_operator_session_file=(
+                os.getenv("CHANNEL_ENGINE_AGENT_OPERATOR_SESSION_FILE", "").strip()
+                or None
+            ),
+            agent_operator_principal_id=os.getenv(
+                "CHANNEL_ENGINE_AGENT_OPERATOR_PRINCIPAL_ID",
+                "ai-cs-desktop-agent-service",
+            ).strip(),
             environment_profile=load_environment_profile(os.environ),
         )

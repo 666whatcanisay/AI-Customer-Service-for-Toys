@@ -139,7 +139,10 @@ from channel_engine.session import (
     SessionHeartbeatScheduler,
     create_channel_session_router,
 )
-from channel_engine.security.rbac import OperatorIdentityProvider
+from channel_engine.security.rbac import (
+    FileBackedAgentOperatorIdentityProvider,
+    OperatorIdentityProvider,
+)
 from channel_engine.storage import (
     RecordNotFound,
     SqlAlchemyUnitOfWork,
@@ -569,11 +572,22 @@ def create_app(
     active_agent_node_registry = agent_node_registry or ChannelAgentNodeRegistry(
         identity_repository=SqlAlchemyAgentIdentityRepository(session_factory)
     )
+    active_agent_operator_identity_provider = agent_operator_identity_provider
+    if (
+        active_agent_operator_identity_provider is None
+        and active_settings.agent_operator_session_file is not None
+    ):
+        active_agent_operator_identity_provider = (
+            FileBackedAgentOperatorIdentityProvider(
+                active_settings.agent_operator_session_file,
+                principal_id=active_settings.agent_operator_principal_id,
+            )
+        )
     application.state.channel_agent_node_registry = active_agent_node_registry
     application.include_router(
         create_channel_agent_node_router(
             active_agent_node_registry,
-            identity_provider=agent_operator_identity_provider,
+            identity_provider=active_agent_operator_identity_provider,
         )
     )
     application.include_router(create_pilot_router(active_pilot, pilot_live))
