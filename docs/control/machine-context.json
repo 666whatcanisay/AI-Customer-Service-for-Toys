@@ -3,10 +3,24 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "1.0.0",
-  "status": "ux_acceptance_data_ready",
-  "current_task": "R027 AI-CS UX Acceptance Data Readiness V1",
-  "current_stage": "The R026 credential, empty-knowledge and ordinary-customer-service-account data blockers are closed in an isolated Runtime. Formal assets remain unchanged; the four-role Edge UX reacceptance remains pending.",
-  "current_gate": "AI_CS_UX_ACCEPTANCE_DATA_READY / UX_REACCEPTANCE_PENDING / PRODUCTION_RC_PROTECTED",
+  "status": "current_capability_validation_report_ready",
+  "current_task": "R029 AI-CS Current Capability Validation V1",
+  "current_stage": "Current AI-CS Runtime, data/RAG candidates and Windows Channel Agent were audited read-only. Controlled single-PC simulation is conditional on clean identity alignment and Agent candidate freeze; real PDD integration remains blocked.",
+  "current_gate": "AI_CS_CURRENT_CAPABILITY_VALIDATION_REPORT_READY / CUSTOMER_PC_SIMULATION_CONDITIONAL / PDD_INTEGRATION_BLOCKED",
+  "current_capability_validation_v1": {
+    "date": "2026-08-07",
+    "requirement": "R029",
+    "gate": "PASS / AI_CS_CURRENT_CAPABILITY_VALIDATION_REPORT_READY",
+    "audited_business_source": "codex/ai-cs-user-experience-acceptance-final-v1@785cff1fbcc79e7110314615673df8d28ee491e6; final report commit resolves separately from Git",
+    "live_runtime_identity": "Four healthy standard/LOCAL services record clean 2af974148e43c13736d63510fb7466658877a112; restart from one approved clean SHA is required before the next simulation",
+    "recommended_data": "Git-ignored R027 isolated 0016 database plus test_knowledge_v031 with 70 embeddings; simulation-only and not a production replacement",
+    "channel_agent": "Candidate 1.1.1 package verified by version/hash; not installed or running, EXE not signed, source repository has 27 dirty entries",
+    "capabilities": "Login, session/RBAC, Store, Product/SKU, RAG, AI reply and Feedback foundation are available; Agent status integration is source-tested but disabled in the current Runtime",
+    "missing": "Real PDD authorization, production PDD Adapter, Message Listener, Browser Control and Send Executor",
+    "contract": "Gateway canonical SHA-256 FEF35AFB67DCD5027D7AA59FF35E5B6035A4130C5C1957AB41D4397D5FA67B80 unchanged; 15 contract tests passed",
+    "report": "docs/control/product-management/AI-CS-Current-Capability-Validation-Report-V1.md",
+    "task_card": "docs/control/product-management/AI-CS-Current-Capability-Validation-V1-Task-Card.md"
+  },
   "ux_acceptance_data_readiness_v1": {
     "date": "2026-08-07",
     "requirement": "R027",
@@ -638,5 +652,5 @@
     "R003 remains open pending full business-result acceptance; R019 IAM acceptance does not close it.",
     "R007 remains a separate company-network/VLAN/port-policy blocker for second-terminal access; it must not be addressed through business code."
   ],
-  "last_updated": "2026-08-06"
+  "last_updated": "2026-08-07"
 }
