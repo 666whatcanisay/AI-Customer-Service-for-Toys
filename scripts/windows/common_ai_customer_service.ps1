@@ -2541,7 +2541,7 @@ function Invoke-RagChatSmoke($Config) {
     if ($null -eq $productItem) { throw 'C active knowledge package 没有可供聊天 smoke 使用的商品。' }
     $skuItem = @($package.items | Where-Object { [string]$_.product_id -eq [string]$productItem.product_id -and -not [string]::IsNullOrWhiteSpace([string]$_.sku_id) } | Select-Object -First 1)[0]
     $payload = @{ question='请根据当前商品资料介绍适用年龄和安全注意事项。'; context=@{ tenant_id=[string]$package.tenant_id; platform=[string]$package.platform; store_code=[string]$package.store_code; product_id=[string]$productItem.product_id; sku_id=if ($skuItem) { [string]$skuItem.sku_id } else { $null } } } | ConvertTo-Json -Depth 5
-    try { $response = Invoke-RestMethod -UseBasicParsing -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload -Uri (Get-ServiceUrl $Config $Config.RagPort '/api/chat') -TimeoutSec 120 } catch { throw "A 真实聊天 smoke 失败：$($_.Exception.Message)" }
+    try { $response = Invoke-RestMethod -UseBasicParsing -Method Post -Headers (Get-AiCsInternalServiceHeaders $Config) -ContentType 'application/json; charset=utf-8' -Body $payload -Uri (Get-ServiceUrl $Config $Config.RagPort '/api/chat') -TimeoutSec 120 } catch { throw "A 真实聊天 smoke 失败：$($_.Exception.Message)" }
     $data = if ($response.data) { $response.data } else { $response }
     $answer = [string]$data.answer
     if ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '大模型尚未配置|大模型请求失败|NO_SCOPED_KNOWLEDGE' -or @($data.sources).Count -eq 0) { throw "A 真实聊天 smoke 未得到可用 Ollama 回答：$answer" }

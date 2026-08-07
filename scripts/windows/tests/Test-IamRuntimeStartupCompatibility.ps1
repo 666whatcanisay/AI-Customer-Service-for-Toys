@@ -33,5 +33,8 @@ if ($main -notmatch 'test_knowledge_internal_router,[\s\S]*?require_internal_ser
 if ($getPackageBlock -notmatch 'Get-AiCsInternalServiceHeaders') {
     throw 'Runtime startup does not authenticate its internal knowledge export call.'
 }
+if ($chatSmokeBlock -notmatch 'Invoke-RestMethod[^\r\n]*-Headers\s+\(Get-AiCsInternalServiceHeaders\s+\$Config\)[^\r\n]*/api/chat') {
+    throw 'RAG chat smoke does not authenticate /api/chat with the internal service identity.'
+}
 
-Write-Host 'PASS: IAM runtime startup uses only the frozen loopback knowledge projection and keeps browser management authenticated.' -ForegroundColor Green
+Write-Host 'PASS: IAM runtime startup uses the internal service identity for knowledge export and chat smoke while browser management remains authenticated.' -ForegroundColor Green
