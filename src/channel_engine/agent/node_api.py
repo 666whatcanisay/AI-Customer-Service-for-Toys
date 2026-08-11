@@ -5,18 +5,20 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import RLock
-from typing import Protocol
+from typing import Callable, Protocol
 from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
 from channel_agent.binding import (
+    AgentActiveStoreSelectionRequest,
     AgentEnrollmentGrantRequest,
     AgentEnrollmentGrantResponse,
     AgentEnrollmentRequest,
     AgentEnrollmentResponse,
     AgentRuntimeBinding,
     AgentStoreBindingUpdateRequest,
+    AgentVerifiedActiveStoreSelectionRequest,
 )
 from channel_agent.contract import (
     AgentConfigResponse,
@@ -37,8 +39,9 @@ from channel_agent.identity import (
     AgentIdentityAuditListResponse,
     AgentIdentityAuditState,
     AgentIdentityBindingRequest,
+    AgentConnectivityStatus,
+    AgentIdentityRestoreRequest,
     AgentIdentityStatus,
-    AgentOnlineStatus,
 )
 from channel_agent.logger import sanitize
 from channel_engine.security.rbac import (
@@ -48,6 +51,12 @@ from channel_engine.security.rbac import (
     OperatorPermission,
     OperatorPrincipal,
     RBACAuthorizer,
+)
+
+from .grants import (
+    EnrollmentGrantRecord,
+    EnrollmentGrantRepositoryPort,
+    InMemoryEnrollmentGrantRepository,
 )
 
 
@@ -71,6 +80,12 @@ class AgentEnrollmentDenied(PermissionError):
     pass
 
 
+class AgentActiveStoreSelectionBlocked(PermissionError):
+    def __init__(self, blockers: tuple[str, ...]) -> None:
+        super().__init__("active store selection is blocked")
+        self.blockers = blockers
+
+
 class AgentIdentityRepositoryPort(Protocol):
     def list_identities(self) -> tuple[AgentIdentity, ...]: ...
 
@@ -87,20 +102,13 @@ class RegisteredChannelAgent:
     status: str
     registered_at: datetime
     last_heartbeat: datetime
+    connectivity_status: AgentConnectivityStatus = AgentConnectivityStatus.OFFLINE
 
 
-@dataclass(frozen=True, slots=True)
-class _EnrollmentGrant:
-    grant_id: str
-    code_digest: str
-    agent_id: str
-    device_id: str
-    user_reference: str
-    store_references: tuple[str, ...]
-    authorized_by: str
-    reason: str
-    issued_at: datetime
-    expires_at: datetime
+class AgentRuntimeRepositoryPort(Protocol):
+    def list_runtime_agents(self) -> tuple[RegisteredChannelAgent, ...]: ...
+
+    def save_runtime_agent(self, agent: RegisteredChannelAgent) -> None: ...
 
 
 class ChannelAgentNodeRegistry:
@@ -112,6 +120,10 @@ class ChannelAgentNodeRegistry:
         managed_config: ManagedAgentConfig | None = None,
         authorizer: RBACAuthorizer | None = None,
         identity_repository: AgentIdentityRepositoryPort | None = None,
+        runtime_repository: AgentRuntimeRepositoryPort | None = None,
+        enrollment_grant_repository: EnrollmentGrantRepositoryPort | None = None,
+        active_store_guard: Callable[[str, str | None, str], tuple[str, ...]]
+        | None = None,
         binding_code_factory=lambda: secrets.token_hex(16).upper(),  # type: ignore[no-untyped-def]
         clock=utc_now,  # type: ignore[no-untyped-def]
     ) -> None:
@@ -122,13 +134,19 @@ class ChannelAgentNodeRegistry:
         )
         self._authorizer = authorizer or RBACAuthorizer()
         self._identity_repository = identity_repository
+        self._runtime_repository = runtime_repository
+        self._enrollment_grant_repository = (
+            enrollment_grant_repository or InMemoryEnrollmentGrantRepository()
+        )
+        self._active_store_guard = active_store_guard or (
+            lambda _agent_id, _current, _target: ()
+        )
         self._binding_code_factory = binding_code_factory
         self._repository_loaded = False
         self._lock = RLock()
         self._agents: dict[str, RegisteredChannelAgent] = {}
         self._identities: dict[str, AgentIdentity] = {}
         self._audit_events: list[AgentIdentityAuditEvent] = []
-        self._enrollment_grants: dict[str, _EnrollmentGrant] = {}
 
     def register(self, request: AgentRegistrationRequest) -> AgentRegistrationResponse:
         with self._lock:
@@ -155,7 +173,9 @@ class ChannelAgentNodeRegistry:
                     user_id=None,
                     store_id=None,
                     store_ids=(),
-                    status=AgentIdentityStatus.UNBOUND,
+                    authorized_store_ids=(),
+                    active_store_id=None,
+                    status=AgentIdentityStatus.REGISTERED,
                     binding_revision=0,
                     created_at=now,
                     updated_at=now,
@@ -171,7 +191,8 @@ class ChannelAgentNodeRegistry:
                     identity,
                     request.user_reference,
                     request.store_reference,
-                    request.store_references,
+                    request.authorized_store_ids or request.store_references,
+                    active_store_id=request.active_store_id,
                 )
                 if identity.status is AgentIdentityStatus.DISABLED:
                     raise AgentIdentityDisabled("agent identity is disabled")
@@ -181,7 +202,7 @@ class ChannelAgentNodeRegistry:
                 else f"agent-registration:{uuid5(NAMESPACE_URL, f'{request.agent_id}:{request.device_id}')}"
             )
             registered_at = previous.registered_at if previous is not None else now
-            self._agents[request.agent_id] = RegisteredChannelAgent(
+            registered = RegisteredChannelAgent(
                 registration_id=registration_id,
                 agent_id=request.agent_id,
                 device_id=request.device_id,
@@ -190,7 +211,10 @@ class ChannelAgentNodeRegistry:
                 status=request.status.value,
                 registered_at=registered_at,
                 last_heartbeat=request.timestamp,
+                connectivity_status=AgentConnectivityStatus.ONLINE,
             )
+            self._agents[request.agent_id] = registered
+            self._save_runtime_agent(registered)
             return AgentRegistrationResponse(
                 registration_id=registration_id,
                 identity=identity,
@@ -226,8 +250,9 @@ class ChannelAgentNodeRegistry:
                 request.store_id,
                 request.store_ids,
                 request.binding_revision,
+                active_store_id=request.active_store_id,
             )
-            self._agents[agent_id] = RegisteredChannelAgent(
+            updated = RegisteredChannelAgent(
                 registration_id=previous.registration_id,
                 agent_id=previous.agent_id,
                 device_id=previous.device_id,
@@ -236,7 +261,14 @@ class ChannelAgentNodeRegistry:
                 status=request.status.value,
                 registered_at=previous.registered_at,
                 last_heartbeat=request.timestamp,
+                connectivity_status=(
+                    AgentConnectivityStatus.OFFLINE
+                    if request.status.value == "STOPPED"
+                    else AgentConnectivityStatus.ONLINE
+                ),
             )
+            self._agents[agent_id] = updated
+            self._save_runtime_agent(updated)
             return AgentHeartbeatAck(
                 identity_status=identity.status,
                 production_eligible=identity.production_eligible,
@@ -281,7 +313,7 @@ class ChannelAgentNodeRegistry:
         expires_at = now + timedelta(seconds=request.expires_in_seconds)
         grant_id = f"agent-enrollment-grant:{uuid5(NAMESPACE_URL, f'{request.agent_id}:{request.device_id}:{now.isoformat()}')}"
         digest = self._binding_code_digest(code)
-        grant = _EnrollmentGrant(
+        grant = EnrollmentGrantRecord(
             grant_id=grant_id,
             code_digest=digest,
             agent_id=request.agent_id,
@@ -295,15 +327,7 @@ class ChannelAgentNodeRegistry:
         )
         with self._lock:
             self._ensure_repository_loaded()
-            self._enrollment_grants = {
-                key: value
-                for key, value in self._enrollment_grants.items()
-                if not (
-                    value.agent_id == request.agent_id
-                    and value.device_id == request.device_id
-                )
-            }
-            self._enrollment_grants[digest] = grant
+            self._enrollment_grant_repository.replace_for_device(grant)
         return AgentEnrollmentGrantResponse(
             grant_id=grant_id,
             agent_id=request.agent_id,
@@ -319,10 +343,10 @@ class ChannelAgentNodeRegistry:
         digest = self._binding_code_digest(request.binding_code)
         with self._lock:
             self._ensure_repository_loaded()
-            grant = self._enrollment_grants.pop(digest, None)
+            now = self._clock()
+            grant = self._enrollment_grant_repository.consume(digest, now)
             if grant is None:
                 raise AgentEnrollmentDenied("binding code is invalid or already used")
-            now = self._clock()
             if now >= grant.expires_at:
                 raise AgentEnrollmentDenied("binding code has expired")
             if (
@@ -348,6 +372,8 @@ class ChannelAgentNodeRegistry:
                     "user_id": grant.user_reference,
                     "store_id": stores[0],
                     "store_ids": stores,
+                    "authorized_store_ids": stores,
+                    "active_store_id": None,
                     "status": AgentIdentityStatus.BOUND,
                     "binding_revision": before.binding_revision + 1,
                     "updated_at": now,
@@ -387,6 +413,8 @@ class ChannelAgentNodeRegistry:
                     "user_id": request.user_reference,
                     "store_id": request.store_reference,
                     "store_ids": (request.store_reference,),
+                    "authorized_store_ids": (request.store_reference,),
+                    "active_store_id": request.store_reference,
                     "status": AgentIdentityStatus.BOUND,
                     "binding_revision": before.binding_revision + 1,
                     "updated_at": self._clock(),
@@ -461,6 +489,12 @@ class ChannelAgentNodeRegistry:
                 update={
                     "store_id": stores[0],
                     "store_ids": stores,
+                    "authorized_store_ids": stores,
+                    "active_store_id": (
+                        before.effective_active_store_id
+                        if before.effective_active_store_id in stores
+                        else None
+                    ),
                     "binding_revision": before.binding_revision + 1,
                     "updated_at": self._clock(),
                 }
@@ -472,6 +506,143 @@ class ChannelAgentNodeRegistry:
                 principal,
                 AgentIdentityAuditAction.STORES_UPDATE,
                 request.reason,
+                before,
+                after,
+            )
+            return after
+
+    def select_active_store(
+        self,
+        agent_id: str,
+        request: AgentActiveStoreSelectionRequest,
+    ) -> AgentIdentity:
+        """Select one authorized store for this device and fail closed on drift."""
+
+        with self._lock:
+            self._ensure_repository_loaded()
+            before = self._identity_or_raise(agent_id)
+            if before.device_id != request.device_id:
+                raise AgentDeviceBindingConflict(
+                    "active store device_id does not match registered Agent"
+                )
+            if before.status not in {
+                AgentIdentityStatus.BOUND,
+                AgentIdentityStatus.ACTIVE,
+            }:
+                raise AgentIdentityTransitionError(
+                    f"active store cannot change from {before.status.value}"
+                )
+            if request.binding_revision != before.binding_revision:
+                raise AgentIdentityClaimMismatch(
+                    "active store selection uses a stale binding revision"
+                )
+            target = request.store_reference
+            if target not in before.authorized_stores:
+                raise AgentIdentityClaimMismatch("active store is not authorized")
+            if request.observed_store_reference != target:
+                raise AgentIdentityClaimMismatch(
+                    "observed PDD store does not match selected store"
+                )
+            blockers = tuple(
+                self._active_store_guard(
+                    agent_id,
+                    before.effective_active_store_id,
+                    target,
+                )
+            )
+            if blockers:
+                raise AgentActiveStoreSelectionBlocked(blockers)
+            if before.effective_active_store_id == target:
+                return before
+            after = before.model_copy(
+                update={
+                    "active_store_id": target,
+                    "binding_revision": before.binding_revision + 1,
+                    "updated_at": self._clock(),
+                }
+            )
+            after = AgentIdentity.model_validate(after.model_dump())
+            self._identities[agent_id] = after
+            self._save_identity(after)
+            self._append_audit_by_operator(
+                f"agent-device:{request.device_id}",
+                AgentIdentityAuditAction.ACTIVE_STORE_SELECT,
+                request.reason,
+                before,
+                after,
+            )
+            return after
+
+    def select_active_store_verified(
+        self,
+        agent_id: str,
+        request: AgentVerifiedActiveStoreSelectionRequest,
+        principal: OperatorPrincipal,
+    ) -> AgentIdentity:
+        """Select an internal Store from an AI-CS verified platform binding.
+
+        AI-CS owns Store permissions and platform identity bindings.  This
+        method therefore accepts the external platform identifier only on the
+        service-authenticated control surface, while independently enforcing
+        device, user, authorization, revision, and runtime guards here.
+        """
+
+        with self._lock:
+            self._ensure_repository_loaded()
+            before = self._identity_or_raise(agent_id)
+            if before.device_id != request.device_id:
+                raise AgentDeviceBindingConflict(
+                    "verified active store device_id does not match registered Agent"
+                )
+            if before.user_id != request.user_reference:
+                raise AgentIdentityClaimMismatch(
+                    "verified active store user does not match bound identity"
+                )
+            if before.status not in {
+                AgentIdentityStatus.BOUND,
+                AgentIdentityStatus.ACTIVE,
+            }:
+                raise AgentIdentityTransitionError(
+                    f"active store cannot change from {before.status.value}"
+                )
+            if request.binding_revision != before.binding_revision:
+                raise AgentIdentityClaimMismatch(
+                    "verified active store selection uses a stale binding revision"
+                )
+            target = request.store_reference
+            if target not in before.authorized_stores:
+                raise AgentIdentityClaimMismatch("active store is not authorized")
+            blockers = tuple(
+                self._active_store_guard(
+                    agent_id,
+                    before.effective_active_store_id,
+                    target,
+                )
+            )
+            if blockers:
+                raise AgentActiveStoreSelectionBlocked(blockers)
+            if before.effective_active_store_id == target:
+                return before
+            after = before.model_copy(
+                update={
+                    "active_store_id": target,
+                    "binding_revision": before.binding_revision + 1,
+                    "updated_at": self._clock(),
+                }
+            )
+            after = AgentIdentity.model_validate(after.model_dump())
+            self._identities[agent_id] = after
+            self._save_identity(after)
+            evidence = (
+                f"{request.reason}; platform={request.platform}; "
+                f"platform_binding={request.platform_binding_id}; "
+                f"platform_binding_verified_at="
+                f"{request.platform_binding_verified_at.isoformat()}"
+            )
+            self._append_audit(
+                principal,
+                AgentIdentityAuditAction.ACTIVE_STORE_SELECT,
+                evidence,
                 before,
                 after,
             )
@@ -502,6 +673,8 @@ class ChannelAgentNodeRegistry:
                     "user_id": None,
                     "store_id": None,
                     "store_ids": (),
+                    "authorized_store_ids": (),
+                    "active_store_id": None,
                     "status": AgentIdentityStatus.DISABLED,
                     "binding_revision": before.binding_revision + 1,
                     "updated_at": self._clock(),
@@ -513,6 +686,141 @@ class ChannelAgentNodeRegistry:
             self._append_audit(
                 principal,
                 AgentIdentityAuditAction.UNBIND,
+                normalized_reason,
+                before,
+                after,
+            )
+            return after
+
+    def release_identity(
+        self,
+        agent_id: str,
+        reason: str,
+        principal: OperatorPrincipal,
+    ) -> AgentIdentity:
+        """Remove account/Store references so this device can be enrolled again."""
+
+        self._authorizer.require(principal, OperatorPermission.AGENT_IDENTITY_MANAGE)
+        normalized_reason = reason.strip()
+        if not normalized_reason or len(normalized_reason) > 512:
+            raise ValueError("unbind reason is required")
+        with self._lock:
+            self._ensure_repository_loaded()
+            before = self._identity_or_raise(agent_id)
+            if before.status is AgentIdentityStatus.REGISTERED:
+                return before
+            if before.status not in {
+                AgentIdentityStatus.BOUND,
+                AgentIdentityStatus.ACTIVE,
+                AgentIdentityStatus.DISABLED,
+            }:
+                raise AgentIdentityTransitionError(
+                    f"identity cannot release from {before.status.value}"
+                )
+            after = before.model_copy(
+                update={
+                    "user_id": None,
+                    "store_id": None,
+                    "store_ids": (),
+                    "authorized_store_ids": (),
+                    "active_store_id": None,
+                    "status": AgentIdentityStatus.REGISTERED,
+                    "binding_revision": before.binding_revision + 1,
+                    "updated_at": self._clock(),
+                }
+            )
+            after = AgentIdentity.model_validate(after.model_dump())
+            self._identities[agent_id] = after
+            self._save_identity(after)
+            self._append_audit(
+                principal,
+                AgentIdentityAuditAction.UNBIND,
+                normalized_reason,
+                before,
+                after,
+            )
+            return after
+
+    def disable_identity(
+        self,
+        agent_id: str,
+        reason: str,
+        principal: OperatorPrincipal,
+    ) -> AgentIdentity:
+        """Fail closed by disabling a device and clearing all account references."""
+
+        self._authorizer.require(principal, OperatorPermission.AGENT_IDENTITY_MANAGE)
+        normalized_reason = reason.strip()
+        if not normalized_reason or len(normalized_reason) > 512:
+            raise ValueError("disable reason is required")
+        with self._lock:
+            self._ensure_repository_loaded()
+            before = self._identity_or_raise(agent_id)
+            if before.status is AgentIdentityStatus.DISABLED:
+                return before
+            after = before.model_copy(
+                update={
+                    "user_id": None,
+                    "store_id": None,
+                    "store_ids": (),
+                    "authorized_store_ids": (),
+                    "active_store_id": None,
+                    "status": AgentIdentityStatus.DISABLED,
+                    "binding_revision": before.binding_revision + 1,
+                    "updated_at": self._clock(),
+                }
+            )
+            after = AgentIdentity.model_validate(after.model_dump())
+            self._identities[agent_id] = after
+            self._save_identity(after)
+            self._append_audit(
+                principal,
+                AgentIdentityAuditAction.DISABLE,
+                normalized_reason,
+                before,
+                after,
+            )
+            return after
+
+    def restore_identity_to_registered(
+        self,
+        agent_id: str,
+        request: AgentIdentityRestoreRequest,
+        principal: OperatorPrincipal,
+    ) -> AgentIdentity:
+        """Recover a disabled device without restoring any former authority."""
+
+        self._authorizer.require(principal, OperatorPermission.AGENT_IDENTITY_MANAGE)
+        normalized_reason = request.reason.strip()
+        if not normalized_reason or len(normalized_reason) > 512:
+            raise ValueError("restore reason is required")
+        with self._lock:
+            self._ensure_repository_loaded()
+            before = self._identity_or_raise(agent_id)
+            if before.status is AgentIdentityStatus.REGISTERED:
+                return before
+            if before.status is not AgentIdentityStatus.DISABLED:
+                raise AgentIdentityTransitionError(
+                    "only a disabled identity can be restored to registered"
+                )
+            after = before.model_copy(
+                update={
+                    "user_id": None,
+                    "store_id": None,
+                    "store_ids": (),
+                    "authorized_store_ids": (),
+                    "active_store_id": None,
+                    "status": AgentIdentityStatus.REGISTERED,
+                    "binding_revision": before.binding_revision + 1,
+                    "updated_at": self._clock(),
+                }
+            )
+            after = AgentIdentity.model_validate(after.model_dump())
+            self._identities[agent_id] = after
+            self._save_identity(after)
+            self._append_audit(
+                principal,
+                AgentIdentityAuditAction.RESTORE_TO_REGISTERED,
                 normalized_reason,
                 before,
                 after,
@@ -584,6 +892,7 @@ class ChannelAgentNodeRegistry:
         store_id: str | None,
         store_ids: tuple[str, ...] = (),
         binding_revision: int = 0,
+        active_store_id: str | None = None,
     ) -> None:
         asserted_stores = store_ids or ((store_id,) if store_id is not None else ())
         if store_ids and store_id != store_ids[0]:
@@ -611,6 +920,13 @@ class ChannelAgentNodeRegistry:
                 raise AgentIdentityClaimMismatch(
                     "Agent identity references do not match server binding"
                 )
+            if (
+                active_store_id is not None
+                and active_store_id != identity.effective_active_store_id
+            ):
+                raise AgentIdentityClaimMismatch(
+                    "Agent active store does not match server selection"
+                )
 
     def _append_audit(
         self,
@@ -635,6 +951,8 @@ class ChannelAgentNodeRegistry:
                     user_id=before.user_id,
                     store_id=before.store_id,
                     store_ids=before.effective_store_ids,
+                    authorized_store_ids=before.authorized_stores,
+                    active_store_id=before.effective_active_store_id,
                     binding_revision=before.binding_revision,
                 ),
                 after=AgentIdentityAuditState(
@@ -642,6 +960,8 @@ class ChannelAgentNodeRegistry:
                     user_id=after.user_id,
                     store_id=after.store_id,
                     store_ids=after.effective_store_ids,
+                    authorized_store_ids=after.authorized_stores,
+                    active_store_id=after.effective_active_store_id,
                     binding_revision=after.binding_revision,
                 ),
             )
@@ -670,6 +990,8 @@ class ChannelAgentNodeRegistry:
                     user_id=before.user_id,
                     store_id=before.store_id,
                     store_ids=before.effective_store_ids,
+                    authorized_store_ids=before.authorized_stores,
+                    active_store_id=before.effective_active_store_id,
                     binding_revision=before.binding_revision,
                 ),
                 after=AgentIdentityAuditState(
@@ -677,6 +999,8 @@ class ChannelAgentNodeRegistry:
                     user_id=after.user_id,
                     store_id=after.store_id,
                     store_ids=after.effective_store_ids,
+                    authorized_store_ids=after.authorized_stores,
+                    active_store_id=after.effective_active_store_id,
                     binding_revision=after.binding_revision,
                 ),
             )
@@ -688,11 +1012,18 @@ class ChannelAgentNodeRegistry:
         if self._identity_repository is not None:
             for identity in self._identity_repository.list_identities():
                 self._identities.setdefault(identity.agent_id, identity)
+        if self._runtime_repository is not None:
+            for agent in self._runtime_repository.list_runtime_agents():
+                self._agents.setdefault(agent.agent_id, agent)
         self._repository_loaded = True
 
     def _save_identity(self, identity: AgentIdentity) -> None:
         if self._identity_repository is not None:
             self._identity_repository.save_identity(identity)
+
+    def _save_runtime_agent(self, agent: RegisteredChannelAgent) -> None:
+        if self._runtime_repository is not None:
+            self._runtime_repository.save_runtime_agent(agent)
 
     def _admin_view(
         self,
@@ -702,21 +1033,35 @@ class ChannelAgentNodeRegistry:
         if agent is None:
             return AgentAdminView(
                 identity=identity,
-                online_status=AgentOnlineStatus.OFFLINE,
+                identity_status=identity.status,
+                connectivity_status=AgentConnectivityStatus.OFFLINE,
                 runtime_status="OFFLINE",
             )
         now = self._clock()
         stale_after = max(self._config.heartbeat_interval_seconds * 3, 15.0)
         age_seconds = max((now - agent.last_heartbeat).total_seconds(), 0.0)
         if agent.status == "STOPPED" or age_seconds > stale_after:
-            online = AgentOnlineStatus.OFFLINE
-        elif agent.status == "DEGRADED":
-            online = AgentOnlineStatus.DEGRADED
+            connectivity = AgentConnectivityStatus.OFFLINE
         else:
-            online = AgentOnlineStatus.ONLINE
+            connectivity = AgentConnectivityStatus.ONLINE
+        if connectivity is not agent.connectivity_status:
+            agent = RegisteredChannelAgent(
+                registration_id=agent.registration_id,
+                agent_id=agent.agent_id,
+                device_id=agent.device_id,
+                version=agent.version,
+                hostname=agent.hostname,
+                status=agent.status,
+                registered_at=agent.registered_at,
+                last_heartbeat=agent.last_heartbeat,
+                connectivity_status=connectivity,
+            )
+            self._agents[agent.agent_id] = agent
+            self._save_runtime_agent(agent)
         return AgentAdminView(
             identity=identity,
-            online_status=online,
+            identity_status=identity.status,
+            connectivity_status=connectivity,
             agent_version=agent.version,
             hostname=agent.hostname,
             runtime_status=agent.status,
@@ -1062,6 +1407,7 @@ def create_channel_agent_node_router(
 __all__ = [
     "AgentDeviceBindingConflict",
     "AgentEnrollmentDenied",
+    "AgentActiveStoreSelectionBlocked",
     "AgentIdentityClaimMismatch",
     "AgentIdentityDisabled",
     "AgentIdentityRepositoryPort",

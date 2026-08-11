@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -16,11 +16,28 @@ from channel_engine.browser import (
     SelectorContract,
     SelectorContractState,
     SelectorDiscoveryWorkflow,
+    SelectorEvidenceEnvironment,
     SelectorKey,
+    SelectorVerificationEvidence,
 )
 
 
 NOW = datetime(2026, 8, 5, 10, 0, tzinfo=timezone.utc)
+
+
+def _evidence(
+    capabilities: frozenset[SelectorCapability],
+) -> SelectorVerificationEvidence:
+    return SelectorVerificationEvidence.issue(
+        reference="evidence-ref://synthetic/pdd/observe/selector-v1",
+        environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        page_fingerprint="sha256:" + "1" * 64,
+        applicable_page_version="synthetic-observe-v1",
+        verified_by="test-ref://channel-engine/cdp-readonly-suite",
+        verified_at=NOW,
+        expires_at=NOW + timedelta(days=365),
+        capability_boundary=capabilities,
+    )
 
 
 class FixedTargetResolver:
@@ -58,14 +75,16 @@ def page() -> BrowserPageContext:
 
 
 def receive_only_contract() -> SelectorContract:
+    capabilities = frozenset(
+        {SelectorCapability.STORE_IDENTITY, SelectorCapability.RECEIVE_MESSAGE}
+    )
+    evidence = _evidence(capabilities)
     return SelectorContract(
         platform="pdd",
         page="merchant_chat",
         version="observe-v1",
         state=SelectorContractState.VERIFIED,
-        capabilities=frozenset(
-            {SelectorCapability.STORE_IDENTITY, SelectorCapability.RECEIVE_MESSAGE}
-        ),
+        capabilities=capabilities,
         bindings=(
             SelectorBinding(
                 key=SelectorKey.STORE_ID,
@@ -121,8 +140,9 @@ def receive_only_contract() -> SelectorContract:
                 value_attribute="datetime",
             ),
         ),
-        evidence_reference="evidence-ref://pdd/observe/selector-v1",
+        evidence_reference=evidence.reference,
         verified_at=NOW,
+        verification_evidence=evidence,
     )
 
 
@@ -142,7 +162,10 @@ def test_real_page_port_baselines_history_then_returns_only_new_messages() -> No
         [raw_message("1"), raw_message("2")],
     )
     port = ChromeDevToolsReadOnlyPagePort(
-        FixedTargetResolver(), evaluator, clock=lambda: NOW
+        FixedTargetResolver(),
+        evaluator,
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
     )
     contract = receive_only_contract()
     attachment = port.attach(page(), contract)
@@ -180,7 +203,12 @@ def test_real_page_port_reads_store_identity_without_raw_credentials() -> None:
             "STORE_NAME": {"count": 1, "value": "Synthetic Store"},
         }
     )
-    port = ChromeDevToolsReadOnlyPagePort(FixedTargetResolver(), evaluator)
+    port = ChromeDevToolsReadOnlyPagePort(
+        FixedTargetResolver(),
+        evaluator,
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
+    )
     bindings = tuple(
         binding
         for binding in receive_only_contract().bindings
@@ -198,7 +226,10 @@ def test_real_page_port_reads_store_identity_without_raw_credentials() -> None:
 
 def test_real_page_port_rejects_send_capability_and_unverified_selector() -> None:
     port = ChromeDevToolsReadOnlyPagePort(
-        FixedTargetResolver(), ScriptedEvaluator()
+        FixedTargetResolver(),
+        ScriptedEvaluator(),
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
     )
     receive = receive_only_contract()
     with_send = receive.model_copy(
@@ -209,7 +240,11 @@ def test_real_page_port_rejects_send_capability_and_unverified_selector() -> Non
         }
     )
     draft = receive.model_copy(
-        update={"state": SelectorContractState.DRAFT, "verified_at": None}
+        update={
+            "state": SelectorContractState.DRAFT,
+            "verified_at": None,
+            "verification_evidence": None,
+        }
     )
 
     with pytest.raises(CDPSelectorRejected, match="receive-only"):
@@ -247,7 +282,10 @@ def test_selector_discovery_requires_probe_before_verified_activation() -> None:
         for binding in candidate.bindings
     }
     port = ChromeDevToolsReadOnlyPagePort(
-        FixedTargetResolver(), ScriptedEvaluator(counts), clock=lambda: NOW
+        FixedTargetResolver(),
+        ScriptedEvaluator(counts),
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
     )
 
     probe = port.probe(page(), candidate)
@@ -255,6 +293,10 @@ def test_selector_discovery_requires_probe_before_verified_activation() -> None:
         candidate,
         probe,
         verified_at=NOW,
+        verified_by="test-ref://channel-engine/discovery-suite",
+        expires_at=NOW + timedelta(days=365),
+        applicable_page_version="synthetic-observe-discovery-v1",
+        environment=SelectorEvidenceEnvironment.SYNTHETIC,
     )
 
     assert discovery.state is SelectorContractState.DISCOVERY

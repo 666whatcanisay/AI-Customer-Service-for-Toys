@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
@@ -48,6 +49,12 @@ class LocatorEngine(StrEnum):
     CSS = "CSS"
     TEXT = "TEXT"
     MOCK = "MOCK"
+
+
+class SelectorEvidenceEnvironment(StrEnum):
+    SYNTHETIC = "SYNTHETIC"
+    STAGING = "STAGING"
+    PRODUCTION = "PRODUCTION"
 
 
 RECEIVE_KEYS = frozenset(
@@ -102,6 +109,94 @@ class SelectorBinding(BrowserModel):
         return self
 
 
+class SelectorVerificationEvidence(BrowserModel):
+    """Durable proof required before selectors may be used at runtime."""
+
+    reference: str = Field(
+        min_length=1,
+        max_length=256,
+        pattern=r"^evidence-ref://[A-Za-z0-9._:/-]+$",
+    )
+    environment: SelectorEvidenceEnvironment
+    page_fingerprint: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+    applicable_page_version: str = Field(min_length=1, max_length=128)
+    verified_by: str = Field(
+        min_length=1,
+        max_length=256,
+        pattern=r"^(operator|test)-ref://[A-Za-z0-9._:/-]+$",
+    )
+    verified_at: AwareDatetime
+    expires_at: AwareDatetime
+    capability_boundary: frozenset[SelectorCapability]
+    selector_set_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+    evidence_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+
+    @staticmethod
+    def _hash_payload(payload: dict[str, object]) -> str:
+        return "sha256:" + hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
+    @classmethod
+    def issue(
+        cls,
+        *,
+        reference: str,
+        environment: SelectorEvidenceEnvironment,
+        page_fingerprint: str,
+        applicable_page_version: str,
+        verified_by: str,
+        verified_at: AwareDatetime,
+        expires_at: AwareDatetime,
+        capability_boundary: frozenset[SelectorCapability],
+        selector_set_hash: str = "sha256:" + "0" * 64,
+    ) -> SelectorVerificationEvidence:
+        payload: dict[str, object] = {
+            "reference": reference,
+            "environment": environment.value,
+            "page_fingerprint": page_fingerprint,
+            "applicable_page_version": applicable_page_version,
+            "verified_by": verified_by,
+            "verified_at": verified_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
+            "capability_boundary": sorted(item.value for item in capability_boundary),
+            "selector_set_hash": selector_set_hash,
+        }
+        return cls(
+            reference=reference,
+            environment=environment,
+            page_fingerprint=page_fingerprint,
+            applicable_page_version=applicable_page_version,
+            verified_by=verified_by,
+            verified_at=verified_at,
+            expires_at=expires_at,
+            capability_boundary=capability_boundary,
+            selector_set_hash=selector_set_hash,
+            evidence_hash=cls._hash_payload(payload),
+        )
+
+    @model_validator(mode="after")
+    def validate_evidence(self) -> SelectorVerificationEvidence:
+        if self.expires_at <= self.verified_at:
+            raise ValueError("selector evidence must expire after verification")
+        payload: dict[str, object] = {
+            "reference": self.reference,
+            "environment": self.environment.value,
+            "page_fingerprint": self.page_fingerprint,
+            "applicable_page_version": self.applicable_page_version,
+            "verified_by": self.verified_by,
+            "verified_at": self.verified_at.isoformat(),
+            "expires_at": self.expires_at.isoformat(),
+            "capability_boundary": sorted(
+                item.value for item in self.capability_boundary
+            ),
+            "selector_set_hash": self.selector_set_hash,
+        }
+        if self.evidence_hash != self._hash_payload(payload):
+            raise ValueError("selector evidence hash mismatch")
+        return self
+
+
 class SelectorContract(BrowserModel):
     platform: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,79}$")
     page: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,79}$")
@@ -115,6 +210,7 @@ class SelectorContract(BrowserModel):
     bindings: tuple[SelectorBinding, ...]
     evidence_reference: str = Field(min_length=1, max_length=256)
     verified_at: AwareDatetime | None = None
+    verification_evidence: SelectorVerificationEvidence | None = None
 
     @model_validator(mode="after")
     def validate_contract(self) -> SelectorContract:
@@ -131,12 +227,28 @@ class SelectorContract(BrowserModel):
         if SelectorCapability.LOGIN_DETECTION in self.capabilities:
             required.update(LOGIN_KEYS)
         if self.state is SelectorContractState.VERIFIED:
-            if self.verified_at is None:
-                raise ValueError("verified selector contract requires verified_at")
+            if self.verified_at is None or self.verification_evidence is None:
+                raise ValueError(
+                    "verified selector contract requires durable verification evidence"
+                )
+            evidence = self.verification_evidence
+            selector_hash_matches = evidence.selector_set_hash == self.selector_set_hash()
+            legacy_synthetic_test_evidence = (
+                evidence.selector_set_hash == "sha256:" + "0" * 64
+                and evidence.environment is SelectorEvidenceEnvironment.SYNTHETIC
+                and evidence.verified_by.startswith("test-ref://")
+            )
+            if (
+                evidence.reference != self.evidence_reference
+                or evidence.verified_at != self.verified_at
+                or evidence.capability_boundary != self.capabilities
+                or not (selector_hash_matches or legacy_synthetic_test_evidence)
+            ):
+                raise ValueError("selector evidence does not match the contract")
             if not required.issubset(set(keys)):
                 raise ValueError("verified selector contract is missing required keys")
-        elif self.verified_at is not None:
-            raise ValueError("unverified selector contract cannot have verified_at")
+        elif self.verified_at is not None or self.verification_evidence is not None:
+            raise ValueError("unverified selector contract cannot have verification evidence")
         return self
 
     @property
@@ -149,6 +261,36 @@ class SelectorContract(BrowserModel):
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
 
+    def selector_set_hash(self) -> str:
+        return selector_set_hash(
+            platform=self.platform,
+            page=self.page,
+            version=self.version,
+            capabilities=self.capabilities,
+            bindings=self.bindings,
+            evidence_reference=self.evidence_reference,
+        )
+
+    def assert_runtime_evidence(
+        self,
+        *,
+        page_fingerprint: str,
+        environment: SelectorEvidenceEnvironment,
+        now: AwareDatetime,
+        capability: SelectorCapability,
+    ) -> None:
+        evidence = self.verification_evidence
+        if self.state is not SelectorContractState.VERIFIED or evidence is None:
+            raise SelectorContractDrift("selector contract has no verified evidence")
+        if evidence.environment is not environment:
+            raise SelectorContractDrift("selector evidence environment mismatch")
+        if evidence.expires_at <= now:
+            raise SelectorContractDrift("selector evidence expired")
+        if evidence.page_fingerprint != page_fingerprint:
+            raise SelectorContractDrift("selector page fingerprint changed")
+        if capability not in evidence.capability_boundary:
+            raise SelectorContractDrift("selector capability is outside evidence boundary")
+
 
 class SelectorProbeResult(BrowserModel):
     contract_id: str
@@ -158,6 +300,10 @@ class SelectorProbeResult(BrowserModel):
     missing_keys: tuple[SelectorKey, ...] = ()
     ambiguous_keys: tuple[SelectorKey, ...] = ()
     checked_at: AwareDatetime
+    page_fingerprint: str | None = Field(
+        default=None,
+        pattern=r"^sha256:[a-f0-9]{64}$",
+    )
 
 
 @runtime_checkable
@@ -336,6 +482,10 @@ class SelectorDiscoveryWorkflow:
         probe: SelectorProbeResult,
         *,
         verified_at: AwareDatetime,
+        verified_by: str,
+        expires_at: AwareDatetime,
+        applicable_page_version: str,
+        environment: SelectorEvidenceEnvironment,
     ) -> SelectorContract:
         if contract.state is not SelectorContractState.DISCOVERY:
             raise SelectorDiscoveryError(
@@ -355,6 +505,21 @@ class SelectorDiscoveryWorkflow:
             raise SelectorDiscoveryError(
                 "selector verification requires durable evidence"
             )
+        if probe.page_fingerprint is None:
+            raise SelectorDiscoveryError(
+                "selector verification requires a page fingerprint"
+            )
+        evidence = SelectorVerificationEvidence.issue(
+            reference=contract.evidence_reference,
+            environment=environment,
+            page_fingerprint=probe.page_fingerprint,
+            applicable_page_version=applicable_page_version,
+            verified_by=verified_by,
+            verified_at=verified_at,
+            expires_at=expires_at,
+            capability_boundary=contract.capabilities,
+            selector_set_hash=contract.selector_set_hash(),
+        )
         return SelectorContract(
             platform=contract.platform,
             page=contract.page,
@@ -364,6 +529,7 @@ class SelectorDiscoveryWorkflow:
             bindings=contract.bindings,
             evidence_reference=contract.evidence_reference,
             verified_at=verified_at,
+            verification_evidence=evidence,
         )
 
 
@@ -386,32 +552,76 @@ def verified_mock_pdd_merchant_chat_v1(
 ) -> SelectorContract:
     """Offline-only complete contract used to test logical selector governance."""
 
+    capabilities = frozenset(
+        {
+            SelectorCapability.LOGIN_DETECTION,
+            SelectorCapability.RECEIVE_MESSAGE,
+            SelectorCapability.SEND_MESSAGE,
+        }
+    )
+    bindings = tuple(
+        SelectorBinding(
+            key=key,
+            engine=LocatorEngine.MOCK,
+            locator=f"mock://{key.value.casefold()}",
+        )
+        for key in sorted(
+            RECEIVE_KEYS | SEND_KEYS | LOGIN_KEYS,
+            key=lambda item: item.value,
+        )
+    )
+    evidence_reference = "evidence-ref://synthetic/pdd/mock-selector-contract-v1"
+    evidence = SelectorVerificationEvidence.issue(
+        reference=evidence_reference,
+        environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        page_fingerprint="sha256:" + "0" * 64,
+        applicable_page_version="synthetic-v1",
+        verified_by="test-ref://channel-engine/selector-suite",
+        verified_at=verified_at,
+        expires_at=datetime.max.replace(tzinfo=verified_at.tzinfo),
+        capability_boundary=capabilities,
+        selector_set_hash=selector_set_hash(
+            platform="pdd",
+            page="merchant_chat",
+            version="mock-v1",
+            capabilities=capabilities,
+            bindings=bindings,
+            evidence_reference=evidence_reference,
+        ),
+    )
     return SelectorContract(
         platform="pdd",
         page="merchant_chat",
         version="mock-v1",
         state=SelectorContractState.VERIFIED,
-        capabilities=frozenset(
-            {
-                SelectorCapability.LOGIN_DETECTION,
-                SelectorCapability.RECEIVE_MESSAGE,
-                SelectorCapability.SEND_MESSAGE,
-            }
-        ),
-        bindings=tuple(
-            SelectorBinding(
-                key=key,
-                engine=LocatorEngine.MOCK,
-                locator=f"mock://{key.value.casefold()}",
-            )
-            for key in sorted(
-                RECEIVE_KEYS | SEND_KEYS | LOGIN_KEYS,
-                key=lambda item: item.value,
-            )
-        ),
-        evidence_reference="experiment://offline-mock-selector-contract-v1",
+        capabilities=capabilities,
+        bindings=bindings,
+        evidence_reference=evidence.reference,
         verified_at=verified_at,
+        verification_evidence=evidence,
     )
+
+
+def selector_set_hash(
+    *,
+    platform: str,
+    page: str,
+    version: str,
+    capabilities: frozenset[SelectorCapability],
+    bindings: tuple[SelectorBinding, ...],
+    evidence_reference: str,
+) -> str:
+    payload = {
+        "platform": platform,
+        "page": page,
+        "version": version,
+        "capabilities": sorted(item.value for item in capabilities),
+        "bindings": [item.model_dump(mode="json") for item in bindings],
+        "evidence_reference": evidence_reference,
+    }
+    return "sha256:" + hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 __all__ = [
@@ -424,11 +634,14 @@ __all__ = [
     "SelectorContractUnavailable",
     "SelectorDiscoveryError",
     "SelectorDiscoveryWorkflow",
+    "SelectorEvidenceEnvironment",
     "SelectorKey",
     "SelectorProbe",
     "SelectorProbeResult",
     "SelectorRegistry",
+    "SelectorVerificationEvidence",
     "STORE_IDENTITY_KEYS",
     "draft_pdd_merchant_chat_v1",
     "verified_mock_pdd_merchant_chat_v1",
+    "selector_set_hash",
 ]

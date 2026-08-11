@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>PDD 客服工作台仿真器</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="simulator-notice">
+    <strong>本地仿真环境</strong>
+    <span>合成店铺 · 合成客户 · 不连接真实平台 · 不产生真实发送</span>
+    <span class="status-dot">运行中</span>
+  </div>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="brand-mark">仿</div>
+      <div class="store-heading">
+        <strong id="storeName">仿真积木店客服账号</strong>
+        <small>客服工作台 / 开发仿真</small>
+      </div>
+      <dl class="metrics">
+        <div><dt>3分钟人工回复率</dt><dd>100%</dd></div>
+        <div><dt>今日咨询人数</dt><dd id="consultCount">3 人</dd></div>
+        <div><dt>待人工处理</dt><dd id="waitingCount">1</dd></div>
+        <div><dt>工作台状态</dt><dd class="healthy">在线</dd></div>
+      </dl>
+      <button class="outline-button" id="resetSimulator" type="button">重置仿真</button>
+    </header>
+
+    <aside class="conversation-sidebar" aria-label="仿真会话列表">
+      <div class="sidebar-tabs">
+        <button class="active" type="button">今日接待 <span id="unreadTotal">1</span></button>
+        <button type="button">全部会话</button>
+      </div>
+      <div class="search-row">
+        <label for="conversationSearch">查找会话</label>
+        <input id="conversationSearch" placeholder="输入测试客户代号">
+      </div>
+      <p class="queue-title">待回复</p>
+      <div id="conversationList" class="conversation-list"></div>
+    </aside>
+
+    <main class="chat-panel" currentuid="sim-customer-a01" data-store-id="SIM-STORE-001">
+      <div class="chat-heading">
+        <div>
+          <strong id="activeCustomer">测试买家 A01</strong>
+          <span class="synthetic-badge">合成数据</span>
+          <small id="activeConversation">SIM-CONV-A01</small>
+        </div>
+        <div class="page-state"><i></i> CUSTOMER_SERVICE_READY</div>
+      </div>
+
+      <section class="commonCard product-context" aria-label="当前商品上下文">
+        <div class="product-art" aria-hidden="true">积木<br>花束</div>
+        <div class="good-content">
+          <p>【仿真商品】香槟玫瑰积木花束礼盒</p>
+          <span>商品ID：SIM-PRODUCT-001</span>
+          <span>适用年龄：8岁以上</span>
+        </div>
+        <strong>¥ 5.15</strong>
+      </section>
+
+      <ul id="msgListContainer" class="message-list" aria-live="polite"></ul>
+
+      <section class="scenario-panel" aria-label="仿真消息控制">
+        <div>
+          <strong>模拟客户消息</strong>
+          <small>仅写入当前本地页面，用于验证 Observer 与 Conversation Buffer。</small>
+        </div>
+        <div class="scenario-buttons">
+          <button type="button" data-scenario="age">年龄咨询</button>
+          <button type="button" data-scenario="sequence">连续三句话</button>
+          <button type="button" data-scenario="missing">缺件问题</button>
+          <button type="button" data-scenario="logistics">物流问题</button>
+        </div>
+      </section>
+
+      <footer class="reply-footer">
+        <div class="reply-toolbar">
+          <span>人工确认回复</span>
+          <span>不会自动发送 · 不会连接真实客户</span>
+        </div>
+        <textarea id="replyTextarea" aria-label="仿真回复输入框" placeholder="输入或由 Channel Agent 填入建议回复"></textarea>
+        <div class="reply-actions">
+          <span id="replyStatus">等待人工输入</span>
+          <button class="send-btn" type="button">发送</button>
+        </div>
+      </footer>
+    </main>
+
+    <aside id="right-panel" class="context-sidebar" aria-label="仿真订单上下文">
+      <div class="context-tabs"><strong>最新订单</strong><span>商品信息</span></div>
+      <article class="order-item">
+        <span class="order-status">待付款</span>
+        <p>订单编号：SIM-ORDER-20260807-001</p>
+        <p>商品：仿真香槟玫瑰积木花束礼盒 ×1</p>
+        <p>SKU：SIM-SKU-AGE8-CHAMPAGNE</p>
+        <p>订单状态：待付款</p>
+      </article>
+      <section class="contract-card">
+        <strong>开发契约</strong>
+        <dl>
+          <div><dt>会话标记</dt><dd>[currentuid]</dd></div>
+          <div><dt>消息容器</dt><dd>#msgListContainer</dd></div>
+          <div><dt>回复输入</dt><dd>#replyTextarea</dd></div>
+          <div><dt>发送按钮</dt><dd>.reply-footer .send-btn</dd></div>
+        </dl>
+      </section>
+      <section class="event-card">
+        <strong>最近仿真事件</strong>
+        <ol id="eventLog"></ol>
+      </section>
+    </aside>
+  </div>
+
+  <div class="confirm-layer" id="confirmLayer" hidden>
+    <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <span>人工审批边界</span>
+      <h2 id="confirmTitle">确认发送到当前仿真会话？</h2>
+      <dl>
+        <div><dt>店铺</dt><dd>仿真积木店客服账号</dd></div>
+        <div><dt>会话</dt><dd id="confirmConversation">SIM-CONV-A01</dd></div>
+        <div><dt>客户</dt><dd id="confirmCustomer">测试买家 A01</dd></div>
+      </dl>
+      <p id="confirmReply"></p>
+      <div>
+        <button id="cancelSend" type="button">取消</button>
+        <button id="confirmSend" class="primary" type="button">人工确认并仿真发送</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

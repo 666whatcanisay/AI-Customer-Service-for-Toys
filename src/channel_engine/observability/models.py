@@ -275,6 +275,17 @@ class OpsApprovalActionResult(ObservabilityModel):
     next_step: str
 
 
+class OpsAgentAdminCommand(ObservabilityModel):
+    """Explicit local-host confirmation for a destructive device action."""
+
+    reason: str = Field(min_length=8, max_length=512)
+    confirmation_text: Literal[
+        "确认解绑设备",
+        "确认禁用设备",
+        "确认恢复为待绑定",
+    ]
+
+
 class OpsComponentStatus(ObservabilityModel):
     component: str
     status: str
@@ -318,6 +329,7 @@ __all__ = [
     "OpsApprovalAction",
     "OpsApprovalActionResult",
     "OpsApprovalCommand",
+    "OpsAgentAdminCommand",
     "OpsConsoleSnapshot",
     "OpsRuntimeStatus",
     "RecoveryRecord",

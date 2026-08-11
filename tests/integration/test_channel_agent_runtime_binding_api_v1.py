@@ -9,8 +9,8 @@ from fastapi.testclient import TestClient
 from channel_agent.client import (
     AgentConnectionError,
     AgentRejectedError,
-    ChannelEngineClient,
 )
+from channel_agent.legacy_client_v1 import LegacyChannelEngineClient as ChannelEngineClient
 from channel_agent.config import ChannelAgentConfig
 from channel_agent.contract import AgentRuntimeStatus
 from channel_agent.identity import AgentIdentityStatus
@@ -69,6 +69,7 @@ def build_clients(tmp_path):
             log_directory=tmp_path / "logs",
         ),
         http_client=transport,
+        allow_legacy_control=True,
     )
     return transport, agent
 
@@ -166,8 +167,15 @@ def test_enrollment_user_multi_store_activation_and_status_sync(tmp_path) -> Non
         "store-api-c",
         "store-api-d",
     )
-    assert admin_view.json()["online_status"] == "ONLINE"
+    assert admin_view.json()["identity_status"] == "ACTIVE"
+    assert admin_view.json()["connectivity_status"] == "ONLINE"
     assert admin_view.json()["identity"]["user_id"] == "user-runtime-api-001"
+    assert admin_view.json()["identity"]["authorized_store_ids"] == [
+        "store-api-a",
+        "store-api-c",
+        "store-api-d",
+    ]
+    assert "active_store_id" in admin_view.json()["identity"]
     transport.close()
 
 
@@ -191,6 +199,7 @@ def test_invalid_enrollment_code_and_insecure_remote_transport_fail_closed(
             device_id="device-insecure-001",
         ),
         http_client=transport,
+        allow_legacy_control=True,
     )
     with pytest.raises(AgentConnectionError, match="requires HTTPS"):
         insecure.enroll(CODE)

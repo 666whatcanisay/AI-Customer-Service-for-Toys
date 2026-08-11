@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlsplit
@@ -8,7 +9,11 @@ import httpx
 from pydantic import ValidationError
 
 from .config import ChannelAgentConfig
-from .binding import AgentEnrollmentRequest, AgentEnrollmentResponse
+from .binding import (
+    AgentActiveStoreSelectionRequest,
+    AgentEnrollmentRequest,
+    AgentEnrollmentResponse,
+)
 from .contract import (
     AgentConfigResponse,
     AgentHeartbeatAck,
@@ -20,6 +25,13 @@ from .contract import (
 )
 from .version import AGENT_PROTOCOL_VERSION, AGENT_VERSION
 from .identity import AgentIdentity, AgentIdentityStatus
+from .control_v2 import DeviceRequestSigner
+from .control_v2 import (
+    AgentAssistantEventPollResponse,
+    AgentObservationAck,
+    AgentObservationSubmission,
+)
+from .security import DeviceCredentialStore, WindowsDeviceCredentialStore
 
 
 class AgentClientError(RuntimeError):
@@ -49,26 +61,63 @@ class AgentProtocolError(AgentClientError):
     pass
 
 
-class ChannelEngineClient:
-    """Versioned control client; it exposes no message or execution operation."""
+class AgentPairingRequiredError(AgentClientError):
+    """The device has no V2.1 credential and must be paired by a human."""
 
-    REGISTER_PATH = "/channel-agent/v1/agents/register"
-    ENROLL_PATH = "/channel-agent/v1/agents/enroll"
+    pass
+
+
+class ChannelEngineClient:
+    """Signed Agent Control V2.1 client used by the production Edge runtime."""
 
     def __init__(
         self,
         config: ChannelAgentConfig,
         *,
         http_client: Any | None = None,
+        credential_store: DeviceCredentialStore | None = None,
     ) -> None:
         self._config = config
         self._owns_client = http_client is None
         self._identity: AgentIdentity | None = None
+        self._credential_store = credential_store or WindowsDeviceCredentialStore()
+        self._signer: DeviceRequestSigner | None = None
+        if config.device_credential_reference is not None:
+            material = self._credential_store.acquire(
+                config.device_credential_reference
+            )
+            self._signer = DeviceRequestSigner(
+                config.agent_id,
+                config.device_id,
+                material.for_signing(),
+            )
         self._http = http_client or httpx.Client(
             base_url=config.server_url,
             timeout=httpx.Timeout(config.connect_timeout_seconds),
             follow_redirects=False,
+            verify=(
+                str(config.server_ca_certificate_path)
+                if config.server_ca_certificate_path is not None
+                else True
+            ),
+            trust_env=False,
         )
+
+    @property
+    def identity(self) -> AgentIdentity | None:
+        """Return the last server-authoritative public identity snapshot."""
+        return self._identity
+
+    def _control_path(self, suffix: str) -> str:
+        if self._signer is None:
+            raise AgentPairingRequiredError(
+                "Channel Agent device pairing is required before control requests"
+            )
+        return f"/channel-agent/v2{suffix}"
+
+    @property
+    def secure_control_ready(self) -> bool:
+        return self._signer is not None
 
     def register(
         self,
@@ -84,13 +133,15 @@ class ChannelEngineClient:
             user_reference=self._config.user_reference,
             store_reference=self._config.store_reference,
             store_references=self._config.store_references,
+            authorized_store_ids=self._config.store_references,
+            active_store_id=self._config.store_reference,
             hostname=hostname,
             status=status,
             timestamp=timestamp,
         )
         response = self._request(
             "POST",
-            self.REGISTER_PATH,
+            self._control_path("/agents/register"),
             json=request.model_dump(mode="json"),
             headers={
                 "Idempotency-Key": (
@@ -114,7 +165,7 @@ class ChannelEngineClient:
         )
         response = self._request(
             "POST",
-            self.ENROLL_PATH,
+            self._control_path("/agents/enroll"),
             json=request.model_dump(mode="json"),
         )
         envelope = self._validate_response(response, AgentEnrollmentResponse)
@@ -125,6 +176,10 @@ class ChannelEngineClient:
             user_id=binding.user_id,
             store_id=binding.store_ids[0] if binding.store_ids else None,
             store_ids=binding.store_ids,
+            authorized_store_ids=(
+                binding.authorized_store_ids or binding.store_ids
+            ),
+            active_store_id=binding.active_store_id,
             status=binding.identity_status,
             binding_revision=binding.binding_revision,
             created_at=binding.created_at,
@@ -151,13 +206,19 @@ class ChannelEngineClient:
             user_id=identity.user_id if asserted else None,
             store_id=store_ids[0] if store_ids else None,
             store_ids=store_ids,
+            authorized_store_ids=store_ids,
+            active_store_id=(
+                identity.effective_active_store_id if asserted else None
+            ),
             binding_revision=identity.binding_revision if asserted else 0,
             version=AGENT_VERSION,
             hostname=hostname,
             status=status,
             timestamp=timestamp,
         )
-        path = f"/channel-agent/v1/agents/{quote(self._config.agent_id, safe='')}/status"
+        path = self._control_path(
+            f"/agents/{quote(self._config.agent_id, safe='')}/status"
+        )
         response = self._request(
             "PUT",
             path,
@@ -169,12 +230,13 @@ class ChannelEngineClient:
         return envelope
 
     def fetch_config(self) -> ManagedAgentConfig:
-        path = f"/channel-agent/v1/agents/{quote(self._config.agent_id, safe='')}/config"
-        response = self._request(
-            "GET",
-            path,
-            params={"device_id": self._config.device_id},
+        path = self._control_path(
+            f"/agents/{quote(self._config.agent_id, safe='')}/config"
         )
+        request_arguments = (
+            {} if self._signer is not None else {"params": {"device_id": self._config.device_id}}
+        )
+        response = self._request("GET", path, **request_arguments)
         envelope = self._validate_response(response, AgentConfigResponse)
         if envelope.agent_id != self._config.agent_id:
             raise AgentProtocolError("Channel Engine returned config for another agent")
@@ -184,15 +246,129 @@ class ChannelEngineClient:
             self._identity = envelope.identity
         return envelope.config
 
+    def select_active_store(
+        self,
+        store_reference: str,
+        observed_store_reference: str,
+        *,
+        reason: str,
+    ) -> AgentIdentity:
+        if self._signer is None:
+            raise AgentConnectionError(
+                "active store selection requires the secure Agent control protocol"
+            )
+        identity = self._identity
+        if identity is None:
+            raise AgentProtocolError("Agent identity is unavailable")
+        request = AgentActiveStoreSelectionRequest(
+            device_id=self._config.device_id,
+            store_reference=store_reference,
+            observed_store_reference=observed_store_reference,
+            binding_revision=identity.binding_revision,
+            reason=reason,
+        )
+        path = self._control_path(
+            f"/agents/{quote(self._config.agent_id, safe='')}/active-store"
+        )
+        response = self._request(
+            "PUT",
+            path,
+            json=request.model_dump(mode="json"),
+        )
+        try:
+            selected = AgentIdentity.model_validate(response.json())
+        except (ValueError, ValidationError, TypeError) as exc:
+            raise AgentProtocolError(
+                "Channel Engine returned an invalid active store response"
+            ) from exc
+        self._identity = selected
+        return selected
+
+    def submit_observation(
+        self, submission: AgentObservationSubmission
+    ) -> AgentObservationAck:
+        self._assert_v21_ready()
+        response = self._request(
+            "POST",
+            "/channel-agent/v2/observations",
+            json=submission.model_dump(mode="json"),
+        )
+        return self._validate_control_response(response, AgentObservationAck)
+
+    def poll_command(self):
+        AgentCommandPollResponse = _execution_model("AgentCommandPollResponse")
+
+        self._assert_v21_ready()
+        response = self._request("GET", "/channel-agent/v2/commands/next")
+        return self._validate_control_response(response, AgentCommandPollResponse)
+
+    def poll_assistant_events(
+        self,
+        *,
+        after_sequence_id: int = 0,
+        limit: int = 100,
+    ) -> AgentAssistantEventPollResponse:
+        self._assert_v21_ready()
+        response = self._request(
+            "GET",
+            "/channel-agent/v2/assistant-events/next",
+            params={"after_sequence_id": after_sequence_id, "limit": limit},
+        )
+        return self._validate_control_response(
+            response, AgentAssistantEventPollResponse
+        )
+
+    def fetch_assistant_snapshot(
+        self,
+        *,
+        store_id: str | None = None,
+        conversation_id: str | None = None,
+    ):
+        from .control_v2 import AgentAssistantSnapshotResponse
+
+        self._assert_v21_ready()
+        params = {}
+        if store_id is not None or conversation_id is not None:
+            if store_id is None or conversation_id is None:
+                raise ValueError("assistant snapshot scope must be complete")
+            params = {
+                "store_id": store_id,
+                "conversation_id": conversation_id,
+            }
+        response = self._request(
+            "GET",
+            "/channel-agent/v2/assistant-snapshot",
+            params=params,
+        )
+        return self._validate_control_response(
+            response, AgentAssistantSnapshotResponse
+        )
+
+    def submit_receipt(self, submission):
+        AgentReceiptAck = _execution_model("AgentReceiptAck")
+
+        self._assert_v21_ready()
+        response = self._request(
+            "POST",
+            "/channel-agent/v2/receipts",
+            json=submission.model_dump(mode="json"),
+        )
+        return self._validate_control_response(response, AgentReceiptAck)
+
     def close(self) -> None:
         if self._owns_client:
             self._http.close()
-
     def _enrollment_transport_is_safe(self) -> bool:
         parsed = urlsplit(self._config.server_url)
         if parsed.scheme == "https":
             return True
         return parsed.hostname in {"127.0.0.1", "::1", "localhost"}
+
+    def _assert_v21_ready(self) -> None:
+        if self._signer is None:
+            raise AgentPairingRequiredError(
+                "Channel Agent V2.1 device credential is unavailable"
+            )
 
     def _request(self, method: str, path: str, **kwargs: object) -> Any:
         headers = {
@@ -204,6 +380,18 @@ class ChannelEngineClient:
         supplied = kwargs.pop("headers", None)
         if isinstance(supplied, dict):
             headers.update({str(key): str(value) for key, value in supplied.items()})
+        if self._signer is not None:
+            value = kwargs.pop("json", None)
+            if value is None:
+                body = b""
+            else:
+                body = json.dumps(
+                    value,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                kwargs["content"] = body
+            headers.update(self._signer.headers(method, path, body))
         try:
             response = self._http.request(method, path, headers=headers, **kwargs)
         except (httpx.TimeoutException, httpx.RequestError) as exc:
@@ -249,16 +437,33 @@ class ChannelEngineClient:
             payload = response.json()
             value = model_type.model_validate(payload)
         except (ValueError, ValidationError, TypeError) as exc:
-            raise AgentProtocolError("Channel Engine returned an invalid V1 envelope") from exc
+            raise AgentProtocolError("Channel Engine returned an invalid control envelope") from exc
         if value.protocol_version != AGENT_PROTOCOL_VERSION:
             raise AgentProtocolError("Channel Agent protocol version mismatch")
         return value
+
+    @staticmethod
+    def _validate_control_response(response: Any, model_type: Any) -> Any:
+        try:
+            return model_type.model_validate(response.json())
+        except (ValueError, ValidationError, TypeError) as exc:
+            raise AgentProtocolError(
+                "Channel Engine returned an invalid V2.1 control response"
+            ) from exc
+
+
+def _execution_model(name: str):
+    """Keep send-capable contracts absent from the OBSERVE_ONLY package."""
+
+    module = __import__("channel_agent.execution_control", fromlist=(name,))
+    return getattr(module, name)
 
 
 __all__ = [
     "AgentClientError",
     "AgentConnectionError",
     "AgentProtocolError",
+    "AgentPairingRequiredError",
     "AgentRejectedError",
     "ChannelEngineClient",
 ]

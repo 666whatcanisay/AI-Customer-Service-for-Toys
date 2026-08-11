@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
+from datetime import datetime, timezone
 from enum import StrEnum
 from threading import Lock
 from typing import Protocol, runtime_checkable
 
-from pydantic import Field, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 
 from channel_engine.channel import (
     AuthorizedOutboundMessage,
@@ -25,6 +27,7 @@ from .selectors import (
     SelectorCapability,
     SelectorContract,
     SelectorContractState,
+    SelectorEvidenceEnvironment,
     SelectorContractUnavailable,
     SelectorRegistry,
 )
@@ -47,6 +50,7 @@ class BrowserSendAction(BrowserModel):
     page: BrowserPageContext
     selector_contract_id: str = Field(min_length=1, max_length=256)
     selector_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+    selector_evidence_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
 
 
 class BrowserActionResult(BrowserModel):
@@ -56,7 +60,7 @@ class BrowserActionResult(BrowserModel):
     error_code: str | None = Field(default=None, max_length=128)
     page_revision_after: str | None = Field(default=None, max_length=128)
     real_browser_called: bool
-    customer_message_sent: bool
+    customer_message_sent: bool | None
     simulation_only: bool = False
 
     @model_validator(mode="after")
@@ -77,6 +81,8 @@ class BrowserActionResult(BrowserModel):
             BrowserActionPhase.CONFIRMED,
         }:
             raise ValueError("UNKNOWN is reserved for post-trigger uncertainty")
+        if self.outcome is ReceiptOutcome.UNKNOWN and self.customer_message_sent is not None:
+            raise ValueError("UNKNOWN cannot claim customer delivery fact")
         if self.outcome is ReceiptOutcome.FAILED and self.phase in {
             BrowserActionPhase.SEND_TRIGGERED,
             BrowserActionPhase.CONFIRMED,
@@ -108,11 +114,16 @@ class ControlledOutboundBrowserExecutor:
         page_router: BrowserPageRouter,
         selector_registry: SelectorRegistry,
         action_port: BrowserActionPort,
+        *,
+        runtime_environment: SelectorEvidenceEnvironment,
+        clock: Callable[[], AwareDatetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         self.authorization_service = authorization_service
         self.page_router = page_router
         self.selector_registry = selector_registry
         self.action_port = action_port
+        self.runtime_environment = runtime_environment
+        self.clock = clock
         self.call_count = 0
 
     def execute(self, command: ExecutionCommand) -> ExecutionResult:
@@ -157,11 +168,21 @@ class ControlledOutboundBrowserExecutor:
                 or SelectorCapability.SEND_MESSAGE not in contract.capabilities
             ):
                 return self._denied("BROWSER_SELECTOR_CONTRACT_NOT_SEND_VERIFIED")
+            contract.assert_runtime_evidence(
+                page_fingerprint=page.page_revision or "",
+                environment=self.runtime_environment,
+                now=self.clock(),
+                capability=SelectorCapability.SEND_MESSAGE,
+            )
+            evidence = contract.verification_evidence
+            if evidence is None:
+                return self._denied("BROWSER_SELECTOR_EVIDENCE_REQUIRED")
             action = BrowserSendAction(
                 authorized=authorized,
                 page=page,
                 selector_contract_id=contract.contract_id,
                 selector_fingerprint=contract.fingerprint(),
+                selector_evidence_hash=evidence.evidence_hash,
             )
         except ExecutionBoundaryDenied:
             return self._denied("BROWSER_SEND_AUTHORIZATION_DENIED")
@@ -182,8 +203,8 @@ class ControlledOutboundBrowserExecutor:
                     "automatic_reply": False,
                     "automatic_retry_allowed": False,
                     "human_takeover_required": True,
-                    "real_browser_called": False,
-                    "customer_message_sent": False,
+                    "transport_triggered": None,
+                    "customer_message_sent": None,
                 },
             )
         return ExecutionResult(
@@ -303,7 +324,7 @@ class FakeBrowserActionPort:
                     error_code="MOCK_BROWSER_CONFIRMATION_UNKNOWN",
                     page_revision_after=action.page.page_revision,
                     real_browser_called=False,
-                    customer_message_sent=False,
+                    customer_message_sent=None,
                     simulation_only=True,
                 ),
             }[self.outcome]

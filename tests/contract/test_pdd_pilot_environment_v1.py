@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 import pytest
 
@@ -25,6 +26,7 @@ from channel_engine.browser import (
     SelectorContractState,
     SelectorDiscoveryError,
     SelectorDiscoveryWorkflow,
+    SelectorEvidenceEnvironment,
     SelectorKey,
     SelectorProbeResult,
     SelectorRegistry,
@@ -126,11 +128,17 @@ def _verified_identity_selector():
         page_context_id="page-pilot-1",
         passed=True,
         checked_at=utc_now(),
+        page_fingerprint="sha256:" + "7" * 64,
     )
+    verified_at = utc_now()
     return SelectorDiscoveryWorkflow.verify(
         candidate,
         probe,
-        verified_at=utc_now(),
+        verified_at=verified_at,
+        verified_by="test-ref://channel-engine/pilot-environment-suite",
+        expires_at=verified_at + timedelta(days=365),
+        applicable_page_version="synthetic-pilot-v1",
+        environment=SelectorEvidenceEnvironment.SYNTHETIC,
     )
 
 

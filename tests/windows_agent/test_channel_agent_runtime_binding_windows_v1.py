@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from channel_agent.binding import AgentEnrollmentGrantRequest
-from channel_agent.client import ChannelEngineClient
+from channel_agent.legacy_client_v1 import LegacyChannelEngineClient as ChannelEngineClient
 from channel_agent.config import ChannelAgentConfig
 from channel_agent.identity import AgentIdentityStatus
 from channel_agent import windows_app
@@ -67,7 +67,9 @@ def test_windows_enrollment_saves_public_binding_without_code(
     transport = TestClient(app, base_url="https://testserver")
 
     def client_factory(config: ChannelAgentConfig) -> ChannelEngineClient:
-        return ChannelEngineClient(config, http_client=transport)
+        return ChannelEngineClient(
+            config, http_client=transport, allow_legacy_control=True
+        )
 
     monkeypatch.setattr(windows_app, "ChannelEngineClient", client_factory)
     monkeypatch.setattr(windows_app.sys, "stdin", io.StringIO(CODE + "\n"))

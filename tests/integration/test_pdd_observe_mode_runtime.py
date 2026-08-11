@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from itertools import count
 
 import pytest
@@ -21,8 +21,10 @@ from channel_engine.browser import (
     SelectorCapability,
     SelectorContract,
     SelectorContractState,
+    SelectorEvidenceEnvironment,
     SelectorKey,
     SelectorRegistry,
+    SelectorVerificationEvidence,
 )
 from channel_engine.conversation import ConversationService
 from channel_engine.gateway import CONTRACT_VERSION
@@ -110,14 +112,25 @@ def selector_contract() -> SelectorContract:
             expected_count_max=maximum,
         )
 
+    capabilities = frozenset(
+        {SelectorCapability.STORE_IDENTITY, SelectorCapability.RECEIVE_MESSAGE}
+    )
+    evidence = SelectorVerificationEvidence.issue(
+        reference="evidence-ref://synthetic/pdd/observe/integration-selector",
+        environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        page_fingerprint="sha256:" + "1" * 64,
+        applicable_page_version="synthetic-observe-v1",
+        verified_by="test-ref://channel-engine/observe-integration-suite",
+        verified_at=NOW,
+        expires_at=NOW + timedelta(days=365),
+        capability_boundary=capabilities,
+    )
     return SelectorContract(
         platform="pdd",
         page="merchant_chat",
         version="observe-v1",
         state=SelectorContractState.VERIFIED,
-        capabilities=frozenset(
-            {SelectorCapability.STORE_IDENTITY, SelectorCapability.RECEIVE_MESSAGE}
-        ),
+        capabilities=capabilities,
         bindings=(
             css(SelectorKey.STORE_ID, "[data-store-id]", "data-store-id", 1),
             css(SelectorKey.STORE_NAME, "[data-store-name]", "data-store-name", 1),
@@ -137,8 +150,9 @@ def selector_contract() -> SelectorContract:
             css(SelectorKey.MESSAGE_CONTENT, ".message-content"),
             css(SelectorKey.MESSAGE_TIMESTAMP, "time[datetime]", "datetime"),
         ),
-        evidence_reference="evidence-ref://pdd/observe/integration-selector",
+        evidence_reference=evidence.reference,
         verified_at=NOW,
+        verification_evidence=evidence,
     )
 
 
@@ -147,6 +161,7 @@ def test_observe_mode_reaches_decision_and_stops_at_waiting_approval(
 ) -> None:
     driver = FakeBrowserRuntimeDriver(
         login_state=BrowserLoginState.AUTHENTICATED,
+        page_revision="sha256:" + "1" * 64,
         clock=lambda: NOW,
     )
     manager = BrowserSessionManager(
@@ -163,7 +178,10 @@ def test_observe_mode_reaches_decision_and_stops_at_waiting_approval(
     registry = SelectorRegistry()
     registry.register(selector_contract(), activate=True)
     page_port = ChromeDevToolsReadOnlyPagePort(
-        Resolver(), Evaluator(), clock=lambda: NOW
+        Resolver(),
+        Evaluator(),
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
     )
     server = MockAICSGateway(
         {(IDENTITY.client_id, IDENTITY.key_id): SECRET},
@@ -246,6 +264,7 @@ def test_observe_mode_waits_for_human_login_and_cannot_bind_early(
 ) -> None:
     driver = FakeBrowserRuntimeDriver(
         login_state=BrowserLoginState.REQUIRED,
+        page_revision="sha256:" + "1" * 64,
         clock=lambda: NOW,
     )
     manager = BrowserSessionManager(
@@ -260,7 +279,10 @@ def test_observe_mode_waits_for_human_login_and_cannot_bind_early(
         clock=lambda: NOW,
     )
     page_port = ChromeDevToolsReadOnlyPagePort(
-        Resolver(), Evaluator(), clock=lambda: NOW
+        Resolver(),
+        Evaluator(),
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
     )
     runtime = PDDObserveModeRuntime(
         manager,

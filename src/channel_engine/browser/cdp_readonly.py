@@ -31,6 +31,7 @@ from .selectors import (
     SelectorBinding,
     SelectorCapability,
     SelectorContract,
+    SelectorEvidenceEnvironment,
     SelectorContractState,
     SelectorKey,
     SelectorProbeResult,
@@ -264,6 +265,7 @@ class ChromeDevToolsReadOnlyPagePort:
         evaluator: CDPEvaluator,
         *,
         baseline_existing_messages: bool = True,
+        runtime_environment: SelectorEvidenceEnvironment = SelectorEvidenceEnvironment.PRODUCTION,
         clock: Callable[[], AwareDatetime] = utc_now,
     ) -> None:
         if not isinstance(resolver, CDPTargetResolver):
@@ -273,6 +275,7 @@ class ChromeDevToolsReadOnlyPagePort:
         self._resolver = resolver
         self._evaluator = evaluator
         self._baseline_existing_messages = baseline_existing_messages
+        self._runtime_environment = runtime_environment
         self._clock = clock
         self._attachments: dict[str, str] = {}
         self._lock = RLock()
@@ -288,6 +291,12 @@ class ChromeDevToolsReadOnlyPagePort:
         selector_contract: SelectorContract,
     ) -> BrowserPageReadAttachment:
         self._require_receive_only_contract(selector_contract)
+        selector_contract.assert_runtime_evidence(
+            page_fingerprint=page.page_revision,
+            environment=self._runtime_environment,
+            now=self._clock(),
+            capability=SelectorCapability.RECEIVE_MESSAGE,
+        )
         target = self._resolver.resolve()
         reference = new_id("cdp-page-read")
         with self._lock:
@@ -449,6 +458,7 @@ class ChromeDevToolsReadOnlyPagePort:
             missing_keys=tuple(missing),
             ambiguous_keys=tuple(ambiguous),
             checked_at=self._clock(),
+            page_fingerprint=page.page_revision,
         )
 
     @staticmethod
@@ -477,6 +487,12 @@ class ChromeDevToolsReadOnlyPagePort:
         contract: SelectorContract,
     ) -> None:
         self._require_receive_only_contract(contract)
+        contract.assert_runtime_evidence(
+            page_fingerprint=page.page_revision,
+            environment=self._runtime_environment,
+            now=self._clock(),
+            capability=SelectorCapability.RECEIVE_MESSAGE,
+        )
         expected = (
             page.page_context_id,
             page.generation,

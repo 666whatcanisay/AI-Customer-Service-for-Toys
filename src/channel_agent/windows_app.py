@@ -14,6 +14,12 @@ from pathlib import Path
 from threading import Event
 
 from .binding import AgentBindingStore
+from .browser import (
+    BrowserControlError,
+    BrowserDisabledError,
+    BrowserSessionStatus,
+    ChannelAgentBrowserManager,
+)
 from .client import (
     AgentClientError,
     AgentConnectionError,
@@ -23,6 +29,13 @@ from .client import (
 )
 from .config import AgentConfigError, load_agent_config
 from .contract import AgentRuntimeStatus
+from .logger import SafeAgentLogger
+from .pdd_login import (
+    PDDLoginObservationAdapter,
+    PDDLoginObservationError,
+    PDDLoginState,
+)
+from .onboarding import ChannelAgentOnboardingService, OnboardingWebServer
 from .windows import (
     WINDOWS_CLIENT_VERSION,
     WindowsAgentHost,
@@ -44,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         choices=(
             "start",
+            "setup",
             "run",
             "stop",
             "status",
@@ -53,6 +67,12 @@ def build_parser() -> argparse.ArgumentParser:
             "upgrade-check",
             "enroll",
             "binding-status",
+            "browser-open",
+            "browser-close",
+            "browser-status",
+            "browser-navigate",
+            "pdd-login-open",
+            "pdd-login-status",
         ),
     )
     parser.add_argument("action", nargs="?", choices=("enable", "disable", "status"))
@@ -63,6 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wait-seconds", type=float, default=10.0)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--binding-code-stdin", action="store_true")
+    parser.add_argument("--url")
     return parser
 
 
@@ -78,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "version":
         print(WINDOWS_CLIENT_VERSION)
         return 0
+    if args.command == "setup":
+        return _setup(config_path, data_root)
     if args.command == "check-config":
         return _check_config(config_path)
     if args.command == "run":
@@ -94,6 +117,10 @@ def main(argv: list[str] | None = None) -> int:
         return _enroll(config_path, data_root, args.binding_code_stdin)
     if args.command == "binding-status":
         return _binding_status(data_root)
+    if args.command.startswith("browser-"):
+        return _browser_command(args.command, config_path, data_root, args.url)
+    if args.command.startswith("pdd-login-"):
+        return _pdd_login_command(args.command, config_path, data_root)
     return _upgrade_check(args.manifest)
 
 
@@ -105,6 +132,35 @@ def _check_config(config_path: Path) -> int:
         return 1
     print(json.dumps(config.public_view(), ensure_ascii=False, indent=2))
     return 0
+
+
+def _setup(config_path: Path, data_root: Path) -> int:
+    if config_path.is_file():
+        print("Channel Agent 已完成首次连接配置。")
+        return 0
+    server: OnboardingWebServer | None = None
+    try:
+        service = ChannelAgentOnboardingService(
+            data_root=data_root,
+            config_path=config_path,
+        )
+        server = OnboardingWebServer(service)
+        url = server.start(open_browser=True)
+        print(f"首次连接向导已打开：{url}")
+        print("发现主机后仍需输入连接码并人工确认，系统不会自动绑定。")
+        while not config_path.is_file():
+            time.sleep(0.25)
+        time.sleep(0.5)
+        print("首次连接配置完成。")
+        return 0
+    except KeyboardInterrupt:
+        return 0
+    except Exception:
+        print("首次连接向导启动失败，请检查本机网络环境。", file=sys.stderr)
+        return 4
+    finally:
+        if server is not None:
+            server.stop()
 
 
 def _run(host: WindowsAgentHost) -> int:
@@ -177,6 +233,15 @@ def _start(host: WindowsAgentHost, wait_seconds: float) -> int:
             print("Channel Agent 已启动。")
             return 0
         if state.process_status is WindowsClientProcessStatus.DEGRADED:
+            if state.browser_enabled and state.browser_status in {
+                BrowserSessionStatus.DEGRADED,
+                BrowserSessionStatus.FAILED,
+            }:
+                print(
+                    "Channel Agent 已启动，但浏览器运行环境不可用。",
+                    file=sys.stderr,
+                )
+                return 5
             print(
                 "Channel Agent 已启动，但 Channel Engine 暂不可用。",
                 file=sys.stderr,
@@ -197,6 +262,7 @@ def _stop(host: WindowsAgentHost, wait_seconds: float) -> int:
         print("Channel Agent 状态文件无效。", file=sys.stderr)
         return 4
     if not state.pid or not _process_exists(state.pid):
+        _close_orphaned_browser(host.config_path, host.data_root)
         _save_stopped(host.state_store, state)
         print("Channel Agent 当前未运行。")
         return 0
@@ -244,9 +310,34 @@ def _status(store: WindowsStateStore, as_json: bool) -> int:
         print(f"生产资格: {'是' if state.production_eligible else '否'}")
         print(f"Agent ID: {state.agent_id or '未配置'}")
         print(f"Device ID: {state.device_id or '未配置'}")
+        print(f"客服端就绪状态: {state.experience_status.value}")
+        print(
+            "授权店铺: "
+            + (", ".join(state.authorized_store_ids) or "尚未绑定")
+        )
+        print(f"当前工作店铺: {state.active_store_id or '尚未选择'}")
+        print(f"Browser enabled: {'YES' if state.browser_enabled else 'NO'}")
+        print(f"Browser status: {state.browser_status.value}")
+        print(f"Browser ID: {state.browser_id or 'NOT_CREATED'}")
+        print(
+            "PDD login observation: "
+            f"{'ENABLED' if state.pdd_login_observation_enabled else 'DISABLED'}"
+        )
+        print(
+            "PDD login state: "
+            f"{state.pdd_login_state.value if state.pdd_login_state else 'NOT_OBSERVED'}"
+        )
+        print(f"PDD store reference: {state.pdd_store_reference or 'NOT_CONFIRMED'}")
+        print(f"Desktop UI: {state.desktop_ui_status}")
+        print(f"Desktop UI URL: {state.desktop_ui_url or 'NOT_RUNNING'}")
     if state.config_status == "INVALID":
         return 1
     if state.process_status is WindowsClientProcessStatus.DEGRADED:
+        if state.browser_enabled and state.browser_status in {
+            BrowserSessionStatus.DEGRADED,
+            BrowserSessionStatus.FAILED,
+        }:
+            return 5
         return 2
     if state.process_status is WindowsClientProcessStatus.FAILED:
         return 4
@@ -370,6 +461,120 @@ def _binding_status(data_root: Path) -> int:
         return 0
     print(binding.model_dump_json(indent=2))
     return 0
+
+
+def _browser_command(
+    command: str,
+    config_path: Path,
+    data_root: Path,
+    url: str | None,
+) -> int:
+    try:
+        config = load_agent_config(config_path)
+    except AgentConfigError:
+        print("浏览器命令失败：Channel Agent 配置无效。", file=sys.stderr)
+        return 1
+    manager = ChannelAgentBrowserManager(
+        agent_id=config.agent_id,
+        data_root=data_root,
+        enabled=config.browser_enabled,
+        logger=SafeAgentLogger(data_root / "logs" / "browser-runtime.jsonl"),
+    )
+    try:
+        if command == "browser-open":
+            state = manager.open_browser()
+        elif command == "browser-close":
+            state = manager.close_browser()
+        elif command == "browser-status":
+            state = manager.browser_status()
+        else:
+            if not url:
+                print("浏览器导航失败：必须提供 --url。", file=sys.stderr)
+                return 1
+            state = manager.navigate(url)
+        print(json.dumps(state.public_view(data_root), ensure_ascii=False, indent=2))
+        return 0
+    except BrowserDisabledError:
+        print(
+            "浏览器控制未启用；请先将 browser_enabled 显式设置为 true。",
+            file=sys.stderr,
+        )
+        return 5
+    except BrowserControlError:
+        print(
+            "浏览器命令失败；未执行页面读取、登录或发送操作。",
+            file=sys.stderr,
+        )
+        return 5
+    finally:
+        manager.close_resources()
+
+
+def _pdd_login_command(command: str, config_path: Path, data_root: Path) -> int:
+    try:
+        config = load_agent_config(config_path)
+    except AgentConfigError:
+        print("PDD 登录观察失败：Channel Agent 配置无效。", file=sys.stderr)
+        return 1
+    if (
+        not config.pdd_login_observation_enabled
+        or config.pdd_login_url is None
+        or config.pdd_customer_service_url is None
+    ):
+        print(
+            "PDD 登录观察未启用；请显式启用 browser_enabled 和 "
+            "pdd_login_observation_enabled。",
+            file=sys.stderr,
+        )
+        return 5
+    manager = ChannelAgentBrowserManager(
+        agent_id=config.agent_id,
+        data_root=data_root,
+        enabled=config.browser_enabled,
+        logger=SafeAgentLogger(data_root / "logs" / "browser-runtime.jsonl"),
+    )
+    observer = PDDLoginObservationAdapter(
+        agent_id=config.agent_id,
+        data_root=data_root,
+        login_url=config.pdd_login_url,
+        customer_service_url=config.pdd_customer_service_url,
+        browser=manager,
+        logger=SafeAgentLogger(data_root / "logs" / "pdd-login-observer.jsonl"),
+    )
+    try:
+        observation = (
+            observer.launch() if command == "pdd-login-open" else observer.observe()
+        )
+        print(json.dumps(observation.public_view(), ensure_ascii=False, indent=2))
+        return 5 if observation.login_state is PDDLoginState.LOGIN_FAILED else 0
+    except (BrowserControlError, PDDLoginObservationError):
+        print(
+            "PDD 登录观察失败；未执行自动登录、消息读取或页面写操作。",
+            file=sys.stderr,
+        )
+        return 5
+    finally:
+        observer.close_resources()
+        manager.close_resources()
+
+
+def _close_orphaned_browser(config_path: Path, data_root: Path) -> None:
+    try:
+        config = load_agent_config(config_path)
+    except AgentConfigError:
+        return
+    manager = ChannelAgentBrowserManager(
+        agent_id=config.agent_id,
+        data_root=data_root,
+        enabled=config.browser_enabled,
+        logger=SafeAgentLogger(data_root / "logs" / "browser-runtime.jsonl"),
+    )
+    try:
+        manager.close_browser()
+    except BrowserControlError:
+        pass
+    finally:
+        manager.close_resources()
 
 
 def _save_stopped(store: WindowsStateStore, state: WindowsClientState) -> None:

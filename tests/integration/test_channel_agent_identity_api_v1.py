@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from channel_agent.client import ChannelEngineClient
+from channel_agent.legacy_client_v1 import LegacyChannelEngineClient as ChannelEngineClient
 from channel_agent.config import ChannelAgentConfig
 from channel_agent.contract import AgentRuntimeStatus
 from channel_agent.identity import AgentIdentityStatus
@@ -66,6 +66,7 @@ def build_client(tmp_path: Path) -> tuple[TestClient, ChannelEngineClient]:
             log_directory=tmp_path / "logs",
         ),
         http_client=transport,
+        allow_legacy_control=True,
     )
     return transport, agent
 
@@ -205,7 +206,7 @@ def test_channel_engine_app_injects_operator_identity_provider(tmp_path: Path) -
 
     assert registered.status_code == 201
     assert listed.status_code == 200
-    assert listed.json()["items"][0]["identity"]["status"] == "UNBOUND"
+    assert listed.json()["items"][0]["identity"]["status"] == "REGISTERED"
 
 
 def test_channel_engine_app_loads_agent_service_identity_from_external_file(

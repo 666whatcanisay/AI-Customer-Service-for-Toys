@@ -88,6 +88,16 @@ def _upgrade_sqlite_runtime_columns(engine: Engine) -> None:
             "process_running": "INTEGER",
             "page_available": "INTEGER",
         },
+        "channel_agent_identities": {
+            "active_store_id": "VARCHAR(160)",
+            "identity_status": "VARCHAR(32) NOT NULL DEFAULT 'REGISTERED'",
+            "connectivity_status": "VARCHAR(16) NOT NULL DEFAULT 'OFFLINE'",
+            "agent_version": "VARCHAR(64)",
+            "hostname": "VARCHAR(255)",
+            "runtime_status": "VARCHAR(64)",
+            "registered_at": "DATETIME",
+            "last_heartbeat": "DATETIME",
+        },
     }
     with engine.begin() as connection:
         inspector = inspect(connection)
@@ -113,4 +123,22 @@ def _upgrade_sqlite_runtime_columns(engine: Engine) -> None:
         connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_transactional_outbox_publish_key "
             "ON transactional_outbox (publish_key)"
+        )
+        connection.exec_driver_sql(
+            "UPDATE channel_agent_identities SET active_store_id = store_id "
+            "WHERE active_store_id IS NULL AND store_id IS NOT NULL"
+        )
+        connection.exec_driver_sql(
+            "UPDATE channel_agent_identities "
+            "SET identity_status = CASE "
+            "WHEN status = 'UNBOUND' THEN 'REGISTERED' "
+            "WHEN status IN ('REGISTERED', 'BOUND', 'ACTIVE', 'DISABLED') THEN status "
+            "ELSE 'REGISTERED' END"
+        )
+        connection.exec_driver_sql(
+            "UPDATE channel_agent_identities SET status = identity_status"
+        )
+        connection.exec_driver_sql(
+            "UPDATE channel_agent_identities SET connectivity_status = 'OFFLINE' "
+            "WHERE connectivity_status NOT IN ('ONLINE', 'OFFLINE')"
         )

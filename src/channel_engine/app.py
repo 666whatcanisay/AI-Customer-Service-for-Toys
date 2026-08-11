@@ -28,7 +28,22 @@ from channel_engine.agent.node_api import (
     ChannelAgentNodeRegistry,
     create_channel_agent_node_router,
 )
-from channel_engine.agent.binding_repository import SqlAlchemyAgentIdentityRepository
+from channel_engine.agent.control_v2 import (
+    DeviceCredentialIndex,
+    HostPairingService,
+    create_channel_agent_control_v2_router,
+)
+from channel_engine.agent.host_control import build_agent_control_v2_from_env
+from channel_agent.control_v2 import (
+    DeviceRequestVerifier,
+    LANHostCandidate,
+    certificate_sha256,
+)
+from channel_agent.security import WindowsDeviceCredentialStore
+from channel_engine.agent.binding_repository import (
+    SqlAlchemyActiveStoreGuard,
+    SqlAlchemyAgentIdentityRepository,
+)
 from channel_engine.channel import (
     AdapterRegistry,
     ChannelManager,
@@ -179,6 +194,8 @@ def create_app(
     first_launch_service: ChannelAgentFirstLaunchService | None = None,
     agent_node_registry: ChannelAgentNodeRegistry | None = None,
     agent_operator_identity_provider: OperatorIdentityProvider | None = None,
+    agent_control_v2_pairing: HostPairingService | None = None,
+    agent_control_v2_verifier: DeviceRequestVerifier | None = None,
     pilot_config: PilotStoreConfig | None = None,
     pilot_runtime: PDDPilotRuntime | None = None,
     pilot_live_capabilities: PilotLiveCapabilitySnapshot | None = None,
@@ -570,7 +587,8 @@ def create_app(
         create_agent_router(active_agent, first_launch_service)
     )
     active_agent_node_registry = agent_node_registry or ChannelAgentNodeRegistry(
-        identity_repository=SqlAlchemyAgentIdentityRepository(session_factory)
+        identity_repository=SqlAlchemyAgentIdentityRepository(session_factory),
+        active_store_guard=SqlAlchemyActiveStoreGuard(session_factory),
     )
     active_agent_operator_identity_provider = agent_operator_identity_provider
     if (
@@ -590,6 +608,23 @@ def create_app(
             identity_provider=active_agent_operator_identity_provider,
         )
     )
+    active_pairing = agent_control_v2_pairing
+    active_verifier = agent_control_v2_verifier
+    if active_pairing is None and active_verifier is None:
+        configured_control = _agent_control_v2_from_env()
+        if configured_control is not None:
+            active_pairing, active_verifier = configured_control
+    if (active_pairing is None) != (active_verifier is None):
+        raise ValueError("Agent Control V2 pairing and verifier must be configured together")
+    if active_pairing is not None and active_verifier is not None:
+        application.include_router(
+            create_channel_agent_control_v2_router(
+                active_agent_node_registry,
+                active_pairing,
+                active_verifier,
+            )
+        )
+        application.state.channel_agent_control_v2_pairing = active_pairing
     application.include_router(create_pilot_router(active_pilot, pilot_live))
     application.include_router(create_runtime_reliability_router(channel_runtime))
     application.include_router(
@@ -599,7 +634,11 @@ def create_app(
         )
     )
     application.include_router(
-        create_observability_router(observability, operations_approval)
+        create_observability_router(
+            observability,
+            operations_approval,
+            active_agent_node_registry,
+        )
     )
     application.include_router(
         create_pdd_runtime_status_router(pdd_runtime_status.snapshot)
@@ -758,6 +797,12 @@ def create_app(
     application.state.operations_approval = operations_approval
     application.state.pdd_runtime_status = pdd_runtime_status
     return application
+
+
+def _agent_control_v2_from_env() -> tuple[HostPairingService, DeviceRequestVerifier] | None:
+    """Compatibility shim for callers of the historical development factory."""
+
+    return build_agent_control_v2_from_env(server_version=__version__)
 
 
 app = create_app()

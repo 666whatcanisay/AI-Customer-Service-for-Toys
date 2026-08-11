@@ -29,6 +29,7 @@ from channel_engine.browser import (
     RawBrowserMessage,
     ReceiveOnlyPageObserver,
     SelectorContractDrift,
+    SelectorEvidenceEnvironment,
     SelectorProbeResult,
     SelectorRegistry,
     draft_pdd_merchant_chat_v1,
@@ -252,6 +253,8 @@ def test_outbound_executor_requires_live_ledger_and_maps_receipt_safely(
         router,
         registry,
         action_port,
+        runtime_environment=SelectorEvidenceEnvironment.SYNTHETIC,
+        clock=lambda: NOW,
     )
     worker = ExecutionWorker(
         foundation["uow_factory"],
@@ -277,7 +280,9 @@ def test_outbound_executor_requires_live_ledger_and_maps_receipt_safely(
     assert receipt.details["automatic_reply"] is False
     assert receipt.details["automatic_retry_allowed"] is expected_retry
     assert receipt.details["real_browser_called"] is False
-    assert receipt.details["customer_message_sent"] is False
+    assert receipt.details["customer_message_sent"] is (
+        None if outcome is ReceiptOutcome.UNKNOWN else False
+    )
     assert receipt.details["simulation_only"] is True
     if outcome is ReceiptOutcome.UNKNOWN:
         assert receipt.details["human_takeover_required"] is True

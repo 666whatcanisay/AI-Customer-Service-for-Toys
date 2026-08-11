@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$InstallRoot,
     [string]$DataRoot,
@@ -11,6 +11,7 @@ if (-not $InstallRoot) { $InstallRoot = Join-Path $env:LOCALAPPDATA 'Programs\AI
 if (-not $DataRoot) { $DataRoot = Join-Path $env:LOCALAPPDATA 'AI-CS\ChannelAgent' }
 $InstallRoot = [System.IO.Path]::GetFullPath($InstallRoot)
 $DataRoot = [System.IO.Path]::GetFullPath($DataRoot)
+. (Join-Path $PSScriptRoot 'ChannelAgentShortcutName.ps1')
 
 function Assert-SafeRemovalTarget([string]$Path) {
     $root = [System.IO.Path]::GetPathRoot($Path)
@@ -30,6 +31,10 @@ if (Test-Path -LiteralPath $executable -PathType Leaf) {
 }
 if (Test-Path -LiteralPath $InstallRoot) {
     Remove-Item -LiteralPath $InstallRoot -Recurse -Force
+}
+$desktopShortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) (Get-ChannelAgentShortcutName)
+if (Test-Path -LiteralPath $desktopShortcut -PathType Leaf) {
+    Remove-Item -LiteralPath $desktopShortcut -Force
 }
 if ($RemoveData -and (Test-Path -LiteralPath $DataRoot)) {
     Remove-Item -LiteralPath $DataRoot -Recurse -Force

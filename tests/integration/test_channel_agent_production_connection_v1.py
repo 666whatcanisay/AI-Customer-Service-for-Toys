@@ -12,11 +12,12 @@ import uvicorn
 from fastapi import FastAPI
 
 from channel_agent import windows_app
+from channel_agent import runtime as runtime_module
 from channel_agent.binding import (
     AgentBindingStore,
     AgentEnrollmentGrantRequest,
 )
-from channel_agent.client import ChannelEngineClient
+from channel_agent.legacy_client_v1 import LegacyChannelEngineClient
 from channel_agent.config import ChannelAgentConfig
 from channel_agent.contract import AgentRuntimeStatus, ManagedAgentConfig
 from channel_agent.identity import AgentIdentityActivationRequest, AgentOnlineStatus
@@ -108,6 +109,13 @@ def test_windows_agent_complete_connection_survives_engine_and_agent_restart(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    class HistoricalV1Client(LegacyChannelEngineClient):
+        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            kwargs["allow_legacy_control"] = True
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(runtime_module, "ChannelEngineClient", HistoricalV1Client)
+    monkeypatch.setattr(windows_app, "ChannelEngineClient", HistoricalV1Client)
     database = tmp_path / "channel-engine.sqlite3"
     engine, session_factory = create_engine_and_session(
         f"sqlite:///{database.as_posix()}"
@@ -137,7 +145,7 @@ def test_windows_agent_complete_connection_survives_engine_and_agent_restart(
         log_directory=data_root / "logs",
     )
     config_path.write_text(config.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    bootstrap = ChannelEngineClient(config)
+    bootstrap = HistoricalV1Client(config)
     bootstrap.register(
         hostname="windows-service-desk-001",
         status=AgentRuntimeStatus.STARTING,
@@ -150,7 +158,7 @@ def test_windows_agent_complete_connection_survives_engine_and_agent_restart(
         lambda: (
             host.state_store.load().process_status
             is WindowsClientProcessStatus.RUNNING
-            and host.state_store.load().identity_status.value == "UNBOUND"
+            and host.state_store.load().identity_status.value == "REGISTERED"
         ),
         "Unbound Agent did not reach ONLINE before enrollment",
     )

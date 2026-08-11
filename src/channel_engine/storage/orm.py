@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     JSON,
     Date,
     DateTime,
@@ -583,7 +584,26 @@ class ChannelAgentIdentityRow(Base):
     user_id: Mapped[str | None] = mapped_column(String(160))
     store_id: Mapped[str | None] = mapped_column(String(160))
     store_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    active_store_id: Mapped[str | None] = mapped_column(String(160))
+    # ``status`` remains as a one-RC compatibility shadow for databases built
+    # before Host Control 2.1.  All V2 reads use the two authoritative columns
+    # below; connectivity never overwrites identity state.
+    legacy_status: Mapped[str] = mapped_column(
+        "status", String(32), nullable=False, default="REGISTERED"
+    )
+    identity_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="REGISTERED", index=True
+    )
+    connectivity_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="OFFLINE", index=True
+    )
+    agent_version: Mapped[str | None] = mapped_column(String(64))
+    hostname: Mapped[str | None] = mapped_column(String(255))
+    runtime_status: Mapped[str | None] = mapped_column(String(64))
+    registered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_heartbeat: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
     binding_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -591,6 +611,167 @@ class ChannelAgentIdentityRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
+
+
+class ChannelAgentEnrollmentGrantRow(Base):
+    __tablename__ = "channel_agent_enrollment_grants"
+    __table_args__ = (
+        Index("ix_channel_agent_grant_device", "agent_id", "device_id", "consumed_at"),
+    )
+
+    code_digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+    grant_id: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    agent_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_reference: Mapped[str] = mapped_column(String(160), nullable=False)
+    store_references: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    authorized_by: Mapped[str] = mapped_column(String(160), nullable=False)
+    reason: Mapped[str] = mapped_column(String(512), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChannelAgentReplayNonceRow(Base):
+    __tablename__ = "channel_agent_replay_nonces"
+    __table_args__ = (Index("ix_channel_agent_nonce_expiry", "expires_at"),)
+
+    namespace: Mapped[str] = mapped_column(String(320), primary_key=True)
+    nonce: Mapped[str] = mapped_column(String(32), primary_key=True)
+    request_timestamp: Mapped[int] = mapped_column(Integer, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ChannelAgentObservationRow(Base):
+    __tablename__ = "channel_agent_observations"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "store_id", "external_message_id"),
+        Index("ix_channel_agent_observation_forwarding", "forwarded_at", "persisted_at"),
+    )
+
+    observation_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    store_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    conversation_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    external_message_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_cursor: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    persisted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    forwarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChannelAgentAssistantEventRow(Base):
+    __tablename__ = "channel_agent_assistant_events"
+    __table_args__ = (
+        Index(
+            "ix_channel_agent_assistant_event_poll",
+            "agent_id",
+            "device_id",
+            "sequence_id",
+        ),
+    )
+
+    sequence_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    agent_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    store_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    conversation_id: Mapped[str | None] = mapped_column(String(255))
+    turn_id: Mapped[str | None] = mapped_column(String(160))
+    decision_id: Mapped[str | None] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+
+class ChannelAgentAssistantSnapshotRow(Base):
+    __tablename__ = "channel_agent_assistant_snapshots"
+    __table_args__ = (
+        Index(
+            "ix_channel_agent_assistant_snapshot_scope",
+            "agent_id",
+            "device_id",
+            "updated_at",
+        ),
+        UniqueConstraint("agent_id", "device_id", "store_id", "conversation_id"),
+    )
+
+    scope_key: Mapped[str] = mapped_column(String(71), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    store_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    conversation_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+
+class ChannelAgentCommandRow(Base):
+    __tablename__ = "channel_agent_commands"
+    __table_args__ = (
+        Index("ix_channel_agent_command_poll", "agent_id", "device_id", "status", "issued_at"),
+    )
+
+    command_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    store_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    execution_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    command_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    delivery_attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChannelAgentReceiptRow(Base):
+    __tablename__ = "channel_agent_receipts"
+
+    receipt_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    execution_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    send_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    agent_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    store_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    receipt_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    persisted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SelectorEvidenceRow(Base):
+    __tablename__ = "selector_evidence"
+    __table_args__ = (
+        UniqueConstraint("platform", "page", "version"),
+        Index("ix_selector_evidence_active", "platform", "page", "active"),
+    )
+
+    evidence_hash: Mapped[str] = mapped_column(String(71), primary_key=True)
+    evidence_reference: Mapped[str] = mapped_column(String(256), nullable=False, unique=True)
+    platform: Mapped[str] = mapped_column(String(80), nullable=False)
+    page: Mapped[str] = mapped_column(String(80), nullable=False)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    environment: Mapped[str] = mapped_column(String(32), nullable=False)
+    page_fingerprint: Mapped[str] = mapped_column(String(71), nullable=False)
+    applicable_page_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    capabilities: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    contract_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    verified_by: Mapped[str] = mapped_column(String(256), nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class PDDProductionSafetyStateRow(Base):

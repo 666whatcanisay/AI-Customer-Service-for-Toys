@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 
+from channel_agent.contract import AgentRegistrationRequest, AgentRuntimeStatus
+from channel_agent.identity import (
+    AgentIdentityActivationRequest,
+    AgentIdentityBindingRequest,
+)
+from channel_engine.agent.node_api import ChannelAgentNodeRegistry
 from channel_engine.app import create_app
 from channel_engine.config import Settings
+from channel_engine.security.rbac import OperatorPrincipal, OperatorRole
 
 
 def test_observability_api_and_read_only_console(tmp_path) -> None:
@@ -77,6 +86,107 @@ def test_trace_lookup_returns_404_for_unknown_identifier(tmp_path) -> None:
     with TestClient(app) as client:
         response = client.get("/ops/traces/not-a-real-id")
     assert response.status_code == 404
+
+
+def test_local_operations_console_has_distinct_device_management_center(
+    tmp_path,
+) -> None:
+    now = datetime(2026, 8, 8, 16, 0, tzinfo=UTC)
+    registry = ChannelAgentNodeRegistry(clock=lambda: now)
+    registry.register(
+        AgentRegistrationRequest(
+            agent_id="agent-device-center-001",
+            device_id="device-device-center-001",
+            agent_version="2.0.0rc1",
+            hostname="customer-service-pc-001",
+            status=AgentRuntimeStatus.ONLINE,
+            timestamp=now,
+        )
+    )
+    admin = OperatorPrincipal(
+        principal_id="device-center-test-admin",
+        roles=frozenset({OperatorRole.ADMIN}),
+        identity_provider="test",
+        authenticated_at=now,
+    )
+    registry.bind_identity(
+        "agent-device-center-001",
+        AgentIdentityBindingRequest(
+            user_reference="user-service-001",
+            store_reference="store-001",
+            reason="approved test device binding",
+        ),
+        admin,
+    )
+    registry.activate_identity(
+        "agent-device-center-001",
+        AgentIdentityActivationRequest(reason="approved active device"),
+        admin,
+    )
+    app = create_app(
+        Settings(database_url=f"sqlite:///{(tmp_path / 'devices.sqlite3').as_posix()}"),
+        agent_node_registry=registry,
+    )
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1",
+        client=("127.0.0.1", 51000),
+    ) as client:
+        listing = client.get("/ops/devices")
+        assert listing.status_code == 200
+        device = next(
+            item
+            for item in listing.json()["items"]
+            if item["agent_id"] == "agent-device-center-001"
+        )
+        assert device["identity_status"] == "ACTIVE"
+        assert device["connectivity_status"] == "ONLINE"
+        assert device["user_reference"] == "user-service-001"
+        assert device["authorized_store_ids"] == ["store-001"]
+        assert device["authoritative_source"] == "CHANNEL_ENGINE_HOST_CONTROL"
+        assert device["last_heartbeat"] == now.isoformat().replace("+00:00", "Z")
+
+        missing_intent = client.post(
+            "/ops/devices/agent-device-center-001/disable",
+            headers={"Origin": "http://127.0.0.1"},
+            json={
+                "reason": "管理员确认停用测试设备",
+                "confirmation_text": "确认禁用设备",
+            },
+        )
+        assert missing_intent.status_code == 403
+        assert registry.identity_snapshot("agent-device-center-001").status.value == "ACTIVE"
+
+        disabled = client.post(
+            "/ops/devices/agent-device-center-001/disable",
+            headers={
+                "Origin": "http://127.0.0.1",
+                "X-Operator-Intent": "HUMAN_CONFIRMED_AGENT_DISABLE",
+            },
+            json={
+                "reason": "管理员确认停用测试设备",
+                "confirmation_text": "确认禁用设备",
+            },
+        )
+        assert disabled.status_code == 200
+        assert disabled.json()["items"][0]["identity_status"] == "DISABLED"
+        assert disabled.json()["items"][0]["user_reference"] is None
+
+        restored = client.post(
+            "/ops/devices/agent-device-center-001/restore-to-registered",
+            headers={
+                "Origin": "http://127.0.0.1",
+                "X-Operator-Intent": "HUMAN_CONFIRMED_AGENT_RESTORE",
+            },
+            json={
+                "reason": "管理员确认恢复测试设备为待绑定",
+                "confirmation_text": "确认恢复为待绑定",
+            },
+        )
+        assert restored.status_code == 200
+        assert restored.json()["items"][0]["identity_status"] == "REGISTERED"
+        assert restored.json()["items"][0]["connectivity_status"] == "ONLINE"
+        assert restored.json()["items"][0]["user_reference"] is None
 
 
 def test_channel_connection_and_bounded_runtime_recovery_are_logged(tmp_path) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
+from threading import RLock
 from typing import Literal, Protocol
 
 from pydantic import (
@@ -690,6 +691,8 @@ class PDDProductionSafetyService:
     ) -> None:
         self._uow_factory = uow_factory
         self._clock = clock
+        self._audit_clock_lock = RLock()
+        self._last_audit_timestamp: datetime | None = None
         self.receipt_store: PDDSendReceiptStore = SqlAlchemyPDDSendReceiptStore(
             uow_factory
         )
@@ -1132,8 +1135,8 @@ class PDDProductionSafetyService:
             "credential_version": account.credential_reference.version,
         }
 
-    @staticmethod
     def _audit(
+        self,
         *,
         action: PDDSafetyAuditAction,
         operator: str,
@@ -1144,11 +1147,19 @@ class PDDProductionSafetyService:
         before: dict[str, object] | None = None,
         after: dict[str, object] | None = None,
     ) -> PDDSafetyAuditEvent:
+        timestamp = _as_utc(now)
+        with self._audit_clock_lock:
+            if (
+                self._last_audit_timestamp is not None
+                and timestamp <= self._last_audit_timestamp
+            ):
+                timestamp = self._last_audit_timestamp + timedelta(microseconds=1)
+            self._last_audit_timestamp = timestamp
         return PDDSafetyAuditEvent(
             audit_event_id=new_id("pdd-safety-audit"),
             operator=operator,
             action=action,
-            timestamp=now,
+            timestamp=timestamp,
             reason=reason,
             store_id=store_id,
             execution_id=execution_id,

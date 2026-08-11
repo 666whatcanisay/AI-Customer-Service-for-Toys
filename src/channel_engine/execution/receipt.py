@@ -10,6 +10,8 @@ from channel_engine.gateway import (
 )
 from channel_engine.models import Execution, Receipt, ReceiptOutcome
 
+from .receipt_facts import assert_unknown_receipt_details, unknown_receipt_details
+
 
 def to_gateway_execution_receipt(
     execution: Execution,
@@ -35,6 +37,14 @@ def to_gateway_execution_receipt(
             retryable=False,
         )
 
+    details = dict(receipt.details)
+    if receipt.outcome is ReceiptOutcome.UNKNOWN:
+        details = unknown_receipt_details(
+            details,
+            transport_triggered=details.get("transport_triggered"),
+        )
+        assert_unknown_receipt_details(details)
+
     return GatewayExecutionReceipt(
         contract_version=CONTRACT_VERSION,
         receipt_id=receipt.receipt_id,
@@ -47,7 +57,7 @@ def to_gateway_execution_receipt(
         external_reference=receipt.external_reference,
         error=error,
         reconciliation_required=receipt.outcome is ReceiptOutcome.UNKNOWN,
-        details=receipt.details,
+        details=details,
         recorded_at=(
             receipt.recorded_at.replace(tzinfo=timezone.utc)
             if receipt.recorded_at.tzinfo is None

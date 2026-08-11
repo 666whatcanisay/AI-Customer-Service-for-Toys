@@ -42,6 +42,8 @@ class AgentRegistrationRequest(AgentContractModel):
     user_reference: str | None = Field(default=None, min_length=1, max_length=160)
     store_reference: str | None = Field(default=None, min_length=1, max_length=160)
     store_references: tuple[str, ...] = Field(default=(), max_length=32)
+    authorized_store_ids: tuple[str, ...] = Field(default=(), max_length=32)
+    active_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     hostname: str = Field(min_length=1, max_length=255)
     status: AgentRuntimeStatus
     timestamp: AwareDatetime
@@ -64,6 +66,8 @@ class AgentHeartbeatRequest(AgentContractModel):
     user_id: str | None = Field(default=None, min_length=1, max_length=160)
     store_id: str | None = Field(default=None, min_length=1, max_length=160)
     store_ids: tuple[str, ...] = Field(default=(), max_length=32)
+    authorized_store_ids: tuple[str, ...] = Field(default=(), max_length=32)
+    active_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     binding_revision: int = Field(default=0, ge=0)
     version: str = Field(min_length=1, max_length=64)
     hostname: str = Field(min_length=1, max_length=255)

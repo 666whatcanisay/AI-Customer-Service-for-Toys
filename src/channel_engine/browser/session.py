@@ -302,7 +302,7 @@ class FakeBrowserRuntimeDriver:
         *,
         login_state: BrowserLoginState = BrowserLoginState.AUTHENTICATED,
         page_available: bool = True,
-        page_revision: str = "mock-page-revision-1",
+        page_revision: str = "sha256:" + "0" * 64,
         clock: Callable[[], AwareDatetime] = utc_now,
     ) -> None:
         self.login_state = login_state

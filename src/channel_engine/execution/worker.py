@@ -28,6 +28,7 @@ from .fake_executor import (
 )
 from .queue import ExecutionLease, ExecutionQueue, LeaseLost
 from .ownership import WorkerOwnershipRegistry
+from .receipt_facts import unknown_receipt_details
 
 
 class WorkerRunResult(BaseModel):
@@ -128,23 +129,23 @@ class ExecutionWorker:
                     result = ExecutionResult(
                         outcome=ReceiptOutcome.UNKNOWN,
                         error_code="ADAPTER_NETWORK_UNKNOWN",
-                        details={
-                            "mode": "FAKE",
-                            "reason": str(exc),
-                            "real_channel_called": False,
-                            "customer_message_sent": False,
-                        },
+                        details=unknown_receipt_details(
+                            {
+                                "mode": "EXECUTION_ADAPTER",
+                                "reason": str(exc),
+                            }
+                        ),
                     )
                 except Exception as exc:
                     result = ExecutionResult(
                         outcome=ReceiptOutcome.UNKNOWN,
                         error_code="ADAPTER_EXCEPTION_UNKNOWN",
-                        details={
-                            "mode": "FAKE",
-                            "reason": type(exc).__name__,
-                            "real_channel_called": False,
-                            "customer_message_sent": False,
-                        },
+                        details=unknown_receipt_details(
+                            {
+                                "mode": "EXECUTION_ADAPTER",
+                                "reason": type(exc).__name__,
+                            }
+                        ),
                     )
 
         return self._finalize(lease, result, adapter_called)
@@ -240,12 +241,18 @@ class ExecutionWorker:
                 )
 
             decision = repo.get_decision(execution.decision_id)
+            receipt_details = dict(result.details)
+            if result.outcome is ReceiptOutcome.UNKNOWN:
+                receipt_details = unknown_receipt_details(
+                    receipt_details,
+                    transport_triggered=receipt_details.get("transport_triggered"),
+                )
             receipt = Receipt(
                 execution_id=execution.execution_id,
                 outcome=result.outcome,
                 external_reference=result.external_reference,
                 details={
-                    **result.details,
+                    **receipt_details,
                     "worker_id": lease.worker_id,
                     "attempt": execution.attempt,
                     "error_code": result.error_code,

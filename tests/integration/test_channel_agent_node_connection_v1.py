@@ -7,11 +7,12 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from channel_agent.client import ChannelEngineClient
+from channel_agent.legacy_client_v1 import LegacyChannelEngineClient as ChannelEngineClient
 from channel_agent.config import ChannelAgentConfig
 from channel_agent.contract import AgentRuntimeStatus, ManagedAgentConfig
 from channel_agent.logger import SafeAgentLogger
 from channel_agent.runtime import ChannelAgentRuntime
+from channel_agent.version import AGENT_VERSION
 from channel_engine.app import create_app
 from channel_engine.agent.node_api import (
     ChannelAgentNodeRegistry,
@@ -61,7 +62,9 @@ def test_agent_connects_to_versioned_channel_engine_api_and_receives_config(
         heartbeat_interval_seconds=0.05,
         log_directory=tmp_path / "logs",
     )
-    client = ChannelEngineClient(config, http_client=transport)
+    client = ChannelEngineClient(
+        config, http_client=transport, allow_legacy_control=True
+    )
     runtime = ChannelAgentRuntime(
         config,
         client,
@@ -84,7 +87,7 @@ def test_agent_connects_to_versioned_channel_engine_api_and_receives_config(
     assert record is not None
     assert record.agent_id == config.agent_id
     assert record.device_id == config.device_id
-    assert record.version == "1.1.1"
+    assert record.version == AGENT_VERSION
     assert record.hostname == "service-desk-pc-01"
     assert record.status == "ONLINE"
     assert record.last_heartbeat == NOW
@@ -105,7 +108,9 @@ def test_registration_is_idempotent_and_device_conflict_fails_closed(
         device_id="device-a",
         log_directory=tmp_path / "logs-a",
     )
-    first = ChannelEngineClient(first_config, http_client=transport)
+    first = ChannelEngineClient(
+        first_config, http_client=transport, allow_legacy_control=True
+    )
 
     one = first.register(
         hostname="pc-a",
@@ -148,16 +153,44 @@ def test_windows_entry_and_example_config_remain_foundation_only() -> None:
     assert "channel-agent-foundation = \"channel_agent.app:main\"" in pyproject
     assert set(payload) == {
         "config_version",
+        "control_protocol_version",
         "server_url",
+        "host_id",
         "agent_id",
         "device_id",
+        "device_credential_reference",
+            "server_ca_certificate_path",
+            "runtime_mode",
+            "development_profile",
         "user_reference",
-            "store_reference",
-            "store_references",
+        "store_reference",
+        "store_references",
         "connect_timeout_seconds",
-        "heartbeat_interval_seconds",
-        "log_directory",
+            "heartbeat_interval_seconds",
+            "desktop_ui_enabled",
+            "desktop_ui_port",
+            "ai_cs_platform_url",
+            "ai_cs_platform_proxy_mode",
+            "ai_cs_ca_certificate_path",
+            "browser_enabled",
+        "pdd_login_observation_enabled",
+        "pdd_login_url",
+        "pdd_customer_service_url",
+            "customer_assistant_enabled",
+            "message_observation_enabled",
+            "observation_stage",
+            "observer_mode",
+            "pdd_observation_evidence_path",
+            "pdd_replay_fixture_path",
+            "pdd_replay_platform_store_id",
+            "conversation_buffer_window_seconds",
+        "manual_approval_required",
+        "auto_reply_enabled",
+            "real_send_enabled",
+            "real_platform_activation_allowed",
+            "log_directory",
     }
     serialized = json.dumps(payload).casefold()
-    for forbidden in ("cookie", "password", "token", "pdd", "send_message"):
+    for forbidden in ("cookie", "password", "plaintext_token", "send_message"):
         assert forbidden not in serialized
+    assert payload["pdd_login_observation_enabled"] is False

@@ -1,0 +1,73 @@
+{
+  "schema_version": "2.0",
+  "release": "AI-CS Channel Agent Windows Client 2.0.0rc4",
+  "entrypoint": "channel_agent.windows_app:main",
+  "source_allowlist": [
+    "src/channel_agent/__init__.py",
+    "src/channel_agent/version.py",
+    "src/channel_agent/config.py",
+    "src/channel_agent/contract.py",
+    "src/channel_agent/identity.py",
+    "src/channel_agent/binding.py",
+    "src/channel_agent/logger.py",
+    "src/channel_agent/heartbeat.py",
+    "src/channel_agent/client.py",
+    "src/channel_agent/control_v2.py",
+    "src/channel_agent/security.py",
+    "src/channel_agent/onboarding.py",
+    "src/channel_agent/diagnostics.py",
+    "src/channel_agent/retention.py",
+    "src/channel_agent/runtime.py",
+    "src/channel_agent/desktop.py",
+    "src/channel_agent/assistant_events.py",
+    "src/channel_agent/browser.py",
+    "src/channel_agent/pdd_login.py",
+    "src/channel_agent/edge_pdd_observe.py",
+    "src/channel_agent/edge_spool.py",
+    "src/channel_agent/observation_stages.py",
+    "src/channel_agent/observation_runtime.py",
+    "src/channel_agent/pdd_observer.py",
+    "src/channel_agent/pdd_page_port.py",
+    "src/channel_agent/pdd_readonly_driver.py",
+    "src/channel_agent/windows.py",
+    "src/channel_agent/windows_app.py"
+  ],
+  "offline_fixture_allowlist": [
+    "simulators/pdd-customer-workspace/fixtures/pdd-readonly-page-fixture.v1.json"
+  ],
+  "dependency_allowlist": [
+    "annotated_types",
+    "anyio",
+    "certifi",
+    "h11",
+    "httpcore",
+    "httpx",
+    "idna",
+    "pydantic",
+    "pydantic_core",
+    "typing_extensions.py",
+    "typing_inspection",
+    "websocket"
+  ],
+  "forbidden_import_roots": [
+    "ai_cs_agent",
+    "channel_engine",
+    "openai",
+    "langchain"
+  ],
+  "excluded": [
+    "Fake",
+    "Sandbox",
+    "Discovery",
+    "Pilot",
+    "run_real_*",
+    "bridge-hot-script",
+    "RAG",
+    "LLM",
+    "knowledge-store",
+    "long-term-business-data",
+    "real-pdd-send",
+    "auto-reply",
+    "plaintext-secret"
+  ]
+}

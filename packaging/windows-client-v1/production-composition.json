@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "release": "AI-CS Channel Agent Windows Client 1.1.1",
+  "release": "AI-CS Channel Agent Windows Client 1.6.0",
   "source_allowlist": [
     "src/channel_agent/__init__.py",
     "src/channel_agent/version.py",
@@ -11,7 +11,15 @@
     "src/channel_agent/logger.py",
     "src/channel_agent/heartbeat.py",
     "src/channel_agent/client.py",
+    "src/channel_agent/control_v2.py",
+    "src/channel_agent/security.py",
+    "src/channel_agent/onboarding.py",
+    "src/channel_agent/diagnostics.py",
+    "src/channel_agent/retention.py",
     "src/channel_agent/runtime.py",
+    "src/channel_agent/desktop.py",
+    "src/channel_agent/browser.py",
+    "src/channel_agent/pdd_login.py",
     "src/channel_agent/windows.py",
     "src/channel_agent/windows_app.py"
   ],
@@ -26,13 +34,18 @@
     "pydantic",
     "pydantic_core",
     "typing_extensions.py",
-    "typing_inspection"
+    "typing_inspection",
+    "websocket"
   ],
   "excluded": [
     "ai_cs_agent",
     "channel_engine",
-    "pdd",
-    "browser-automation",
+    "real-pdd-chat",
+    "pdd-message-read",
+    "pdd-message-send",
+    "pdd-order-action",
+    "pdd-experimental",
+    "real-browser-automation",
     "message-read",
     "message-send",
     "cookie",

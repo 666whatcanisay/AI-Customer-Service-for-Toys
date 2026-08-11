@@ -4,10 +4,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+import channel_agent.binding as binding_module
 from channel_agent.binding import (
     AgentBindingStore,
     AgentEnrollmentGrantRequest,
     AgentEnrollmentRequest,
+    AgentRuntimeBinding,
     AgentStoreBindingUpdateRequest,
 )
 from channel_agent.client import AgentConnectionError
@@ -20,6 +22,7 @@ from channel_agent.contract import (
     AgentRuntimeStatus,
     ManagedAgentConfig,
 )
+from channel_agent.desktop import DesktopAssistantServer
 from channel_agent.identity import (
     AgentIdentity,
     AgentIdentityActivationRequest,
@@ -315,6 +318,103 @@ def test_local_binding_store_contains_references_but_no_binding_code(tmp_path) -
     assert saved.store_ids == ("store-a", "store-b")
     assert "binding_code" not in serialized.casefold()
     assert CODE not in serialized
+
+
+def test_local_binding_store_retries_transient_windows_replace_conflict(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = ChannelAgentNodeRegistry(
+        clock=lambda: NOW,
+        binding_code_factory=lambda: CODE,
+    )
+    enroll(registry)
+    identity = registry.identity_snapshot("agent-runtime-binding-001")
+    assert identity is not None
+    store = AgentBindingStore(tmp_path / "runtime" / "agent-binding.json")
+    original_replace = binding_module._atomic_replace
+    attempts = 0
+
+    def transient_replace(source, target) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError("synthetic Windows sharing violation")
+        original_replace(source, target)
+
+    monkeypatch.setattr(binding_module, "_atomic_replace", transient_replace)
+    store.save_identity(identity)
+
+    assert attempts == 3
+    assert store.load() is not None
+    assert store.load().identity_status is AgentIdentityStatus.BOUND
+
+
+def test_local_binding_store_recovers_when_primary_stays_locked(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = ChannelAgentNodeRegistry(
+        clock=lambda: NOW,
+        binding_code_factory=lambda: CODE,
+    )
+    enroll(registry)
+    identity = registry.identity_snapshot("agent-runtime-binding-001")
+    assert identity is not None
+    store = AgentBindingStore(tmp_path / "runtime" / "agent-binding.json")
+    store.save_identity(identity)
+    active = registry.activate_identity(
+        "agent-runtime-binding-001",
+        AgentIdentityActivationRequest(reason="approved after local enrollment"),
+        principal(OperatorRole.ADMIN, "admin-runtime-binding"),
+    )
+    original_replace = binding_module._atomic_replace
+
+    def locked_primary(source, target) -> None:
+        if str(target) == str(store.path):
+            raise PermissionError("synthetic permanent target lock")
+        original_replace(source, target)
+
+    monkeypatch.setattr(binding_module, "_atomic_replace", locked_primary)
+    store.save_identity(active)
+
+    recovered = store.load()
+    assert recovered is not None
+    assert recovered.identity_status is AgentIdentityStatus.ACTIVE
+    assert recovered.binding_revision == active.binding_revision
+    assert len(tuple(store.path.parent.glob(".agent-binding.json.*.pending"))) == 1
+
+
+def test_identity_sync_keeps_authoritative_binding_when_status_snapshot_is_locked(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = ChannelAgentNodeRegistry(
+        clock=lambda: NOW,
+        binding_code_factory=lambda: CODE,
+    )
+    enroll(registry)
+    active = registry.activate_identity(
+        "agent-runtime-binding-001",
+        AgentIdentityActivationRequest(reason="approved after local enrollment"),
+        principal(OperatorRole.ADMIN, "admin-runtime-binding"),
+    )
+    assistant = DesktopAssistantServer(data_root=tmp_path)
+
+    def locked_status_snapshot(_path, _payload) -> None:
+        raise PermissionError("synthetic channel-agent-state sharing conflict")
+
+    monkeypatch.setattr(
+        "channel_agent.desktop.atomic_write_bytes",
+        locked_status_snapshot,
+    )
+    assistant._persist_binding(  # noqa: SLF001 - recovery contract test
+        AgentRuntimeBinding.from_identity(active)
+    )
+
+    recovered = AgentBindingStore(
+        tmp_path / "runtime" / "agent-binding.json"
+    ).load()
+    assert recovered is not None
+    assert recovered.identity_status is AgentIdentityStatus.ACTIVE
+    assert recovered.binding_revision == active.binding_revision
 
 
 class RecoveringBoundClient:

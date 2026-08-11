@@ -12,6 +12,7 @@ build/
 *.egg-info/
 .env
 *.log
+.codex-remote-attachments/
 
 # Generated validation/report artifacts are not RC source inputs.
 evidence/

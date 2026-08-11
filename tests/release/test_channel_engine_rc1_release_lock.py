@@ -14,13 +14,13 @@ from channel_engine.security.rbac import OperatorRole
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_VERSION = "0.1.0rc1"
+EXPECTED_VERSION = "0.2.0rc2"
 EXPECTED_CONTRACT_SHA256 = (
     "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5"
 )
 
 
-def test_rc1_version_is_consistent() -> None:
+def test_rc2_version_is_consistent() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["version"] == EXPECTED_VERSION
     assert __version__ == EXPECTED_VERSION

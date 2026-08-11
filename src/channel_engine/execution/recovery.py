@@ -14,6 +14,8 @@ from channel_engine.observability import (
 )
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
+from .receipt_facts import unknown_receipt_details
+
 
 class RecoveryResult(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -80,14 +82,13 @@ class ExecutionRecovery:
                     execution_id=execution.execution_id,
                     outcome=ReceiptOutcome.UNKNOWN,
                     external_reference=None,
-                    details={
-                        "mode": "RECOVERY",
-                        "reason": "WORKER_LEASE_EXPIRED",
-                        "real_channel_called": False,
-                        "customer_message_sent": False,
-                        "automatic_retry_allowed": False,
-                        "attempt": execution.attempt,
-                    },
+                    details=unknown_receipt_details(
+                        {
+                            "mode": "RECOVERY",
+                            "reason": "WORKER_LEASE_EXPIRED",
+                            "attempt": execution.attempt,
+                        }
+                    ),
                     recorded_at=now,
                 )
                 repo.append_receipt(receipt)

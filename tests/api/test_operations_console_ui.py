@@ -26,12 +26,17 @@ def test_console_page_assets_and_security_headers(tmp_path) -> None:
     assert 'id="view-overview"' in page.text
     assert 'id="view-approvals"' in page.text
     assert 'id="view-recovery"' in page.text
+    assert 'id="global-admin-login"' in page.text
+    assert 'id="global-admin-logout"' in page.text
+    assert 'id="ops-admin-login-dialog"' in page.text
     assert css.status_code == 200
     assert css.headers["content-type"].startswith("text/css")
     assert ".system-banner" in css.text
     assert javascript.status_code == 200
     assert javascript.headers["content-type"].startswith("text/javascript")
     assert "/ops/console/snapshot" in javascript.text
+    assert "if (!state.adminSession.authenticated && !state.adminPrompted)" in javascript.text
+    assert "view === 'devices' && !state.adminSession.authenticated" not in javascript.text
     assert "innerHTML" not in javascript.text
 
 

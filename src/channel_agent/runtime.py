@@ -102,6 +102,7 @@ class ChannelAgentRuntime:
         self._store_ids = config.store_references or (
             (config.store_reference,) if config.store_reference is not None else ()
         )
+        self._active_store_id = config.store_reference
         self._production_eligible = False
         self._remote_config: ManagedAgentConfig | None = None
         self._last_heartbeat: datetime | None = None
@@ -145,7 +146,10 @@ class ChannelAgentRuntime:
             self._logger.event(
                 "CHANNEL_ENGINE_CONNECTED",
                 "SUCCESS",
-                {"agent_id": self._config.agent_id, "protocol_version": "1.0"},
+                {
+                    "agent_id": self._config.agent_id,
+                    "control_protocol_version": self._config.control_protocol_version,
+                },
             )
         except AgentClientError as exc:
             self._degrade(exc, "AGENT_START_CONNECTION_FAILED")
@@ -232,7 +236,7 @@ class ChannelAgentRuntime:
                 agent_id=self._config.agent_id,
                 device_id=self._config.device_id,
                 user_id=self._user_id,
-                store_id=self._store_ids[0] if self._store_ids else None,
+                store_id=self._active_store_id,
                 store_ids=self._store_ids,
                 binding_revision=self._binding_revision,
                 identity=self._identity,
@@ -314,6 +318,7 @@ class ChannelAgentRuntime:
         self._production_eligible = identity.production_eligible
         self._user_id = identity.user_id
         self._store_ids = identity.effective_store_ids
+        self._active_store_id = identity.effective_active_store_id
 
     def _degrade(self, error: Exception, event: str) -> None:
         with self._lock:
