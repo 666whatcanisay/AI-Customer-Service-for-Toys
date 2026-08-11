@@ -19,6 +19,7 @@ from app.test_catalog.models import (
     TestProduct as ProductModel,
     TestStore as StoreModel,
 )
+from app.store_platform_bindings.models import StorePlatformBinding
 
 
 PASSWORD = "Correct-Horse-42!"
@@ -71,6 +72,26 @@ def _seed_product(session: Session, store: StoreModel, product_id: str = "PRODUC
         sales_status="ON_SALE", age_min=6, age_max=12, safety_summary=None,
         review_status="APPROVED", publishable=True, customer_service_status="ENABLED",
         source_ids_json="[]", raw_data_json="{}",
+    ))
+    session.commit()
+
+
+def _seed_platform_binding(
+    session: Session,
+    store: StoreModel,
+    platform_store_id: str,
+) -> None:
+    now = datetime.now(timezone.utc)
+    session.add(StorePlatformBinding(
+        binding_id=f"binding-{store.id}-{platform_store_id}",
+        store_id=store.id,
+        platform="pinduoduo",
+        platform_store_id=platform_store_id,
+        status="ACTIVE",
+        verified_at=now,
+        verified_by="pytest-admin",
+        created_at=now,
+        change_reason="测试平台店铺身份由管理员人工确认",
     ))
     session.commit()
 
@@ -267,7 +288,7 @@ def test_admin_user_crud_role_assignment_and_store_binding(
     assert body["stores"][0] == {
         "id": body["stores"][0]["id"], "store_id": store.id,
         "store_code": store.store_code, "store_name": store.store_name,
-        "platform": "pdd", "is_default": True,
+        "platform": "pdd", "is_default": True, "platform_bindings": [],
     }
     user_id = body["id"]
 
@@ -381,6 +402,34 @@ def test_workspace_proxy_validates_bound_scope_before_unchanged_chat_forward(
         "/api/v1/workspace/ai-replies", headers=_headers(token), json=denied
     ).status_code == 403
     assert len(calls) == 1
+
+
+def test_authorized_store_projection_includes_only_active_platform_identity_bindings(
+    auth_client: TestClient,
+    session: Session,
+) -> None:
+    store = _seed_store(session, package_id="PKG-IAM-PLATFORM", store_code="STORE-PLATFORM")
+    _seed_platform_binding(session, store, "328616090")
+    _create_user(
+        session,
+        "support.platform",
+        RoleName.CUSTOMER_SERVICE,
+        [{"store_id": store.id, "is_default": True}],
+    )
+    token = _login(auth_client, "support.platform")
+
+    current = auth_client.get("/api/v1/auth/me", headers=_headers(token))
+
+    assert current.status_code == 200, current.text
+    projected = current.json()["user"]["stores"][0]
+    assert projected["store_code"] == "STORE-PLATFORM"
+    assert projected["platform_bindings"] == [{
+        "platform": "pinduoduo",
+        "platform_store_id": "328616090",
+        "status": "ACTIVE",
+        "verified_at": projected["platform_bindings"][0]["verified_at"],
+        "verified_by": "pytest-admin",
+    }]
 
 
 def test_internal_username_initial_password_first_change_and_multi_store_selection(

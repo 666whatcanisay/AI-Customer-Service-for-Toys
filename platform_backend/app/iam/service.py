@@ -16,12 +16,13 @@ from app.iam.models import (
 )
 from app.iam.schemas import (
     LoginResponse, RoleName, StoreBindingInput, StoreBindingProjection,
-    StoreOptionProjection, UserCreateRequest, UserProjection, UserStatus,
+    StoreOptionProjection, StorePlatformIdentityProjection, UserCreateRequest, UserProjection, UserStatus,
     UserUpdateRequest, canonical_username,
 )
 from app.iam.security import create_session_token, hash_password, hash_session_token, verify_password
 from app.test_catalog.models import TestStore
 from app.desktop_agent.models import DesktopWorkflowAuditEvent
+from app.store_platform_bindings.service import active_binding_projections_by_store
 
 
 PERMISSIONS_BY_ROLE: dict[RoleName, frozenset[str]] = {
@@ -105,13 +106,28 @@ def _binding_rows(session: Session, user_id: str) -> list[tuple[UserStoreBinding
 
 def project_user(session: Session, user: User) -> UserProjection:
     roles = role_names(session, user.id)
+    binding_rows = _binding_rows(session, user.id)
+    platform_bindings = active_binding_projections_by_store(
+        session,
+        {store.id for _, store in binding_rows},
+    )
     stores = [
         StoreBindingProjection(
             id=binding.id, store_id=store.id, store_code=store.store_code,
             store_name=store.store_name, platform=store.platform,
             is_default=binding.is_default,
+            platform_bindings=[
+                StorePlatformIdentityProjection(
+                    platform=item.platform,
+                    platform_store_id=item.platform_store_id,
+                    status=item.status.value,
+                    verified_at=item.verified_at,
+                    verified_by=item.verified_by,
+                )
+                for item in platform_bindings.get(store.id, [])
+            ],
         )
-        for binding, store in _binding_rows(session, user.id)
+        for binding, store in binding_rows
     ]
     return UserProjection(
         id=user.id, username=user.username, display_name=user.display_name,
@@ -266,10 +282,24 @@ class UserService:
             select(TestStore).where(TestStore.customer_service_status == "ENABLED")
             .order_by(TestStore.store_name, TestStore.id)
         ).all()
+        platform_bindings = active_binding_projections_by_store(
+            self.session,
+            {store.id for store in stores},
+        )
         return [
             StoreOptionProjection(
                 store_id=store.id, store_code=store.store_code,
                 store_name=store.store_name, platform=store.platform,
+                platform_bindings=[
+                    StorePlatformIdentityProjection(
+                        platform=item.platform,
+                        platform_store_id=item.platform_store_id,
+                        status=item.status.value,
+                        verified_at=item.verified_at,
+                        verified_by=item.verified_by,
+                    )
+                    for item in platform_bindings.get(store.id, [])
+                ],
             )
             for store in stores
         ]

@@ -48,6 +48,14 @@ class StoreBindingInput(StrictModel):
     is_default: bool = False
 
 
+class StorePlatformIdentityProjection(StrictModel):
+    platform: str
+    platform_store_id: str
+    status: str
+    verified_at: datetime
+    verified_by: str
+
+
 class StoreBindingProjection(StrictModel):
     id: int
     store_id: int
@@ -55,6 +63,7 @@ class StoreBindingProjection(StrictModel):
     store_name: str
     platform: str
     is_default: bool
+    platform_bindings: list[StorePlatformIdentityProjection] = Field(default_factory=list)
 
 
 class StoreOptionProjection(StrictModel):
@@ -62,6 +71,7 @@ class StoreOptionProjection(StrictModel):
     store_code: str
     store_name: str
     platform: str
+    platform_bindings: list[StorePlatformIdentityProjection] = Field(default_factory=list)
 
 
 class UserProjection(StrictModel):

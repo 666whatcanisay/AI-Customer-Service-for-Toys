@@ -38,9 +38,10 @@ def test_0013_to_head_to_0013_and_back_to_head_is_reversible(tmp_path: Path) -> 
         item["name"] for item in inspector.get_indexes("user_store_bindings")
     }
     assert "uq_user_store_bindings_single_default" in binding_indexes
+    assert "store_platform_bindings" in inspector.get_table_names()
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0016_production_hardening_v1"
+            "0018_store_platform_bindings_v1"
         )
     engine.dispose()
 
@@ -51,6 +52,7 @@ def test_0013_to_head_to_0013_and_back_to_head_is_reversible(tmp_path: Path) -> 
         "login_attempt_buckets",
         "conversation_context_resolutions",
         "desktop_workflow_audit_events",
+        "store_platform_bindings",
     }.isdisjoint(downgraded.get_table_names())
     assert {"generation_token", "generation_started_at"}.isdisjoint(
         item["name"] for item in downgraded.get_columns("product_knowledge_publications")

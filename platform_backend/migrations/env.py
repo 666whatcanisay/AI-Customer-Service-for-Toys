@@ -16,6 +16,7 @@ from app.knowledge_publishing import models as knowledge_publishing_models  # no
 from app.iam import models as iam_models  # noqa: F401
 from app.workspace import models as workspace_models  # noqa: F401
 from app.desktop_agent import models as desktop_agent_models  # noqa: F401
+from app.store_platform_bindings import models as store_platform_binding_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

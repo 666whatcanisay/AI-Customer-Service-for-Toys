@@ -178,6 +178,8 @@ class OperationManagementService:
         raw["remarks"] = request.remarks
         store.raw_data_json = _dump(_record_operation(raw, "STORE_UPDATED"))
         package.platform = request.platform.value
+        if package.schema_version == "c-operation-store.v1":
+            package.package_name = f"{request.store_name} · 运营建档"
         if previous_platform != request.platform.value:
             self._update_platform_copies(store, request.platform.value)
         self.session.commit()
@@ -273,6 +275,9 @@ class OperationManagementService:
         )
         if store is None:
             raise AppError("OPERATION_PRODUCT_SCOPE_INVALID", "商品所属店铺不完整", status_code=409)
+        package = self.session.get(TestKnowledgePackage, store.package_id)
+        if package is None:
+            raise AppError("OPERATION_STORE_SCOPE_INVALID", "店铺业务范围不完整", status_code=409)
 
         product_raw = _json_dict(product.raw_data_json)
         existing_summary = str(product_raw.get("product_summary") or "")
@@ -292,6 +297,8 @@ class OperationManagementService:
             product.publishable = False
 
         store.store_name = request.store_display_name
+        if package.schema_version == "c-operation-store.v1":
+            package.package_name = f"{request.store_display_name} · 运营建档"
         store_raw = _json_dict(store.raw_data_json)
         store_raw["remarks"] = request.store_remarks
         store.raw_data_json = _dump(

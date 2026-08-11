@@ -1,16 +1,30 @@
 """Authenticated Customer Desktop Workflow V1 API."""
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.desktop_agent.schemas import (
+    AdminBindingTargetListResponse,
     DesktopAgentStatusResponse,
+    AdminDeviceDisableRequest,
+    AdminDeviceListResponse,
+    AdminDeviceRestoreRequest,
+    AdminEnrollmentGrantRequest,
+    AdminEnrollmentGrantResponse,
+    AdminHostPairingCodeRotateRequest,
+    AdminHostPairingCodeRotateResponse,
+    DesktopBindingActivationRequest,
+    DesktopActiveStoreSelectionRequest,
     DesktopBindingGrantRequest,
     DesktopBindingGrantResponse,
     DesktopWorkflowAuditListResponse,
 )
-from app.desktop_agent.service import DesktopAgentService, DesktopWorkflowAuditService
+from app.desktop_agent.service import (
+    DesktopAgentAdminService,
+    DesktopAgentService,
+    DesktopWorkflowAuditService,
+)
 from app.desktop_agent.upstream import (
     ChannelAgentNotConfigured,
     ChannelAgentPermissionInvalid,
@@ -98,6 +112,49 @@ def issue_desktop_binding_grant(
         raise _upstream_error(exc) from None
 
 
+@router.post("/activate", response_model=DesktopAgentStatusResponse)
+def activate_desktop_binding(
+    request: DesktopBindingActivationRequest,
+    response: Response,
+    principal: Principal = Depends(require_workspace_access),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> DesktopAgentStatusResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return DesktopAgentService(session, upstream).activate(principal, request)
+    except (
+        ChannelAgentNotConfigured, ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid, ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None
+
+
+@router.post("/active-store", response_model=DesktopAgentStatusResponse)
+def select_desktop_active_store(
+    request: DesktopActiveStoreSelectionRequest,
+    response: Response,
+    principal: Principal = Depends(require_workspace_access),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> DesktopAgentStatusResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return DesktopAgentService(session, upstream).select_active_store(
+            principal,
+            request,
+        )
+    except (
+        ChannelAgentNotConfigured,
+        ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid,
+        ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None
+
+
 @admin_router.get("/audit", response_model=DesktopWorkflowAuditListResponse)
 def desktop_workflow_audit(
     response: Response,
@@ -108,3 +165,149 @@ def desktop_workflow_audit(
 ) -> DesktopWorkflowAuditListResponse:
     response.headers["Cache-Control"] = "no-store"
     return DesktopWorkflowAuditService(session).list(user_id=user_id, limit=limit)
+
+
+@admin_router.get("/devices", response_model=AdminDeviceListResponse)
+def admin_devices(
+    response: Response,
+    _: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> AdminDeviceListResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return DesktopAgentAdminService(session, upstream).list_devices()
+    except (
+        ChannelAgentNotConfigured,
+        ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid,
+        ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None
+
+
+@admin_router.get("/binding-targets", response_model=AdminBindingTargetListResponse)
+def admin_binding_targets(
+    response: Response,
+    _: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> AdminBindingTargetListResponse:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return DesktopAgentAdminService(session, upstream).list_binding_targets()
+
+
+@admin_router.post(
+    "/host/pairing-codes/rotate",
+    response_model=AdminHostPairingCodeRotateResponse,
+    status_code=201,
+)
+def admin_rotate_host_pairing_code(
+    request: AdminHostPairingCodeRotateRequest,
+    response: Response,
+    principal: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> AdminHostPairingCodeRotateResponse:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    try:
+        return DesktopAgentAdminService(session, upstream).rotate_host_pairing_code(
+            principal,
+            request,
+        )
+    except (
+        ChannelAgentNotConfigured,
+        ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid,
+        ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None
+
+
+@admin_router.post(
+    "/devices/{agent_id}/enrollment-grants",
+    response_model=AdminEnrollmentGrantResponse,
+    status_code=201,
+)
+def admin_issue_enrollment_grant(
+    request: AdminEnrollmentGrantRequest,
+    response: Response,
+    agent_id: str = Path(min_length=1, max_length=128),
+    principal: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> AdminEnrollmentGrantResponse:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    try:
+        return DesktopAgentAdminService(session, upstream).issue_enrollment_grant(
+            principal,
+            agent_id,
+            request,
+        )
+    except (
+        ChannelAgentNotConfigured,
+        ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid,
+        ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None
+
+
+@admin_router.post(
+    "/devices/{agent_id}/disable",
+    response_model=AdminDeviceListResponse,
+)
+def admin_disable_device(
+    request: AdminDeviceDisableRequest,
+    response: Response,
+    agent_id: str = Path(min_length=1, max_length=128),
+    principal: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> AdminDeviceListResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return DesktopAgentAdminService(session, upstream).disable(
+            principal, agent_id, request
+        )
+    except (
+        ChannelAgentNotConfigured,
+        ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid,
+        ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None
+
+
+@admin_router.post(
+    "/devices/{agent_id}/restore-to-registered",
+    response_model=AdminDeviceListResponse,
+)
+def admin_restore_device(
+    request: AdminDeviceRestoreRequest,
+    response: Response,
+    agent_id: str = Path(min_length=1, max_length=128),
+    principal: Principal = Depends(require_user_manage),
+    session: Session = Depends(get_db),
+    upstream: ChannelAgentUpstream = Depends(get_channel_agent_upstream),
+) -> AdminDeviceListResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return DesktopAgentAdminService(session, upstream).restore_to_registered(
+            principal, agent_id, request
+        )
+    except (
+        ChannelAgentNotConfigured,
+        ChannelAgentUnavailable,
+        ChannelAgentPermissionInvalid,
+        ChannelAgentResponseInvalid,
+        ChannelAgentRequestRejected,
+    ) as exc:
+        raise _upstream_error(exc) from None

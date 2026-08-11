@@ -971,28 +971,40 @@ function Get-LanServiceListenerAddress($Config, [int]$Port) {
 }
 
 function Get-LanPlatformEnvironment($Config) {
+    $integrationEnabled = if (-not [string]::IsNullOrWhiteSpace([string]$env:CHANNEL_AGENT_INTEGRATION_ENABLED)) { [string]$env:CHANNEL_AGENT_INTEGRATION_ENABLED } else { ([bool]$Config.ChannelAgentIntegrationEnabled).ToString().ToLowerInvariant() }
+    $serverUrl = if (-not [string]::IsNullOrWhiteSpace([string]$env:CHANNEL_AGENT_SERVER_URL)) { [string]$env:CHANNEL_AGENT_SERVER_URL } else { [string]$Config.ChannelAgentServerUrl }
     return @{
         DATABASE_URL = [string]$Config.PlatformDatabaseUrl
         CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
         AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
-        CHANNEL_AGENT_INTEGRATION_ENABLED = ([bool]$Config.ChannelAgentIntegrationEnabled).ToString().ToLowerInvariant()
-        CHANNEL_AGENT_SERVER_URL = [string]$Config.ChannelAgentServerUrl
+        CHANNEL_AGENT_INTEGRATION_ENABLED = $integrationEnabled
+        CHANNEL_AGENT_SERVER_URL = $serverUrl
         CHANNEL_AGENT_OPERATOR_SESSION_FILE = [string]$Config.ChannelAgentOperatorSessionReference
+        CHANNEL_AGENT_SERVICE_ID = [string]$env:CHANNEL_AGENT_SERVICE_ID
+        CHANNEL_AGENT_SERVICE_KEY_ID = [string]$env:CHANNEL_AGENT_SERVICE_KEY_ID
+        CHANNEL_AGENT_SERVICE_CREDENTIAL_REFERENCE = [string]$env:CHANNEL_AGENT_SERVICE_CREDENTIAL_REFERENCE
+        CHANNEL_AGENT_CA_CERTIFICATE_FILE = [string]$env:CHANNEL_AGENT_CA_CERTIFICATE_FILE
         CHANNEL_AGENT_TIMEOUT_SECONDS = [string]$Config.ChannelAgentTimeoutSeconds
         INTERNAL_SERVICE_SECRET_FILE = [string]$Config.InternalServiceSecretReference
     }
 }
 
 function Get-LocalPlatformEnvironment($Config) {
+    $integrationEnabled = if (-not [string]::IsNullOrWhiteSpace([string]$env:CHANNEL_AGENT_INTEGRATION_ENABLED)) { [string]$env:CHANNEL_AGENT_INTEGRATION_ENABLED } else { ([bool]$Config.ChannelAgentIntegrationEnabled).ToString().ToLowerInvariant() }
+    $serverUrl = if (-not [string]::IsNullOrWhiteSpace([string]$env:CHANNEL_AGENT_SERVER_URL)) { [string]$env:CHANNEL_AGENT_SERVER_URL } else { [string]$Config.ChannelAgentServerUrl }
     return @{
         DATABASE_URL = [string]$Config.PlatformDatabaseUrl
         CORS_ALLOWED_ORIGINS = (@($Config.CorsAllowedOrigins) -join ',')
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
         AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
-        CHANNEL_AGENT_INTEGRATION_ENABLED = ([bool]$Config.ChannelAgentIntegrationEnabled).ToString().ToLowerInvariant()
-        CHANNEL_AGENT_SERVER_URL = [string]$Config.ChannelAgentServerUrl
+        CHANNEL_AGENT_INTEGRATION_ENABLED = $integrationEnabled
+        CHANNEL_AGENT_SERVER_URL = $serverUrl
         CHANNEL_AGENT_OPERATOR_SESSION_FILE = [string]$Config.ChannelAgentOperatorSessionReference
+        CHANNEL_AGENT_SERVICE_ID = [string]$env:CHANNEL_AGENT_SERVICE_ID
+        CHANNEL_AGENT_SERVICE_KEY_ID = [string]$env:CHANNEL_AGENT_SERVICE_KEY_ID
+        CHANNEL_AGENT_SERVICE_CREDENTIAL_REFERENCE = [string]$env:CHANNEL_AGENT_SERVICE_CREDENTIAL_REFERENCE
+        CHANNEL_AGENT_CA_CERTIFICATE_FILE = [string]$env:CHANNEL_AGENT_CA_CERTIFICATE_FILE
         CHANNEL_AGENT_TIMEOUT_SECONDS = [string]$Config.ChannelAgentTimeoutSeconds
         INTERNAL_SERVICE_SECRET_FILE = [string]$Config.InternalServiceSecretReference
     }

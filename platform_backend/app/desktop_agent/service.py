@@ -6,11 +6,25 @@ from sqlalchemy.orm import Session
 from app.desktop_agent.models import DesktopWorkflowAuditEvent, utc_now
 from app.desktop_agent.schemas import (
     AgentIdentityStatus,
+    AgentOnlineStatus,
+    AdminBindingTarget,
+    AdminBindingTargetListResponse,
+    AdminBindingTargetStore,
+    AdminDeviceDisableRequest,
+    AdminDeviceListResponse,
+    AdminDeviceProjection,
+    AdminDeviceRestoreRequest,
+    AdminEnrollmentGrantRequest,
+    AdminEnrollmentGrantResponse,
+    AdminHostPairingCodeRotateRequest,
+    AdminHostPairingCodeRotateResponse,
     DesktopAgentProjection,
     DesktopAgentStatusResponse,
     DesktopAssociationState,
     DesktopBindingGrantRequest,
     DesktopBindingGrantResponse,
+    DesktopBindingActivationRequest,
+    DesktopActiveStoreSelectionRequest,
     DesktopWorkflowAuditListResponse,
     DesktopWorkflowAuditProjection,
     UpstreamAgentView,
@@ -18,8 +32,10 @@ from app.desktop_agent.schemas import (
 from app.desktop_agent.upstream import ChannelAgentUpstream
 from app.errors import AppError
 from app.iam.dependencies import Principal
-from app.iam.schemas import RoleName
+from app.iam.schemas import RoleName, UserStatus
+from app.iam.service import UserService
 from app.workspace.service import StoreContextService
+from app.store_platform_bindings.service import active_binding_projections_by_store
 
 
 class DesktopWorkflowAuditService:
@@ -30,6 +46,7 @@ class DesktopWorkflowAuditService:
         self, *, actor_user_id: str, event_type: str, current_state: str,
         agent_id: str | None = None, device_id: str | None = None,
         store_id: int | None = None, previous_state: str | None = None,
+        reason: str | None = None,
         commit: bool = True,
     ) -> DesktopWorkflowAuditEvent:
         row = DesktopWorkflowAuditEvent(
@@ -40,6 +57,7 @@ class DesktopWorkflowAuditService:
             store_id=store_id,
             previous_state=previous_state,
             current_state=current_state,
+            reason=reason,
             outcome="SUCCESS",
             occurred_at=utc_now(),
         )
@@ -53,7 +71,7 @@ class DesktopWorkflowAuditService:
     ) -> None:
         state = "|".join((
             item.identity.status.value,
-            item.online_status.value,
+            item.connectivity_status.value,
             item.runtime_status,
             str(item.identity.binding_revision),
         ))
@@ -102,6 +120,7 @@ class DesktopWorkflowAuditService:
                 store_id=row.store_id,
                 previous_state=row.previous_state,
                 current_state=row.current_state,
+                reason=row.reason,
                 outcome=row.outcome,
                 occurred_at=row.occurred_at,
             ) for row in rows],
@@ -134,7 +153,7 @@ class DesktopAgentService:
             device_name=item.hostname,
             agent_version=item.agent_version,
             identity_status=item.identity.status,
-            online_status=item.online_status,
+            online_status=AgentOnlineStatus(item.connectivity_status.value),
             runtime_status=item.runtime_status,
             production_eligible=item.identity.status is AgentIdentityStatus.ACTIVE,
             binding_revision=item.identity.binding_revision,
@@ -221,7 +240,7 @@ class DesktopAgentService:
                 status_code=404,
             )
         if (
-            candidate.identity.status is not AgentIdentityStatus.UNBOUND
+            candidate.identity.status is not AgentIdentityStatus.REGISTERED
             or candidate.identity.user_id is not None
             or candidate.identity.effective_store_ids
         ):
@@ -246,7 +265,7 @@ class DesktopAgentService:
             agent_id=request.agent_id,
             device_id=request.device_id,
             store_id=store.store_id,
-            previous_state="UNBOUND",
+            previous_state="REGISTERED",
             current_state="GRANT_ISSUED",
         )
         return DesktopBindingGrantResponse(
@@ -256,3 +275,368 @@ class DesktopAgentService:
             binding_code=result.binding_code,
             expires_at=result.expires_at,
         )
+
+    def activate(
+        self,
+        principal: Principal,
+        request: DesktopBindingActivationRequest,
+    ) -> DesktopAgentStatusResponse:
+        _, store = self._store_context(principal, request.store_id)
+        listing = self.upstream.list_agents()
+        candidate = next((
+            item for item in listing.items
+            if item.identity.agent_id == request.agent_id
+            and item.identity.device_id == request.device_id
+        ), None)
+        if candidate is None:
+            raise AppError(
+                "CHANNEL_AGENT_NOT_REGISTERED",
+                "The specified Agent and device are not registered.",
+                status_code=404,
+            )
+        if (
+            candidate.identity.user_id != principal.user_id
+            or store.store_code not in candidate.identity.effective_store_ids
+        ):
+            raise AppError(
+                "AUTHORIZATION_DENIED",
+                "The bound device is outside the authenticated user and Store scope.",
+                status_code=403,
+            )
+        if candidate.identity.status is AgentIdentityStatus.ACTIVE:
+            return self.status(principal, request.store_id)
+        if candidate.identity.status is not AgentIdentityStatus.BOUND:
+            raise AppError(
+                "CHANNEL_AGENT_BINDING_INVALID",
+                "Only a bound device can be activated.",
+                status_code=409,
+            )
+        self.upstream.activate_agent(
+            agent_id=request.agent_id,
+            reason="AI-CS authenticated self-device enrollment completed",
+        )
+        self.audit.add(
+            actor_user_id=principal.user_id,
+            event_type="DEVICE_BINDING_ACTIVATED",
+            agent_id=request.agent_id,
+            device_id=request.device_id,
+            store_id=request.store_id,
+            previous_state="BOUND",
+            current_state="ACTIVE",
+        )
+        return self.status(principal, request.store_id)
+
+    def select_active_store(
+        self,
+        principal: Principal,
+        request: DesktopActiveStoreSelectionRequest,
+    ) -> DesktopAgentStatusResponse:
+        """Resolve an observed platform identity to one authorized AI-CS Store."""
+
+        _, store = self._store_context(principal, request.store_id)
+        bindings = active_binding_projections_by_store(
+            self.session,
+            {store.store_id},
+        ).get(store.store_id, [])
+        platform = request.platform.strip().casefold()
+        observed = request.observed_platform_store_id.strip()
+        binding = next(
+            (
+                item
+                for item in bindings
+                if item.platform.casefold() == platform
+                and item.platform_store_id == observed
+            ),
+            None,
+        )
+        if binding is None:
+            raise AppError(
+                "PLATFORM_STORE_BINDING_NOT_VERIFIED",
+                "The observed platform Store is not an active verified binding.",
+                status_code=409,
+            )
+
+        listing = self.upstream.list_agents()
+        candidate = next(
+            (
+                item
+                for item in listing.items
+                if item.identity.agent_id == request.agent_id
+                and item.identity.device_id == request.device_id
+            ),
+            None,
+        )
+        if candidate is None:
+            raise AppError(
+                "CHANNEL_AGENT_NOT_REGISTERED",
+                "The specified Agent and device are not registered.",
+                status_code=404,
+            )
+        if (
+            candidate.identity.user_id != principal.user_id
+            or store.store_code not in candidate.identity.effective_store_ids
+        ):
+            raise AppError(
+                "AUTHORIZATION_DENIED",
+                "The device or Store is outside the authenticated user scope.",
+                status_code=403,
+            )
+        if candidate.identity.status not in {
+            AgentIdentityStatus.BOUND,
+            AgentIdentityStatus.ACTIVE,
+        }:
+            raise AppError(
+                "CHANNEL_AGENT_BINDING_INVALID",
+                "Only a bound or active device can select its working Store.",
+                status_code=409,
+            )
+
+        self.upstream.select_active_store(
+            agent_id=request.agent_id,
+            device_id=request.device_id,
+            user_reference=principal.user_id,
+            store_reference=store.store_code,
+            platform=platform,
+            observed_platform_store_id=observed,
+            platform_binding_id=binding.binding_id,
+            platform_binding_verified_at=binding.verified_at.isoformat(),
+            binding_revision=candidate.identity.binding_revision,
+            reason="Customer service operator confirmed the observed platform Store",
+        )
+        self.audit.add(
+            actor_user_id=principal.user_id,
+            event_type="ACTIVE_STORE_SELECTED",
+            agent_id=request.agent_id,
+            device_id=request.device_id,
+            store_id=store.store_id,
+            previous_state=candidate.identity.effective_active_store_id,
+            current_state=store.store_code,
+            reason=f"verified platform binding {binding.binding_id}",
+        )
+        return self.status(principal, request.store_id)
+
+
+class DesktopAgentAdminService:
+    """RBAC-gated facade; Host Control remains the only device authority."""
+
+    def __init__(self, session: Session, upstream: ChannelAgentUpstream) -> None:
+        self.session = session
+        self.upstream = upstream
+        self.audit = DesktopWorkflowAuditService(session)
+
+    def list_devices(self) -> AdminDeviceListResponse:
+        listing = self.upstream.list_agents()
+        return AdminDeviceListResponse(
+            items=tuple(
+                AdminDeviceProjection(
+                    agent_id=item.identity.agent_id,
+                    device_id=item.identity.device_id,
+                    agent_version=item.agent_version,
+                    hostname=item.hostname,
+                    identity_status=item.identity_status,
+                    connectivity_status=item.connectivity_status,
+                    runtime_status=item.runtime_status,
+                    user_reference=item.identity.user_id,
+                    authorized_store_ids=item.identity.effective_store_ids,
+                    active_store_id=item.identity.effective_active_store_id,
+                    binding_revision=item.identity.binding_revision,
+                    last_heartbeat=item.last_heartbeat,
+                    authoritative_source=item.authoritative_source,
+                )
+                for item in listing.items
+            ),
+            count=listing.count,
+            checked_at=listing.server_time,
+            authoritative_source=listing.authoritative_source,
+        )
+
+    def rotate_host_pairing_code(
+        self,
+        principal: Principal,
+        request: AdminHostPairingCodeRotateRequest,
+    ) -> AdminHostPairingCodeRotateResponse:
+        result = self.upstream.rotate_host_pairing_code(reason=request.reason)
+        self.audit.add(
+            actor_user_id=principal.user_id,
+            event_type="HOST_PAIRING_CODE_ROTATED",
+            agent_id=result.host_id,
+            current_state="PAIRING_CODE_ROTATED",
+            reason=request.reason,
+        )
+        return AdminHostPairingCodeRotateResponse(
+            host_id=result.host_id,
+            pairing_code=result.pairing_code,
+            expires_at=result.expires_at,
+            display_once=result.display_once,
+        )
+
+    def list_binding_targets(self) -> AdminBindingTargetListResponse:
+        targets: list[AdminBindingTarget] = []
+        for user in UserService(self.session).list_users():
+            if (
+                user.status is not UserStatus.ACTIVE
+                or RoleName.CUSTOMER_SERVICE not in user.roles
+                or not user.stores
+            ):
+                continue
+            targets.append(
+                AdminBindingTarget(
+                    user_id=user.id,
+                    username=user.username,
+                    display_name=user.display_name,
+                    stores=tuple(
+                        AdminBindingTargetStore(
+                            store_id=store.store_id,
+                            store_code=store.store_code,
+                            store_name=store.store_name,
+                            platform=store.platform,
+                            is_default=store.is_default,
+                        )
+                        for store in user.stores
+                    ),
+                )
+            )
+        return AdminBindingTargetListResponse(
+            items=tuple(targets),
+            count=len(targets),
+            checked_at=utc_now(),
+        )
+
+    def issue_enrollment_grant(
+        self,
+        principal: Principal,
+        agent_id: str,
+        request: AdminEnrollmentGrantRequest,
+    ) -> AdminEnrollmentGrantResponse:
+        listing = self.upstream.list_agents()
+        device = next(
+            (item for item in listing.items if item.identity.agent_id == agent_id),
+            None,
+        )
+        if device is None:
+            raise AppError(
+                "CHANNEL_AGENT_NOT_REGISTERED",
+                "The specified Agent is not registered.",
+                status_code=404,
+            )
+        if (
+            device.identity.status is not AgentIdentityStatus.REGISTERED
+            or device.identity.user_id is not None
+            or device.identity.effective_store_ids
+        ):
+            raise AppError(
+                "CHANNEL_AGENT_BINDING_INVALID",
+                "Only a REGISTERED and unbound device can receive an enrollment grant.",
+                status_code=409,
+            )
+
+        target = next(
+            (
+                user
+                for user in UserService(self.session).list_users()
+                if user.id == request.user_id
+            ),
+            None,
+        )
+        if target is None or target.status is not UserStatus.ACTIVE:
+            raise AppError(
+                "BINDING_TARGET_USER_UNAVAILABLE",
+                "The selected user is not available for device binding.",
+                status_code=409,
+            )
+        if RoleName.CUSTOMER_SERVICE not in target.roles:
+            raise AppError(
+                "BINDING_TARGET_ROLE_INVALID",
+                "Only a CUSTOMER_SERVICE user can be bound to a customer desktop.",
+                status_code=409,
+            )
+        stores_by_id = {store.store_id: store for store in target.stores}
+        requested_ids = tuple(request.store_ids)
+        if any(store_id not in stores_by_id for store_id in requested_ids):
+            raise AppError(
+                "BINDING_TARGET_STORE_UNAUTHORIZED",
+                "One or more selected Stores are outside the user's existing authorization.",
+                status_code=403,
+            )
+        ordered = sorted(
+            (stores_by_id[store_id] for store_id in requested_ids),
+            key=lambda store: (not store.is_default, requested_ids.index(store.store_id)),
+        )
+        store_codes = tuple(store.store_code for store in ordered)
+        result = self.upstream.issue_enrollment_grant(
+            agent_id=device.identity.agent_id,
+            device_id=device.identity.device_id,
+            user_reference=target.id,
+            store_references=store_codes,
+            reason=request.reason,
+        )
+        self.audit.add(
+            actor_user_id=principal.user_id,
+            event_type="DEVICE_BINDING_GRANT_ISSUED_BY_ADMIN",
+            agent_id=device.identity.agent_id,
+            device_id=device.identity.device_id,
+            store_id=ordered[0].store_id,
+            previous_state=AgentIdentityStatus.REGISTERED.value,
+            current_state="GRANT_ISSUED",
+        )
+        return AdminEnrollmentGrantResponse(
+            grant_id=result.grant_id,
+            agent_id=result.agent_id,
+            device_id=result.device_id,
+            user_reference=target.id,
+            store_references=store_codes,
+            binding_code=result.binding_code,
+            issued_at=result.issued_at,
+            expires_at=result.expires_at,
+        )
+
+    def disable(
+        self,
+        principal: Principal,
+        agent_id: str,
+        request: AdminDeviceDisableRequest,
+    ) -> AdminDeviceListResponse:
+        before = self._identity_status(agent_id)
+        self.upstream.disable_agent(agent_id=agent_id, reason=request.reason)
+        self.audit.add(
+            actor_user_id=principal.user_id,
+            event_type="DEVICE_DISABLED_BY_ADMIN",
+            agent_id=agent_id,
+            previous_state=before.value,
+            current_state=AgentIdentityStatus.DISABLED.value,
+        )
+        return self.list_devices()
+
+    def restore_to_registered(
+        self,
+        principal: Principal,
+        agent_id: str,
+        request: AdminDeviceRestoreRequest,
+    ) -> AdminDeviceListResponse:
+        before = self._identity_status(agent_id)
+        self.upstream.restore_agent_to_registered(
+            agent_id=agent_id,
+            reason=request.reason,
+        )
+        self.audit.add(
+            actor_user_id=principal.user_id,
+            event_type="DEVICE_RESTORED_TO_REGISTERED",
+            agent_id=agent_id,
+            previous_state=before.value,
+            current_state=AgentIdentityStatus.REGISTERED.value,
+        )
+        return self.list_devices()
+
+    def _identity_status(self, agent_id: str) -> AgentIdentityStatus:
+        listing = self.upstream.list_agents()
+        item = next(
+            (item for item in listing.items if item.identity.agent_id == agent_id),
+            None,
+        )
+        if item is None:
+            raise AppError(
+                "CHANNEL_AGENT_NOT_REGISTERED",
+                "The requested Agent is not registered by Host Control.",
+                status_code=404,
+            )
+        return item.identity_status

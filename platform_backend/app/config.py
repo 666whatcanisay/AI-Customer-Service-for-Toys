@@ -72,6 +72,10 @@ class Settings:
     channel_agent_integration_enabled: bool
     channel_agent_server_url: str | None
     channel_agent_operator_session_file: str | None
+    channel_agent_service_id: str | None
+    channel_agent_service_key_id: str | None
+    channel_agent_service_credential_reference: str | None
+    channel_agent_ca_certificate_file: str | None
     channel_agent_timeout_seconds: float
     internal_service_secret_file: str | None = None
     iam_login_max_failures: int = 5
@@ -164,6 +168,19 @@ def get_settings() -> Settings:
         ),
         channel_agent_operator_session_file=(
             os.getenv("CHANNEL_AGENT_OPERATOR_SESSION_FILE", "").strip() or None
+        ),
+        channel_agent_service_id=(
+            os.getenv("CHANNEL_AGENT_SERVICE_ID", "").strip() or None
+        ),
+        channel_agent_service_key_id=(
+            os.getenv("CHANNEL_AGENT_SERVICE_KEY_ID", "").strip() or None
+        ),
+        channel_agent_service_credential_reference=(
+            os.getenv("CHANNEL_AGENT_SERVICE_CREDENTIAL_REFERENCE", "").strip()
+            or None
+        ),
+        channel_agent_ca_certificate_file=(
+            os.getenv("CHANNEL_AGENT_CA_CERTIFICATE_FILE", "").strip() or None
         ),
         channel_agent_timeout_seconds=_positive_float("CHANNEL_AGENT_TIMEOUT_SECONDS", "5"),
         internal_service_secret_file=(

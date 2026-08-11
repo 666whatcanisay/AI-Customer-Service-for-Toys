@@ -32,6 +32,7 @@ class DesktopWorkflowAuditEvent(Base):
     )
     previous_state: Mapped[str | None] = mapped_column(String(160), nullable=True)
     current_state: Mapped[str] = mapped_column(String(160), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
     outcome: Mapped[str] = mapped_column(String(24), nullable=False, default="SUCCESS")
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
