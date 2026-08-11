@@ -2,7 +2,9 @@
 
 AI-CS Channel Execution Engine 是 AI-CS 的独立执行层。AI-CS 负责 Decision、RAG、Knowledge 与 Model；Channel Engine 负责渠道运行、会话、人工审批、受控执行、Receipt、Outbox 与可观测性。
 
-当前候选版本：`0.1.0rc1`。
+当前源码收口版本：Channel Engine `0.2.0rc2`，Channel Agent `2.0.0rc4`。
+
+本版本的发布状态是 `RC4_OBSERVATION_FOUNDATION_CHECKPOINT`：离线回放、只读观察、Host 接收和 AI 建议链可验证；真实 PDD 页面证据与现场观察仍是独立 Gate，受控发送不在本版本范围内。
 
 ## 冻结边界
 

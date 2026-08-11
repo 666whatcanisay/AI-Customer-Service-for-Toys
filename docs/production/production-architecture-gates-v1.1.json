@@ -1,0 +1,47 @@
+{
+  "schema_version": "production-architecture-gates.v1.1",
+  "generated_at": "2026-08-08T06:09:07.142394+00:00",
+  "software_rc": "PASS",
+  "real_platform_decision": "BLOCKED",
+  "gateway_contract_sha256": "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5",
+  "windows_archive_sha256": "2b03d0199be91e484e8b29a3acd4101268209351acae7fb985c2f610e2481eeb",
+  "selector_evidence_hash": null,
+  "checks": [
+    {
+      "gate": "COORDINATED_VERSION",
+      "status": "PASS",
+      "detail": "engine=0.2.0rc1, agent=2.0.0rc1, control=2.1"
+    },
+    {
+      "gate": "GATEWAY_CONTRACT_FROZEN",
+      "status": "PASS",
+      "detail": "canonical_sha256=e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5"
+    },
+    {
+      "gate": "PRODUCTION_V1_UNMOUNTED",
+      "status": "PASS",
+      "detail": "production Host composition contains no legacy/Fake/Pilot router"
+    },
+    {
+      "gate": "UNKNOWN_RECEIPT_SEMANTICS",
+      "status": "PASS",
+      "detail": "delivery fact=null, auto-retry=false, reconciliation=true"
+    },
+    {
+      "gate": "SAFETY_LOCKS",
+      "status": "PASS",
+      "detail": "manual approval required; auto reply, real send and activation disabled"
+    },
+    {
+      "gate": "WINDOWS_PACKAGE_BOUNDARY",
+      "status": "PASS",
+      "detail": "manifest files=1708, forbidden=0"
+    },
+    {
+      "gate": "PRODUCTION_SELECTOR_EVIDENCE",
+      "status": "BLOCKED",
+      "detail": "no operator-verified PRODUCTION selector evidence supplied"
+    }
+  ],
+  "real_platform_side_effects": 0
+}
