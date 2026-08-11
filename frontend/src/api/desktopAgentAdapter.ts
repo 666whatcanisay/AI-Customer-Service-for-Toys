@@ -57,7 +57,14 @@ const associationStates: readonly DesktopAssociationState[] = [
   'MULTIPLE_MATCHES', 'DISABLED'
 ]
 const onlineStates: readonly DesktopAgentOnlineStatus[] = ['ONLINE', 'DEGRADED', 'OFFLINE']
-const identityStates: readonly DesktopAgentIdentityStatus[] = ['UNBOUND', 'BOUND', 'ACTIVE', 'DISABLED']
+const identityStates: readonly DesktopAgentIdentityStatus[] = ['REGISTERED', 'BOUND', 'ACTIVE', 'DISABLED']
+
+const identityStatus = (value: unknown): DesktopAgentIdentityStatus => {
+  // Host Control V2.1 emits REGISTERED.  UNBOUND is accepted only as a
+  // compatibility input and is normalized before it reaches UI state.
+  const normalized = value === 'UNBOUND' ? 'REGISTERED' : value
+  return oneOf(normalized, identityStates, '绑定状态')
+}
 
 export function adaptDesktopAgentStatus(value: unknown): DesktopAgentStatus {
   const item = record(value)
@@ -73,7 +80,7 @@ export function adaptDesktopAgentStatus(value: unknown): DesktopAgentStatus {
       deviceId: text(data.device_id, '设备标识'),
       deviceName: nullableText(data.device_name),
       agentVersion: nullableText(data.agent_version),
-      identityStatus: oneOf(data.identity_status, identityStates, '绑定状态'),
+      identityStatus: identityStatus(data.identity_status),
       onlineStatus: oneOf(data.online_status, onlineStates, '在线状态'),
       runtimeStatus: text(data.runtime_status, '运行状态'),
       productionEligible: boolean(data.production_eligible),

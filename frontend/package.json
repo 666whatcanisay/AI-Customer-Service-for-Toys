@@ -9,6 +9,7 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "build": "vite build",
+    "build:agent": "vite build --mode channel-agent --outDir dist-agent",
     "preview": "vite preview"
   },
   "dependencies": {

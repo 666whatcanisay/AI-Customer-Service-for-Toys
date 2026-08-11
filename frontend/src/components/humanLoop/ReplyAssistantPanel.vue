@@ -48,8 +48,17 @@
         <span v-if="conversation">{{ conversationStatusLabel }} · {{ conversation.messages.length }} 条消息</span>
       </div>
       <div class="messages">
-        <article v-for="message in conversation?.messages ?? []" :key="message.messageId" class="customer-message">
-          <div><span>{{ message.customerLabel }}</span><time>{{ formatTime(message.receivedAt) }}</time></div>
+        <article
+          v-for="message in conversation?.messages ?? []"
+          :key="message.messageId"
+          class="customer-message"
+          :class="{ 'operator-message': message.direction === 'OUTBOUND_HISTORY' }"
+          :data-message-direction="message.direction === 'OUTBOUND_HISTORY' ? 'operator' : 'customer'"
+        >
+          <div class="message-meta">
+            <span>{{ message.direction === 'OUTBOUND_HISTORY' ? '客服回复' : message.customerLabel }}</span>
+            <time>{{ formatTime(message.receivedAt) }}</time>
+          </div>
           <p>{{ message.content }}</p>
           <small>{{ sourceLabel(message.source) }}</small>
         </article>
@@ -98,7 +107,7 @@
         <textarea
           :value="draft.editedAnswer"
           :readonly="!canEditText"
-          rows="6"
+          rows="3"
           aria-label="回复草稿"
           :placeholder="draftPlaceholder"
           data-testid="reply-draft-editor"
@@ -123,7 +132,7 @@
           <span class="manual-boundary">不会自动发送，也不会计入 AI 采用数据。</span>
         </template>
         <template v-else>
-          <button type="button" class="accept" :disabled="actionBusy || draft?.state === 'EDITED' || !canSubmitFeedback" data-testid="direct-accept" @click="$emit('accept', 'DIRECT_ACCEPT')">采用回复</button>
+          <button type="button" class="accept" :disabled="actionBusy || draft?.state === 'EDITED' || !canSubmitFeedback" data-testid="direct-accept" @click="$emit('accept', 'DIRECT_ACCEPT')">{{ draft?.decisionId ? '确认并发送到当前 PDD 会话' : '采用回复' }}</button>
           <button v-if="draft?.state !== 'EDITED'" type="button" class="edit-accept" :disabled="actionBusy" data-testid="edit-draft" @click="$emit('startEdit')">修改回复</button>
           <button v-else type="button" class="edit-accept" :disabled="actionBusy || !hasEditedAnswer || !canSubmitFeedback" data-testid="edited-accept" @click="$emit('accept', 'EDITED_ACCEPT')">采用修改</button>
           <button type="button" class="reject" :disabled="actionBusy || !canSubmitFeedback" data-testid="reject-draft" @click="openFeedback('REJECT')">拒绝回复</button>
@@ -131,8 +140,8 @@
         </template>
       </footer>
       <footer v-else-if="draft?.decisionState === 'APPROVED'" class="approved-actions">
-        <span>采用结果已记录。请人工复制到渠道窗口，并再次核对后发送。</span>
-        <button type="button" data-testid="copy-approved-reply" @click="$emit('copy')">复制已确认回复</button>
+        <span>{{ draft.decisionId ? '已由客服人工确认并通过 Channel Agent 发送。' : '采用结果已记录。请人工复制到渠道窗口，并再次核对后发送。' }}</span>
+        <button v-if="!draft.decisionId" type="button" data-testid="copy-approved-reply" @click="$emit('copy')">复制已确认回复</button>
       </footer>
       <footer v-else-if="draft?.decisionState === 'REJECTED'" class="rejected-actions">
         本草稿已拒绝，反馈已沉淀；可等待客户新消息或重新生成。
@@ -161,21 +170,58 @@
     </section>
 
     <section class="evidence-section" data-testid="knowledge-evidence">
-      <div class="evidence-heading">
-        <div><span>商品与知识依据</span><h2>为什么这样回答</h2></div>
-        <strong>{{ draft?.citations.length ?? 0 }} 条依据</strong>
-      </div>
-      <div v-if="draft?.citations.length" class="evidence-grid">
-        <article v-for="(citation, index) in draft.citations" :key="citation.chunkId ?? `${citation.file}-${index}`">
-          <div><span :class="`source-${sourceKind(citation).code}`">{{ sourceKind(citation).label }}</span><small>#{{ index + 1 }}</small></div>
-          <strong>{{ citation.file }}</strong>
-          <p>{{ citation.summary }}</p>
-          <footer><span>{{ citation.productId ? '已匹配当前商品' : '通用知识' }}</span><span>{{ citation.skuId ? '已匹配当前规格' : '适用全部规格' }}</span></footer>
-        </article>
-      </div>
-      <div v-else class="evidence-empty">
-        {{ draft?.replySource === 'MANUAL' ? '本次为人工直接回复，未调用 AI，也没有 AI 知识依据。' : '生成建议后，这里会展示商品知识、FAQ 与安全规则依据。' }}
-      </div>
+      <button
+        type="button"
+        class="evidence-summary"
+        :aria-expanded="evidenceOpen"
+        aria-controls="knowledge-evidence-dialog"
+        data-testid="open-knowledge-evidence"
+        @click="evidenceOpen = true"
+      >
+        <div>
+          <span>商品与知识依据</span>
+          <strong>{{ evidenceSummary }}</strong>
+          <small>{{ draft?.citations.length ? '商品、SKU 与知识范围均需人工核对' : '生成建议后可在这里查看引用详情' }}</small>
+        </div>
+        <div class="evidence-summary-action">
+          <b>{{ draft?.citations.length ?? 0 }}</b>
+          <span>条依据</span>
+          <i>查看详情</i>
+        </div>
+      </button>
+
+      <Teleport to="body">
+        <div
+          v-if="evidenceOpen"
+          id="knowledge-evidence-dialog"
+          class="evidence-dialog-backdrop"
+          role="presentation"
+          data-testid="knowledge-evidence-dialog"
+          @click.self="evidenceOpen = false"
+        >
+          <section class="evidence-dialog" role="dialog" aria-modal="true" aria-labelledby="evidence-dialog-title">
+            <header>
+              <div>
+                <span>AI 回复依据</span>
+                <h2 id="evidence-dialog-title">商品与知识依据</h2>
+                <p>请结合当前商品、SKU 和风险提示核对后再采用回复。</p>
+              </div>
+              <button type="button" aria-label="关闭商品与知识依据" data-testid="close-knowledge-evidence" @click="evidenceOpen = false">×</button>
+            </header>
+            <div v-if="draft?.citations.length" class="evidence-grid">
+              <article v-for="(citation, index) in draft.citations" :key="citation.chunkId ?? `${citation.file}-${index}`">
+                <div><span :class="`source-${sourceKind(citation).code}`">{{ sourceKind(citation).label }}</span><small>#{{ index + 1 }}</small></div>
+                <strong>{{ citation.file }}</strong>
+                <p>{{ citation.summary }}</p>
+                <footer><span>{{ citation.productId ? '已匹配当前商品' : '通用知识' }}</span><span>{{ citation.skuId ? '已匹配当前规格' : '适用全部规格' }}</span></footer>
+              </article>
+            </div>
+            <div v-else class="evidence-empty">
+              {{ draft?.replySource === 'MANUAL' ? '本次为人工直接回复，未调用 AI，也没有 AI 知识依据。' : '当前还没有知识依据；生成建议后可在这里查看。' }}
+            </div>
+          </section>
+        </div>
+      </Teleport>
     </section>
   </main>
 </template>
@@ -232,6 +278,7 @@ const emit = defineEmits<{
 const feedbackMode = ref<'REJECT' | 'ISSUE' | null>(null)
 const feedbackType = ref<AiResponseFeedbackType>('FACT_ERROR')
 const feedbackNote = ref('')
+const evidenceOpen = ref(false)
 
 const draftStateLabels: Record<string, string> = {
   MESSAGE_RECEIVED: '已收到客户消息',
@@ -270,6 +317,12 @@ const draftTone = computed(() => ({
 const draftPlaceholder = computed(() => canComposeManually.value
   ? '可生成 AI 建议；如果商品无法识别，也可在这里直接输入人工回复…'
   : props.draft?.replySource === 'MANUAL' ? '请输入人工回复…' : 'AI 回复建议')
+const evidenceSummary = computed(() => {
+  if (props.draft?.replySource === 'MANUAL') return '人工回复，未调用 AI'
+  const citations = props.draft?.citations ?? []
+  if (!citations.length) return '等待生成知识依据'
+  return `已找到 ${citations.length} 条${sourceKind(citations[0]).label}依据`
+})
 
 const handleDraftInput = (event: Event): void => {
   const value = (event.target as HTMLTextAreaElement).value
@@ -302,6 +355,9 @@ const submitFeedback = (): void => {
 watch(() => props.feedbackReceiptId, (value, previous) => {
   if (value && value !== previous) feedbackMode.value = null
 })
+watch(() => props.draft?.messageId, () => {
+  evidenceOpen.value = false
+})
 
 const sourceLabel = (source: ChannelMessageSource): string => {
   if (source === 'MANUAL') return '人工录入 · 当前页面内存'
@@ -333,7 +389,7 @@ const sourceKind = (citation: RagCitation): { code: string; label: string } => {
 </script>
 
 <style scoped>
-.reply-assistant { min-width: 0; min-height: 0; padding: 18px; overflow: auto; color: var(--workspace-text); background: linear-gradient(145deg, #f8fcf8, #edf7ef); }
+.reply-assistant { min-width: 0; min-height: 0; padding: 14px 16px 18px; overflow: auto; color: var(--workspace-text); background: linear-gradient(145deg, #f8fcf8, #edf7ef); }
 .assistant-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 13px; }
 .assistant-header p, .evidence-heading span { margin: 0 0 5px; color: var(--workspace-accent); font-size: 9px; font-weight: 900; letter-spacing: .14em; }
 .assistant-header h1 { margin: 0; color: var(--workspace-text); font-size: 21px; }
@@ -350,20 +406,23 @@ const sourceKind = (citation: RagCitation): { code: string; label: string } => {
 .context-health > span { color: var(--workspace-accent); }
 .context-health small { color: var(--workspace-muted); font-size: 9px; line-height: 1.4; }
 .context-health.warning > span, .context-health.warning small { color: var(--workspace-warning); }
-.timeline { margin-top: 11px; border: 1px solid var(--workspace-border); border-radius: 12px; background: #fbfefb; }
+.timeline { display: grid; grid-template-rows: auto minmax(0, 1fr); height: clamp(260px, 36vh, 380px); margin-top: 11px; overflow: hidden; border: 1px solid var(--workspace-border); border-radius: 12px; background: #fbfefb; }
 .timeline-heading { display: flex; justify-content: space-between; align-items: center; padding: 11px 13px; border-bottom: 1px solid #253550; }
 .timeline-heading div { display: flex; gap: 8px; align-items: center; }
 .timeline-heading { border-bottom-color: var(--workspace-border); }
 .timeline-heading strong { color: var(--workspace-text); font-size: 11px; }
 .timeline-heading span { color: var(--workspace-muted); font-size: 9px; }
-.messages { display: grid; gap: 8px; max-height: 160px; padding: 12px; overflow: auto; }
-.customer-message { max-width: 78%; padding: 10px 12px; border: 1px solid #d0e3d4; border-radius: 4px 12px 12px; background: #e8f4eb; }
-.customer-message div { display: flex; justify-content: space-between; gap: 12px; }
-.customer-message div span { color: var(--workspace-accent-strong); font-size: 9px; font-weight: 800; }
-.customer-message time, .customer-message small { color: var(--workspace-muted); font-size: 8px; }
-.customer-message p { margin: 7px 0; color: var(--workspace-text); font-size: 11px; line-height: 1.55; }
+.messages { display: grid; align-content: start; gap: 13px; min-height: 0; padding: 16px 18px 20px; overflow: auto; background: linear-gradient(180deg, #fbfefb, #f4faf5); }
+.customer-message { justify-self: start; width: fit-content; min-width: 190px; max-width: min(72%, 680px); padding: 11px 14px; border: 1px solid #c9dfcf; border-radius: 5px 16px 16px; background: #e5f3e8; box-shadow: 0 3px 10px rgb(45 91 57 / 5%); }
+.customer-message.operator-message { justify-self: end; border-color: #bad4e2; border-radius: 16px 5px 16px 16px; background: #e7f2f8; box-shadow: 0 3px 10px rgb(42 78 104 / 6%); }
+.message-meta { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
+.message-meta span { color: var(--workspace-accent-strong); font-size: 10px; font-weight: 900; }
+.operator-message .message-meta span { color: #356b87; }
+.customer-message time { color: var(--workspace-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.customer-message > small { display: block; margin-top: 7px; color: #8c968f; font-size: 8px; }
+.customer-message p { margin: 8px 0 0; color: #27342c; font-size: 13px; line-height: 1.7; letter-spacing: .01em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .timeline-empty { padding: 15px; color: var(--workspace-muted); font-size: 10px; text-align: center; }
-.draft-card { margin-top: 11px; padding: 14px; border: 1px solid var(--workspace-border-strong); border-radius: 13px; background: #fff; box-shadow: 0 8px 24px rgb(47 100 60 / 8%); transition: border-color 160ms ease, box-shadow 160ms ease; }
+.draft-card { margin-top: 11px; padding: 11px 13px; border: 1px solid var(--workspace-border-strong); border-radius: 13px; background: #fff; box-shadow: 0 8px 24px rgb(47 100 60 / 8%); transition: border-color 160ms ease, box-shadow 160ms ease; }
 .draft-card.ready { border-color: var(--workspace-accent); box-shadow: 0 0 0 1px rgb(47 125 87 / 8%), 0 16px 34px rgb(47 100 60 / 10%); }
 .draft-card.accepted { border-color: #5a9b76; }
 .draft-card.expired { border-color: #d9aeb2; }
@@ -378,31 +437,45 @@ const sourceKind = (citation: RagCitation): { code: string; label: string } => {
 button:disabled { opacity: .4; cursor: not-allowed; }
 .generating-state { display: flex; gap: 10px; align-items: center; min-height: 110px; justify-content: center; color: var(--workspace-text-soft); font-size: 11px; }
 .generating-state i { width: 13px; height: 13px; border: 2px solid #b8d1bf; border-top-color: var(--workspace-accent); border-radius: 50%; animation: spin .8s linear infinite; }
-.draft-body { margin-top: 12px; }
-.draft-body textarea { box-sizing: border-box; width: 100%; min-height: 128px; resize: vertical; padding: 13px; border: 1px solid #b7d1bd; border-radius: 10px; outline: none; color: var(--workspace-text); background: #fafffb; font-size: 12px; line-height: 1.65; }
+.draft-body { margin-top: 8px; }
+.draft-body textarea { box-sizing: border-box; width: 100%; min-height: 68px; max-height: 110px; resize: vertical; padding: 10px 12px; border: 1px solid #b7d1bd; border-radius: 9px; outline: none; color: var(--workspace-text); background: #fafffb; font-size: 12px; line-height: 1.55; }
 .draft-body textarea:focus { border-color: var(--workspace-accent); box-shadow: 0 0 0 3px rgb(47 125 87 / 11%); }
 .draft-body textarea:read-only { color: var(--workspace-text-soft); background: #f2f7f3; }
 .edited-note, .manual-note, .manual-hint, .warning-note, .action-error { margin: 7px 0 0; font-size: 9px; line-height: 1.5; }
 .edited-note { color: var(--workspace-warning); }.manual-note { color: #6e551b; }.manual-hint { color: var(--workspace-accent-strong); }.warning-note, .action-error { color: var(--workspace-danger); }
-.draft-empty { display: grid; min-height: 100px; place-content: center; text-align: center; }
+.draft-empty { display: grid; min-height: 58px; place-content: center; text-align: center; }
 .draft-empty strong { color: var(--workspace-text-soft); font-size: 12px; }.draft-empty p { margin: 7px 0 0; color: var(--workspace-muted); font-size: 9px; }
-.review-actions { display: flex; gap: 8px; align-items: center; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--workspace-border); }
+.review-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--workspace-border); }
 .review-actions .accept { background: var(--workspace-accent); }.review-actions .edit-accept { background: #a77521; }.review-actions .reject { margin-left: auto; background: #a94c56; }.review-actions .flag { background: #4f7d91; }.manual-boundary { color: var(--workspace-muted); font-size: 9px; }
 .approved-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--workspace-border); color: var(--workspace-accent-strong); font-size: 9px; }
 .approved-actions button { background: var(--workspace-accent); }.rejected-actions { margin-top: 11px; color: var(--workspace-danger); font-size: 9px; }
 .feedback-form { display: grid; gap: 7px; margin-top: 11px; padding: 11px; border: 1px solid #e3c37b; border-radius: 10px; background: #fff8e8; }.feedback-form > div { display: flex; align-items: center; justify-content: space-between; }.feedback-form strong { color: #8d6219; font-size: 11px; }.feedback-form > div button { border: 0; color: #8c7955; background: transparent; cursor: pointer; }.feedback-form label { color: #806f50; font-size: 9px; }.feedback-form select, .feedback-form textarea { padding: 7px; border: 1px solid #d9bd80; border-radius: 7px; color: #4d4029; background: #fff; font-size: 9px; }.feedback-form > button { padding: 8px; border: 0; border-radius: 7px; color: #fff; background: #a77521; font-size: 9px; font-weight: 800; cursor: pointer; }.feedback-form > button:disabled { opacity: .45; }.feedback-receipt { margin: 9px 0 0; color: var(--workspace-accent); font-size: 9px; }
-.evidence-section { margin-top: 11px; padding: 13px; border: 1px solid var(--workspace-border); border-radius: 12px; background: #fbfefb; }
-.evidence-heading { display: flex; justify-content: space-between; align-items: end; }
-.evidence-heading h2 { margin: 0; color: var(--workspace-text); font-size: 14px; }.evidence-heading strong { color: var(--workspace-muted); font-size: 10px; }
-.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.evidence-grid article { min-width: 0; padding: 11px; border: 1px solid var(--workspace-border); border-radius: 9px; background: #f2f8f3; }
+.evidence-section { margin-top: 11px; border: 1px solid var(--workspace-border); border-radius: 12px; overflow: hidden; background: #fbfefb; }
+.evidence-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 11px 13px; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.evidence-summary:hover { background: #f1f8f3; }
+.evidence-summary > div:first-child { min-width: 0; }
+.evidence-summary > div:first-child > span { display: block; margin-bottom: 3px; color: var(--workspace-accent); font-size: 8px; font-weight: 900; letter-spacing: .12em; }
+.evidence-summary > div:first-child > strong { display: inline; color: var(--workspace-text); font-size: 11px; }
+.evidence-summary > div:first-child > small { margin-left: 9px; color: var(--workspace-muted); font-size: 9px; }
+.evidence-summary-action { display: flex; flex: 0 0 auto; align-items: baseline; gap: 4px; color: var(--workspace-muted); font-size: 9px; }
+.evidence-summary-action b { color: var(--workspace-accent-strong); font-size: 15px; }
+.evidence-summary-action i { margin-left: 8px; padding: 5px 8px; border-radius: 7px; color: var(--workspace-accent-strong); background: var(--workspace-accent-soft); font-style: normal; font-weight: 800; }
+.evidence-dialog-backdrop { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 28px; background: rgb(24 43 31 / 46%); backdrop-filter: blur(3px); }
+.evidence-dialog { width: min(760px, 92vw); max-height: min(680px, 86vh); overflow: auto; padding: 20px; border: 1px solid #c6dacb; border-radius: 16px; background: #fbfefb; box-shadow: 0 30px 90px rgb(21 53 31 / 28%); }
+.evidence-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--workspace-border); }
+.evidence-dialog > header span { color: var(--workspace-accent); font-size: 9px; font-weight: 900; letter-spacing: .14em; }
+.evidence-dialog > header h2 { margin: 5px 0 0; color: var(--workspace-text); font-size: 19px; }
+.evidence-dialog > header p { margin: 7px 0 0; color: var(--workspace-muted); font-size: 10px; }
+.evidence-dialog > header button { width: 32px; height: 32px; border: 1px solid var(--workspace-border); border-radius: 9px; color: var(--workspace-text-soft); background: #fff; font-size: 20px; cursor: pointer; }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.evidence-grid article { min-width: 0; padding: 13px; border: 1px solid var(--workspace-border); border-radius: 10px; background: #f2f8f3; }
 .evidence-grid article > div, .evidence-grid footer { display: flex; justify-content: space-between; gap: 8px; }
 .evidence-grid article > div span { padding: 3px 6px; border-radius: 999px; font-size: 8px; font-weight: 900; }
 .source-product { color: #2f6079; background: #dff0f5; }.source-faq { color: #286a4c; background: #dcefe1; }.source-rule { color: #86601b; background: #fff0c9; }
 .evidence-grid small, .evidence-grid footer { color: var(--workspace-muted); font-size: 8px; }
 .evidence-grid article > strong { display: block; margin-top: 8px; overflow: hidden; color: var(--workspace-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .evidence-grid p { margin: 6px 0 9px; color: var(--workspace-text-soft); font-size: 9px; line-height: 1.5; }
-.evidence-empty { padding: 18px; color: var(--workspace-muted); font-size: 10px; text-align: center; }
+.evidence-empty { padding: 28px 18px; color: var(--workspace-muted); font-size: 10px; text-align: center; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1120px) { .context-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }.evidence-grid { grid-template-columns: 1fr; } }
 </style>

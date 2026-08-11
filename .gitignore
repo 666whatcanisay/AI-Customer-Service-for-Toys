@@ -22,11 +22,14 @@ htmlcov/
 # Node
 node_modules/
 dist/
+dist-agent/
 .vite/
 coverage/
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+frontend/pnpm-lock.yaml
+frontend/pnpm-workspace.yaml
 
 # Private data and databases
 backend/vector_db/*

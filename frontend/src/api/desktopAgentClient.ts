@@ -16,7 +16,13 @@ const responseCode = (value: unknown): string | null => {
   return typeof code === 'string' ? code : null
 }
 
-const mapError = (error: unknown): DesktopAgentClientError => {
+const responseRequestId = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object') return null
+  const requestId = (value as Record<string, unknown>).request_id
+  return typeof requestId === 'string' && requestId.trim() ? requestId : null
+}
+
+export const mapDesktopAgentError = (error: unknown): DesktopAgentClientError => {
   if (error instanceof DesktopAgentClientError) return error
   if (error instanceof DesktopAgentAdapterError) {
     return new DesktopAgentClientError('contract', error.message)
@@ -25,8 +31,9 @@ const mapError = (error: unknown): DesktopAgentClientError => {
   if (axios.isAxiosError(error)) {
     const status = error.response?.status ?? null
     const code = responseCode(error.response?.data)
+    const requestId = responseRequestId(error.response?.data)
     if (error.code === 'ECONNABORTED') {
-      return new DesktopAgentClientError('timeout', '客服设备状态检查超时。', status)
+      return new DesktopAgentClientError('timeout', '客服设备状态检查超时。', status, code, requestId)
     }
     const mapped: Record<string, [DesktopAgentClientError['kind'], string]> = {
       CHANNEL_AGENT_INTEGRATION_NOT_CONFIGURED: ['not_configured', '客服设备接入尚未配置，请联系管理员。'],
@@ -36,13 +43,16 @@ const mapError = (error: unknown): DesktopAgentClientError => {
       CHANNEL_AGENT_RESPONSE_INVALID: ['contract', 'Agent 状态响应版本不兼容，请联系管理员。'],
       CHANNEL_AGENT_REQUEST_REJECTED: ['rejected', 'Agent 服务器拒绝了本次设备操作。'],
       CHANNEL_AGENT_NOT_REGISTERED: ['rejected', '未找到对应的 Agent 与设备，请先启动并注册客户端。'],
-      CHANNEL_AGENT_BINDING_INVALID: ['rejected', '该 Agent 已绑定或不可用于本次绑定。']
+      CHANNEL_AGENT_BINDING_INVALID: ['rejected', '该 Agent 已绑定或不可用于本次绑定。'],
+      PLATFORM_STORE_BINDING_NOT_VERIFIED: ['rejected', 'PDD店铺号尚未与当前授权店铺建立有效绑定。']
     }
-    if (code && mapped[code]) return new DesktopAgentClientError(mapped[code][0], mapped[code][1], status)
+    if (code && mapped[code]) {
+      return new DesktopAgentClientError(mapped[code][0], mapped[code][1], status, code, requestId)
+    }
     if (error.code === 'ERR_NETWORK' || status === 500 || status === 502 || status === 503) {
-      return new DesktopAgentClientError('server_unreachable', 'Agent 状态服务暂时不可用。', status)
+      return new DesktopAgentClientError('server_unreachable', 'Agent 状态服务暂时不可用。', status, code, requestId)
     }
-    return new DesktopAgentClientError('unknown', '客服设备操作失败。', status)
+    return new DesktopAgentClientError('unknown', '客服设备操作失败。', status, code, requestId)
   }
   return new DesktopAgentClientError('unknown', error instanceof Error ? error.message : '客服设备操作失败。')
 }
@@ -55,7 +65,7 @@ export const desktopAgentClient = {
       })
       return adaptDesktopAgentStatus(response.data)
     } catch (error) {
-      throw mapError(error)
+      throw mapDesktopAgentError(error)
     }
   },
 
@@ -71,7 +81,48 @@ export const desktopAgentClient = {
       }, { signal })
       return adaptDesktopBindingGrant(response.data)
     } catch (error) {
-      throw mapError(error)
+      throw mapDesktopAgentError(error)
+    }
+  },
+
+  async activateBinding(
+    request: { agentId: string; deviceId: string; storeId: number },
+    signal?: AbortSignal
+  ): Promise<DesktopAgentStatus> {
+    try {
+      const response = await http.post('/api/v1/workspace/desktop-agent/activate', {
+        agent_id: request.agentId,
+        device_id: request.deviceId,
+        store_id: request.storeId
+      }, { signal })
+      return adaptDesktopAgentStatus(response.data)
+    } catch (error) {
+      throw mapDesktopAgentError(error)
+    }
+  },
+
+  async selectActiveStore(
+    request: {
+      agentId: string
+      deviceId: string
+      storeId: number
+      platform: string
+      observedPlatformStoreId: string
+    },
+    signal?: AbortSignal
+  ): Promise<DesktopAgentStatus> {
+    try {
+      const response = await http.post('/api/v1/workspace/desktop-agent/active-store', {
+        agent_id: request.agentId,
+        device_id: request.deviceId,
+        store_id: request.storeId,
+        platform: request.platform,
+        observed_platform_store_id: request.observedPlatformStoreId,
+        human_confirmed: true
+      }, { signal })
+      return adaptDesktopAgentStatus(response.data)
+    } catch (error) {
+      throw mapDesktopAgentError(error)
     }
   }
 }

@@ -129,6 +129,14 @@ describe('HumanInLoopWorkspace', () => {
     expect((wrapper.get('[data-testid="reply-draft-editor"]').element as HTMLTextAreaElement).value)
       .toBe('您好，这款积木建议 5 岁以上使用。')
     expect(wrapper.get('[data-testid="knowledge-evidence"]').text()).toContain('商品知识')
+    await wrapper.get('[data-testid="open-knowledge-evidence"]').trigger('click')
+    await flushPromises()
+    const evidenceDialog = document.body.querySelector('[data-testid="knowledge-evidence-dialog"]')
+    expect(evidenceDialog?.textContent).toContain('商品与知识依据')
+    expect(evidenceDialog?.textContent).toContain('建议年龄 5 岁以上')
+    ;(document.body.querySelector('[data-testid="close-knowledge-evidence"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.body.querySelector('[data-testid="knowledge-evidence-dialog"]')).toBeNull()
 
     await wrapper.get('[data-testid="edit-draft"]').trigger('click')
     await wrapper.get('[data-testid="reply-draft-editor"]').setValue('您好，这款积木建议 5 岁以上使用，并请家长陪同。')
@@ -143,7 +151,7 @@ describe('HumanInLoopWorkspace', () => {
     expect(wrapper.get('[data-testid="interaction-receipt"]').text()).toContain('采用结果已记录')
     expect(wrapper.get('[data-testid="interaction-receipt"]').text()).not.toContain('AIE-001')
     expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('已采用')
-    expect(wrapper.text()).toContain('系统不自动发送')
+    expect(wrapper.text()).toContain('系统不会自动发送')
   })
 
   it('expires the visible draft when a new manual message arrives', async () => {

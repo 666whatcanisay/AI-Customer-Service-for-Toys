@@ -1,6 +1,47 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { InMemoryChannelMessageAdapter } from './channelMessageAdapter'
+import { HttpChannelAgentMessageAdapter, InMemoryChannelMessageAdapter } from './channelMessageAdapter'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+const safeChannelAgentFeed = () => ({
+  schemaVersion: 'channel-agent-workspace-feed.v1',
+  conversations: [],
+  reply: null,
+  safety: {
+    readOnly: true,
+    autoReply: false,
+    realSend: false,
+    browserWriteOperations: 0,
+    executionCount: 0,
+    receiptCount: 0,
+    sendCount: 0
+  }
+})
+
+describe('HttpChannelAgentMessageAdapter', () => {
+  it('accepts the canonical safe empty feed used before the first real message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => safeChannelAgentFeed()
+    }))
+    await expect(new HttpChannelAgentMessageAdapter().listConversations()).resolves.toEqual([])
+  })
+
+  it('fails closed if any automatic-send safety fact becomes unsafe', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...safeChannelAgentFeed(),
+        safety: { ...safeChannelAgentFeed().safety, autoReply: true }
+      })
+    }))
+    await expect(new HttpChannelAgentMessageAdapter().listConversations())
+      .rejects.toThrow('Channel Agent 会话安全校验失败')
+  })
+})
 
 describe('InMemoryChannelMessageAdapter', () => {
   it('starts empty and does not invent a real channel conversation', async () => {

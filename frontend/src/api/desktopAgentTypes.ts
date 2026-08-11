@@ -7,7 +7,7 @@ export type DesktopAssociationState =
   | 'DISABLED'
 
 export type DesktopAgentOnlineStatus = 'ONLINE' | 'DEGRADED' | 'OFFLINE'
-export type DesktopAgentIdentityStatus = 'UNBOUND' | 'BOUND' | 'ACTIVE' | 'DISABLED'
+export type DesktopAgentIdentityStatus = 'REGISTERED' | 'BOUND' | 'ACTIVE' | 'DISABLED'
 
 export interface DesktopAgentProjection {
   agentId: string
@@ -54,7 +54,9 @@ export class DesktopAgentClientError extends Error {
   constructor(
     public readonly kind: DesktopAgentErrorKind,
     message: string,
-    public readonly status: number | null = null
+    public readonly status: number | null = null,
+    public readonly code: string | null = null,
+    public readonly requestId: string | null = null
   ) {
     super(message)
     this.name = 'DesktopAgentClientError'

@@ -5,7 +5,7 @@ const path = require('node:path')
 const { chromium } = require('playwright')
 
 const TARGET = {
-  storeName: process.env.R003_STORE_NAME || '玩趣乐园积木店',
+  storeName: process.env.R003_STORE_NAME || '玩具乐园积木店',
   storeCode: process.env.R003_STORE_CODE || 'c-store-6639df2982014226',
   productId:
     process.env.R003_PRODUCT_ID || 'C-PRODUCT-747f463efb104440a6bdda416cd072eb',

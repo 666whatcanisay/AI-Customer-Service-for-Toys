@@ -4,6 +4,57 @@ import { DesktopAgentAdapterError, adaptDesktopAgentStatus, adaptDesktopBindingG
 
 
 describe('desktopAgentAdapter', () => {
+  it('accepts the authoritative Host Control V2.1 REGISTERED and OFFLINE projection', () => {
+    const status = adaptDesktopAgentStatus({
+      schema_version: 'ai-cs.customer-desktop-workflow.v1',
+      user_id: 'user-001',
+      store_id: 1,
+      store_code: 'STORE-A',
+      association_state: 'BINDING_REQUIRED',
+      agent: {
+        agent_id: 'agent-001',
+        device_id: 'device-001',
+        device_name: '客服电脑',
+        agent_version: '2.0.0rc1',
+        identity_status: 'REGISTERED',
+        online_status: 'OFFLINE',
+        runtime_status: 'OFFLINE',
+        production_eligible: false,
+        binding_revision: 0,
+        last_heartbeat: null
+      },
+      checked_at: '2026-08-08T17:50:00+08:00'
+    })
+
+    expect(status.agent?.identityStatus).toBe('REGISTERED')
+    expect(status.agent?.onlineStatus).toBe('OFFLINE')
+  })
+
+  it('normalizes the legacy UNBOUND input to REGISTERED', () => {
+    const status = adaptDesktopAgentStatus({
+      schema_version: 'ai-cs.customer-desktop-workflow.v1',
+      user_id: 'user-001',
+      store_id: 1,
+      store_code: 'STORE-A',
+      association_state: 'BINDING_REQUIRED',
+      agent: {
+        agent_id: 'agent-001',
+        device_id: 'device-001',
+        device_name: null,
+        agent_version: null,
+        identity_status: 'UNBOUND',
+        online_status: 'OFFLINE',
+        runtime_status: 'OFFLINE',
+        production_eligible: false,
+        binding_revision: 0,
+        last_heartbeat: null
+      },
+      checked_at: '2026-08-08T17:50:00+08:00'
+    })
+
+    expect(status.agent?.identityStatus).toBe('REGISTERED')
+  })
+
   it('adapts a strict current-user and Store Agent projection', () => {
     expect(adaptDesktopAgentStatus({
       schema_version: 'ai-cs.customer-desktop-workflow.v1',

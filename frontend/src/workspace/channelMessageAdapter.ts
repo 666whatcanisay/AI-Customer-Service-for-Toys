@@ -7,6 +7,7 @@ export interface ChannelMessageEnvelope {
   content: string
   receivedAt: string
   source: ChannelMessageSource
+  senderRole?: 'CUSTOMER' | 'AGENT'
 }
 
 export interface ChannelConversationSeed {
@@ -17,10 +18,116 @@ export interface ChannelConversationSeed {
   messages: ChannelMessageEnvelope[]
 }
 
+export interface ChannelAgentReplySeed {
+  conversationId: string
+  messageId: string
+  decisionId: string
+  answer: string
+  requestId: string | null
+  action: 'DIRECT_ANSWER' | 'CONTROLLED_ANSWER' | 'ASK_CLARIFY' | 'REQUIRE_LOOKUP' | 'TRANSFER_HUMAN' | 'REFUSE'
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH'
+  citations: Array<{
+    file: string
+    page: number | null
+    chunkId: string | null
+    summary: string
+    distance: number | null
+    knowledgeVersion: string | null
+    sourceIds: string[]
+    productId: string | null
+    skuId: string | null
+  }>
+  warnings: string[]
+  requiredFields: string[]
+  product: {
+    productReference: string
+    productName: string
+    applicableAge: string
+  } | null
+}
+
 export interface ChannelMessageAdapter {
   listConversations(): Promise<ChannelConversationSeed[]>
+  latestReply(): Promise<ChannelAgentReplySeed | null>
   createManualConversation(customerLabel: string, content: string): Promise<ChannelConversationSeed>
   receiveManualMessage(conversationId: string, content: string): Promise<ChannelMessageEnvelope>
+}
+
+type ChannelAgentFeed = {
+  schemaVersion: 'channel-agent-workspace-feed.v1'
+  conversations: ChannelConversationSeed[]
+  reply: Omit<ChannelAgentReplySeed, 'product'> | null
+  productContext?: {
+    productReference?: string
+    productName?: string
+    applicableAge?: string
+  }
+  safety: {
+    readOnly: true
+    autoReply: false
+    realSend: false
+    browserWriteOperations: 0
+    executionCount: 0
+    receiptCount: 0
+    sendCount: 0
+  }
+}
+
+const CHANNEL_AGENT_FEED_URL = '/channel-agent-api/assistant-feed.json'
+
+const isChannelAgentFeed = (value: unknown): value is ChannelAgentFeed => {
+  if (!value || typeof value !== 'object') return false
+  const feed = value as Partial<ChannelAgentFeed>
+  return feed.schemaVersion === 'channel-agent-workspace-feed.v1'
+    && Array.isArray(feed.conversations)
+    && feed.safety?.readOnly === true
+    && feed.safety.autoReply === false
+    && feed.safety.realSend === false
+    && feed.safety.browserWriteOperations === 0
+    && feed.safety.executionCount === 0
+    && feed.safety.receiptCount === 0
+    && feed.safety.sendCount === 0
+}
+
+export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
+  private feed: ChannelAgentFeed | null = null
+
+  async listConversations(): Promise<ChannelConversationSeed[]> {
+    const response = await fetch(CHANNEL_AGENT_FEED_URL, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    })
+    if (!response.ok) throw new Error('Channel Agent 真实会话暂时不可用')
+    const payload: unknown = await response.json()
+    if (!isChannelAgentFeed(payload)) throw new Error('Channel Agent 会话安全校验失败')
+    this.feed = payload
+    return structuredClone(payload.conversations)
+  }
+
+  async latestReply(): Promise<ChannelAgentReplySeed | null> {
+    if (!this.feed?.reply?.answer) return null
+    const product = this.feed.productContext
+    return structuredClone({
+      ...this.feed.reply,
+      product: product?.productReference && product.productName && product.applicableAge
+        ? {
+            productReference: product.productReference,
+            productName: product.productName,
+            applicableAge: product.applicableAge
+          }
+        : null
+    })
+  }
+
+  async createManualConversation(): Promise<ChannelConversationSeed> {
+    throw new Error('真实 Channel Agent 模式不使用手工模拟客户')
+  }
+
+  async receiveManualMessage(): Promise<ChannelMessageEnvelope> {
+    throw new Error('真实 Channel Agent 模式不使用手工模拟客户')
+  }
 }
 
 const createId = (prefix: string): string => {
@@ -98,6 +205,10 @@ export class InMemoryChannelMessageAdapter implements ChannelMessageAdapter {
     return structuredClone(this.conversations)
   }
 
+  async latestReply(): Promise<ChannelAgentReplySeed | null> {
+    return null
+  }
+
   async createManualConversation(
     customerLabel: string,
     content: string
@@ -153,4 +264,6 @@ export class InMemoryChannelMessageAdapter implements ChannelMessageAdapter {
 }
 
 export const createWorkspaceMessageAdapter = (): ChannelMessageAdapter =>
-  new InMemoryChannelMessageAdapter(import.meta.env.MODE === 'test' ? VALIDATION_CONVERSATIONS : [])
+  import.meta.env.MODE === 'test'
+    ? new InMemoryChannelMessageAdapter(VALIDATION_CONVERSATIONS)
+    : new HttpChannelAgentMessageAdapter()

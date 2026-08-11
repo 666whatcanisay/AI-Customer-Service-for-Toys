@@ -43,6 +43,12 @@
       <small>可在客服反馈记录中查看。</small>
     </section>
 
+    <section v-if="executionReceiptId" class="receipt-card" data-testid="execution-receipt">
+      <span>执行回执</span>
+      <strong>已确认发送到当前 PDD 会话</strong>
+      <small>回执 {{ executionReceiptId }}</small>
+    </section>
+
     <section v-if="feedbackReceiptId" class="receipt-card issue-receipt" data-testid="decision-feedback-receipt">
       <span>问题反馈回执</span>
       <strong>问题反馈已记录</strong>
@@ -70,7 +76,7 @@
       <ul>
         <li>AI 只生成建议</li>
         <li>客服必须人工确认</li>
-        <li>系统不自动发送</li>
+        <li>仅在客服点击“确认发送”后执行单条回复</li>
         <li>不退款、不修改订单</li>
       </ul>
     </section>
@@ -87,6 +93,7 @@ const props = defineProps<{
   draft: ReplyDraft | null
   conversation: WorkspaceConversation | null
   receiptId: string
+  executionReceiptId: string
   feedbackReceiptId: string
 }>()
 
@@ -104,7 +111,7 @@ const conversationNextStep = computed(() => {
   if (!props.conversation) return '从左侧选择会话。'
   if (props.conversation.status === 'NEW') return '打开会话开始处理。'
   if (props.conversation.status === 'PROCESSING') return '生成并人工审核回复。'
-  if (props.conversation.status === 'WAITING_REPLY') return '等待客服在渠道窗口人工发送。'
+  if (props.conversation.status === 'WAITING_REPLY') return '等待客服确认并发送。'
   return '会话已由客服显式完成。'
 })
 
@@ -122,8 +129,8 @@ const decisionTone = computed(() => ({
 const nextStep = computed(() => {
   if (!props.draft) return '选择一条会话开始处理。'
   if (props.draft.decisionState === 'APPROVED') return isManualReply.value
-    ? '请复制到渠道窗口，再次核对后发送。'
-    : '已记录采用；请人工复制到渠道发送。'
+    ? '请核对目标会话后完成发送。'
+    : props.executionReceiptId ? '已发送并生成不可变回执。' : '请核对目标会话后确认发送。'
   if (props.draft.decisionState === 'REJECTED') return '已记录拒绝；问题进入反馈闭环。'
   if (props.draft.state === 'MESSAGE_RECEIVED') return '可生成 AI 建议，也可直接输入人工回复。'
   if (['UNDERSTANDING', 'GENERATING'].includes(props.draft.state)) return 'AI 正在处理，请等待。'

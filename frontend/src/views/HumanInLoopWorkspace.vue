@@ -60,6 +60,7 @@
       :draft="activeDraft"
       :conversation="activeConversation"
       :receipt-id="interactionReceiptId"
+      :execution-receipt-id="executionReceiptId"
       :feedback-receipt-id="feedbackReceiptId"
       @complete="completeConversation"
       @reopen="reopenConversation"
@@ -75,6 +76,7 @@ import { storeToRefs } from 'pinia'
 
 import { aiInteractionEventClient, createAiInteractionEventIdempotencyKey } from '@/api/aiInteractionEventClient'
 import { aiResponseFeedbackClient, createAiResponseFeedbackIdempotencyKey } from '@/api/aiResponseFeedbackClient'
+import { channelAgentSendClient } from '@/api/channelAgentSendClient'
 import type { AiResponseFeedbackType } from '@/api/aiResponseFeedbackTypes'
 import { ragClient } from '@/api/ragClient'
 import type { AdoptionType } from '@/api/ragTypes'
@@ -115,6 +117,7 @@ const generationBusy = ref(false)
 const actionBusy = ref(false)
 const actionError = ref('')
 const interactionReceiptId = ref('')
+const executionReceiptId = ref('')
 const feedbackBusy = ref(false)
 const feedbackReceiptId = ref('')
 const interactionKeys = new Map<string, string>()
@@ -127,6 +130,7 @@ const desktopBindingBusy = ref(false)
 const desktopBindingGrant = ref<DesktopBindingGrant | null>(null)
 let desktopStatusTimer: ReturnType<typeof setInterval> | null = null
 let desktopBindingGrantTimer: ReturnType<typeof setTimeout> | null = null
+let channelFeedTimer: ReturnType<typeof setInterval> | null = null
 let desktopStatusRequestSequence = 0
 
 const selectedStore = computed(() => stores.value.find((item) => item.storeId === selectedStoreId.value) ?? null)
@@ -226,6 +230,7 @@ const invalidateDraftForContextChange = (): void => {
   if (activeDraft.value && activeDraft.value.state !== 'MESSAGE_RECEIVED') {
     workspace.restartDraft()
     interactionReceiptId.value = ''
+    executionReceiptId.value = ''
     actionError.value = ''
   }
 }
@@ -266,6 +271,7 @@ const selectSku = (skuId: string): void => {
 const selectConversation = (conversationId: string): void => {
   workspace.selectConversation(conversationId)
   interactionReceiptId.value = ''
+  executionReceiptId.value = ''
   feedbackReceiptId.value = ''
   actionError.value = ''
   resetResolution()
@@ -297,6 +303,7 @@ const receiveManualMessage = async (payload: {
       workspace.addConversation(conversation)
     }
     interactionReceiptId.value = ''
+    executionReceiptId.value = ''
     feedbackReceiptId.value = ''
     actionError.value = ''
     resetResolution()
@@ -371,6 +378,7 @@ const generateDraft = async (): Promise<void> => {
   generationBusy.value = true
   actionError.value = ''
   interactionReceiptId.value = ''
+  executionReceiptId.value = ''
   try {
     const resolved = await resolveConversation()
     if (!resolved) return
@@ -493,6 +501,7 @@ const acceptDraft = async (type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT' | 'MANUAL_ACC
     workspace.acceptDraft()
     actionError.value = ''
     interactionReceiptId.value = ''
+    executionReceiptId.value = ''
     ElMessage.success('人工回复已确认；请复制到渠道窗口核对后发送')
     return
   }
@@ -503,6 +512,32 @@ const acceptDraft = async (type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT' | 'MANUAL_ACC
   actionBusy.value = true; actionError.value = ''
   try {
     interactionReceiptId.value = await recordInteraction(type)
+    const draft = activeDraft.value
+    const operatorReference = auth.user.value?.id
+    if (type === 'DIRECT_ACCEPT' && draft?.decisionId && operatorReference) {
+      const send = await channelAgentSendClient.approveAndSend({
+        contractVersion: '1.0',
+        decisionId: draft.decisionId,
+        conversationId: draft.conversationId,
+        customerMessageId: draft.messageId,
+        replyText: draft.originalAnswer,
+        operatorReference,
+        confirmationPhrase: `CONFIRM SEND ${draft.decisionId}`,
+        idempotencyKey: `pdd-controlled-send:${draft.decisionId}`,
+        confirmedAt: new Date().toISOString()
+      })
+      executionReceiptId.value = send.receipt_id
+      if (send.outcome === 'UNKNOWN') {
+        throw new Error('发送结果未知，系统已停止且不会重试；请立即检查当前 PDD 会话。')
+      }
+      if (send.outcome !== 'SUCCESS' || !send.customer_message_sent) {
+        throw new Error('PDD 未确认发送成功，系统已停止；请核对当前客服窗口。')
+      }
+      workspace.acceptDraft()
+      workspace.completeConversation()
+      ElMessage.success('回复已发送到当前 PDD 会话，并已生成执行回执')
+      return
+    }
     workspace.acceptDraft()
     ElMessage.success('采用结果已记录；请人工复制并发送')
   } catch (error) { actionError.value = error instanceof Error ? error.message : '采用结果保存失败。' }
@@ -587,6 +622,7 @@ const reopenConversation = (): void => {
   try {
     workspace.reopenConversation()
     interactionReceiptId.value = ''
+    executionReceiptId.value = ''
     feedbackReceiptId.value = ''
     actionError.value = ''
   } catch (error) {
@@ -594,18 +630,87 @@ const reopenConversation = (): void => {
   }
 }
 
+const syncChannelAgentFeed = async (): Promise<void> => {
+  try {
+    const liveConversations = await channelAdapter.listConversations()
+    if (conversations.value.length === 0) {
+      workspace.installConversations(liveConversations)
+    } else {
+      for (const seed of liveConversations) {
+        const existing = conversations.value.find(
+          (item) => item.conversationId === seed.conversationId
+        )
+        if (!existing) {
+          workspace.addConversation(seed)
+          continue
+        }
+        const known = new Set(existing.messages.map((message) => message.messageId))
+        for (const message of seed.messages) {
+          if (!known.has(message.messageId)) workspace.receiveMessage(message)
+        }
+      }
+    }
+
+    const liveReply = await channelAdapter.latestReply()
+    if (
+      liveReply
+      && activeDraft.value?.messageId === liveReply.messageId
+      && activeDraft.value.state === 'MESSAGE_RECEIVED'
+    ) {
+      if (liveReply.product) {
+        products.value = [{
+          productId: liveReply.product.productReference,
+          displayName: `${liveReply.product.productName}（适用年龄：${liveReply.product.applicableAge}）`
+        }]
+        selectedProductId.value = liveReply.product.productReference
+        contextWarning.value = '商品事实来自当前真实 PDD 会话与人工确认；店铺映射本轮不作为阻塞条件。'
+      }
+      workspace.beginUnderstanding()
+      await nextTick()
+      workspace.beginGenerating()
+      workspace.setDraftReady({
+        answer: liveReply.answer,
+        requestId: liveReply.requestId,
+        decisionId: liveReply.decisionId,
+        action: liveReply.action,
+        riskLevel: liveReply.riskLevel,
+        citations: liveReply.citations,
+        warnings: liveReply.warnings,
+        requiredFields: liveReply.requiredFields
+      })
+      workspace.beginHumanReview()
+    }
+    if (actionError.value.startsWith('Channel Agent ')) actionError.value = ''
+  } catch (error) {
+    actionError.value = error instanceof Error
+      ? error.message
+      : 'Channel Agent 真实会话加载失败。'
+  }
+}
+
+const handleChannelAgentAssistantEvent = (): void => {
+  void syncChannelAgentFeed()
+}
+
 onMounted(async () => {
-  workspace.installConversations(await channelAdapter.listConversations())
+  window.addEventListener('channel-agent:assistant-event', handleChannelAgentAssistantEvent)
   await loadWorkspaceContext()
+  await syncChannelAgentFeed()
+  channelFeedTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') void syncChannelAgentFeed()
+  }, 1_500)
   desktopStatusTimer = setInterval(() => {
     if (document.visibilityState === 'visible') void loadDesktopAgentStatus()
   }, 30_000)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('channel-agent:assistant-event', handleChannelAgentAssistantEvent)
   desktopStatusRequestSequence += 1
   if (desktopStatusTimer) clearInterval(desktopStatusTimer)
   desktopStatusTimer = null
+  if (channelFeedTimer) clearInterval(channelFeedTimer)
+  channelFeedTimer = null
   if (desktopBindingGrantTimer) clearTimeout(desktopBindingGrantTimer)
   desktopBindingGrantTimer = null
   desktopBindingGrant.value = null

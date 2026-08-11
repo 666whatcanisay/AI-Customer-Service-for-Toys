@@ -1,7 +1,19 @@
 import axios from 'axios'
 import { computed, readonly, ref } from 'vue'
+import {
+  channelAgentLocalSecurityHeaders,
+  fetchChannelAgentBootstrap
+} from '@/api/channelAgentDesktopClient'
 
 export type RoleName = 'ADMIN' | 'OPERATOR' | 'CUSTOMER_SERVICE'
+
+export interface AuthStorePlatformBinding {
+  platform: string
+  platform_store_id: string
+  status: 'ACTIVE' | 'REVOKED'
+  verified_at: string
+  verified_by: string
+}
 
 export interface AuthStoreBinding {
   id: number
@@ -10,6 +22,7 @@ export interface AuthStoreBinding {
   store_name: string
   platform: string
   is_default: boolean
+  platform_bindings?: AuthStorePlatformBinding[]
 }
 
 export interface AuthUser {
@@ -36,6 +49,7 @@ interface LoginResponse {
 
 const STORAGE_KEY = 'ai-cs-customer-session-v1'
 const API_BASE_URL = (import.meta.env.VITE_PLATFORM_API_BASE_URL || '/platform-api').replace(/\/$/, '')
+const CHANNEL_AGENT_DESKTOP = import.meta.env.VITE_CHANNEL_AGENT_DESKTOP === 'true'
 const authHttp = axios.create({ baseURL: API_BASE_URL, timeout: 15_000 })
 const token = ref('')
 const user = ref<AuthUser | null>(null)
@@ -91,7 +105,13 @@ async function restore(): Promise<boolean> {
 }
 
 async function login(username: string, password: string): Promise<AuthUser> {
-  const response = await authHttp.post<LoginResponse>('/api/v1/auth/login', { username, password })
+  // Public login routes do not pass through the authenticated router guard.
+  // Refresh the process-local CSRF immediately before submitting credentials so
+  // an EXE restart can never leave the page using a token from the old runtime.
+  if (CHANNEL_AGENT_DESKTOP) await fetchChannelAgentBootstrap()
+  const response = await authHttp.post<LoginResponse>('/api/v1/auth/login', { username, password }, {
+    headers: channelAgentLocalSecurityHeaders()
+  })
   token.value = response.data.access_token
   user.value = response.data.user
   initialized.value = true
@@ -102,7 +122,9 @@ async function login(username: string, password: string): Promise<AuthUser> {
 async function logout(): Promise<void> {
   try {
     if (token.value) {
-      await authHttp.post('/api/v1/auth/logout', undefined, { headers: authorizationHeader() })
+      await authHttp.post('/api/v1/auth/logout', undefined, {
+        headers: { ...authorizationHeader(), ...channelAgentLocalSecurityHeaders() }
+      })
     }
   } finally {
     clearAuthSession()
@@ -113,7 +135,7 @@ async function changePassword(currentPassword: string, newPassword: string): Pro
   await authHttp.post('/api/v1/auth/change-password', {
     current_password: currentPassword,
     new_password: newPassword
-  }, { headers: authorizationHeader() })
+  }, { headers: { ...authorizationHeader(), ...channelAgentLocalSecurityHeaders() } })
   clearAuthSession()
 }
 
@@ -122,6 +144,7 @@ export interface AuthStoreOption {
   store_code: string
   store_name: string
   platform: string
+  platform_bindings?: AuthStorePlatformBinding[]
 }
 
 async function listStoreOptions(): Promise<AuthStoreOption[]> {
@@ -135,7 +158,7 @@ async function replaceStoreBindings(storeIds: number[], defaultStoreId?: number)
   const response = await authHttp.put<AuthUser>('/api/v1/auth/store-bindings', {
     store_ids: storeIds,
     default_store_id: defaultStoreId ?? storeIds[0]
-  }, { headers: authorizationHeader() })
+  }, { headers: { ...authorizationHeader(), ...channelAgentLocalSecurityHeaders() } })
   user.value = response.data
   return response.data
 }
@@ -143,7 +166,7 @@ async function replaceStoreBindings(storeIds: number[], defaultStoreId?: number)
 async function setDefaultStore(storeId: number): Promise<AuthUser> {
   const response = await authHttp.put<AuthUser>('/api/v1/auth/default-store', {
     store_id: storeId
-  }, { headers: authorizationHeader() })
+  }, { headers: { ...authorizationHeader(), ...channelAgentLocalSecurityHeaders() } })
   user.value = response.data
   return response.data
 }

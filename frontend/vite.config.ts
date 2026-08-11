@@ -27,7 +27,10 @@ export default defineConfig(({ mode }) => ({
   define: {
     'import.meta.env.VITE_FRONTEND_VERSION': JSON.stringify(frontendPackage.version),
     'import.meta.env.VITE_GIT_SHORT_SHA': JSON.stringify(getGitShortSha()),
-    'import.meta.env.VITE_BUILD_MODE': JSON.stringify(mode)
+    'import.meta.env.VITE_BUILD_MODE': JSON.stringify(mode),
+    'import.meta.env.VITE_CHANNEL_AGENT_DESKTOP': JSON.stringify(
+      mode === 'channel-agent' ? 'true' : 'false'
+    )
   },
   resolve: {
     alias: {

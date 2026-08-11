@@ -25,7 +25,7 @@ export type DecisionReviewState = 'WAITING_HUMAN' | 'APPROVED' | 'REJECTED'
 export type ReplyDraftSource = 'AI' | 'MANUAL'
 
 export interface WorkspaceMessage extends ChannelMessageEnvelope {
-  direction: 'INBOUND' | 'OUTBOUND_DRAFT'
+  direction: 'INBOUND' | 'OUTBOUND_HISTORY' | 'OUTBOUND_DRAFT'
 }
 
 export interface WorkspaceConversation {
@@ -47,6 +47,7 @@ export interface ReplyDraft {
   originalAnswer: string
   editedAnswer: string
   requestId: string | null
+  decisionId: string | null
   action: RagAction | null
   riskLevel: RiskLevel | null
   citations: RagCitation[]
@@ -111,7 +112,10 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       unreadCount: seed.unreadCount,
       source: seed.source,
       status: 'NEW',
-      messages: seed.messages.map((message) => ({ ...message, direction: 'INBOUND' }))
+      messages: seed.messages.map((message) => ({
+        ...message,
+        direction: message.senderRole === 'AGENT' ? 'OUTBOUND_HISTORY' : 'INBOUND'
+      }))
     }))
     if (!activeConversationId.value && conversations.value.length > 0) {
       activeConversationId.value = conversations.value[0].conversationId
@@ -128,7 +132,10 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       unreadCount: seed.unreadCount,
       source: seed.source,
       status: 'NEW',
-      messages: seed.messages.map((message) => ({ ...message, direction: 'INBOUND' }))
+      messages: seed.messages.map((message) => ({
+        ...message,
+        direction: message.senderRole === 'AGENT' ? 'OUTBOUND_HISTORY' : 'INBOUND'
+      }))
     }
     conversations.value.unshift(conversation)
     selectConversation(conversation.conversationId)
@@ -149,6 +156,11 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       (item) => item.conversationId === message.conversationId
     )
     if (!conversation) throw new Error('消息对应的会话不存在')
+
+    if (message.senderRole === 'AGENT') {
+      conversation.messages.push({ ...message, direction: 'OUTBOUND_HISTORY' })
+      return
+    }
 
     if (activeDraft.value?.conversationId === message.conversationId) archiveActiveDraft()
     conversation.messages.push({ ...message, direction: 'INBOUND' })
@@ -175,6 +187,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
   function setDraftReady(payload: {
     answer: string
     requestId: string | null
+    decisionId?: string | null
     action: RagAction | null
     riskLevel: RiskLevel | null
     citations: RagCitation[]
@@ -187,6 +200,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     activeDraft.value.editedAnswer = payload.answer
     activeDraft.value.replySource = 'AI'
     activeDraft.value.requestId = payload.requestId
+    activeDraft.value.decisionId = payload.decisionId ?? null
     activeDraft.value.action = payload.action
     activeDraft.value.riskLevel = payload.riskLevel
     activeDraft.value.citations = payload.citations
@@ -215,6 +229,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     activeDraft.value.originalAnswer = ''
     activeDraft.value.editedAnswer = answer
     activeDraft.value.requestId = null
+    activeDraft.value.decisionId = null
     activeDraft.value.action = null
     activeDraft.value.riskLevel = null
     activeDraft.value.citations = []
@@ -299,6 +314,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       originalAnswer: '',
       editedAnswer: '',
       requestId: null,
+      decisionId: null,
       action: null,
       riskLevel: null,
       citations: [],
