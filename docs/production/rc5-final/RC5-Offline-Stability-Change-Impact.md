@@ -27,5 +27,4 @@
 
 - 冻结源码：Engine `abc9b8d6fb3f068d1997fb25f76ee6ae0421c4af`；AI-CS `ed7c7b804cb5d5d1d55aab202cf4ae8398231028`。
 - 新候选包：`ca32e8ccc391fdaa1ea926eb2f5dabba77c89bf1819fd1e82c5e663a8c15c76a`。
-- 当前已安装 Agent 未被覆盖，不能宣称它已经运行上述新源码。
-
+- 已安装 Agent 已用该候选包受控覆盖升级；Manifest、EXE、PYZ 与候选包一致。升级前后 Identity、Binding、Active Store、Profile 和 PDD Session 比对 9/9 PASS。

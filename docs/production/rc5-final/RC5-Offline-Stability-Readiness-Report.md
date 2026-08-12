@@ -76,7 +76,7 @@ Synthetic/Replay
 
 ## 仍未完成但不阻塞本轮
 
-- 当前安装的 Agent 仍是旧运行产物；新候选包已生成但没有覆盖安装，以保护 Identity、Binding、Profile 和 PDD Session。
+- 最终快照发现旧安装产物的 EXE/PYZ 与其 Manifest 声明不一致；已用隔离验证过的新候选包完成受控覆盖升级。升级后 Manifest、EXE、PYZ 与候选包一致，Agent ID、Device ID、Binding revision、Active Store、受保护配置、Profile identity 和 PDD Session 均保持不变。
 - PDD Snapshot 平行模型、大型模块拆分是维护性工作；没有真实 Replay 前不重构。
 - 真实 PDD Selector、读取、角色、商品/SKU、订单、真实发送均为 `NOT IN SCOPE`。
 - 代码签名、企业证书、Windows Service、正式 Release Tag 属商业发布阶段。
@@ -90,8 +90,8 @@ Synthetic/Replay
 | 跨库恢复与一致备份 | PASS |
 | 绿色助手人工确认闭环 | PASS |
 | Windows 候选包隔离部署 | PASS |
+| 源码→候选包→安装→Agent 运行身份 | PASS |
 | 真实 PDD 读取 | NOT IN SCOPE |
 | 真实 PDD 发送 | NOT IN SCOPE |
 | 可进入真实 PDD 只读 Pilot | YES |
 | 可进入真实发送 Pilot | NO |
-
