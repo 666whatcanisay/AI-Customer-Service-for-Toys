@@ -139,20 +139,6 @@ foreach ($pattern in @('annotated_types-*.dist-info','anyio-*.dist-info','certif
         Copy-Item -LiteralPath $_.FullName -Destination $runtimeSite -Recurse
     }
 }
-# Bytecode caches are machine-local build residue. Shipping them makes the
-# package larger and can push isolated/upgrade staging paths over legacy
-# Windows path limits; the embedded runtime executes the canonical .py files.
-Get-ChildItem -LiteralPath $runtime -Recurse -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -eq '__pycache__' } |
-    Sort-Object { $_.FullName.Length } -Descending |
-    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
-Get-ChildItem -LiteralPath $runtime -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.Extension -in @('.pyc', '.pyo') } |
-    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
-if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python.exe') -PathType Leaf)) {
-    throw 'Embedded Python runtime was removed while pruning build residue.'
-}
-
 $launcherSource = Join-Path $repoRoot 'packaging\windows-client-v1\ChannelAgentLauncher.cs'
 $versionMatch = [regex]::Match($version, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:rc(?<rc>\d+))?$')
 if (-not $versionMatch.Success) { throw "Cannot create Windows version resources for $version." }
@@ -273,6 +259,19 @@ try {
 } finally {
     $env:PYTHONHOME = $previousPythonHome
     $env:PYTHONNOUSERSITE = $previousPythonNoUserSite
+}
+
+# Isolated startup can generate bytecode caches. Remove them only after that
+# validation so no machine-local build residue enters the release manifest.
+Get-ChildItem -LiteralPath $runtime -Recurse -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq '__pycache__' } |
+    Sort-Object { $_.FullName.Length } -Descending |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+Get-ChildItem -LiteralPath $runtime -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Extension -in @('.pyc', '.pyo') } |
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python.exe') -PathType Leaf)) {
+    throw 'Embedded Python runtime was removed while pruning build residue.'
 }
 
 $files = Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
