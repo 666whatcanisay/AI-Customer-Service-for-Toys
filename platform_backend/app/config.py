@@ -58,6 +58,9 @@ class Settings:
     environment: str
     cors_allowed_origins: tuple[str, ...]
     database_url: str
+    database_binding_path: str | None
+    database_environment_id: str | None
+    require_database_identity: bool
     max_upload_bytes: int
     max_import_rows: int
     max_test_package_upload_bytes: int
@@ -124,6 +127,17 @@ def _positive_float(name: str, default: str) -> float:
     return value
 
 
+def _database_url() -> str:
+    value = os.getenv("DATABASE_URL", "").strip()
+    if value:
+        return value
+    if _environment_flag("AI_CS_ALLOW_EPHEMERAL_DATABASE"):
+        return "sqlite://"
+    raise ValueError(
+        "DATABASE_URL is required; AI-CS will not create a default platform.db"
+    )
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings(
@@ -134,7 +148,16 @@ def get_settings() -> Settings:
         cors_allowed_origins=parse_cors_allowed_origins(
             os.getenv("CORS_ALLOWED_ORIGINS", DEFAULT_CORS_ALLOWED_ORIGINS)
         ),
-        database_url=os.getenv("DATABASE_URL", "sqlite:///./platform.db"),
+        database_url=_database_url(),
+        database_binding_path=(
+            os.getenv("PLATFORM_DATABASE_BINDING_PATH", "").strip() or None
+        ),
+        database_environment_id=(
+            os.getenv("PLATFORM_DATABASE_ENVIRONMENT_ID", "").strip() or None
+        ),
+        require_database_identity=_environment_flag(
+            "PLATFORM_REQUIRE_DATABASE_IDENTITY", True
+        ),
         max_upload_bytes=int(os.getenv("PLATFORM_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024))),
         max_import_rows=int(os.getenv("PLATFORM_MAX_IMPORT_ROWS", "1000")),
         max_test_package_upload_bytes=int(

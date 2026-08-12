@@ -1,7 +1,11 @@
 from collections.abc import Iterator
+import os
 from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
+
+os.environ.setdefault("AI_CS_ALLOW_EPHEMERAL_DATABASE", "true")
+os.environ.setdefault("PLATFORM_REQUIRE_DATABASE_IDENTITY", "false")
 
 import pytest
 from fastapi.testclient import TestClient

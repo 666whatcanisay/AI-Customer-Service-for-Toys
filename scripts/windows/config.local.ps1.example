@@ -47,7 +47,13 @@
     RagHealthPath = '/api/health'; PlatformHealthPath = '/health'
     OllamaModel = 'qwen3.5:9b'
     OllamaBaseUrl = 'http://127.0.0.1:11434'
-    PlatformDatabaseUrl = 'sqlite:///./platform.db'
+    # Production startup requires an explicit absolute database plus an
+    # internal/sidecar identity binding. Create or upgrade it only through
+    # Invoke-PlatformControlledMigration.ps1.
+    PlatformDatabaseUrl = 'sqlite:///C:/absolute/path/to/platform.sqlite3'
+    PlatformDatabaseBindingPath = 'C:\absolute\path\to\platform.binding.json'
+    PlatformDatabaseEnvironmentId = 'AI_CS_STANDARD'
+    PlatformRequireDatabaseIdentity = $true
     # A运行路径和active collection由本配置统一提供；启动脚本不再依赖调用终端预先设置环境变量。
     RagKnowledgeBasePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\knowledge_base')
     RagVectorDbPath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path 'backend\vector_db')

@@ -43,14 +43,12 @@ try {
     foreach ($pair in $services) { Assert-PortAvailable $config $pair.Name $pair.Port }
 
     $platformEnvironment = Get-LanPlatformEnvironment $config
-    Invoke-WithProcessEnvironment $platformEnvironment { Invoke-PlatformMigration $config } | Out-Null
+    Invoke-WithProcessEnvironment $platformEnvironment { Assert-PlatformDatabaseReady $config } | Out-Null
 
     Start-ManagedServiceWithEnvironment $config 'platform' $config.PlatformPythonPath @('-m','uvicorn','app.main:app','--host',$config.PlatformBindAddress,'--port',$config.PlatformPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'platform_backend') 'app.main:app' $config.PlatformPort $platformEnvironment | Out-Null
     $startedServices += 'platform'
     Wait-HttpOk (Get-ServiceUrl $config $config.PlatformPort $config.PlatformHealthPath) 60 '平台服务'
     Update-ManagedServiceListenerRecord $config 'platform' | Out-Null
-
-    Import-TestDataPackage $config | Out-Null
 
     $ragEnvironment = Get-LanRagEnvironment $config
     Start-ManagedServiceWithEnvironment $config 'rag' $config.RagPythonPath @('-m','uvicorn','app.main:app','--host',$config.RagBindAddress,'--port',$config.RagPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'backend') 'app.main:app' $config.RagPort $ragEnvironment | Out-Null
@@ -58,8 +56,8 @@ try {
     Wait-HttpOk (Get-ServiceUrl $config $config.RagPort $config.RagHealthPath) 120 'RAG 服务'
     Update-ManagedServiceListenerRecord $config 'rag' | Out-Null
     Wait-RagRuntimeReady $config 120 | Out-Null
-    Sync-TestKnowledge $config | Out-Null
-    Invoke-RagChatSmoke $config | Out-Null
+    $activeCollectionState = Get-RagActiveCollectionStartupState $config
+    if (-not $activeCollectionState.Ready) { Write-Warning 'A active collection 未就绪；普通启动不会导入或同步测试知识。' }
 
     $startedServices += 'customer-web'
     Start-CustomerWebService $config | Out-Null

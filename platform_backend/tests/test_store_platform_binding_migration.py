@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import os
 
 from alembic import command
 from alembic.config import Config
@@ -7,6 +8,7 @@ from sqlalchemy import create_engine, text
 
 
 def _config(database_path: Path) -> Config:
+    os.environ.pop("DATABASE_URL", None)
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     config.set_main_option(
         "script_location", str(Path(__file__).resolve().parents[1] / "migrations")

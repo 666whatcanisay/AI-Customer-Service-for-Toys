@@ -64,6 +64,9 @@ try {
     OpenBrowser = (1 -eq 0)
     RuntimeDirectory = '$temporaryRoot\runtime'
     InternalServiceSecretReference = '$internalSecretPath'
+    PlatformDatabaseUrl = 'sqlite:///$($temporaryRoot.Replace('\','/'))/runtime/platform.sqlite3'
+    PlatformDatabaseBindingPath = '$temporaryRoot\runtime\platform.binding.json'
+    PlatformDatabaseEnvironmentId = 'OPS_RUNTIME_FIX2'
     TestDataPackagePath = ''
     AutoImportTestData = (1 -eq 0)
 }
@@ -72,9 +75,9 @@ try {
     $config = Get-LocalConfig $legacyConfigPath
     if (
         $config.OllamaBaseUrl -ne 'http://127.0.0.1:11434' -or
-        $config.PlatformDatabaseUrl -ne 'sqlite:///./platform.db' -or
-        $config.TestKnowledgePackageId -ne 'PDD-SM-2026-001-TEST' -or
-        -not $config.AutoSyncTestKnowledge -or
+        $config.PlatformDatabaseUrl -notmatch '^sqlite:///' -or
+        -not [string]::IsNullOrWhiteSpace($config.TestKnowledgePackageId) -or
+        $config.AutoSyncTestKnowledge -or
         $config.RagPrimaryCollectionName -ne 'documents' -or
         $config.RagActiveCollectionName -ne 'test_knowledge_v031' -or
         $config.RagVectorDbPath -ne (Join-Path $temporaryRepository 'backend\vector_db')
@@ -187,8 +190,11 @@ try {
 
     $startScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\start_ai_customer_service.ps1') -Raw
     $statusScriptText = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\windows\status_ai_customer_service.ps1') -Raw
-    if ($startScriptText -notmatch 'Stop-StartedServices' -or $startScriptText -notmatch 'Get-RagActiveCollectionStartupState' -or $startScriptText -notmatch 'KNOWLEDGE_SYNC_NON_FATAL') {
-        throw 'Standard startup does not enforce active-collection readiness and partial-start cleanup.'
+    if ($startScriptText -notmatch 'Stop-StartedServices' -or $startScriptText -notmatch 'Get-RagActiveCollectionStartupState' -or $startScriptText -notmatch 'Assert-PlatformDatabaseReady') {
+        throw 'Standard startup does not enforce database identity, active-collection status and partial-start cleanup.'
+    }
+    if ($startScriptText -match 'Invoke-PlatformMigration|Import-TestDataPackage|Sync-TestKnowledge|Invoke-RagChatSmoke') {
+        throw 'Standard startup still performs migration or acceptance-knowledge initialization.'
     }
     if ($statusScriptText -notmatch 'A active collection' -or $statusScriptText -notmatch 'A available collections') {
         throw 'Standard status does not display active and available collection state.'

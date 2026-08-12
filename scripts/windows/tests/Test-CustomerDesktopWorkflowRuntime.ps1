@@ -6,6 +6,9 @@ $scriptRoot = Split-Path -Parent $PSScriptRoot
 
 $config = @{
     PlatformDatabaseUrl = 'sqlite:///runtime-test.db'
+    PlatformDatabaseBindingPath = 'C:\runtime\platform.binding.json'
+    PlatformDatabaseEnvironmentId = 'CUSTOMER_DESKTOP_TEST'
+    PlatformRequireDatabaseIdentity = $true
     CorsAllowedOrigins = @('http://127.0.0.1:5173')
     LanCorsAllowedOrigins = 'http://192.168.1.20:5173'
     PlatformKnowledgeMaterialStorageDirectory = 'C:\runtime\knowledge-materials'

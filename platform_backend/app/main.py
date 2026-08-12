@@ -1,11 +1,19 @@
 """FastAPI entrypoint for the C Platform API and production IAM boundary."""
 
+from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import Settings, get_settings
+from app.runtime_database_identity import (
+    DatabaseIdentityError,
+    validate_runtime_database,
+)
 from app.api.admin_routes import router as admin_router
 from app.api.admin_suggestion_routes import router as admin_suggestion_router
 from app.api.customer_suggestion_routes import router as customer_suggestion_router
@@ -62,13 +70,45 @@ from app.desktop_agent.routes import (
     router as desktop_agent_router,
 )
 
+def _sqlite_path(database_url: str) -> Path:
+    parsed = urlsplit(database_url)
+    if parsed.scheme != "sqlite" or parsed.netloc not in {"", None}:
+        raise DatabaseIdentityError("Production Platform database must be local SQLite")
+    raw_path = unquote(parsed.path)
+    if not raw_path or raw_path == "/:memory:":
+        raise DatabaseIdentityError("Production Platform database must be a file")
+    # SQLAlchemy encodes Windows C:/ paths as /C:/... in a sqlite URL.
+    if len(raw_path) >= 3 and raw_path[0] == "/" and raw_path[2] == ":":
+        raw_path = raw_path[1:]
+    path = Path(raw_path)
+    if not path.is_absolute():
+        raise DatabaseIdentityError("Production Platform database path must be absolute")
+    return path
+
+
 def create_app(settings_override: Settings | None = None) -> FastAPI:
     settings = settings_override or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        if settings.require_database_identity:
+            if not settings.database_binding_path or not settings.database_environment_id:
+                raise DatabaseIdentityError(
+                    "Platform database binding path and environment ID are required"
+                )
+            validate_runtime_database(
+                _sqlite_path(settings.database_url),
+                settings.database_binding_path,
+                expected_environment_id=settings.database_environment_id,
+            )
+        yield
+
     application = FastAPI(
         title=settings.app_name,
         version=settings.version,
         docs_url=None,
         redoc_url=None,
+        lifespan=lifespan,
     )
     application.state.settings = settings
     application.middleware("http")(request_id_middleware)

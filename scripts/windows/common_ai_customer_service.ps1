@@ -94,9 +94,14 @@ function Get-LocalConfig([string]$ConfigPath) {
         ChannelAgentOperatorSessionReference = ''
         ChannelAgentTimeoutSeconds = 5
         OllamaBaseUrl = 'http://127.0.0.1:11434'
-        PlatformDatabaseUrl = 'sqlite:///./platform.db'
-        TestKnowledgePackageId = 'PDD-SM-2026-001-TEST'
-        AutoSyncTestKnowledge = $true
+        # No database default: a missing production path must fail closed.
+        PlatformDatabaseUrl = ''
+        PlatformDatabaseBindingPath = ''
+        PlatformDatabaseEnvironmentId = ''
+        PlatformRequireDatabaseIdentity = $true
+        # Acceptance knowledge belongs to an explicit bootstrap command.
+        TestKnowledgePackageId = ''
+        AutoSyncTestKnowledge = $false
         RagPrimaryCollectionName = 'documents'
         RagActiveCollectionName = 'test_knowledge_v031'
         # The dedicated LAN launcher always resolves this value again at startup.
@@ -169,9 +174,20 @@ function Get-LocalConfig([string]$ConfigPath) {
     } catch {
         throw "OllamaBaseUrl 必须是有效的 http(s) 地址：$($config.OllamaBaseUrl)"
     }
-    foreach ($key in @('PlatformDatabaseUrl', 'TestKnowledgePackageId')) {
+    foreach ($key in @('PlatformDatabaseUrl', 'PlatformDatabaseBindingPath', 'PlatformDatabaseEnvironmentId')) {
         if ([string]::IsNullOrWhiteSpace([string]$config[$key])) { throw "配置项 $key 缺失或为空。" }
     }
+    $databaseUri = $null
+    if (-not [uri]::TryCreate([string]$config.PlatformDatabaseUrl, [UriKind]::Absolute, [ref]$databaseUri) -or $databaseUri.Scheme -ne 'sqlite') {
+        throw 'PlatformDatabaseUrl 必须是指向绝对路径的 sqlite URL。'
+    }
+    $databasePath = [uri]::UnescapeDataString($databaseUri.AbsolutePath)
+    if ($databasePath -match '^/[A-Za-z]:/') { $databasePath = $databasePath.Substring(1) }
+    $databasePath = $databasePath.Replace('/', [IO.Path]::DirectorySeparatorChar)
+    if (-not [IO.Path]::IsPathRooted($databasePath)) { throw 'PlatformDatabaseUrl 禁止相对路径。' }
+    $config.PlatformDatabasePath = [IO.Path]::GetFullPath($databasePath)
+    $config.PlatformDatabaseBindingPath = [IO.Path]::GetFullPath([string]$config.PlatformDatabaseBindingPath)
+    if ([string]$config.PlatformDatabaseEnvironmentId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$') { throw 'PlatformDatabaseEnvironmentId 格式无效。' }
     try {
         $adminWebUri = [uri]$config.AdminWebUrl
         if (-not $adminWebUri.IsAbsoluteUri -or $adminWebUri.Scheme -notin @('http', 'https') -or [string]::IsNullOrWhiteSpace($adminWebUri.Host) -or $adminWebUri.Port -ne [int]$config.AdminWebPort) {
@@ -182,7 +198,7 @@ function Get-LocalConfig([string]$ConfigPath) {
         throw "AdminWebUrl 必须是与 AdminWebPort 一致的有效 http(s) 地址：$($config.AdminWebUrl)"
     }
     if ([string]::IsNullOrWhiteSpace([string]$config.AdminWebBindAddress)) { throw 'AdminWebBindAddress 不能为空。' }
-    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser', 'GatewayEnabled', 'ChannelAgentIntegrationEnabled')) {
+    foreach ($key in @('OpenBrowser', 'AutoImportTestData', 'AutoSyncTestKnowledge', 'PlatformRequireDatabaseIdentity', 'EnableLanMode', 'LanMode', 'AllowPublicNetwork', 'AdminEnableLanMode', 'AdminOpenBrowser', 'GatewayEnabled', 'ChannelAgentIntegrationEnabled')) {
         if ($config[$key] -isnot [bool]) {
             $parsed = $false
             if (-not [bool]::TryParse([string]$config[$key], [ref]$parsed)) { throw "配置项 $key 必须为 true 或 false。" }
@@ -975,6 +991,9 @@ function Get-LanPlatformEnvironment($Config) {
     $serverUrl = if (-not [string]::IsNullOrWhiteSpace([string]$env:CHANNEL_AGENT_SERVER_URL)) { [string]$env:CHANNEL_AGENT_SERVER_URL } else { [string]$Config.ChannelAgentServerUrl }
     return @{
         DATABASE_URL = [string]$Config.PlatformDatabaseUrl
+        PLATFORM_DATABASE_BINDING_PATH = [string]$Config.PlatformDatabaseBindingPath
+        PLATFORM_DATABASE_ENVIRONMENT_ID = [string]$Config.PlatformDatabaseEnvironmentId
+        PLATFORM_REQUIRE_DATABASE_IDENTITY = ([bool]$Config.PlatformRequireDatabaseIdentity).ToString().ToLowerInvariant()
         CORS_ALLOWED_ORIGINS = [string]$Config.LanCorsAllowedOrigins
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
         AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
@@ -995,6 +1014,9 @@ function Get-LocalPlatformEnvironment($Config) {
     $serverUrl = if (-not [string]::IsNullOrWhiteSpace([string]$env:CHANNEL_AGENT_SERVER_URL)) { [string]$env:CHANNEL_AGENT_SERVER_URL } else { [string]$Config.ChannelAgentServerUrl }
     return @{
         DATABASE_URL = [string]$Config.PlatformDatabaseUrl
+        PLATFORM_DATABASE_BINDING_PATH = [string]$Config.PlatformDatabaseBindingPath
+        PLATFORM_DATABASE_ENVIRONMENT_ID = [string]$Config.PlatformDatabaseEnvironmentId
+        PLATFORM_REQUIRE_DATABASE_IDENTITY = ([bool]$Config.PlatformRequireDatabaseIdentity).ToString().ToLowerInvariant()
         CORS_ALLOWED_ORIGINS = (@($Config.CorsAllowedOrigins) -join ',')
         PLATFORM_KNOWLEDGE_MATERIAL_STORAGE_DIR = [string]$Config.PlatformKnowledgeMaterialStorageDirectory
         AI_SERVICE_BASE_URL = "http://127.0.0.1:$($Config.RagPort)"
@@ -1873,16 +1895,21 @@ function Assert-OllamaReady($Config) {
     return $tags
 }
 
-function Invoke-PlatformMigration($Config) {
+function Assert-PlatformDatabaseReady($Config) {
     $platformDirectory = Join-Path $Config.RepositoryRoot 'platform_backend'
+    if (-not (Test-Path -LiteralPath $Config.PlatformDatabasePath -PathType Leaf)) { throw "C 数据库不存在：$($Config.PlatformDatabasePath)。普通启动不会创建数据库。" }
+    if ((Get-Item -LiteralPath $Config.PlatformDatabasePath).Length -le 16) { throw "C 数据库为空或损坏：$($Config.PlatformDatabasePath)" }
     Push-Location -LiteralPath $platformDirectory
     try {
-        & $Config.PlatformPythonPath -m alembic upgrade head
+        & $Config.PlatformPythonPath -m app.runtime_database_identity validate `
+            --database $Config.PlatformDatabasePath `
+            --binding $Config.PlatformDatabaseBindingPath `
+            --environment-id $Config.PlatformDatabaseEnvironmentId | Out-Null
         $exitCode = $LASTEXITCODE
     } finally {
         Pop-Location
     }
-    if ($exitCode -ne 0) { throw "C 数据库迁移失败（退出码 $exitCode）；不会启动 C。" }
+    if ($exitCode -ne 0) { throw "C 数据库身份或版本校验失败（退出码 $exitCode）；普通启动不会迁移或建库。" }
 }
 
 function Get-PlatformMigrationStatus($Config) {

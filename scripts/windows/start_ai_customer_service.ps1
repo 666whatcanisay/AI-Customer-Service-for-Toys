@@ -37,28 +37,21 @@ try {
     if ($alreadyRunning.Count -gt 0) { throw "仅部分服务处于可信健康运行状态：$($alreadyRunning.Name -join ', ')。请先使用状态脚本核对，避免混合启动。" }
     foreach ($pair in $services) { Assert-PortAvailable $config $pair.Name $pair.Port }
     $platformEnvironment = Get-LocalPlatformEnvironment $config
-    Invoke-WithProcessEnvironment $platformEnvironment { Invoke-PlatformMigration $config } | Out-Null
+    Invoke-WithProcessEnvironment $platformEnvironment { Assert-PlatformDatabaseReady $config } | Out-Null
 
     $startedServices += 'platform'
     Start-ManagedServiceWithEnvironment $config 'platform' $config.PlatformPythonPath @('-m','uvicorn','app.main:app','--host',$config.BindAddress,'--port',$config.PlatformPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'platform_backend') 'app.main:app' $config.PlatformPort $platformEnvironment | Out-Null
     Wait-HttpOk (Get-ServiceUrl $config $config.PlatformPort $config.PlatformHealthPath) 60 '平台服务'
     Update-ManagedServiceListenerRecord $config 'platform' | Out-Null
 
-    Import-TestDataPackage $config | Out-Null
     $ragEnvironment = Get-LocalRagEnvironment $config
     $startedServices += 'rag'
     Start-ManagedServiceWithEnvironment $config 'rag' $config.RagPythonPath @('-m','uvicorn','app.main:app','--host',$config.BindAddress,'--port',$config.RagPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'backend') 'app.main:app' $config.RagPort $ragEnvironment | Out-Null
     Wait-HttpOk (Get-ServiceUrl $config $config.RagPort $config.RagHealthPath) 120 'RAG 服务'
     Update-ManagedServiceListenerRecord $config 'rag' | Out-Null
     Wait-RagRuntimeReady $config 120 | Out-Null
-    # KNOWLEDGE_SYNC_NON_FATAL: keep the runtime available while surfacing knowledge degradation.
-    try {
-        Sync-TestKnowledge $config | Out-Null
-    } catch {
-        Write-Warning "A 知识同步异常：$($_.Exception.Message)。服务继续启动，并检查当前 active collection。"
-    }
     $activeCollectionState = Get-RagActiveCollectionStartupState $config
-    if ($activeCollectionState.Ready) { Invoke-RagChatSmoke $config | Out-Null }
+    if (-not $activeCollectionState.Ready) { Write-Warning 'A active collection 未就绪；普通启动不会导入或同步测试知识。' }
 
     $startedServices += 'customer-web'
     Start-CustomerWebService $config | Out-Null

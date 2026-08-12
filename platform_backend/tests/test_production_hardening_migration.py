@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from alembic import command
 from alembic.config import Config
@@ -6,6 +7,7 @@ from sqlalchemy import create_engine, inspect, text
 
 
 def _config(database_path: Path) -> Config:
+    os.environ.pop("DATABASE_URL", None)
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     config.set_main_option(
         "script_location", str(Path(__file__).resolve().parents[1] / "migrations")
@@ -39,9 +41,10 @@ def test_0013_to_head_to_0013_and_back_to_head_is_reversible(tmp_path: Path) -> 
     }
     assert "uq_user_store_bindings_single_default" in binding_indexes
     assert "store_platform_bindings" in inspector.get_table_names()
+    assert "runtime_database_identity" in inspector.get_table_names()
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0018_store_platform_bindings_v1"
+            "0019_runtime_database_identity_v1"
         )
     engine.dispose()
 
@@ -53,6 +56,7 @@ def test_0013_to_head_to_0013_and_back_to_head_is_reversible(tmp_path: Path) -> 
         "conversation_context_resolutions",
         "desktop_workflow_audit_events",
         "store_platform_bindings",
+        "runtime_database_identity",
     }.isdisjoint(downgraded.get_table_names())
     assert {"generation_token", "generation_started_at"}.isdisjoint(
         item["name"] for item in downgraded.get_columns("product_knowledge_publications")
