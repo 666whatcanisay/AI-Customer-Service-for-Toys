@@ -43,13 +43,64 @@ function Set-PrivateRuntimeDirectoryAcl {
     [System.IO.Directory]::SetAccessControl($Path, $acl)
 }
 
-foreach ($required in @('ChannelAgent.exe', 'app\channel-agent.pyz', 'release-manifest.json')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $PackageRoot $required) -PathType Leaf)) {
-        throw "Required package file is missing: $required"
+function Assert-PackageIntegrity([string]$Root, $Manifest) {
+    foreach ($required in @('ChannelAgent.exe', 'app\channel-agent.pyz', 'release-manifest.json')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Root $required) -PathType Leaf)) {
+            throw "Required package file is missing: $required"
+        }
+    }
+    if ($Manifest.PSObject.Properties.Name -contains 'files') {
+        foreach ($file in @($Manifest.files)) {
+            $candidate = Join-Path $Root ([string]$file.path).Replace('/', '\')
+            if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                throw "Manifest file is missing: $($file.path)"
+            }
+            $actual = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne ([string]$file.sha256).ToLowerInvariant()) {
+                throw "Manifest file hash mismatch: $($file.path)"
+            }
+        }
     }
 }
+
+function Get-InstallOwnedProcesses([string]$InstallDirectory) {
+    $prefix = [IO.Path]::GetFullPath($InstallDirectory).TrimEnd('\') + '\'
+    @(Get-Process ChannelAgent,python,pythonw -ErrorAction SilentlyContinue | Where-Object {
+        try {
+            $_.Path -and [IO.Path]::GetFullPath($_.Path).StartsWith(
+                $prefix,
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        } catch { $false }
+    })
+}
+
+function Stop-KnownAgentLauncher([string]$InstallDirectory, [string]$AgentDataRoot) {
+    $Executable = Join-Path $InstallDirectory 'ChannelAgent.exe'
+    if (Test-Path -LiteralPath $Executable -PathType Leaf) {
+        $escapedDataRoot = $AgentDataRoot.Replace('"', '\"')
+        $stopProcess = Start-Process -FilePath $Executable `
+            -ArgumentList "stop --data-root `"$escapedDataRoot`" --wait-seconds 12" `
+            -WindowStyle Hidden -Wait -PassThru
+        if ($stopProcess.ExitCode -ne 0 -and -not $Force) {
+            throw 'The existing Channel Agent could not be stopped safely.'
+        }
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        $matching = @(Get-InstallOwnedProcesses $InstallDirectory)
+        if ($matching.Count -eq 0) { return }
+        if ($Force) {
+            $matching | Stop-Process -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw 'The existing Channel Agent still owns the install directory.'
+}
+
 if ($InstallRoot -eq $PackageRoot) { throw 'InstallRoot cannot equal PackageRoot.' }
 $packageManifest = Get-Content -LiteralPath (Join-Path $PackageRoot 'release-manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+Assert-PackageIntegrity $PackageRoot $packageManifest
 $existingInstall = Test-Path -LiteralPath $InstallRoot -PathType Container
 if ($existingInstall) {
     $existingManifestPath = Join-Path $InstallRoot 'release-manifest.json'
@@ -64,36 +115,39 @@ if ($existingInstall) {
         catch { throw 'Installed or package version is invalid.' }
     }
 
-    # Stop the previous runtime before replacing files. This preserves the data
-    # directory and lets a novice safely run the same installer for upgrades.
-    $existingExecutable = Join-Path $InstallRoot 'ChannelAgent.exe'
-    if (Test-Path -LiteralPath $existingExecutable -PathType Leaf) {
-        $escapedDataRoot = $DataRoot.Replace('"', '\"')
-        $stopProcess = Start-Process -FilePath $existingExecutable `
-            -ArgumentList "stop --data-root `"$escapedDataRoot`" --wait-seconds 12" `
-            -WindowStyle Hidden -Wait -PassThru
-        if ($stopProcess.ExitCode -ne 0 -and -not $Force) {
-            throw 'The existing Channel Agent could not be stopped safely.'
-        }
-    }
-
-    # A tray process does not own business state. Terminate only launchers whose
-    # executable path is exactly the known install/package launcher, so no
-    # unrelated ChannelAgent process can be affected.
-    $knownLaunchers = @(
-        [System.IO.Path]::GetFullPath((Join-Path $InstallRoot 'ChannelAgent.exe')),
-        [System.IO.Path]::GetFullPath((Join-Path $PackageRoot 'ChannelAgent.exe'))
-    )
-    Get-CimInstance Win32_Process -Filter "Name='ChannelAgent.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.ExecutablePath -and $knownLaunchers -contains [System.IO.Path]::GetFullPath($_.ExecutablePath)) {
-            Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
-        }
-    }
+    # Do not touch the installed tree until the new package is fully staged and
+    # the exact known launcher has released its file handles.
+    Stop-KnownAgentLauncher $InstallRoot $DataRoot
 }
 
-New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
-Get-ChildItem -LiteralPath $PackageRoot -Force | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $InstallRoot -Recurse -Force
+$installParent = Split-Path -Parent $InstallRoot
+$installLeaf = Split-Path -Leaf $InstallRoot
+New-Item -ItemType Directory -Path $installParent -Force | Out-Null
+$transactionId = [Guid]::NewGuid().ToString('N')
+$stageRoot = Join-Path $installParent ".$installLeaf.incoming-$transactionId"
+$rollbackRoot = Join-Path $installParent ".$installLeaf.rollback-$transactionId"
+try {
+    New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+    Get-ChildItem -LiteralPath $PackageRoot -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $stageRoot -Recurse -Force
+    }
+    Assert-PackageIntegrity $stageRoot $packageManifest
+    if ($existingInstall) { Move-Item -LiteralPath $InstallRoot -Destination $rollbackRoot }
+    try {
+        Move-Item -LiteralPath $stageRoot -Destination $InstallRoot
+    } catch {
+        if (Test-Path -LiteralPath $rollbackRoot -PathType Container) {
+            Move-Item -LiteralPath $rollbackRoot -Destination $InstallRoot
+        }
+        throw
+    }
+    if (Test-Path -LiteralPath $rollbackRoot -PathType Container) {
+        Remove-Item -LiteralPath $rollbackRoot -Recurse -Force
+    }
+} finally {
+    if (Test-Path -LiteralPath $stageRoot -PathType Container) {
+        Remove-Item -LiteralPath $stageRoot -Recurse -Force
+    }
 }
 foreach ($relative in @('config', 'logs', 'runtime')) {
     New-Item -ItemType Directory -Path (Join-Path $DataRoot $relative) -Force | Out-Null

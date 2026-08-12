@@ -33,7 +33,11 @@ $appStage = Join-Path $stageRoot 'app'
 $packageRoot = Join-Path $resolvedOutput 'AI-CS-Channel-Agent'
 $archive = Join-Path $resolvedOutput "AI-CS-Channel-Agent-$version-windows-x64.zip"
 if (Test-Path -LiteralPath $resolvedOutput) {
-    if ($resolvedOutput -ne $allowedOutputRoot) { throw 'Refusing to clear unexpected output root.' }
+    $allowedPrefix = $allowedOutputRoot.TrimEnd('\') + '\'
+    if (
+        $resolvedOutput -ne $allowedOutputRoot -and
+        -not $resolvedOutput.StartsWith($allowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+    ) { throw 'Refusing to clear unexpected output root.' }
     Remove-Item -LiteralPath $resolvedOutput -Recurse -Force
 }
 foreach ($path in @(
