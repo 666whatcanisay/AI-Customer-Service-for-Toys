@@ -18,6 +18,8 @@ $serviceCredentialReference = 'wincred://AI-CS/ChannelEngine/ai-cs-desktop-03452
 $pairingCredentialReference = 'wincred://AI-CS/ChannelEngine/ai-cs-desktop-0345200/PairingCodeV2'
 $scheme = 'https'
 $publicUrl = "${scheme}://${BindAddress}:$Port"
+$databasePath = Join-Path $repoRoot '.runtime\channel-engine.sqlite3'
+$databaseBindingPath = "$databasePath.binding.json"
 
 if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
     throw 'CHANNEL_ENGINE_PYTHON_UNAVAILABLE'
@@ -39,7 +41,10 @@ $pairingCode | & $python (Join-Path $repoRoot 'scripts\support\provision_channel
 if ($LASTEXITCODE -ne 0) { throw 'PAIRING_CREDENTIAL_PROVISIONING_FAILED' }
 
 $env:PYTHONPATH = Join-Path $repoRoot 'src'
-$env:CHANNEL_ENGINE_DATABASE_URL = 'sqlite:///' + ((Join-Path $repoRoot '.runtime\channel-engine.sqlite3').Replace('\','/'))
+$env:CHANNEL_ENGINE_DATABASE_URL = 'sqlite:///' + ($databasePath.Replace('\','/'))
+$env:CHANNEL_ENGINE_DATABASE_BINDING_PATH = $databaseBindingPath
+$env:CHANNEL_ENGINE_DATABASE_ENVIRONMENT_ID = 'RC5_CHANNEL_ENGINE_LOCAL'
+$env:CHANNEL_ENGINE_REQUIRE_DATABASE_IDENTITY = 'true'
 $env:CHANNEL_ENGINE_AGENT_CONTROL_V2_ENABLED = 'true'
 $env:CHANNEL_ENGINE_AGENT_HOST_ID = 'ai-cs-desktop-0345200'
 $env:CHANNEL_ENGINE_AGENT_PUBLIC_URL = $publicUrl

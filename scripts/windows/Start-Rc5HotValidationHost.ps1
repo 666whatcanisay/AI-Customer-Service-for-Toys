@@ -46,6 +46,9 @@ New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
 
 $env:PYTHONPATH = Join-Path $repoRoot 'src'
 $env:CHANNEL_ENGINE_DATABASE_URL = 'sqlite:///' + ($databasePath.Replace('\','/'))
+$env:CHANNEL_ENGINE_DATABASE_BINDING_PATH = "$databasePath.binding.json"
+$env:CHANNEL_ENGINE_DATABASE_ENVIRONMENT_ID = 'RC5_CHANNEL_ENGINE_LOCAL'
+$env:CHANNEL_ENGINE_REQUIRE_DATABASE_IDENTITY = 'true'
 $env:CHANNEL_ENGINE_AGENT_CONTROL_V2_ENABLED = 'true'
 $env:CHANNEL_ENGINE_AGENT_HOST_ID = 'ai-cs-desktop-0345200'
 $env:CHANNEL_ENGINE_AGENT_PUBLIC_URL = "https://127.0.0.1:$Port"

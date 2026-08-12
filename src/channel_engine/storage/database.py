@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from channel_engine.models.entities import utc_now
 
-from .versioning import ensure_runtime_storage_version
+from .versioning import ensure_runtime_storage_version, validate_runtime_storage_version
 
 
 class Base(DeclarativeBase):
@@ -50,12 +50,41 @@ def create_engine_and_session(database_url: str) -> tuple[Engine, sessionmaker[S
 
 
 def create_schema(engine: Engine) -> None:
+    """Explicitly initialize or additively upgrade a development/test database."""
+
     from . import orm  # noqa: F401
 
     Base.metadata.create_all(engine)
     if engine.dialect.name == "sqlite":
         _upgrade_sqlite_runtime_columns(engine)
     ensure_runtime_storage_version(engine, utc_now())
+
+
+def validate_schema(engine: Engine) -> None:
+    """Validate production schema compatibility without executing DDL or UPDATE."""
+
+    from . import orm  # noqa: F401
+
+    inspector = inspect(engine)
+    actual_tables = set(inspector.get_table_names())
+    expected_tables = set(Base.metadata.tables)
+    missing_tables = sorted(expected_tables - actual_tables)
+    if missing_tables:
+        raise RuntimeError(
+            "channel engine database schema is not initialized; missing tables: "
+            + ", ".join(missing_tables)
+        )
+    for table_name, table in Base.metadata.tables.items():
+        actual_columns = {
+            column["name"] for column in inspector.get_columns(table_name)
+        }
+        missing_columns = sorted(set(table.columns.keys()) - actual_columns)
+        if missing_columns:
+            raise RuntimeError(
+                f"channel engine database table {table_name} is missing columns: "
+                + ", ".join(missing_columns)
+            )
+    validate_runtime_storage_version(engine, utc_now())
 
 
 def _upgrade_sqlite_runtime_columns(engine: Engine) -> None:

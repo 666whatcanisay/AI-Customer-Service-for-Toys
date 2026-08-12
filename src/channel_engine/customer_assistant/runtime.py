@@ -318,6 +318,13 @@ class CustomerAssistantRuntime:
 
         return self._buffer.load_reply(decision_id)
 
+    def stored_replies(
+        self,
+    ) -> tuple[tuple[CustomerContext, AIReplyPackage], ...]:
+        """Enumerate canonical durable replies for projection reconciliation."""
+
+        return self._buffer.stored_replies()
+
     def purge_expired_content(
         self, *, retention: timedelta = timedelta(hours=24)
     ) -> dict[str, int]:

@@ -26,6 +26,7 @@ from channel_engine.pdd_adapter import PDDPrivacyFilteredMessage
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
 from .control_store import AgentControlStore
+from .assistant_projection import AssistantProjectionReconciler
 from .observation_pipeline import AgentObservationContextProvider
 from .observation_worker import AgentObservationWorker
 
@@ -57,6 +58,7 @@ class HostAssistantComposition:
     offline_control: OfflineReplyControlStore
     buffer: SQLiteConversationBuffer
     gateway: ProductionGatewayClient | None = None
+    projection_reconciler: AssistantProjectionReconciler | None = None
 
     def close(self) -> None:
         if self.gateway is not None:
@@ -171,7 +173,18 @@ def build_host_assistant_composition(
         offline_control=offline_control,
         clock=clock,
     )
-    return HostAssistantComposition(worker, offline_control, buffer, gateway)
+    return HostAssistantComposition(
+        worker,
+        offline_control,
+        buffer,
+        gateway,
+        AssistantProjectionReconciler(
+            control_store,
+            assistant,
+            offline_control,
+            clock=clock,
+        ),
+    )
 
 
 __all__ = [

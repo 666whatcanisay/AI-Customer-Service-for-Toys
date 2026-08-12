@@ -1,29 +1,38 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from collections.abc import Callable
 import os
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from sqlalchemy.engine import make_url
 
-from channel_engine import __version__
-from channel_engine.agent.binding_repository import (
-    SqlAlchemyActiveStoreGuard,
-    SqlAlchemyAgentIdentityRepository,
-    SqlAlchemyEnrollmentGrantRepository,
-)
-from channel_engine.agent.control_store import AgentControlStore, SqlAlchemyReplayNonceStore
-from channel_engine.agent.control_v2 import (
-    create_channel_agent_control_v2_router,
-    create_channel_agent_service_v2_router,
-)
-from channel_engine.agent.execution_commands import SqlAlchemyAgentReceiptReconciler
 from channel_agent.control_v2 import (
     AgentCommandEnvelope,
     AgentObservationSubmission,
     ServiceApprovalDelivery,
 )
 from channel_agent.observation_stages import ObservationStage
+from channel_engine import __version__
+from channel_engine.agent.assistant_factory import (
+    HostAssistantComposition,
+    build_host_assistant_composition,
+)
+from channel_engine.agent.binding_repository import (
+    SqlAlchemyActiveStoreGuard,
+    SqlAlchemyAgentIdentityRepository,
+    SqlAlchemyEnrollmentGrantRepository,
+)
+from channel_engine.agent.control_store import (
+    AgentControlStore,
+    SqlAlchemyReplayNonceStore,
+)
+from channel_engine.agent.control_v2 import (
+    create_channel_agent_control_v2_router,
+    create_channel_agent_service_v2_router,
+)
+from channel_engine.agent.execution_commands import SqlAlchemyAgentReceiptReconciler
 from channel_engine.agent.host_control import (
     build_agent_control_v2_from_env,
     build_ai_cs_service_verifier_from_env,
@@ -33,12 +42,13 @@ from channel_engine.agent.observation_worker import (
     AgentObservationWorker,
     AgentObservationWorkerRunner,
 )
-from channel_engine.agent.assistant_factory import (
-    HostAssistantComposition,
-    build_host_assistant_composition,
-)
 from channel_engine.config import Settings
-from channel_engine.storage import SqlAlchemyUnitOfWork, create_engine_and_session, create_schema
+from channel_engine.storage import (
+    SqlAlchemyUnitOfWork,
+    create_engine_and_session,
+    validate_schema,
+)
+from channel_engine.storage.runtime_database_identity import validate_runtime_database
 
 
 def _observation_stage_from_env() -> ObservationStage:
@@ -100,7 +110,26 @@ def create_host_control_app(
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI):
-        create_schema(engine)
+        validate_schema(engine)
+        if active_settings.require_database_identity:
+            database_path = _local_sqlite_path(active_settings.database_url)
+            if (
+                active_settings.database_binding_path is None
+                or active_settings.database_environment_id is None
+            ):
+                raise ValueError("Channel Engine runtime database identity is required")
+            validate_runtime_database(
+                database_path,
+                active_settings.database_binding_path,
+                expected_environment_id=active_settings.database_environment_id,
+            )
+        if (
+            assistant_composition is not None
+            and assistant_composition.projection_reconciler is not None
+        ):
+            application.state.channel_agent_projection_reconciliation = (
+                assistant_composition.projection_reconciler.reconcile()
+            )
         if worker_runner is not None:
             worker_runner.start()
         try:
@@ -189,7 +218,14 @@ def create_host_control_app(
     return application
 
 
-app = create_host_control_app()
+def _local_sqlite_path(database_url: str) -> Path:
+    parsed = make_url(database_url)
+    if parsed.get_backend_name() != "sqlite" or not parsed.database:
+        raise ValueError("production Host Control requires an explicit SQLite database")
+    path = Path(parsed.database).expanduser()
+    if not path.is_absolute():
+        raise ValueError("production Host Control SQLite path must be absolute")
+    return path.resolve(strict=False)
 
 
 def run() -> None:
@@ -198,11 +234,12 @@ def run() -> None:
     import uvicorn
 
     uvicorn.run(
-        "channel_engine.production_app:app",
+        "channel_engine.production_app:create_host_control_app",
         host="127.0.0.1",
         port=8000,
         reload=False,
+        factory=True,
     )
 
 
-__all__ = ["app", "create_host_control_app", "run"]
+__all__ = ["create_host_control_app", "run"]

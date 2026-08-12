@@ -84,7 +84,11 @@ $pairingCode | & $python (Join-Path $repoRoot 'scripts\support\provision_channel
     --credential-reference $pairingCredentialReference --expires-in-seconds 300 | Out-Null
 if ($LASTEXITCODE -ne 0) { throw '无法安全保存短期连接码。' }
 $publicUrl = "https://${BindAddress}:$AgentPort"
-$env:CHANNEL_ENGINE_DATABASE_URL = 'sqlite:///' + ((Join-Path $runtimeRoot 'channel-engine.sqlite3').Replace('\','/'))
+$engineDatabasePath = Join-Path $runtimeRoot 'channel-engine.sqlite3'
+$env:CHANNEL_ENGINE_DATABASE_URL = 'sqlite:///' + ($engineDatabasePath.Replace('\','/'))
+$env:CHANNEL_ENGINE_DATABASE_BINDING_PATH = "$engineDatabasePath.binding.json"
+$env:CHANNEL_ENGINE_DATABASE_ENVIRONMENT_ID = 'RC5_LAN_HOST'
+$env:CHANNEL_ENGINE_REQUIRE_DATABASE_IDENTITY = 'true'
 $env:CHANNEL_ENGINE_AGENT_CONTROL_V2_ENABLED = 'true'
 $env:CHANNEL_ENGINE_AGENT_HOST_ID = $hostId
 $env:CHANNEL_ENGINE_AGENT_PUBLIC_URL = $publicUrl

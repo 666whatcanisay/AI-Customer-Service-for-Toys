@@ -597,6 +597,44 @@ class OfflineReplyControlStore:
         value = ExecutionPreparation.model_validate_json(row[0])
         return value.model_copy(update={"state": PreparationState(row[1])})
 
+    def reply_outcome(self, decision_id: str) -> ReplyControlOutcome | None:
+        """Read the immutable decision snapshot without re-evaluating policy."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT store_id,policy_mode,policy_revision,quality_status,
+                       quality_reasons,created_at
+                FROM offline_reply_decisions WHERE decision_id=?
+                """,
+                (decision_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        store_id, policy_mode, policy_revision, quality_status, reasons, created_at = row
+        preparation = self.preparation(decision_id)
+        quality = QualityGateResult(
+            decision_id=decision_id,
+            status=QualityGateStatus(quality_status),
+            reason_codes=tuple(json.loads(reasons)),
+            checked_at=datetime.fromisoformat(created_at),
+        )
+        policy = ReplyPolicy(
+            store_id=store_id,
+            mode=ReplyPolicyMode(policy_mode),
+            revision=int(policy_revision),
+            updated_by=f"decision-snapshot:{decision_id}",
+            updated_at=datetime.fromisoformat(created_at),
+        )
+        return ReplyControlOutcome(
+            policy=policy,
+            quality=quality,
+            preparation=preparation,
+            waiting_for_human=(
+                preparation is None and quality.status is QualityGateStatus.PASS
+            ),
+        )
+
     def authorized_history_candidates(
         self,
         *,

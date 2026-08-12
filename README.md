@@ -45,7 +45,7 @@ python -m venv .venv
 只启动本地受控 API：
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn channel_engine.production_app:app --host 127.0.0.1 --port 18020
+.\.venv\Scripts\python.exe -m uvicorn channel_engine.production_app:create_host_control_app --factory --host 127.0.0.1 --port 18020
 ```
 
 执行 RC5 后端黑盒验收（不会启动浏览器或调用真实发送）：

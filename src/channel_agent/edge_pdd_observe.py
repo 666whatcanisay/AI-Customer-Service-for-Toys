@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 from datetime import UTC, datetime, timedelta
@@ -44,6 +45,8 @@ class PDDWorkspaceProduct(EdgePDDObserveModel):
 
 class PDDWorkspaceOrder(EdgePDDObserveModel):
     order_reference: str | None = Field(default=None, max_length=255)
+    logistics_reference: str | None = Field(default=None, max_length=255)
+    aftersales_reference: str | None = Field(default=None, max_length=255)
     order_status: str | None = Field(default=None, max_length=128)
     logistics_status: str | None = Field(default=None, max_length=128)
     aftersales_status: str | None = Field(default=None, max_length=128)
@@ -91,7 +94,7 @@ class PDDWorkspaceSnapshot(EdgePDDObserveModel):
     captured_at: AwareDatetime
 
     @model_validator(mode="after")
-    def validate_messages(self) -> "PDDWorkspaceSnapshot":
+    def validate_messages(self) -> PDDWorkspaceSnapshot:
         ordered = tuple(
             sorted(
                 self.messages,
@@ -119,10 +122,12 @@ class PDDWorkspaceObservationMapper:
         agent_id: str,
         device_id: str,
         provider_id: str = "pdd-readonly",
+        reference_tokenizer: PDDLocalReferenceTokenizer | None = None,
     ) -> None:
         self.agent_id = agent_id
         self.device_id = device_id
         self.provider_id = provider_id
+        self._reference_tokenizer = reference_tokenizer
 
     def map_customer_messages(
         self,
@@ -147,7 +152,14 @@ class PDDWorkspaceObservationMapper:
                 timestamp=item.timestamp,
             )
             for item in snapshot.messages[-20:]
-            if item.sender != "UNKNOWN" and (filtered := privacy_filter(item.content))
+            if item.sender != "UNKNOWN"
+            and (
+                filtered := privacy_filter(
+                    item.content,
+                    tokenizer=self._reference_tokenizer,
+                    store_id=snapshot.store_id,
+                )
+            )
         )
         results: list[EdgeObservation] = []
         for message in snapshot.messages:
@@ -158,7 +170,11 @@ class PDDWorkspaceObservationMapper:
                 and message.external_message_id not in selected_message_ids
             ):
                 continue
-            content = privacy_filter(message.content)
+            content = privacy_filter(
+                message.content,
+                tokenizer=self._reference_tokenizer,
+                store_id=snapshot.store_id,
+            )
             if not content:
                 continue
             payload = {
@@ -175,7 +191,12 @@ class PDDWorkspaceObservationMapper:
                 "content": content,
                 "timestamp": message.timestamp.isoformat(),
                 "product": snapshot.product.model_dump(mode="json"),
-                "order": snapshot.order.model_dump(mode="json"),
+                "order": _privacy_safe_order(
+                    snapshot.order,
+                    tokenizer=self._reference_tokenizer,
+                    store_id=snapshot.store_id,
+                    real_pdd=is_real,
+                ),
                 "page_fingerprint": snapshot.page_fingerprint,
                 "selector_evidence_hash": snapshot.selector_evidence_hash,
                 "privacy_filtered": True,
@@ -186,7 +207,7 @@ class PDDWorkspaceObservationMapper:
                     (
                         f"{self.provider_id}\0{snapshot.store_id}\0"
                         f"{snapshot.conversation_id}\0{message.external_message_id}"
-                    ).encode("utf-8")
+                    ).encode()
                 ).hexdigest(),
                 "visible_history": [
                     item.model_dump(mode="json") for item in visible_history
@@ -226,24 +247,115 @@ class PDDWorkspaceObservationMapper:
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 _ID_CARD = re.compile(r"(?<!\d)\d{17}[0-9Xx](?!\w)")
 _PAYMENT = re.compile(r"(?<!\d)\d{12,19}(?!\d)")
+_ADDRESS = re.compile(
+    r"(?:收货地址|详细地址|地址|address)\s*[:：]?\s*[^。；;\n]{2,180}",
+    re.IGNORECASE,
+)
+_SOCIAL_ACCOUNT = re.compile(
+    r"(?:微信号|微信|wx|wechat)\s*[:：]?\s*[A-Za-z0-9_-]{5,64}",
+    re.IGNORECASE,
+)
+_EXPLICIT_NAME = re.compile(
+    r"(?:收货人|姓名|我叫|name)\s*[:：]?\s*"
+    r"(?:[\u4e00-\u9fff·]{2,12}|[A-Za-z][A-Za-z .'-]{1,40})",
+    re.IGNORECASE,
+)
+_BUSINESS_REFERENCE = re.compile(
+    r"(?P<label>订单号|订单编号|order(?:\s*id)?|"
+    r"物流单号|运单号|tracking(?:\s*(?:id|number))?)"
+    r"\s*[:：#]?\s*(?P<value>[A-Za-z0-9_-]{6,64})",
+    re.IGNORECASE,
+)
 
 
-def privacy_filter(content: str) -> str:
-    value = _PHONE.sub("[手机号已脱敏]", content)
+class PDDLocalReferenceTokenizer:
+    """Create stable non-reversible tokens for business-critical identifiers."""
+
+    def __init__(self, key: bytes) -> None:
+        if len(key) < 32:
+            raise ValueError("PDD reference token key must contain at least 32 bytes")
+        self._key = bytes(key)
+
+    def tokenize(self, kind: str, value: str, *, store_id: str) -> str:
+        canonical_kind = kind.strip().upper()
+        prefix = {
+            "ORDER": "PDD_ORDER",
+            "LOGISTICS": "PDD_LOGISTICS",
+            "AFTERSALES": "PDD_AFTERSALES",
+        }.get(canonical_kind)
+        if prefix is None or not value.strip() or not store_id.strip():
+            raise ValueError("PDD business reference token input is invalid")
+        digest = hmac.new(
+            self._key,
+            f"{store_id}\0{canonical_kind}\0{value.strip()}".encode(),
+            hashlib.sha256,
+        ).hexdigest()[:16].upper()
+        return f"{prefix}_{digest}"
+
+
+def privacy_filter(
+    content: str,
+    *,
+    tokenizer: PDDLocalReferenceTokenizer | None = None,
+    store_id: str = "UNKNOWN",
+) -> str:
+    def replace_reference(match: re.Match[str]) -> str:
+        label = match.group("label").casefold()
+        kind = (
+            "LOGISTICS"
+            if any(marker in label for marker in ("物流", "运单", "tracking"))
+            else "ORDER"
+        )
+        if tokenizer is None:
+            return f"{kind}_[REFERENCE_REDACTED]"
+        return tokenizer.tokenize(kind, match.group("value"), store_id=store_id)
+
+    value = _BUSINESS_REFERENCE.sub(replace_reference, content)
+    value = _PHONE.sub("[手机号已脱敏]", value)
     value = _ID_CARD.sub("[证件号已脱敏]", value)
     value = _PAYMENT.sub("[支付信息已脱敏]", value)
+    value = _ADDRESS.sub("[ADDRESS_REDACTED]", value)
+    value = _SOCIAL_ACCOUNT.sub("[SOCIAL_ACCOUNT_REDACTED]", value)
+    value = _EXPLICIT_NAME.sub("[NAME_REDACTED]", value)
+
     return value.strip()
+
+
+def _privacy_safe_order(
+    order: PDDWorkspaceOrder,
+    *,
+    tokenizer: PDDLocalReferenceTokenizer | None,
+    store_id: str,
+    real_pdd: bool,
+) -> dict[str, object]:
+    result = order.model_dump(mode="json")
+    for field, kind in {
+        "order_reference": "ORDER",
+        "logistics_reference": "LOGISTICS",
+        "aftersales_reference": "AFTERSALES",
+    }.items():
+        value = result.get(field)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        if real_pdd and tokenizer is None:
+            raise PDDWorkspaceBoundaryError(
+                "REAL_PDD business reference requires a local tokenizer"
+            )
+        if tokenizer is not None:
+            result[field] = tokenizer.tokenize(kind, value, store_id=store_id)
+    return result
 
 
 __all__ = [
     "EdgePDDObserveModel",
+    "PDDLocalReferenceTokenizer",
     "PDDSelectorRuntimeEvidence",
+    "PDDVisibleHistoryItem",
     "PDDWorkspaceBoundaryError",
     "PDDWorkspaceMessage",
     "PDDWorkspaceObservationMapper",
     "PDDWorkspaceOrder",
     "PDDWorkspaceProduct",
     "PDDWorkspaceSnapshot",
-    "PDDVisibleHistoryItem",
     "privacy_filter",
 ]

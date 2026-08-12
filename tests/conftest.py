@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 
 import pytest
+
+os.environ.setdefault("CHANNEL_ENGINE_DATABASE_URL", "sqlite://")
+os.environ.setdefault("CHANNEL_ENGINE_REQUIRE_DATABASE_IDENTITY", "false")
 
 from channel_engine.execution import FakeExecutor
 from channel_engine.gateway import FakeGateway

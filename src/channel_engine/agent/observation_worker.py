@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from threading import Event, Lock, Thread
-from typing import Callable, Literal
+from typing import Literal
 
+from channel_agent.observation_stages import ObservationStage
 from channel_engine.customer_assistant import (
     CustomerAssistantRuntime,
     OfflineReplyControlStore,
@@ -19,9 +21,8 @@ from channel_engine.customer_assistant.models import (
     ConversationTurn,
 )
 from channel_engine.pdd_adapter import PDDPrivacyFilteredMessage
-from channel_agent.control_v2 import AgentAssistantSnapshot
-from channel_agent.observation_stages import ObservationStage
 
+from .assistant_projection import build_assistant_snapshot
 from .control_store import AgentControlStore
 from .observation_pipeline import PDDObservationPayload
 
@@ -54,6 +55,7 @@ class AgentObservationWorker:
         stage: ObservationStage = ObservationStage.AI_SUGGESTIONS,
         offline_control: OfflineReplyControlStore | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        fault_injector: Callable[[str], None] | None = None,
     ) -> None:
         if observer_mode != "OBSERVE_ONLY":
             raise AgentObservationWorkerError(
@@ -64,6 +66,7 @@ class AgentObservationWorker:
         self._stage = stage
         self._offline_control = offline_control
         self._clock = clock
+        self._fault_injector = fault_injector or (lambda _checkpoint: None)
 
     def run_once(self, *, limit: int = 100) -> AgentObservationWorkerResult:
         self._store.purge_expired()
@@ -263,6 +266,7 @@ class AgentObservationWorker:
                 break
             if package is None:
                 break
+            self._fault_injector("AFTER_BUFFER_REPLY_COMMIT")
             scope = self._scope(package.store_id, package.conversation_id)
             if scope is None:
                 raise AgentObservationWorkerError("assistant event route is unavailable")
@@ -301,72 +305,27 @@ class AgentObservationWorker:
                     package,
                     trace_id=trace_id,
                 )
+            self._fault_injector("AFTER_CONTROL_DECISION_COMMIT")
             status = package.state
             if control_outcome is not None:
-                if control_outcome.preparation is not None:
+                if (
+                    control_outcome.preparation is not None
+                    and control_outcome.preparation.state.value == "READY"
+                ):
                     status = "EXECUTION_PREPARED"
                 elif control_outcome.quality.status.value == "BLOCKED":
                     status = "MANUAL_INTERVENTION"
             self._store.persist_assistant_snapshot(
-                AgentAssistantSnapshot(
+                build_assistant_snapshot(
+                    package,
+                    control_outcome,
                     agent_id=scope[0],
                     device_id=scope[1],
-                    store_id=package.store_id,
-                    conversation_id=package.conversation_id,
-                    revision=1,
-                    status=status,
-                    turn_id=package.turn_id,
-                    decision_id=package.decision_id,
-                    request_id=package.request_id,
-                    customer_reference=package.customer_reference,
-                    current_question=package.customer_question,
-                    action=package.action,
-                    reply_content=package.reply_content,
-                    risk_level=package.risk_level.value,
-                    ai_cs_action=getattr(package, "ai_cs_action", "UNKNOWN"),
-                    warnings=getattr(package, "warnings", ()),
-                    required_fields=getattr(package, "required_fields", ()),
-                    policy_mode=(
-                        control_outcome.policy.mode.value
-                        if control_outcome is not None
-                        else "MANUAL_CONFIRM"
-                    ),
-                    quality_status=(
-                        control_outcome.quality.status.value
-                        if control_outcome is not None
-                        else "PASS"
-                    ),
-                    preparation_id=(
-                        control_outcome.preparation.preparation_id
-                        if control_outcome is not None
-                        and control_outcome.preparation is not None
-                        else None
-                    ),
                     trace_id=trace_id,
-                    processing_stage=(
-                        "EXECUTION_PREPARED"
-                        if status == "EXECUTION_PREPARED"
-                        else "WAITING_CONFIRMATION"
-                    ),
-                    safety={
-                        "manual_approval_required": status != "EXECUTION_PREPARED",
-                        "auto_reply": bool(
-                            control_outcome is not None
-                            and control_outcome.preparation is not None
-                            and control_outcome.preparation.authorization_kind.value
-                            == "AUTO_POLICY"
-                        ),
-                        "execution_prepared": status == "EXECUTION_PREPARED",
-                        "preparation_count": 1 if status == "EXECUTION_PREPARED" else 0,
-                    },
-                    citations=tuple(
-                        citation.model_dump(mode="json")
-                        for citation in package.citations
-                    ),
-                    updated_at=now,
-                    expires_at=now + timedelta(minutes=30),
+                    now=now,
                 )
             )
+            self._fault_injector("AFTER_ASSISTANT_SNAPSHOT_COMMIT")
             self._store.append_assistant_event(
                 event_id=_event_id("AI_SUGGESTION_READY", package.decision_id),
                 event_type="AI_SUGGESTION_READY",

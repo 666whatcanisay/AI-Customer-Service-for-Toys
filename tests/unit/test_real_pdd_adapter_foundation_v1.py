@@ -17,8 +17,10 @@ from channel_agent.controlled_send_grant import (
     ControlledSendGrantV1,
 )
 from channel_agent.edge_pdd_observe import (
+    PDDLocalReferenceTokenizer,
     PDDWorkspaceMessage,
     PDDWorkspaceObservationMapper,
+    PDDWorkspaceOrder,
     PDDWorkspaceSnapshot,
 )
 from channel_agent.edge_spool import DurableEdgeSpool, EdgeSpoolConflict
@@ -30,7 +32,6 @@ from channel_engine.agent.observation_pipeline import (
     PDDObservationPayload,
 )
 from channel_engine.provider import NormalizedChannelObservation
-
 
 NOW = datetime(2026, 8, 12, 7, 0, tzinfo=UTC)
 STORE = "c-store-pilot"
@@ -106,6 +107,54 @@ def test_mapper_emits_v22_real_provider_and_page_history() -> None:
     assert all(item.source == "REAL_PDD" for item in payload.visible_history)
 
 
+def test_real_business_references_are_stable_tokens_and_never_cross_raw() -> None:
+    tokenizer = PDDLocalReferenceTokenizer(b"privacy-token-key-32-bytes-minimum!!")
+    snapshot = _snapshot().model_copy(
+        update={
+            "order": PDDWorkspaceOrder(
+                order_reference="RAW-ORDER-A1B2C3",
+                logistics_reference="RAW-TRACK-Z9Y8X7",
+                order_status="PAID",
+            ),
+            "messages": (
+                PDDWorkspaceMessage(
+                    external_message_id="customer-private-1",
+                    sender="CUSTOMER",
+                    content=(
+                        "姓名：张三，地址：上海市示例路88号；"
+                        "微信号 wx_secret_88；订单号 RAW-ORDER-A1B2C3"
+                    ),
+                    timestamp=NOW,
+                    sequence=1,
+                ),
+            ),
+        }
+    )
+    payload = PDDWorkspaceObservationMapper(
+        agent_id="agent-1",
+        device_id="device-1",
+        reference_tokenizer=tokenizer,
+    ).map_customer_messages(snapshot)[0].payload
+
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "张三" not in serialized
+    assert "上海市示例路88号" not in serialized
+    assert "wx_secret_88" not in serialized
+    assert "RAW-ORDER-A1B2C3" not in serialized
+    assert payload["order"]["order_reference"].startswith("PDD_ORDER_")
+    assert payload["order"]["logistics_reference"].startswith("PDD_LOGISTICS_")
+
+
+def test_real_order_reference_without_local_tokenizer_fails_closed() -> None:
+    snapshot = _snapshot().model_copy(
+        update={"order": PDDWorkspaceOrder(order_reference="RAW-ORDER-A1B2C3")}
+    )
+    with pytest.raises(Exception, match="local tokenizer"):
+        PDDWorkspaceObservationMapper(
+            agent_id="agent-1", device_id="device-1"
+        ).map_customer_messages(snapshot)
+
+
 def test_v21_remains_accepted_but_cannot_carry_visible_history() -> None:
     payload = PDDWorkspaceObservationMapper(
         agent_id="agent-1", device_id="device-1"
@@ -166,6 +215,25 @@ def test_real_provider_is_bounded_and_rejects_non_real_items() -> None:
     assert item.provider_id == "pilot-real"
     with pytest.raises(ProviderUnavailable):
         RealPDDProvider(lambda limit: (real, real)).poll(limit=1)
+
+
+def test_real_provider_revalidates_copied_business_references() -> None:
+    real = NormalizedChannelObservation.synthetic(
+        provider_id="seed",
+        store_id=STORE,
+        conversation_id=CONVERSATION,
+        external_message_id="message-unsafe",
+        source_sequence=1,
+        content="只读消息",
+        timestamp=NOW,
+    ).model_copy(
+        update={
+            "provider_kind": "REAL_PDD",
+            "order": {"order_reference": "RAW-ORDER-A1B2C3"},
+        }
+    )
+    with pytest.raises(ProviderUnavailable):
+        RealPDDProvider(lambda _limit: (real,)).poll(limit=1)
 
 
 def test_pdd_store_binding_projects_verified_server_mapping() -> None:

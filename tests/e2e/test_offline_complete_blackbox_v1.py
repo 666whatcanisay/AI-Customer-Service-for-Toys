@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -172,6 +173,88 @@ def test_black_box_manual_confirm_reaches_execution_prepared_without_real_send(
         } <= stages.keys()
         assert stages["EXECUTION_PREPARED"].reason_code == "REAL_SEND_BLOCKED"
         assert runtime.offline_control.real_success_count() == 0
+    finally:
+        runtime.close()
+
+
+@pytest.mark.parametrize(
+    "checkpoint",
+    [
+        "AFTER_BUFFER_REPLY_COMMIT",
+        "AFTER_CONTROL_DECISION_COMMIT",
+        "AFTER_ASSISTANT_SNAPSHOT_COMMIT",
+    ],
+)
+def test_projection_reconciler_repairs_each_cross_database_crash_window(
+    tmp_path: Path,
+    checkpoint: str,
+) -> None:
+    root = tmp_path / checkpoint.casefold()
+    gateway = OfflineAICSGateway()
+    triggered = False
+
+    def fail_once(value: str) -> None:
+        nonlocal triggered
+        if not triggered and value == checkpoint:
+            triggered = True
+            raise RuntimeError(f"injected crash at {value}")
+
+    first = OfflineCompleteRuntime(
+        root,
+        gateway,
+        clock=lambda: NOW,
+        fault_injector=fail_once,
+    )
+    value = observation(message_id="synthetic-message-1")
+    try:
+        first.ingest_provider(SyntheticPDDProvider((value,)))
+        with pytest.raises(RuntimeError, match="injected crash"):
+            first.drain()
+    finally:
+        first.close()
+
+    recovered = OfflineCompleteRuntime(root, gateway, clock=lambda: NOW)
+    try:
+        snapshot = recovered.conversations()[0]
+        assert snapshot.status == "WAITING_APPROVAL"
+        assert snapshot.safety.real_send is False
+        assert recovered.offline_control.reply_outcome(snapshot.decision_id) is not None
+        revision = snapshot.revision
+
+        second = recovered.reconcile_projections()
+        assert second.unchanged == 1
+        assert second.snapshots_rebuilt == 0
+        assert recovered.conversations()[0].revision == revision
+        assert recovered.offline_control.real_success_count() == 0
+    finally:
+        recovered.close()
+
+
+def test_runtime_backup_quiesces_reconciles_and_creates_one_epoch(
+    tmp_path: Path,
+) -> None:
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "backup-runtime", OfflineAICSGateway(), clock=lambda: NOW
+    )
+    try:
+        runtime.ingest_provider(
+            SyntheticPDDProvider((observation(message_id="synthetic-message-1"),))
+        )
+        runtime.drain()
+        manifest = runtime.create_backup(tmp_path / "backup-set")
+
+        payload = json.loads((manifest.destination / "manifest.json").read_text())
+        assert payload["backup_epoch"] == manifest.backup_epoch
+        assert payload["whole_file_sha_usage"] == "BACKUP_EVIDENCE_ONLY"
+        assert payload["projection_reconciliation"]["unchanged"] == 1
+        assert set(payload["high_water_marks"]) == {
+            "HOST_CONTROL",
+            "CONVERSATION_BUFFER",
+            "OFFLINE_CONTROL",
+        }
+        assert all(item["sha256"] for item in payload["artifacts"])
+        for item in payload["artifacts"]:
+            assert (manifest.destination / item["backup_name"]).is_file()
     finally:
         runtime.close()
 

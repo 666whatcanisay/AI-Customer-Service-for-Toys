@@ -8,6 +8,10 @@ from pathlib import Path
 
 from channel_agent.control_v2 import AgentAssistantSnapshot, AgentObservationSubmission
 from channel_agent.observation_stages import ObservationStage
+from channel_engine.agent.assistant_projection import (
+    AssistantProjectionReconciliation,
+    AssistantProjectionReconciler,
+)
 from channel_engine.agent.control_store import AgentControlStore
 from channel_engine.agent.observation_pipeline import AgentObservationContextProvider
 from channel_engine.agent.observation_worker import (
@@ -29,6 +33,12 @@ from channel_engine.customer_assistant import (
     SQLiteConversationBuffer,
 )
 from channel_engine.gateway import AICSGateway
+from channel_engine.operations import (
+    RuntimeBackupManifest,
+    RuntimeBackupSet,
+    RuntimeMaintenanceBarrier,
+)
+from channel_engine.operations.runtime_backup import sqlite_high_water
 from channel_engine.provider import ChannelMessageProvider, NormalizedChannelObservation
 from channel_engine.storage import (
     SqlAlchemyUnitOfWork,
@@ -51,10 +61,12 @@ class OfflineCompleteRuntime:
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         quiet_window: timedelta = timedelta(milliseconds=1),
+        fault_injector: Callable[[str], None] | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self._clock = clock
+        self._maintenance = RuntimeMaintenanceBarrier()
         self._engine, sessions = create_engine_and_session(
             f"sqlite:///{(self.root / 'host.sqlite3').as_posix()}"
         )
@@ -99,7 +111,15 @@ class OfflineCompleteRuntime:
             stage=ObservationStage.AI_SUGGESTIONS,
             offline_control=self.offline_control,
             clock=clock,
+            fault_injector=fault_injector,
         )
+        self._reconciler = AssistantProjectionReconciler(
+            self.control_store,
+            assistant,
+            self.offline_control,
+            clock=clock,
+        )
+        self.last_reconciliation = self._reconciler.reconcile()
 
     def ingest_provider(
         self,
@@ -109,13 +129,19 @@ class OfflineCompleteRuntime:
         device_id: str = "offline-device",
         limit: int = 100,
     ) -> int:
-        observations = provider.poll(limit=max(1, min(limit, 100)))
-        for value in observations:
-            self._accept(value, agent_id=agent_id, device_id=device_id)
-        return len(observations)
+        with self._maintenance.operation():
+            observations = provider.poll(limit=max(1, min(limit, 100)))
+            for value in observations:
+                self._accept(value, agent_id=agent_id, device_id=device_id)
+            return len(observations)
 
     def drain(self, *, limit: int = 100) -> AgentObservationWorkerResult:
-        return self._worker.run_once(limit=limit)
+        with self._maintenance.operation():
+            return self._worker.run_once(limit=limit)
+
+    def reconcile_projections(self) -> AssistantProjectionReconciliation:
+        self.last_reconciliation = self._reconciler.reconcile()
+        return self.last_reconciliation
 
     def set_policy(
         self,
@@ -124,9 +150,10 @@ class OfflineCompleteRuntime:
         *,
         authorized_by: str = "offline:operator",
     ) -> ReplyPolicy:
-        return self.offline_control.set_policy(
-            store_id, mode, authorized_by=authorized_by
-        )
+        with self._maintenance.operation():
+            return self.offline_control.set_policy(
+                store_id, mode, authorized_by=authorized_by
+            )
 
     def prepare_manually(
         self,
@@ -137,16 +164,51 @@ class OfflineCompleteRuntime:
         conversation_id: str,
         customer_reference: str,
     ) -> ExecutionPreparation:
-        prepared = self.offline_control.prepare(
-            decision_id,
-            authorization_kind=AuthorizationKind.HUMAN,
-            authorized_by=authorized_by,
-            expected_store_id=store_id,
-            expected_conversation_id=conversation_id,
-            expected_customer_reference=customer_reference,
-        )
-        self.control_store.mark_snapshot_execution_prepared(prepared)
-        return prepared
+        with self._maintenance.operation():
+            prepared = self.offline_control.prepare(
+                decision_id,
+                authorization_kind=AuthorizationKind.HUMAN,
+                authorized_by=authorized_by,
+                expected_store_id=store_id,
+                expected_conversation_id=conversation_id,
+                expected_customer_reference=customer_reference,
+            )
+            self.control_store.mark_snapshot_execution_prepared(prepared)
+            return prepared
+
+    def create_backup(
+        self,
+        destination: str | Path,
+        *,
+        assets: dict[str, str | Path] | None = None,
+        timeout_seconds: float = 30.0,
+    ) -> RuntimeBackupManifest:
+        with self._maintenance.quiesce(timeout_seconds=timeout_seconds):
+            reconciliation = self._reconciler.reconcile()
+            self.last_reconciliation = reconciliation
+            databases = {
+                "HOST_CONTROL": self.root / "host.sqlite3",
+                "CONVERSATION_BUFFER": self.root / "conversation-buffer.sqlite3",
+                "OFFLINE_CONTROL": self.root / "offline-control.sqlite3",
+            }
+            high_water = {
+                role: sqlite_high_water(path) for role, path in databases.items()
+            }
+            return RuntimeBackupSet(
+                databases,
+                assets=assets,
+                clock=self._clock,
+            ).create(
+                destination,
+                projection_reconciliation={
+                    "durable_replies": reconciliation.durable_replies,
+                    "decisions_repaired": reconciliation.decisions_repaired,
+                    "snapshots_rebuilt": reconciliation.snapshots_rebuilt,
+                    "unchanged": reconciliation.unchanged,
+                    "unroutable": reconciliation.unroutable,
+                },
+                high_water_marks=high_water,
+            )
 
     def conversations(
         self,

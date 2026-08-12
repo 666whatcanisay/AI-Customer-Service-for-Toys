@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import UTC, datetime
 import hashlib
 import json
+import re
+from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
@@ -12,9 +13,9 @@ from channel_agent.control_v2 import AgentObservationSubmission
 from channel_engine.channel import NormalizedMessage
 from channel_engine.conversation import ConversationService, IntakeResult
 from channel_engine.customer_assistant import (
+    ContextPageState,
     ConversationHistoryCandidate,
     ConversationHistoryEntry,
-    ContextPageState,
     HistorySource,
     PageContext,
     ProductContext,
@@ -79,7 +80,7 @@ class PDDObservationPayload(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_v22_provider_boundary(self) -> "PDDObservationPayload":
+    def validate_v22_provider_boundary(self) -> PDDObservationPayload:
         if self.schema_version.endswith("v2.2"):
             if self.provider_id is None or self.provider_kind is None:
                 raise ValueError("PDD Observation v2.2 requires Provider identity")
@@ -88,6 +89,20 @@ class PDDObservationPayload(BaseModel):
             )
             if any(item.source != required_source for item in self.visible_history):
                 raise ValueError("visible history source does not match Provider kind")
+            if self.provider_kind == "REAL_PDD":
+                for field, prefix in {
+                    "order_reference": "PDD_ORDER_",
+                    "logistics_reference": "PDD_LOGISTICS_",
+                    "aftersales_reference": "PDD_AFTERSALES_",
+                }.items():
+                    value = self.order.get(field)
+                    if value is not None and (
+                        not isinstance(value, str)
+                        or re.fullmatch(rf"{prefix}[A-F0-9]{{16}}", value) is None
+                    ):
+                        raise ValueError(
+                            f"REAL_PDD {field} must use a local privacy token"
+                        )
         elif self.visible_history:
             raise ValueError("PDD Observation v2.1 cannot carry visible history")
         return self
@@ -282,9 +297,7 @@ class AgentObservationContextProvider:
             trace_id = payload.trace_id or (
                 "trace:"
                 + hashlib.sha256(
-                    f"{store_id}\0{conversation_id}\0{latest.observation_id}".encode(
-                        "utf-8"
-                    )
+                    f"{store_id}\0{conversation_id}\0{latest.observation_id}".encode()
                 ).hexdigest()
             )
             audit = dict(merged.audit)

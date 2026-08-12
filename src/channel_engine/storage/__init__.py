@@ -1,4 +1,4 @@
-from .database import Base, create_engine_and_session, create_schema
+from .database import Base, create_engine_and_session, create_schema, validate_schema
 from .repository import (
     ChannelEngineRepository,
     OutboxItem,
@@ -11,6 +11,7 @@ from .versioning import (
     RuntimeStorageStatus,
     RuntimeStorageVersionError,
     ensure_runtime_storage_version,
+    validate_runtime_storage_version,
 )
 
 __all__ = [
@@ -26,4 +27,6 @@ __all__ = [
     "create_engine_and_session",
     "create_schema",
     "ensure_runtime_storage_version",
+    "validate_runtime_storage_version",
+    "validate_schema",
 ]

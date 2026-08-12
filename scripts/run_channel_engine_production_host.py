@@ -33,11 +33,12 @@ def main() -> int:
     os.environ.pop("CHANNEL_ENGINE_TLS_PRIVATE_KEY", None)
     os.environ.pop("CHANNEL_ENGINE_TLS_PRIVATE_KEY_CREDENTIAL_REFERENCE", None)
     uvicorn.run(
-        "channel_engine.production_app:app",
+        "channel_engine.production_app:create_host_control_app",
         host=args.host,
         port=args.port,
         reload=False,
         access_log=False,
+        factory=True,
         **options,
     )
     return 0

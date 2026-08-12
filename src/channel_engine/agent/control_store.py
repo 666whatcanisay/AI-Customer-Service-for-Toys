@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -463,6 +463,27 @@ class AgentControlStore:
                     ChannelAgentAssistantSnapshotRow.scope_key,
                 ).limit(1)
             )
+            if row is None:
+                return None
+            return AgentAssistantSnapshot.model_validate_json(
+                json.dumps(row.snapshot_json, ensure_ascii=False, separators=(",", ":"))
+            )
+
+    def stored_assistant_snapshot(
+        self,
+        agent_id: str,
+        device_id: str,
+        *,
+        store_id: str,
+        conversation_id: str,
+    ) -> AgentAssistantSnapshot | None:
+        """Read the durable projection even after its UI visibility TTL elapsed."""
+
+        scope_key = _assistant_scope_key(
+            agent_id, device_id, store_id, conversation_id
+        )
+        with self._session_factory() as session:
+            row = session.get(ChannelAgentAssistantSnapshotRow, scope_key)
             if row is None:
                 return None
             return AgentAssistantSnapshot.model_validate_json(

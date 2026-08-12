@@ -6,7 +6,6 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict
 from sqlalchemy import Engine, select
 
-
 RUNTIME_STORAGE_VERSION = "1.0"
 RUNTIME_STORAGE_SINGLETON_ID = "channel-engine-runtime"
 
@@ -69,10 +68,42 @@ def ensure_runtime_storage_version(engine: Engine, now: datetime) -> RuntimeStor
     )
 
 
+def validate_runtime_storage_version(engine: Engine, now: datetime) -> RuntimeStorageStatus:
+    """Verify the manifest without mutating timestamps during ordinary startup."""
+
+    from .orm import RuntimeStorageMetadataRow
+
+    table = RuntimeStorageMetadataRow.__table__
+    with engine.connect() as connection:
+        row = connection.execute(
+            select(table).where(table.c.singleton_id == RUNTIME_STORAGE_SINGLETON_ID)
+        ).mappings().one_or_none()
+    if row is None:
+        raise RuntimeStorageVersionError("runtime storage manifest is missing")
+    persisted_version = row["runtime_storage_version"]
+    if persisted_version != RUNTIME_STORAGE_VERSION:
+        raise RuntimeStorageVersionError(
+            "unsupported runtime storage version: "
+            f"{persisted_version}; expected {RUNTIME_STORAGE_VERSION}"
+        )
+    initialized_at = row["initialized_at"]
+    verified_at = row["verified_at"]
+    if initialized_at.tzinfo is None:
+        initialized_at = initialized_at.replace(tzinfo=now.tzinfo)
+    if verified_at.tzinfo is None:
+        verified_at = verified_at.replace(tzinfo=now.tzinfo)
+    return RuntimeStorageStatus(
+        initialized_at=initialized_at,
+        verified_at=verified_at,
+        backend=engine.dialect.name,
+    )
+
+
 __all__ = [
     "RUNTIME_STORAGE_SINGLETON_ID",
     "RUNTIME_STORAGE_VERSION",
     "RuntimeStorageStatus",
     "RuntimeStorageVersionError",
     "ensure_runtime_storage_version",
+    "validate_runtime_storage_version",
 ]

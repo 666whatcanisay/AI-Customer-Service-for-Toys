@@ -14,6 +14,9 @@ from channel_engine.environment import (
 @dataclass(frozen=True, slots=True)
 class Settings:
     database_url: str = "sqlite:///./.runtime/channel-engine.sqlite3"
+    database_binding_path: str | None = None
+    database_environment_id: str | None = None
+    require_database_identity: bool = False
     service_name: str = "ai-cs-channel-execution-engine"
     environment_profile: EnvironmentProfileV1 = field(
         default_factory=default_mock_profile
@@ -50,12 +53,28 @@ class Settings:
         return self.environment_profile.profile.value
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
+        database_url = os.getenv("CHANNEL_ENGINE_DATABASE_URL", "").strip()
+        if not database_url:
+            raise ValueError("CHANNEL_ENGINE_DATABASE_URL is required")
+        require_identity = os.getenv(
+            "CHANNEL_ENGINE_REQUIRE_DATABASE_IDENTITY", "true"
+        ).strip().casefold() not in {"0", "false", "no", "off"}
+        binding_path = os.getenv(
+            "CHANNEL_ENGINE_DATABASE_BINDING_PATH", ""
+        ).strip() or None
+        environment_id = os.getenv(
+            "CHANNEL_ENGINE_DATABASE_ENVIRONMENT_ID", ""
+        ).strip() or None
+        if require_identity and (binding_path is None or environment_id is None):
+            raise ValueError(
+                "Channel Engine database binding path and environment ID are required"
+            )
         return cls(
-            database_url=os.getenv(
-                "CHANNEL_ENGINE_DATABASE_URL",
-                "sqlite:///./.runtime/channel-engine.sqlite3",
-            ),
+            database_url=database_url,
+            database_binding_path=binding_path,
+            database_environment_id=environment_id,
+            require_database_identity=require_identity,
             execution_worker_id=os.getenv(
                 "CHANNEL_ENGINE_WORKER_ID", "foundation-execution-worker"
             ),

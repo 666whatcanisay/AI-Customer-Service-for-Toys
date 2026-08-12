@@ -5,8 +5,13 @@ import json
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from channel_engine.provider import NormalizedChannelObservation
-from channel_engine.provider import ChannelMessageProvider, ProviderIngress
+from pydantic import ValidationError
+
+from channel_engine.provider import (
+    ChannelMessageProvider,
+    NormalizedChannelObservation,
+    ProviderIngress,
+)
 
 from .control_v2 import AgentObservationSubmission
 
@@ -93,9 +98,29 @@ class RealPDDProvider:
             raise ProviderUnavailable("REAL_PDD read adapter exceeded the bounded poll")
         normalized: list[NormalizedChannelObservation] = []
         for item in observations:
-            if item.provider_kind != "REAL_PDD":
+            try:
+                validated = NormalizedChannelObservation.model_validate(
+                    item.model_dump(mode="python")
+                )
+            except ValidationError as exc:
+                raise ProviderUnavailable(
+                    "REAL_PDD Provider received an invalid normalized item"
+                ) from exc
+            if validated.provider_kind != "REAL_PDD":
                 raise ProviderUnavailable("REAL_PDD Provider received a non-real item")
-            normalized.append(item.model_copy(update={"provider_id": self.provider_id}))
+            try:
+                normalized.append(
+                    NormalizedChannelObservation.model_validate(
+                        {
+                            **validated.model_dump(mode="python"),
+                            "provider_id": self.provider_id,
+                        }
+                    )
+                )
+            except ValidationError as exc:
+                raise ProviderUnavailable(
+                    "REAL_PDD Provider identity update failed validation"
+                ) from exc
         return tuple(normalized)
 
 
@@ -152,8 +177,8 @@ def provider_observation_id(value: NormalizedChannelObservation) -> str:
 
 
 __all__ = [
-    "ProviderUnavailable",
     "ChannelAgentProviderIngress",
+    "ProviderUnavailable",
     "RealPDDProvider",
     "RecordedReplayProvider",
     "SyntheticPDDProvider",

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Literal, Protocol, runtime_checkable
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 
 class ProviderModel(BaseModel):
@@ -57,6 +58,23 @@ class NormalizedChannelObservation(ProviderModel):
         default_factory=tuple, max_length=20
     )
 
+    @model_validator(mode="after")
+    def real_pdd_references_are_tokenized(self) -> NormalizedChannelObservation:
+        if self.provider_kind != "REAL_PDD":
+            return self
+        for field, prefix in {
+            "order_reference": "PDD_ORDER_",
+            "logistics_reference": "PDD_LOGISTICS_",
+            "aftersales_reference": "PDD_AFTERSALES_",
+        }.items():
+            value = self.order.get(field)
+            if value is not None and (
+                not isinstance(value, str)
+                or re.fullmatch(rf"{prefix}[A-F0-9]{{16}}", value) is None
+            ):
+                raise ValueError(f"REAL_PDD {field} must use a local privacy token")
+        return self
+
     @classmethod
     def synthetic(
         cls,
@@ -73,7 +91,7 @@ class NormalizedChannelObservation(ProviderModel):
         store_name: str | None = None,
         catalog_tenant_id: str = "CHANNEL-AGENT-PILOT",
         catalog_platform: str = "pdd",
-    ) -> "NormalizedChannelObservation":
+    ) -> NormalizedChannelObservation:
         material = json.dumps(
             [provider_id, store_id, conversation_id, external_message_id],
             ensure_ascii=False,
@@ -91,7 +109,7 @@ class NormalizedChannelObservation(ProviderModel):
             store_name=store_name,
             conversation_id=conversation_id,
             customer_reference="sha256:"
-            + hashlib.sha256(f"{store_id}\0{conversation_id}".encode("utf-8")).hexdigest(),
+            + hashlib.sha256(f"{store_id}\0{conversation_id}".encode()).hexdigest(),
             external_message_id=external_message_id,
             source_cursor=f"{provider_id}:{store_id}:{conversation_id}:{source_sequence}",
             source_sequence=source_sequence,
@@ -101,7 +119,7 @@ class NormalizedChannelObservation(ProviderModel):
             product=product or {},
             order=order or {},
             page_fingerprint="sha256:"
-            + hashlib.sha256(f"synthetic-page:{store_id}".encode("utf-8")).hexdigest(),
+            + hashlib.sha256(f"synthetic-page:{store_id}".encode()).hexdigest(),
         )
 
     def pdd_payload(self) -> dict[str, object]:
@@ -166,6 +184,6 @@ class ProviderIngress:
 __all__ = [
     "ChannelMessageProvider",
     "NormalizedChannelObservation",
-    "ProviderVisibleHistoryItem",
     "ProviderIngress",
+    "ProviderVisibleHistoryItem",
 ]

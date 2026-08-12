@@ -1,39 +1,42 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from threading import Event, RLock
-from typing import Callable, Literal
+from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from .binding import AgentBindingStore, atomic_write_bytes
 from .assistant_events import AssistantEventPoller
+from .binding import AgentBindingStore, atomic_write_bytes
 from .browser import (
     BrowserControlError,
     BrowserSessionState,
     BrowserSessionStatus,
     ChannelAgentBrowserManager,
 )
-from .config import AgentConfigError, ChannelAgentConfig, load_agent_config, save_agent_config
 from .client import ChannelEngineClient
+from .config import (
+    AgentConfigError,
+    ChannelAgentConfig,
+    load_agent_config,
+    save_agent_config,
+)
 from .contract import AgentRuntimeStatus
 from .desktop import DesktopAssistantServer
-from .edge_pdd_observe import PDDWorkspaceObservationMapper
+from .edge_pdd_observe import PDDLocalReferenceTokenizer, PDDWorkspaceObservationMapper
 from .edge_spool import DurableEdgeSpool
 from .identity import AgentIdentityStatus
 from .logger import SafeAgentLogger
-from .pdd_login import (
-    PDDLoginObservation,
-    PDDLoginObservationAdapter,
-    PDDLoginState,
-)
 from .observation_runtime import (
     NoopAssistantEventRuntime,
     ObserveOnlyRuntimeComponent,
@@ -41,18 +44,25 @@ from .observation_runtime import (
     PersistOnlyObservationForwarder,
 )
 from .observation_stages import ObservationStage
+from .pdd_login import (
+    PDDLoginObservation,
+    PDDLoginObservationAdapter,
+    PDDLoginState,
+)
 from .pdd_observer import PDDMessageObserver, PDDObserverRunner
+from .pdd_page_port import ReplayPDDPageReadPort, load_pdd_replay_fixture
 from .pdd_readonly_driver import (
     EvidenceBackedPDDReadOnlyDriver,
     build_replay_observer_evidence,
     load_pdd_observer_evidence,
 )
-from .pdd_page_port import ReplayPDDPageReadPort, load_pdd_replay_fixture
 from .retention import TransientBusinessDataPolicy
 from .runtime import AgentRuntimeSnapshot, ChannelAgentRuntime, build_runtime
-from .security import WindowsDPAPITransientPayloadProtector
+from .security import (
+    WindowsDeviceCredentialStore,
+    WindowsDPAPITransientPayloadProtector,
+)
 from .version import AGENT_VERSION
-
 
 WINDOWS_CLIENT_VERSION = "2.0.0rc5"
 WINDOWS_STATE_VERSION = "1.0"
@@ -830,6 +840,22 @@ class WindowsAgentHost:
                 platform_store_id=platform_store_id,
                 evidence=evidence,
             )
+        reference_tokenizer = None
+        if config.development_profile != "OFFLINE_REPLAY":
+            if config.device_credential_reference is None:
+                raise WindowsClientError(
+                    "REAL_PDD privacy tokenization requires the bound device credential"
+                )
+            device_key = WindowsDeviceCredentialStore().acquire(
+                config.device_credential_reference
+            ).for_signing()
+            reference_tokenizer = PDDLocalReferenceTokenizer(
+                hmac.new(
+                    device_key,
+                    b"AI-CS PDD local business reference token v1",
+                    hashlib.sha256,
+                ).digest()
+            )
         spool = DurableEdgeSpool(
             data_root / "runtime" / "observe-only-spool.sqlite3",
             WindowsDPAPITransientPayloadProtector(),
@@ -848,6 +874,7 @@ class WindowsAgentHost:
                 if config.development_profile == "OFFLINE_REPLAY"
                 else "real-pdd-readonly"
             ),
+            reference_tokenizer=reference_tokenizer,
         )
         observer = PDDMessageObserver(
             driver=driver,
@@ -1110,8 +1137,8 @@ def _version_tuple(value: str) -> tuple[int, int, int, int, int]:
 
 
 __all__ = [
-    "UpgradeCheckResult",
     "WINDOWS_CLIENT_VERSION",
+    "UpgradeCheckResult",
     "WindowsAgentHost",
     "WindowsAutoStartManager",
     "WindowsClientError",

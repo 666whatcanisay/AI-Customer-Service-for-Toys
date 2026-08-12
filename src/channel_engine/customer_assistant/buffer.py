@@ -258,6 +258,28 @@ class SQLiteConversationBuffer:
                 return CustomerContext.model_validate_json(context_json), package
         return None
 
+    def stored_replies(
+        self,
+    ) -> tuple[tuple[CustomerContext, AIReplyPackage], ...]:
+        """Return durable AI facts used to rebuild downstream projections."""
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT context_json,reply_package_json
+                FROM assistant_buffer_turns
+                WHERE context_json IS NOT NULL AND reply_package_json IS NOT NULL
+                ORDER BY updated_at,turn_id
+                """
+            ).fetchall()
+        return tuple(
+            (
+                CustomerContext.model_validate_json(context_json),
+                AIReplyPackage.model_validate_json(package_json),
+            )
+            for context_json, package_json in rows
+        )
+
     def complete(self, turn_id: str) -> None:
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")

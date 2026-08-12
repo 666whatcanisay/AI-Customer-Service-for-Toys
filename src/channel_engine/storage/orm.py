@@ -928,3 +928,22 @@ class PDDPilotEvidenceRow(Base):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class RuntimeDatabaseIdentityRow(Base):
+    __tablename__ = "runtime_database_identity"
+
+    database_role: Mapped[str] = mapped_column(String(64), primary_key=True)
+    database_instance_id: Mapped[str] = mapped_column(
+        String(36), nullable=False, unique=True
+    )
+    environment_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    identity_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    schema_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_by_source_commit: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    restore_generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    restored_from_backup_epoch: Mapped[str | None] = mapped_column(String(160))
+    last_restored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
