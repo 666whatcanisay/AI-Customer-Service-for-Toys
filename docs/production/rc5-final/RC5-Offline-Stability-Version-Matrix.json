@@ -1,0 +1,51 @@
+{
+  "schema": "rc5-offline-stability-version-matrix.v1",
+  "generated_at": "2026-08-12T20:40:07+08:00",
+  "scope": "OFFLINE_NO_REAL_PDD",
+  "source": {
+    "engine_commit": "abc9b8d6fb3f068d1997fb25f76ee6ae0421c4af",
+    "ai_cs_commit": "ed7c7b804cb5d5d1d55aab202cf4ae8398231028",
+    "engine_version": "0.2.0rc3",
+    "agent_version": "2.0.0rc5",
+    "ai_cs_contracts": "0.14.0",
+    "platform_migration_head": "0019_runtime_database_identity_v1",
+    "channel_engine_storage_version": "1.0"
+  },
+  "candidate_package": {
+    "path": "dist/windows-client-v2/rc5-offline-stability/AI-CS-Channel-Agent-2.0.0rc5-windows-x64.zip",
+    "archive_sha256": "ca32e8ccc391fdaa1ea926eb2f5dabba77c89bf1819fd1e82c5e663a8c15c76a",
+    "manifest_sha256": "8a1bcc195301450f748f989dc9f44ff6f656a4dfbe96dbdf59050a948b563d23",
+    "executable_sha256": "ca7707dbfabc4f5765615e845bc1b6b3e11634be99ce959313765db6b0ff1bf5",
+    "runtime_sha256": "3bb64b59cfec3993e633f79634fdf33f7401c647060288e18af11ace3ba46329",
+    "file_count": 1722,
+    "isolated_deployment": "13/13 PASS"
+  },
+  "installed_runtime": {
+    "version": "2.0.0rc5",
+    "matches_candidate_sha": false,
+    "mutated_by_validation": false,
+    "identity_status": "ACTIVE",
+    "binding_revision": 2,
+    "profile_preserved": true,
+    "pdd_session_preserved": true
+  },
+  "verification": {
+    "engine": "771 PASS, 1 NOT IN SCOPE",
+    "ai_cs_backend": "153 PASS, 3 NOT IN SCOPE",
+    "platform": "180 PASS",
+    "contracts": "16 PASS",
+    "assistant_ui": "214 PASS",
+    "admin_ui": "90 PASS",
+    "windows_deployment": "13/13 PASS",
+    "real_execution_attempts": 0,
+    "real_sends": 0,
+    "real_receipts": 0
+  },
+  "gates": {
+    "rc5_offline_stability_ready": true,
+    "real_pdd_read_ready": false,
+    "real_pdd_adapter_ready": false,
+    "real_pdd_send_ready": false,
+    "may_enter_read_only_pilot": true
+  }
+}

@@ -1,5 +1,7 @@
 # RC5 Final Test Report
 
+> 2026-08-12 离线稳定性回归更新：Engine `771 PASS`、AI-CS Backend `153 PASS`、Platform `180 PASS`、Contracts `16 PASS`、客服前端 `214 PASS`、Admin `90 PASS`、Windows 隔离部署 `13/13 PASS`。详见 [RC5 Offline Stability Readiness Report](RC5-Offline-Stability-Readiness-Report.md)。
+
 ## 总结
 
 RC5 离线范围内没有未解决 P0/P1 阻塞。真实 PDD 和显式真实依赖测试按范围标为 **NOT IN SCOPE**，不伪装为 PASS。
@@ -44,4 +46,3 @@ SyntheticPDDProvider
 - `.runtime/rc5-final/migration-matrix/migration-matrix.json`
 - `.runtime/rc5-final/ui-acceptance-20260812/synthetic-positive-v2/manual-confirm-result.json`
 - `../AI-CS/.runtime/rc5-final-build/*-junit.xml`
-

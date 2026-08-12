@@ -1,5 +1,7 @@
 # RC5 Pilot Readiness Checklist
 
+> 2026-08-12 更新：数据库身份、受控迁移、跨库投影重建、静默屏障备份与绿色助手离线 Gate 均 PASS。可进入真实 PDD **只读** Pilot；真实发送仍为 NO。详见 [RC5 Offline Stability Readiness Report](RC5-Offline-Stability-Readiness-Report.md)。
+
 ## 一页结论
 
 | 项目 | 状态 | 结论 |
@@ -39,4 +41,3 @@
 - [ ] Kill Switch 负责人和回滚步骤
 - [ ] 脱敏日志与证据目录
 - [ ] 真实 PDD 只读测试时间窗
-

@@ -1,5 +1,7 @@
 # RC5 Version Matrix and Release BOM
 
+> 2026-08-12 新冻结事实见 [RC5 Offline Stability Version Matrix](RC5-Offline-Stability-Version-Matrix.json)。当前已安装 Agent 未被覆盖；新候选包与源码已分别记录，禁止把旧正文的历史 SHA 当作本轮候选包 SHA。
+
 ## 组件矩阵
 
 | 组件 | 冻结版本/标识 |
@@ -38,4 +40,3 @@
 - 最终候选 ZIP SHA 和 Gateway Contract SHA。
 
 机器可读值见 [rc5-release-bom.json](rc5-release-bom.json)。
-
