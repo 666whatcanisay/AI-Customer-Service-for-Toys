@@ -142,10 +142,12 @@ foreach ($pattern in @('annotated_types-*.dist-info','anyio-*.dist-info','certif
 # Bytecode caches are machine-local build residue. Shipping them makes the
 # package larger and can push isolated/upgrade staging paths over legacy
 # Windows path limits; the embedded runtime executes the canonical .py files.
-Get-ChildItem -LiteralPath $runtime -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
+Get-ChildItem -LiteralPath $runtime -Recurse -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq '__pycache__' } |
     Sort-Object { $_.FullName.Length } -Descending |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
-Get-ChildItem -LiteralPath $runtime -Recurse -File -Include '*.pyc','*.pyo' -ErrorAction SilentlyContinue |
+Get-ChildItem -LiteralPath $runtime -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Extension -in @('.pyc', '.pyo') } |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
 if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python.exe') -PathType Leaf)) {
     throw 'Embedded Python runtime was removed while pruning build residue.'

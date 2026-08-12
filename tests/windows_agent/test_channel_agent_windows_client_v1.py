@@ -557,6 +557,7 @@ def test_windows_build_prunes_bytecode_without_pipeline_path_binding() -> None:
     )
 
     assert "ForEach-Object { Remove-Item -LiteralPath $_.FullName" in build
+    assert "Where-Object { $_.Extension -in @('.pyc', '.pyo') }" in build
     assert "Embedded Python runtime was removed while pruning build residue." in build
 
 
