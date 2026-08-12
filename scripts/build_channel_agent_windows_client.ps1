@@ -139,6 +139,14 @@ foreach ($pattern in @('annotated_types-*.dist-info','anyio-*.dist-info','certif
         Copy-Item -LiteralPath $_.FullName -Destination $runtimeSite -Recurse
     }
 }
+# Bytecode caches are machine-local build residue. Shipping them makes the
+# package larger and can push isolated/upgrade staging paths over legacy
+# Windows path limits; the embedded runtime executes the canonical .py files.
+Get-ChildItem -LiteralPath $runtime -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
+    Sort-Object { $_.FullName.Length } -Descending |
+    Remove-Item -Recurse -Force
+Get-ChildItem -LiteralPath $runtime -Recurse -File -Include '*.pyc','*.pyo' -ErrorAction SilentlyContinue |
+    Remove-Item -Force
 
 $launcherSource = Join-Path $repoRoot 'packaging\windows-client-v1\ChannelAgentLauncher.cs'
 $versionMatch = [regex]::Match($version, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:rc(?<rc>\d+))?$')

@@ -123,9 +123,9 @@ if ($existingInstall) {
 $installParent = Split-Path -Parent $InstallRoot
 $installLeaf = Split-Path -Leaf $InstallRoot
 New-Item -ItemType Directory -Path $installParent -Force | Out-Null
-$transactionId = [Guid]::NewGuid().ToString('N')
-$stageRoot = Join-Path $installParent ".$installLeaf.incoming-$transactionId"
-$rollbackRoot = Join-Path $installParent ".$installLeaf.rollback-$transactionId"
+$transactionId = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+$stageRoot = Join-Path $installParent ".$installLeaf.inc-$transactionId"
+$rollbackRoot = Join-Path $installParent ".$installLeaf.bak-$transactionId"
 try {
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
     Get-ChildItem -LiteralPath $PackageRoot -Force | ForEach-Object {
