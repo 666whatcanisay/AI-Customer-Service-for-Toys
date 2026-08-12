@@ -41,6 +41,46 @@ describe('HttpChannelAgentMessageAdapter', () => {
     await expect(new HttpChannelAgentMessageAdapter().listConversations())
       .rejects.toThrow('Channel Agent 会话安全校验失败')
   })
+
+  it('accepts v2 low-risk automatic preparation and resolves the reply per conversation', async () => {
+    const reply = {
+      conversationId: 'conversation-b', customerReference: `sha256:${'b'.repeat(64)}`,
+      messageId: 'message-b', decisionId: 'decision-b', answer: 'reply-b', requestId: 'request-b',
+      action: 'CONTROLLED_ANSWER', riskLevel: 'LOW', citations: [], warnings: [], requiredFields: [],
+      state: 'EXECUTION_PREPARED', qualityStatus: 'PASS', policyMode: 'AUTO_LOW_RISK',
+      preparationId: `execution-preparation:${'c'.repeat(64)}`, traceId: `trace:${'d'.repeat(64)}`
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...safeChannelAgentFeed(),
+        schemaVersion: 'channel-agent-workspace-feed.v2',
+        conversations: [
+          { conversationId: 'conversation-a', customerLabel: '客户 A', unreadCount: 0, source: 'CHANNEL_AGENT', messages: [] },
+          { conversationId: 'conversation-b', customerLabel: '客户 B', unreadCount: 1, source: 'CHANNEL_AGENT', messages: [], reply }
+        ],
+        replies: { 'conversation-b': reply },
+        safety: { ...safeChannelAgentFeed().safety, autoReply: true, executionPrepared: true }
+      })
+    }))
+    const adapter = new HttpChannelAgentMessageAdapter()
+    await adapter.listConversations()
+
+    await expect(adapter.latestReply('conversation-a')).resolves.toBeNull()
+    await expect(adapter.latestReply('conversation-b')).resolves.toMatchObject({
+      answer: 'reply-b', policyMode: 'AUTO_LOW_RISK', state: 'EXECUTION_PREPARED'
+    })
+  })
+
+  it('persists a read cursor through the local desktop endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchMock)
+    await new HttpChannelAgentMessageAdapter().markRead('conversation/a')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/local-api/v1/conversations/conversation%2Fa/read',
+      expect.objectContaining({ method: 'POST', credentials: 'same-origin' })
+    )
+  })
 })
 
 describe('InMemoryChannelMessageAdapter', () => {

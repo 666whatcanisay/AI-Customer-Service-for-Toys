@@ -1,3 +1,5 @@
+import { channelAgentLocalSecurityHeaders } from '@/api/channelAgentDesktopClient'
+
 export type ChannelMessageSource = 'MANUAL' | 'VALIDATION_FIXTURE' | 'CHANNEL_AGENT'
 
 export interface ChannelMessageEnvelope {
@@ -13,13 +15,22 @@ export interface ChannelMessageEnvelope {
 export interface ChannelConversationSeed {
   conversationId: string
   customerLabel: string
+  customerReference?: string
   unreadCount: number
   source: ChannelMessageSource
+  state?: string | null
+  processingStage?: string | null
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  qualityStatus?: string | null
+  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  preparationId?: string | null
+  traceId?: string | null
   messages: ChannelMessageEnvelope[]
 }
 
 export interface ChannelAgentReplySeed {
   conversationId: string
+  customerReference?: string
   messageId: string
   decisionId: string
   answer: string
@@ -39,6 +50,11 @@ export interface ChannelAgentReplySeed {
   }>
   warnings: string[]
   requiredFields: string[]
+  state?: string | null
+  qualityStatus?: string | null
+  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  preparationId?: string | null
+  traceId?: string | null
   product: {
     productReference: string
     productName: string
@@ -48,15 +64,17 @@ export interface ChannelAgentReplySeed {
 
 export interface ChannelMessageAdapter {
   listConversations(): Promise<ChannelConversationSeed[]>
-  latestReply(): Promise<ChannelAgentReplySeed | null>
+  latestReply(conversationId?: string): Promise<ChannelAgentReplySeed | null>
+  markRead(conversationId: string): Promise<void>
   createManualConversation(customerLabel: string, content: string): Promise<ChannelConversationSeed>
   receiveManualMessage(conversationId: string, content: string): Promise<ChannelMessageEnvelope>
 }
 
 type ChannelAgentFeed = {
-  schemaVersion: 'channel-agent-workspace-feed.v1'
-  conversations: ChannelConversationSeed[]
+  schemaVersion: 'channel-agent-workspace-feed.v1' | 'channel-agent-workspace-feed.v2'
+  conversations: Array<ChannelConversationSeed & { reply?: Omit<ChannelAgentReplySeed, 'product'> | null }>
   reply: Omit<ChannelAgentReplySeed, 'product'> | null
+  replies?: Record<string, Omit<ChannelAgentReplySeed, 'product'>>
   productContext?: {
     productReference?: string
     productName?: string
@@ -64,7 +82,7 @@ type ChannelAgentFeed = {
   }
   safety: {
     readOnly: true
-    autoReply: false
+    autoReply: boolean
     realSend: false
     browserWriteOperations: 0
     executionCount: 0
@@ -78,10 +96,14 @@ const CHANNEL_AGENT_FEED_URL = '/channel-agent-api/assistant-feed.json'
 const isChannelAgentFeed = (value: unknown): value is ChannelAgentFeed => {
   if (!value || typeof value !== 'object') return false
   const feed = value as Partial<ChannelAgentFeed>
-  return feed.schemaVersion === 'channel-agent-workspace-feed.v1'
+  const supportedVersion = feed.schemaVersion === 'channel-agent-workspace-feed.v1'
+    || feed.schemaVersion === 'channel-agent-workspace-feed.v2'
+  const validAutomaticPreparation = feed.safety?.autoReply === false
+    || feed.schemaVersion === 'channel-agent-workspace-feed.v2'
+  return supportedVersion
     && Array.isArray(feed.conversations)
     && feed.safety?.readOnly === true
-    && feed.safety.autoReply === false
+    && validAutomaticPreparation
     && feed.safety.realSend === false
     && feed.safety.browserWriteOperations === 0
     && feed.safety.executionCount === 0
@@ -106,11 +128,17 @@ export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
     return structuredClone(payload.conversations)
   }
 
-  async latestReply(): Promise<ChannelAgentReplySeed | null> {
-    if (!this.feed?.reply?.answer) return null
-    const product = this.feed.productContext
+  async latestReply(conversationId?: string): Promise<ChannelAgentReplySeed | null> {
+    const reply = conversationId
+      ? this.feed?.replies?.[conversationId]
+        ?? this.feed?.conversations.find((item) => item.conversationId === conversationId)?.reply
+        ?? (this.feed?.reply?.conversationId === conversationId ? this.feed.reply : null)
+        ?? null
+      : this.feed?.reply ?? null
+    if (!reply?.answer) return null
+    const product = this.feed?.productContext
     return structuredClone({
-      ...this.feed.reply,
+      ...reply,
       product: product?.productReference && product.productName && product.applicableAge
         ? {
             productReference: product.productReference,
@@ -119,6 +147,22 @@ export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
           }
         : null
     })
+  }
+
+  async markRead(conversationId: string): Promise<void> {
+    const response = await fetch(
+      `/local-api/v1/conversations/${encodeURIComponent(conversationId)}/read`,
+      {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          ...channelAgentLocalSecurityHeaders()
+        }
+      }
+    )
+    if (!response.ok) throw new Error('CHANNEL_AGENT_MARK_READ_FAILED')
   }
 
   async createManualConversation(): Promise<ChannelConversationSeed> {
@@ -208,6 +252,8 @@ export class InMemoryChannelMessageAdapter implements ChannelMessageAdapter {
   async latestReply(): Promise<ChannelAgentReplySeed | null> {
     return null
   }
+
+  async markRead(): Promise<void> {}
 
   async createManualConversation(
     customerLabel: string,

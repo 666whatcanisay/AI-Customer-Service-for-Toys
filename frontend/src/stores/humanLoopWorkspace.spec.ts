@@ -97,6 +97,27 @@ describe('human-in-loop reply draft state machine', () => {
     expect(store.activeDraft).toMatchObject({ messageId: 'message-2', state: 'MESSAGE_RECEIVED' })
   })
 
+  it('keeps a background conversation isolated when it receives a new message', () => {
+    const store = useHumanLoopWorkspaceStore()
+    const background: ChannelConversationSeed = {
+      ...seed,
+      conversationId: 'conversation-2',
+      customerLabel: '客户 B02',
+      messages: [{ ...seed.messages[0], messageId: 'message-b1', conversationId: 'conversation-2' }]
+    }
+    store.installConversations([seed, background])
+
+    store.receiveMessage({
+      messageId: 'message-b2', conversationId: 'conversation-2', customerLabel: '客户 B02',
+      content: '还有其他颜色吗？', receivedAt: '2026-08-06T08:02:00Z', source: 'CHANNEL_AGENT'
+    })
+
+    expect(store.activeConversationId).toBe('conversation-1')
+    expect(store.activeDraft?.messageId).toBe('message-1')
+    expect(store.conversations.find((item) => item.conversationId === 'conversation-2'))
+      .toMatchObject({ unreadCount: 2, status: 'NEW' })
+  })
+
   it('rejects illegal transitions and records a rejected human decision', () => {
     const store = useHumanLoopWorkspaceStore()
     store.installConversations([seed])

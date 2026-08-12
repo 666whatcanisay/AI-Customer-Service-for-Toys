@@ -1,5 +1,20 @@
 # Contract changelog
 
+## 0.14.0 - 2026-08-11
+
+- Added an offline-complete Channel Provider profile, bounded verified
+  product/order/conversation context, and source descriptors in flexible
+  Gateway Decision metadata. Gateway wire `1.0` and its canonical schema are
+  unchanged.
+- Added per-Store `MANUAL_CONFIRM` / `AUTO_LOW_RISK` policy coordination,
+  durable `EXECUTION_PREPARED` semantics, and full-pipeline trace projection.
+  Automatic preparation never performs a platform write or enables real send.
+- Defined strict Synthetic versus Real Receipt evidence. Synthetic success is
+  excluded from real-send success metrics and cannot claim an external side
+  effect, customer delivery, real adapter identity or production activation.
+- Existing heartbeat, Agent login/binding, observation ACK, LAN/TLS, Workspace
+  chat, Prompt and successful AI answer semantics remain compatible.
+
 ## 0.13.0 - 2026-08-06
 
 - Added HTTP 429 `AUTHENTICATION_RATE_LIMITED` plus `Retry-After` for persistent,

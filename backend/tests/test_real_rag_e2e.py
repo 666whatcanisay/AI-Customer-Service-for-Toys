@@ -45,6 +45,9 @@ def test_real_synthetic_pdf_to_qwen_answer_with_citations(tmp_path: Path):
     assert len(pages) == 1
 
     base = Settings.from_env()
+    internal_service_secret = tmp_path / "internal-service.secret"
+    internal_service_token = "real-rag-e2e-internal-service-token-32-bytes"
+    internal_service_secret.write_text(internal_service_token, encoding="ascii")
     store = VectorStore(
         persist_dir=tmp_path / "vector_db",
         collection_name="real_synthetic_rag",
@@ -78,6 +81,7 @@ def test_real_synthetic_pdf_to_qwen_answer_with_citations(tmp_path: Path):
             llm_max_tokens=256,
             rag_distance_threshold=threshold,
             top_k=1,
+            internal_service_secret_file=internal_service_secret,
         )
         service = RAGService(settings, vector_store=store)
 
@@ -132,7 +136,9 @@ def test_real_synthetic_pdf_to_qwen_answer_with_citations(tmp_path: Path):
             return service
 
         app = create_app(settings=settings, rag_factory=factory)
-        with TestClient(app) as client:
+        with TestClient(
+            app, headers={"X-AI-CS-Service-Token": internal_service_token}
+        ) as client:
             for _ in range(100):
                 status = client.get("/api/status").json()
                 if status.get("ready"):

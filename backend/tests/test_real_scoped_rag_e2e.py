@@ -14,6 +14,7 @@ from app.config.settings import Settings
 from app.main import create_app
 from app.models.chat import FrozenChatContext
 from app.service.rag_service import RAGService
+from app.service.iam_authorization import require_operations_identity
 from app.service.test_knowledge import parse_test_knowledge_package
 from app.service.vector_store import VectorStore
 
@@ -29,6 +30,9 @@ PACKAGE_ID = "PKG-PDD-SM-V031-SYNTHETIC"
 )
 def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
     base = Settings.from_env()
+    internal_service_secret = tmp_path / "internal-service.secret"
+    internal_service_token = "real-scoped-rag-internal-service-token-32-bytes"
+    internal_service_secret.write_text(internal_service_token, encoding="ascii")
     embedding_store = VectorStore(
         persist_dir=tmp_path / "vector_db",
         collection_name="real_scoped_legacy",
@@ -56,6 +60,9 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
         llm_max_tokens=256,
         rag_distance_threshold=0.45,
         top_k=3,
+        test_knowledge_collection_name="real_test_knowledge_v031",
+        active_collection_name="real_test_knowledge_v031",
+        internal_service_secret_file=internal_service_secret,
     )
     service = RAGService(
         settings,
@@ -146,7 +153,16 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
         def factory(active_settings: Settings) -> RAGService:
             return service
 
-        with TestClient(create_app(settings=settings, rag_factory=factory)) as client:
+        application = create_app(settings=settings, rag_factory=factory)
+        application.dependency_overrides[require_operations_identity] = lambda: {
+            "id": "real-rag-test-operator",
+            "permissions": ["ai_quality.view"],
+            "must_change_password": False,
+        }
+        with TestClient(
+            application,
+            headers={"X-AI-CS-Service-Token": internal_service_token},
+        ) as client:
             for _ in range(100):
                 if client.get("/api/status").json().get("ready"):
                     break
@@ -162,7 +178,7 @@ def test_real_scoped_q80_answer_and_api_smoke(tmp_path: Path):
             assert response.status_code == 200
             data = response.json()["data"]
             assert data["action"] == "DIRECT_ANSWER"
-            assert data["context"] == chat_context.model_dump()
+            assert data["context"] == chat_context.model_dump(mode="json")
             assert data["sources"][0]["knowledge_version"] == "V0.3.1"
 
             admin_response = client.post(

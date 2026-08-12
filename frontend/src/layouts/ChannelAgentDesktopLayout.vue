@@ -9,6 +9,14 @@
       <div class="runtime-summary" aria-label="客户端运行状态">
         <span :class="statusClass(agentStatus)"><i />Agent {{ statusLabel(agentStatus) }}</span>
         <span :class="statusClass(browserStatus)"><i />PDD {{ pddLabel }}</span>
+        <button
+          v-if="canOpenPddWindow"
+          type="button"
+          class="pdd-launch"
+          :disabled="openingPdd"
+          data-testid="open-pdd-window"
+          @click="openPddWindow"
+        >{{ openingPdd ? '正在启动…' : '启动 PDD 专属窗口' }}</button>
         <span :class="activeStore ? 'healthy' : 'attention'" data-testid="active-store-status"><i />{{ storeLabel }}</span>
         <select
           v-if="storeOptions.length > 1"
@@ -55,6 +63,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthSession } from '@/auth/authSession'
 import {
   fetchChannelAgentBootstrap,
+  requestChannelAgentPddWindowOpen,
   requestChannelAgentSafeStop,
   selectChannelAgentActiveStore,
   type ChannelAgentBootstrap
@@ -65,6 +74,7 @@ const bootstrap = ref<ChannelAgentBootstrap | null>(null)
 const loading = ref(false)
 const error = ref(false)
 const switchingStore = ref(false)
+const openingPdd = ref(false)
 const selectedStore = ref('')
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -72,10 +82,15 @@ const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CON
 const browserStatus = computed(() => bootstrap.value?.browser.status ?? 'STOPPED')
 const pddLabel = computed(() => {
   const login = bootstrap.value?.browser.pdd_login_state
-  if (login === 'CUSTOMER_SERVICE_READY' || login === 'LOGIN_SUCCESS') return '已登录'
+  if (login === 'CUSTOMER_SERVICE_READY') return '客服工作台已就绪'
+  if (login === 'PDD_LOGIN_SUCCESS' || login === 'LOGIN_SUCCESS' || login === 'OPENING_CUSTOMER_SERVICE') return '已登录'
   if (login === 'WAITING_QR_SCAN' || login === 'PDD_LOGIN_PAGE') return '等待扫码'
   return statusLabel(browserStatus.value)
 })
+const canOpenPddWindow = computed(() => Boolean(
+  bootstrap.value?.browser.pdd_workspace_launch_available
+  && ['STOPPED', 'FAILED', 'DEGRADED'].includes(browserStatus.value)
+))
 const authorizedStores = computed(() => bootstrap.value?.binding.authorized_store_ids ?? [])
 const storeOptions = computed(() => authorizedStores.value.map((storeCode) => {
   const store = auth.user.value?.stores.find((item) => item.store_code === storeCode)
@@ -120,6 +135,23 @@ async function refresh() {
     error.value = true
   } finally {
     loading.value = false
+  }
+}
+
+async function openPddWindow() {
+  if (openingPdd.value) return
+  openingPdd.value = true
+  try {
+    const result = await requestChannelAgentPddWindowOpen()
+    if (bootstrap.value) {
+      bootstrap.value.browser.status = result.browser_status
+      bootstrap.value.browser.pdd_login_state = result.pdd_login_state
+    }
+    ElMessage.success('PDD 专属 Edge 已启动，请在新窗口中人工登录。')
+  } catch {
+    ElMessage.error('PDD 专属窗口启动失败，请确认 Microsoft Edge 可用后重试。')
+  } finally {
+    openingPdd.value = false
   }
 }
 
@@ -185,6 +217,7 @@ onBeforeUnmount(() => {
 .brand{display:flex;align-items:center;gap:10px;min-width:230px}.brand-mark{display:grid;width:40px;height:40px;place-items:center;border-radius:12px;background:linear-gradient(135deg,#2f8b61,#72d7bd);color:#fff;font-weight:900}.brand strong,.brand small{display:block}.brand small{margin-top:2px;color:#72877c;font-size:11px}
 .runtime-summary{display:flex;align-items:center;gap:14px;margin-left:auto}.runtime-summary span{display:flex;align-items:center;gap:6px;color:#667b70;font-size:12px}.runtime-summary i{width:8px;height:8px;border-radius:50%;background:#d99b2b}.runtime-summary .healthy i{background:#29a875}.runtime-summary .attention{color:#9a6300}
 .runtime-summary select{max-width:190px;padding:7px 28px 7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:12px}
+.runtime-summary .pdd-launch{padding:6px 10px;border:1px solid #d6a331;border-radius:8px;background:#fff8e7;color:#8b5c00;font-size:12px;cursor:pointer;white-space:nowrap}.runtime-summary .pdd-launch:disabled{cursor:wait;opacity:.65}
 .operator{display:flex;align-items:center;gap:10px;padding-left:18px;border-left:1px solid #dce8e0}.operator small,.operator strong{display:block}.operator small{color:#788b81;font-size:10px}.operator strong{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.operator button{padding:7px 10px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;cursor:pointer}.operator .danger{border-color:#e2b8b2;color:#a13c30}
 .safety-strip,.agent-warning{padding:8px 20px;border-bottom:1px solid #e6d5a7;background:#fff8e7;color:#77510a;font-size:12px}.safety-strip strong{margin-right:10px;padding:2px 7px;border-radius:999px;background:#e79c1b;color:#fff}.agent-warning{border-color:#efc5c0;background:#fff0ee;color:#943a30}
 .agent-desktop-content{min-width:0;min-height:0;padding:12px;overflow:auto}

@@ -10,6 +10,7 @@ export type ChannelAgentBootstrap = {
   browser: {
     status: string
     pdd_login_state: string | null
+    pdd_workspace_launch_available?: boolean
   }
   binding: {
     agent_id: string | null
@@ -78,6 +79,24 @@ export async function requestChannelAgentSafeStop(): Promise<void> {
     }
   })
   if (!response.ok) throw new Error(`CHANNEL_AGENT_STOP_${response.status}`)
+}
+
+export type ChannelAgentPddWindowLaunch = {
+  schema_version: 'channel-agent-pdd-window-launch.v1'
+  status: 'OPENING' | 'READY'
+  browser_status: string
+  pdd_login_state: string | null
+  human_login_required: true
+  observer_started: false
+  real_send_enabled: false
+}
+
+export function requestChannelAgentPddWindowOpen(): Promise<ChannelAgentPddWindowLaunch> {
+  return localJson('/local-api/v1/browser/pdd/open', {
+    method: 'POST',
+    headers: { 'X-Channel-Agent-Intent': 'HUMAN_REQUESTED_PDD_WINDOW' },
+    body: '{}'
+  })
 }
 
 export type DoctorStatus = 'PASS' | 'WARNING' | 'BLOCKED'

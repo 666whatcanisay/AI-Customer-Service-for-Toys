@@ -4,9 +4,16 @@ This directory is jointly owned by all three development lines. Schemas are the
 versioned compatibility boundary; do not make breaking changes without updating
 `version.json`, `CHANGELOG.md`, and the compatibility notes in the pull request.
 
-Current coordinated baseline: `0.13.0`. Customer-service catalog consumers must use
+Current coordinated baseline: `0.14.0`. Customer-service catalog consumers must use
 the C-owned `pilot-business-catalog.v1.1` projection and must not derive
 availability from legacy test or publication fields.
+
+`0.14.0` coordinates the offline-complete customer-service chain. Provider
+implementations normalize into one observation shape; AI-CS validates bounded
+verified business context and returns bounded citation descriptors in Gateway
+metadata; Channel Engine stops at `EXECUTION_PREPARED / REAL_SEND_BLOCKED`.
+Synthetic receipts are structurally distinct from future real PDD receipts.
+The production-frozen Gateway wire remains `1.0`.
 
 `0.13.0` also closes the legacy A exposure boundary: only `/api/health` remains
 unauthenticated. C calls A with a file-referenced service identity, B continues

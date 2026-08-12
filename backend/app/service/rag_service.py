@@ -878,9 +878,17 @@ class RAGService:
             fields.append("sku_id")
         elif action == "REQUIRE_LOOKUP":
             if self._question_has(question, r"发货", r"到货", r"物流", r"赠品", r"活动"):
-                fields.append("order_id")
+                if not (
+                    context.verified_transaction
+                    and context.verified_transaction.order_reference
+                ):
+                    fields.append("order_id")
         elif action == "TRANSFER_HUMAN":
-            fields.append("order_id")
+            if not (
+                context.verified_transaction
+                and context.verified_transaction.order_reference
+            ):
+                fields.append("order_id")
             if self._question_has(question, r"少了.*零件", r"缺件", r"补发"):
                 if store_scope:
                     fields.extend(["product_id", "sku_id"])
@@ -932,6 +940,7 @@ class RAGService:
         answer_action: str = "DIRECT_ANSWER",
         risk_level: str = "LOW",
         answer_focus: str | None = None,
+        recent_conversation: str = "（无历史对话）",
     ) -> str:
         if not self.model_configured:
             return MODEL_NOT_CONFIGURED_MESSAGE
@@ -942,6 +951,7 @@ class RAGService:
             risk_level=risk_level,
             question=question,
             answer_focus=answer_focus or self._answer_focus(question),
+            recent_conversation=recent_conversation,
         )
         try:
             messages = [
@@ -1116,6 +1126,7 @@ class RAGService:
                 answer_action=answer_action,
                 risk_level=risk_level or "LOW",
                 answer_focus=self._answer_focus(question),
+                recent_conversation=self._recent_conversation_prompt(context),
             )
             if context:
                 exact_sku_fact = self._result_for(
@@ -1192,3 +1203,16 @@ class RAGService:
             ),
             "context": context.model_dump() if context else None,
         }
+
+    @staticmethod
+    def _recent_conversation_prompt(context: FrozenChatContext | None) -> str:
+        """Render bounded verified history as quoted data, never as instructions."""
+
+        if context is None or not context.recent_conversation:
+            return "（无历史对话）"
+        values: list[str] = []
+        for index, item in enumerate(context.recent_conversation[-20:], start=1):
+            role = "客户" if item.sender == "customer" else "客服"
+            content = item.content.replace("\r", " ").replace("\n", " ").strip()[:500]
+            values.append(f"{index}. [{role}] {content}")
+        return "\n".join(values)

@@ -10,11 +10,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.desktop_agent.models import DesktopWorkflowAuditEvent
 from app.desktop_agent.schemas import (
+    ReplyPolicyMode,
     UpstreamAgentIdentity,
     UpstreamAgentList,
     UpstreamAgentView,
     UpstreamEnrollmentGrant,
     UpstreamHostPairingCode,
+    UpstreamExecutionPreparation,
+    UpstreamReplyPolicy,
 )
 from app.desktop_agent.upstream import (
     ChannelAgentNotConfigured,
@@ -45,6 +48,10 @@ class FakeUpstream:
         self.activation_calls: list[dict[str, object]] = []
         self.store_selection_calls: list[dict[str, object]] = []
         self.pairing_rotation_calls: list[dict[str, object]] = []
+        self.policy_calls: list[dict[str, object]] = []
+        self.preparation_calls: list[dict[str, object]] = []
+        self.policy_mode = ReplyPolicyMode.MANUAL_CONFIRM
+        self.policy_revision = 1
 
     def list_agents(self) -> UpstreamAgentList:
         return UpstreamAgentList(
@@ -147,6 +154,49 @@ class FakeUpstream:
             self.items[index] = UpstreamAgentView.model_validate(updated)
             return identity
         raise AssertionError("agent fixture not found")
+
+    def get_reply_policy(self, *, store_id: str) -> UpstreamReplyPolicy:
+        return UpstreamReplyPolicy(
+            store_id=store_id,
+            mode=self.policy_mode,
+            revision=self.policy_revision,
+            updated_by="system:default",
+            updated_at=NOW,
+        )
+
+    def set_reply_policy(self, **kwargs: object) -> UpstreamReplyPolicy:
+        self.policy_calls.append(kwargs)
+        self.policy_mode = ReplyPolicyMode(str(kwargs["mode"]))
+        self.policy_revision += 1
+        return UpstreamReplyPolicy(
+            store_id=str(kwargs["store_id"]),
+            mode=self.policy_mode,
+            revision=self.policy_revision,
+            updated_by="service:test:actor-sha256:redacted",
+            updated_at=NOW,
+        )
+
+    def prepare_execution(self, **kwargs: object) -> UpstreamExecutionPreparation:
+        self.preparation_calls.append(kwargs)
+        return UpstreamExecutionPreparation(
+            preparation_version="1.0",
+            preparation_id="execution-preparation:" + "1" * 64,
+            decision_id=str(kwargs["decision_id"]),
+            trace_id="trace:" + "2" * 64,
+            store_id=str(kwargs["store_id"]),
+            conversation_id=str(kwargs["conversation_id"]),
+            customer_reference=str(kwargs["customer_reference"]),
+            conversation_revision=1,
+            policy_mode=self.policy_mode,
+            policy_revision=self.policy_revision,
+            authorization_kind="HUMAN",
+            authorized_by="service:test:actor-sha256:redacted",
+            state="READY",
+            prepared_at=NOW,
+            expires_at=datetime(2026, 8, 6, 8, 5, tzinfo=timezone.utc),
+            real_send_enabled=False,
+            external_side_effect=False,
+        )
 
 
 @pytest.fixture
@@ -272,6 +322,80 @@ def test_agent_identity_contract_rejects_unknown_or_inconsistent_permission_fiel
     del missing["items"][0]["identity"]["device_id"]  # type: ignore[index]
     with pytest.raises(ValidationError, match="device_id"):
         UpstreamAgentList.model_validate(missing)
+
+
+def test_workspace_controls_reply_policy_and_human_execution_preparation(
+    auth_client: TestClient,
+    session: Session,
+) -> None:
+    authorized = _seed_store(session, "STORE-OFFLINE-CONTROL")
+    outside = _seed_store(session, "STORE-OUTSIDE-CONTROL")
+    user = _create_user(
+        session,
+        "offline.control.cs",
+        RoleName.CUSTOMER_SERVICE,
+        [{"store_id": authorized.id, "is_default": True}],
+    )
+    headers = _login(auth_client, "offline.control.cs")
+    fake = FakeUpstream([_agent(user_id=user.id, store_codes=(authorized.store_code,))])
+    app.dependency_overrides[get_channel_agent_upstream] = lambda: fake
+
+    policy = auth_client.get(
+        f"/api/v1/workspace/reply-policy?store_id={authorized.id}",
+        headers=headers,
+    )
+    assert policy.status_code == 200, policy.text
+    assert policy.json()["mode"] == "MANUAL_CONFIRM"
+
+    rejected = auth_client.put(
+        "/api/v1/workspace/reply-policy",
+        headers=headers,
+        json={
+            "store_id": authorized.id,
+            "mode": "AUTO_LOW_RISK",
+            "expected_revision": 1,
+            "human_confirmed": False,
+        },
+    )
+    assert rejected.status_code == 422
+    assert fake.policy_calls == []
+
+    changed = auth_client.put(
+        "/api/v1/workspace/reply-policy",
+        headers=headers,
+        json={
+            "store_id": authorized.id,
+            "mode": "AUTO_LOW_RISK",
+            "expected_revision": 1,
+            "human_confirmed": True,
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["mode"] == "AUTO_LOW_RISK"
+    assert fake.policy_calls[0]["actor_reference"] == user.id
+
+    customer_reference = "sha256:" + "a" * 64
+    prepared = auth_client.post(
+        "/api/v1/workspace/decisions/decision-offline-1/execution-preparations",
+        headers=headers,
+        json={
+            "store_id": authorized.id,
+            "conversation_id": "conversation-offline-1",
+            "customer_reference": customer_reference,
+            "human_confirmed": True,
+        },
+    )
+    assert prepared.status_code == 201, prepared.text
+    assert prepared.json()["state"] == "READY"
+    assert prepared.json()["real_send_enabled"] is False
+    assert prepared.json()["external_side_effect"] is False
+    assert fake.preparation_calls[0]["actor_reference"] == user.id
+
+    forbidden = auth_client.get(
+        f"/api/v1/workspace/reply-policy?store_id={outside.id}",
+        headers=headers,
+    )
+    assert forbidden.status_code == 403
 
 
 def test_admin_device_management_uses_authoritative_host_state(

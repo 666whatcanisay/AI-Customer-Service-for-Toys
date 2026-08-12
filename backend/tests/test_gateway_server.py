@@ -200,6 +200,80 @@ def test_gateway_decision_returns_contract_response_and_required_approval(
     assert payload["metadata"]["source_count"] == 1
 
 
+def test_gateway_validates_bounded_host_context_and_projects_citations(
+    gateway_harness,
+) -> None:
+    client, install, _ = gateway_harness
+    captured = []
+
+    def provider(question, context):
+        del question
+        captured.append(context)
+        return {
+            **_result("DIRECT_ANSWER"),
+            "required_fields": [],
+            "sources": [
+                {
+                    "source_name": "synthetic-product-faq.md",
+                    "page": 1,
+                    "chunk_id": "chunk-product-001",
+                    "distance": 0.1,
+                    "product_id": "PRODUCT-SYNTHETIC",
+                    "sku_id": "SKU-SYNTHETIC",
+                }
+            ],
+        }
+
+    install(provider)
+    request_payload = _request_payload()
+    request_payload["context"].update(
+        {
+            "product": {
+                "product_reference": "PRODUCT-SYNTHETIC",
+                "product_name": "Synthetic Product",
+                "sku_reference": "SKU-SYNTHETIC",
+                "sku_name": "Standard",
+                "attributes": {"color": "violet"},
+            },
+            "transaction": {
+                "order_reference": "ORDER-SYNTHETIC",
+                "order_status": "PAID",
+                "logistics_status": "NOT_SHIPPED",
+                "aftersales_status": None,
+                "payment_data_included": False,
+                "address_data_included": False,
+            },
+            "visible_conversation_history": [
+                {
+                    "message_id": "message-history-001",
+                    "sender": "customer",
+                    "content": "Synthetic recent question",
+                    "timestamp": "2026-08-11T12:00:00Z",
+                }
+            ],
+        }
+    )
+    request_payload["context"]["ai_cs_scope"]["sku_id"] = "SKU-SYNTHETIC"
+
+    response = _post_decision(client, request_payload)
+
+    assert response.status_code == 200
+    assert len(captured) == 1
+    context = captured[0]
+    assert context.verified_product.product_name == "Synthetic Product"
+    assert context.verified_transaction.order_reference == "ORDER-SYNTHETIC"
+    assert context.recent_conversation[0].content == "Synthetic recent question"
+    assert response.json()["metadata"]["citations"] == [
+        {
+            "reference": "chunk-product-001",
+            "title": "synthetic-product-faq.md",
+            "product_id": "PRODUCT-SYNTHETIC",
+            "sku_id": "SKU-SYNTHETIC",
+            "source_kind": "RAG_KNOWLEDGE",
+        }
+    ]
+
+
 def test_gateway_lan_edge_preserves_hmac_decision_and_idempotency(
     gateway_harness,
 ) -> None:

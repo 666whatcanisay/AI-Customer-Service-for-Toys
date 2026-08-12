@@ -2,8 +2,67 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ai-cs.local/contracts/customer-desktop-workflow.v1.schema.json",
   "title": "AI-CS Customer Desktop Workflow V1",
-  "description": "C-owned authenticated projection and one-time enrollment facade over the existing Channel Agent V1 boundary.",
+  "description": "C-owned authenticated projection, enrollment and offline reply-control facade over the Channel Agent boundary.",
   "$defs": {
+    "ReplyPolicyMode": { "type": "string", "enum": ["MANUAL_CONFIRM", "AUTO_LOW_RISK"] },
+    "ReplyPolicyChangeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store_id", "mode", "human_confirmed"],
+      "properties": {
+        "store_id": { "type": "integer", "minimum": 1 },
+        "mode": { "$ref": "#/$defs/ReplyPolicyMode" },
+        "expected_revision": { "type": ["integer", "null"], "minimum": 1 },
+        "human_confirmed": { "const": true }
+      }
+    },
+    "ReplyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store_id", "mode", "revision", "updated_by", "updated_at"],
+      "properties": {
+        "store_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "mode": { "$ref": "#/$defs/ReplyPolicyMode" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "updated_by": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ExecutionPreparationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store_id", "conversation_id", "customer_reference", "human_confirmed"],
+      "properties": {
+        "store_id": { "type": "integer", "minimum": 1 },
+        "conversation_id": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "customer_reference": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "human_confirmed": { "const": true }
+      }
+    },
+    "ExecutionPreparation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preparation_version", "preparation_id", "decision_id", "trace_id", "store_id", "conversation_id", "customer_reference", "conversation_revision", "policy_mode", "policy_revision", "authorization_kind", "authorized_by", "state", "prepared_at", "expires_at", "real_send_enabled", "external_side_effect"],
+      "properties": {
+        "preparation_version": { "const": "1.0" },
+        "preparation_id": { "type": "string", "pattern": "^execution-preparation:[a-f0-9]{64}$" },
+        "decision_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "trace_id": { "type": "string", "pattern": "^trace:[a-f0-9]{64}$" },
+        "store_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "conversation_id": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "customer_reference": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "conversation_revision": { "type": "integer", "minimum": 1 },
+        "policy_mode": { "$ref": "#/$defs/ReplyPolicyMode" },
+        "policy_revision": { "type": "integer", "minimum": 1 },
+        "authorization_kind": { "type": "string", "enum": ["HUMAN", "AUTO_POLICY"] },
+        "authorized_by": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "state": { "type": "string", "enum": ["READY", "INVALIDATED", "EXPIRED", "CONSUMED"] },
+        "prepared_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "real_send_enabled": { "const": false },
+        "external_side_effect": { "const": false }
+      }
+    },
     "AgentIdentityStatus": { "type": "string", "enum": ["UNBOUND", "BOUND", "ACTIVE", "DISABLED"] },
     "AgentOnlineStatus": { "type": "string", "enum": ["ONLINE", "DEGRADED", "OFFLINE"] },
     "AssociationState": { "type": "string", "enum": ["READY", "BINDING_REQUIRED", "ACTIVATION_REQUIRED", "STORE_MISMATCH", "MULTIPLE_MATCHES", "DISABLED"] },
@@ -110,6 +169,10 @@
     { "$ref": "#/$defs/StatusResponse" },
     { "$ref": "#/$defs/BindingGrantRequest" },
     { "$ref": "#/$defs/BindingGrantResponse" },
+    { "$ref": "#/$defs/ReplyPolicyChangeRequest" },
+    { "$ref": "#/$defs/ReplyPolicy" },
+    { "$ref": "#/$defs/ExecutionPreparationRequest" },
+    { "$ref": "#/$defs/ExecutionPreparation" },
     { "$ref": "#/$defs/AuditListResponse" },
     { "$ref": "#/$defs/ErrorEnvelope" }
   ]

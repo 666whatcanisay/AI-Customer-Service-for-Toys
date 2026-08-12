@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from app.config.settings import Settings
 from app.main import create_app
-from app.models.chat import FrozenChatContext
+from app.models.chat import FrozenChatContext, VerifiedConversationEntry
 from app.service.evaluation import (
     EvaluationCase,
     EvaluationValidationError,
@@ -51,6 +51,31 @@ def context(product_id: str = "P-Q80", sku_id: str | None = None):
         product_id=product_id,
         sku_id=sku_id,
     )
+
+
+def test_verified_multiturn_history_is_rendered_in_order_and_bounded():
+    entries = tuple(
+        VerifiedConversationEntry(
+            message_id=f"message-{index}",
+            sender="customer" if index % 2 else "operator",
+            content=f"turn-{index}",
+            timestamp=f"2026-08-12T02:00:{index:02d}Z",
+        )
+        for index in range(1, 21)
+    )
+    value = context().model_copy(update={"recent_conversation": entries})
+
+    rendered = RAGService._recent_conversation_prompt(value)
+
+    lines = rendered.splitlines()
+    assert len(lines) == 20
+    assert lines[0] == "1. [客户] turn-1"
+    assert lines[1] == "2. [客服] turn-2"
+    assert lines[-1] == "20. [客服] turn-20"
+
+
+def test_empty_multiturn_history_is_explicit():
+    assert RAGService._recent_conversation_prompt(context()) == "（无历史对话）"
 
 
 def is_store_guard(result: dict) -> bool:

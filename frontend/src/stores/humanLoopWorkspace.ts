@@ -31,9 +31,17 @@ export interface WorkspaceMessage extends ChannelMessageEnvelope {
 export interface WorkspaceConversation {
   conversationId: string
   customerLabel: string
+  customerReference?: string
   unreadCount: number
   source: ChannelMessageSource
   status: ConversationStatus
+  hostState?: string | null
+  processingStage?: string | null
+  riskLevel?: RiskLevel | null
+  qualityStatus?: string | null
+  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  preparationId?: string | null
+  traceId?: string | null
   messages: WorkspaceMessage[]
 }
 
@@ -53,6 +61,11 @@ export interface ReplyDraft {
   citations: RagCitation[]
   warnings: string[]
   requiredFields: string[]
+  hostState: string | null
+  qualityStatus: string | null
+  policyMode: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  preparationId: string | null
+  traceId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -109,9 +122,17 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     conversations.value = seeds.map((seed) => ({
       conversationId: seed.conversationId,
       customerLabel: seed.customerLabel,
+      customerReference: seed.customerReference,
       unreadCount: seed.unreadCount,
       source: seed.source,
       status: 'NEW',
+      hostState: seed.state,
+      processingStage: seed.processingStage,
+      riskLevel: seed.riskLevel,
+      qualityStatus: seed.qualityStatus,
+      policyMode: seed.policyMode,
+      preparationId: seed.preparationId,
+      traceId: seed.traceId,
       messages: seed.messages.map((message) => ({
         ...message,
         direction: message.senderRole === 'AGENT' ? 'OUTBOUND_HISTORY' : 'INBOUND'
@@ -125,20 +146,28 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     }
   }
 
-  function addConversation(seed: ChannelConversationSeed): void {
+  function addConversation(seed: ChannelConversationSeed, select = true): void {
     const conversation: WorkspaceConversation = {
       conversationId: seed.conversationId,
       customerLabel: seed.customerLabel,
+      customerReference: seed.customerReference,
       unreadCount: seed.unreadCount,
       source: seed.source,
       status: 'NEW',
+      hostState: seed.state,
+      processingStage: seed.processingStage,
+      riskLevel: seed.riskLevel,
+      qualityStatus: seed.qualityStatus,
+      policyMode: seed.policyMode,
+      preparationId: seed.preparationId,
+      traceId: seed.traceId,
       messages: seed.messages.map((message) => ({
         ...message,
         direction: message.senderRole === 'AGENT' ? 'OUTBOUND_HISTORY' : 'INBOUND'
       }))
     }
     conversations.value.unshift(conversation)
-    selectConversation(conversation.conversationId)
+    if (select) selectConversation(conversation.conversationId)
   }
 
   function selectConversation(conversationId: string): void {
@@ -162,10 +191,14 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       return
     }
 
-    if (activeDraft.value?.conversationId === message.conversationId) archiveActiveDraft()
+    const isActive = activeConversationId.value === message.conversationId
+    if (isActive && activeDraft.value?.conversationId === message.conversationId) {
+      archiveActiveDraft()
+    }
     conversation.messages.push({ ...message, direction: 'INBOUND' })
     conversation.unreadCount += 1
     conversation.status = 'NEW'
+    if (!isActive) return
     activeConversationId.value = message.conversationId
     conversation.unreadCount = 0
     conversation.status = 'PROCESSING'
@@ -193,6 +226,11 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     citations: RagCitation[]
     warnings: string[]
     requiredFields: string[]
+    hostState?: string | null
+    qualityStatus?: string | null
+    policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+    preparationId?: string | null
+    traceId?: string | null
   }): void {
     transition('DRAFT_READY')
     if (!activeDraft.value) return
@@ -206,6 +244,11 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     activeDraft.value.citations = payload.citations
     activeDraft.value.warnings = payload.warnings
     activeDraft.value.requiredFields = payload.requiredFields
+    activeDraft.value.hostState = payload.hostState ?? null
+    activeDraft.value.qualityStatus = payload.qualityStatus ?? null
+    activeDraft.value.policyMode = payload.policyMode ?? null
+    activeDraft.value.preparationId = payload.preparationId ?? null
+    activeDraft.value.traceId = payload.traceId ?? null
     activeDraft.value.updatedAt = nowIso()
   }
 
@@ -235,6 +278,11 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     activeDraft.value.citations = []
     activeDraft.value.warnings = []
     activeDraft.value.requiredFields = []
+    activeDraft.value.hostState = null
+    activeDraft.value.qualityStatus = null
+    activeDraft.value.policyMode = null
+    activeDraft.value.preparationId = null
+    activeDraft.value.traceId = null
     activeDraft.value.updatedAt = nowIso()
   }
 
@@ -320,6 +368,11 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       citations: [],
       warnings: [],
       requiredFields: [],
+      hostState: null,
+      qualityStatus: null,
+      policyMode: null,
+      preparationId: null,
+      traceId: null,
       createdAt,
       updatedAt: createdAt
     }

@@ -14,6 +14,39 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ReplyPolicyMode(StrEnum):
+    MANUAL_CONFIRM = "MANUAL_CONFIRM"
+    AUTO_LOW_RISK = "AUTO_LOW_RISK"
+
+
+class UpstreamReplyPolicy(StrictModel):
+    store_id: str = Field(min_length=1, max_length=160)
+    mode: ReplyPolicyMode
+    revision: int = Field(ge=1)
+    updated_by: str = Field(min_length=1, max_length=160)
+    updated_at: AwareDatetime
+
+
+class UpstreamExecutionPreparation(StrictModel):
+    preparation_version: Literal["1.0"]
+    preparation_id: str = Field(pattern=r"^execution-preparation:[a-f0-9]{64}$")
+    decision_id: str = Field(min_length=1, max_length=160)
+    trace_id: str = Field(pattern=r"^trace:[a-f0-9]{64}$")
+    store_id: str = Field(min_length=1, max_length=160)
+    conversation_id: str = Field(min_length=1, max_length=255)
+    customer_reference: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+    conversation_revision: int = Field(ge=1)
+    policy_mode: ReplyPolicyMode
+    policy_revision: int = Field(ge=1)
+    authorization_kind: Literal["HUMAN", "AUTO_POLICY"]
+    authorized_by: str = Field(min_length=1, max_length=160)
+    state: Literal["READY", "INVALIDATED", "EXPIRED", "CONSUMED"]
+    prepared_at: AwareDatetime
+    expires_at: AwareDatetime
+    real_send_enabled: Literal[False]
+    external_side_effect: Literal[False]
+
+
 class AgentIdentityStatus(StrEnum):
     REGISTERED = "REGISTERED"
     UNBOUND = "REGISTERED"

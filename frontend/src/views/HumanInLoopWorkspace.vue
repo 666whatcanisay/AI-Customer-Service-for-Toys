@@ -14,6 +14,26 @@
       @bind="requestDesktopBinding"
       @clear-grant="clearDesktopBindingGrant"
     />
+    <section v-if="desktopMode" class="offline-policy-panel" data-testid="offline-policy-panel">
+      <div>
+        <strong>离线回复策略</strong>
+        <span>可切换人工确认或低风险自动准备；真实 PDD 发送始终关闭。</span>
+      </div>
+      <label>
+        <span>当前模式</span>
+        <select
+          :value="replyPolicy?.mode ?? 'MANUAL_CONFIRM'"
+          :disabled="replyPolicyBusy || !selectedStoreId || !canManageReplyPolicy"
+          data-testid="reply-policy-mode"
+          @change="changeReplyPolicy"
+        >
+          <option value="MANUAL_CONFIRM">MANUAL_CONFIRM（人工确认）</option>
+          <option value="AUTO_LOW_RISK">AUTO_LOW_RISK（仅低风险自动准备）</option>
+        </select>
+      </label>
+      <b>REAL_SEND = OFF</b>
+      <small v-if="replyPolicyError">{{ replyPolicyError }}</small>
+    </section>
     <div class="human-loop-workspace-grid">
     <ConversationCenter
       :conversations="conversations"
@@ -60,7 +80,6 @@
       :draft="activeDraft"
       :conversation="activeConversation"
       :receipt-id="interactionReceiptId"
-      :execution-receipt-id="executionReceiptId"
       :feedback-receipt-id="feedbackReceiptId"
       @complete="completeConversation"
       @reopen="reopenConversation"
@@ -76,7 +95,11 @@ import { storeToRefs } from 'pinia'
 
 import { aiInteractionEventClient, createAiInteractionEventIdempotencyKey } from '@/api/aiInteractionEventClient'
 import { aiResponseFeedbackClient, createAiResponseFeedbackIdempotencyKey } from '@/api/aiResponseFeedbackClient'
-import { channelAgentSendClient } from '@/api/channelAgentSendClient'
+import {
+  offlineReplyControlClient,
+  type ReplyPolicy,
+  type ReplyPolicyMode
+} from '@/api/offlineReplyControlClient'
 import type { AiResponseFeedbackType } from '@/api/aiResponseFeedbackTypes'
 import { ragClient } from '@/api/ragClient'
 import type { AdoptionType } from '@/api/ragTypes'
@@ -102,6 +125,7 @@ const {
   agentStatus, conversationCounts
 } = storeToRefs(workspace)
 const channelAdapter = createWorkspaceMessageAdapter()
+const desktopMode = import.meta.env.VITE_CHANNEL_AGENT_DESKTOP === 'true'
 
 const stores = ref<WorkspaceStoreContext[]>([])
 const products = ref<ProductContextCandidate[]>([])
@@ -117,17 +141,20 @@ const generationBusy = ref(false)
 const actionBusy = ref(false)
 const actionError = ref('')
 const interactionReceiptId = ref('')
-const executionReceiptId = ref('')
 const feedbackBusy = ref(false)
 const feedbackReceiptId = ref('')
 const interactionKeys = new Map<string, string>()
 const feedbackKeys = new Map<string, string>()
+const readFingerprints = new Map<string, string>()
 const desktopAgentStatus = ref<DesktopAgentStatus | null>(null)
 const desktopAgentError = ref('')
 const desktopAgentErrorKind = ref('')
 const desktopAgentLoading = ref(false)
 const desktopBindingBusy = ref(false)
 const desktopBindingGrant = ref<DesktopBindingGrant | null>(null)
+const replyPolicy = ref<ReplyPolicy | null>(null)
+const replyPolicyBusy = ref(false)
+const replyPolicyError = ref('')
 let desktopStatusTimer: ReturnType<typeof setInterval> | null = null
 let desktopBindingGrantTimer: ReturnType<typeof setTimeout> | null = null
 let channelFeedTimer: ReturnType<typeof setInterval> | null = null
@@ -145,6 +172,7 @@ const contextStatus = computed(() => {
 })
 const canGenerateReply = computed(() => auth.hasPermission('ai.reply'))
 const canSubmitFeedback = computed(() => auth.hasPermission('feedback.submit'))
+const canManageReplyPolicy = computed(() => auth.hasPermission('customer_service.manage'))
 
 const resetResolution = (): void => {
   resolution.value = null
@@ -164,7 +192,10 @@ const loadWorkspaceContext = async (): Promise<void> => {
     stores.value = result.stores
     selectedStoreId.value = result.effectiveStore?.storeId ?? null
     if (!selectedStoreId.value) contextError.value = '请先完成默认客服店铺选择。'
-    if (selectedStoreId.value) await loadDesktopAgentStatus()
+    if (selectedStoreId.value) {
+      await loadDesktopAgentStatus()
+      await loadReplyPolicy()
+    }
   } catch (error) {
     contextError.value = error instanceof Error ? error.message : '店铺上下文暂时不可用。'
   } finally {
@@ -189,6 +220,50 @@ async function loadDesktopAgentStatus(): Promise<void> {
     desktopAgentErrorKind.value = error instanceof DesktopAgentClientError ? error.kind : 'unknown'
   } finally {
     if (requestSequence === desktopStatusRequestSequence) desktopAgentLoading.value = false
+  }
+}
+
+async function loadReplyPolicy(): Promise<void> {
+  if (!desktopMode || !selectedStoreId.value) return
+  replyPolicyBusy.value = true
+  replyPolicyError.value = ''
+  try {
+    replyPolicy.value = await offlineReplyControlClient.getPolicy(selectedStoreId.value)
+  } catch (error) {
+    replyPolicy.value = null
+    replyPolicyError.value = error instanceof Error ? error.message : '回复策略暂时不可用。'
+  } finally {
+    replyPolicyBusy.value = false
+  }
+}
+
+const changeReplyPolicy = async (event: Event): Promise<void> => {
+  const select = event.target as HTMLSelectElement
+  const mode = select.value as ReplyPolicyMode
+  if (!selectedStoreId.value || mode === replyPolicy.value?.mode) return
+  const confirmed = window.confirm(
+    mode === 'AUTO_LOW_RISK'
+      ? '确认启用 AUTO_LOW_RISK？仅通过质量门的低风险回复会自动进入 EXECUTION_PREPARED，真实发送仍关闭。'
+      : '确认切换回 MANUAL_CONFIRM？此后每条回复都必须人工确认后才能进入执行准备。'
+  )
+  if (!confirmed) {
+    select.value = replyPolicy.value?.mode ?? 'MANUAL_CONFIRM'
+    return
+  }
+  replyPolicyBusy.value = true
+  replyPolicyError.value = ''
+  try {
+    replyPolicy.value = await offlineReplyControlClient.setPolicy({
+      storeId: selectedStoreId.value,
+      mode,
+      expectedRevision: replyPolicy.value?.revision ?? null
+    })
+    ElMessage.success(`回复策略已切换为 ${mode}；真实发送保持关闭。`)
+  } catch (error) {
+    replyPolicyError.value = error instanceof Error ? error.message : '回复策略切换失败。'
+    select.value = replyPolicy.value?.mode ?? 'MANUAL_CONFIRM'
+  } finally {
+    replyPolicyBusy.value = false
   }
 }
 
@@ -230,7 +305,6 @@ const invalidateDraftForContextChange = (): void => {
   if (activeDraft.value && activeDraft.value.state !== 'MESSAGE_RECEIVED') {
     workspace.restartDraft()
     interactionReceiptId.value = ''
-    executionReceiptId.value = ''
     actionError.value = ''
   }
 }
@@ -249,6 +323,7 @@ const selectStore = async (storeId: number): Promise<void> => {
     resetResolution()
     desktopBindingGrant.value = null
     await loadDesktopAgentStatus()
+    await loadReplyPolicy()
   } catch {
     contextError.value = '店铺切换失败，请稍后重试；如持续失败，请联系管理员。'
   } finally {
@@ -268,13 +343,26 @@ const selectSku = (skuId: string): void => {
   actionError.value = skuId ? 'SKU 已确认，请再次点击生成回复建议。' : ''
 }
 
+const persistConversationRead = async (conversationId: string): Promise<void> => {
+  if (!desktopMode) return
+  const conversation = conversations.value.find((item) => item.conversationId === conversationId)
+  const fingerprint = conversation?.messages.at(-1)?.messageId
+  if (!fingerprint || readFingerprints.get(conversationId) === fingerprint) return
+  try {
+    await channelAdapter.markRead(conversationId)
+    readFingerprints.set(conversationId, fingerprint)
+  } catch {
+    actionError.value = '会话已打开，但已读游标保存失败；稍后将自动重试。'
+  }
+}
+
 const selectConversation = (conversationId: string): void => {
   workspace.selectConversation(conversationId)
   interactionReceiptId.value = ''
-  executionReceiptId.value = ''
   feedbackReceiptId.value = ''
   actionError.value = ''
   resetResolution()
+  void persistConversationRead(conversationId)
 }
 
 const setAgentAvailability = (online: boolean): void => {
@@ -303,7 +391,6 @@ const receiveManualMessage = async (payload: {
       workspace.addConversation(conversation)
     }
     interactionReceiptId.value = ''
-    executionReceiptId.value = ''
     feedbackReceiptId.value = ''
     actionError.value = ''
     resetResolution()
@@ -378,7 +465,6 @@ const generateDraft = async (): Promise<void> => {
   generationBusy.value = true
   actionError.value = ''
   interactionReceiptId.value = ''
-  executionReceiptId.value = ''
   try {
     const resolved = await resolveConversation()
     if (!resolved) return
@@ -501,7 +587,6 @@ const acceptDraft = async (type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT' | 'MANUAL_ACC
     workspace.acceptDraft()
     actionError.value = ''
     interactionReceiptId.value = ''
-    executionReceiptId.value = ''
     ElMessage.success('人工回复已确认；请复制到渠道窗口核对后发送')
     return
   }
@@ -511,33 +596,28 @@ const acceptDraft = async (type: 'DIRECT_ACCEPT' | 'EDITED_ACCEPT' | 'MANUAL_ACC
   }
   actionBusy.value = true; actionError.value = ''
   try {
-    interactionReceiptId.value = await recordInteraction(type)
     const draft = activeDraft.value
-    const operatorReference = auth.user.value?.id
-    if (type === 'DIRECT_ACCEPT' && draft?.decisionId && operatorReference) {
-      const send = await channelAgentSendClient.approveAndSend({
-        contractVersion: '1.0',
-        decisionId: draft.decisionId,
-        conversationId: draft.conversationId,
-        customerMessageId: draft.messageId,
-        replyText: draft.originalAnswer,
-        operatorReference,
-        confirmationPhrase: `CONFIRM SEND ${draft.decisionId}`,
-        idempotencyKey: `pdd-controlled-send:${draft.decisionId}`,
-        confirmedAt: new Date().toISOString()
-      })
-      executionReceiptId.value = send.receipt_id
-      if (send.outcome === 'UNKNOWN') {
-        throw new Error('发送结果未知，系统已停止且不会重试；请立即检查当前 PDD 会话。')
+    if (desktopMode && type === 'DIRECT_ACCEPT' && draft?.decisionId) {
+      const customerReference = activeConversation.value?.customerReference
+      if (!selectedStoreId.value || !customerReference) {
+        throw new Error('缺少店铺或去标识化客户引用，无法安全准备执行。')
       }
-      if (send.outcome !== 'SUCCESS' || !send.customer_message_sent) {
-        throw new Error('PDD 未确认发送成功，系统已停止；请核对当前客服窗口。')
+      if (!draft.preparationId) {
+        const prepared = await offlineReplyControlClient.prepareExecution({
+          decisionId: draft.decisionId,
+          storeId: selectedStoreId.value,
+          conversationId: draft.conversationId,
+          customerReference
+        })
+        draft.preparationId = prepared.preparationId
+        draft.hostState = 'EXECUTION_PREPARED'
+        draft.traceId = prepared.traceId
       }
       workspace.acceptDraft()
-      workspace.completeConversation()
-      ElMessage.success('回复已发送到当前 PDD 会话，并已生成执行回执')
+      ElMessage.success('已生成 EXECUTION_PREPARED；未读取或发送任何真实 PDD 消息。')
       return
     }
+    interactionReceiptId.value = await recordInteraction(type)
     workspace.acceptDraft()
     ElMessage.success('采用结果已记录；请人工复制并发送')
   } catch (error) { actionError.value = error instanceof Error ? error.message : '采用结果保存失败。' }
@@ -622,7 +702,6 @@ const reopenConversation = (): void => {
   try {
     workspace.reopenConversation()
     interactionReceiptId.value = ''
-    executionReceiptId.value = ''
     feedbackReceiptId.value = ''
     actionError.value = ''
   } catch (error) {
@@ -641,8 +720,20 @@ const syncChannelAgentFeed = async (): Promise<void> => {
           (item) => item.conversationId === seed.conversationId
         )
         if (!existing) {
-          workspace.addConversation(seed)
+          workspace.addConversation(seed, false)
           continue
+        }
+        existing.customerLabel = seed.customerLabel
+        existing.customerReference = seed.customerReference
+        existing.hostState = seed.state
+        existing.processingStage = seed.processingStage
+        existing.riskLevel = seed.riskLevel
+        existing.qualityStatus = seed.qualityStatus
+        existing.policyMode = seed.policyMode
+        existing.preparationId = seed.preparationId
+        existing.traceId = seed.traceId
+        if (existing.conversationId !== activeConversationId.value) {
+          existing.unreadCount = seed.unreadCount
         }
         const known = new Set(existing.messages.map((message) => message.messageId))
         for (const message of seed.messages) {
@@ -651,7 +742,7 @@ const syncChannelAgentFeed = async (): Promise<void> => {
       }
     }
 
-    const liveReply = await channelAdapter.latestReply()
+    const liveReply = await channelAdapter.latestReply(activeConversationId.value)
     if (
       liveReply
       && activeDraft.value?.messageId === liveReply.messageId
@@ -676,9 +767,18 @@ const syncChannelAgentFeed = async (): Promise<void> => {
         riskLevel: liveReply.riskLevel,
         citations: liveReply.citations,
         warnings: liveReply.warnings,
-        requiredFields: liveReply.requiredFields
+        requiredFields: liveReply.requiredFields,
+        hostState: liveReply.state,
+        qualityStatus: liveReply.qualityStatus,
+        policyMode: liveReply.policyMode,
+        preparationId: liveReply.preparationId,
+        traceId: liveReply.traceId
       })
       workspace.beginHumanReview()
+      if (liveReply.preparationId) workspace.acceptDraft()
+    }
+    if (activeConversationId.value) {
+      void persistConversationRead(activeConversationId.value)
     }
     if (actionError.value.startsWith('Channel Agent ')) actionError.value = ''
   } catch (error) {
@@ -743,6 +843,9 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   background: var(--workspace-canvas);
 }
+
+.offline-policy-panel { display: flex; align-items: center; gap: 14px; padding: 9px 12px; border: 1px solid var(--workspace-border-strong); border-radius: 12px; color: var(--workspace-text); background: #f7fcf8; }
+.offline-policy-panel > div { display: grid; gap: 2px; margin-right: auto; }.offline-policy-panel strong { font-size: 11px; }.offline-policy-panel span, .offline-policy-panel small { color: var(--workspace-text-soft); font-size: 9px; }.offline-policy-panel label { display: flex; align-items: center; gap: 7px; }.offline-policy-panel select { padding: 6px 8px; border: 1px solid var(--workspace-border); border-radius: 7px; color: var(--workspace-text); background: #fff; font-size: 9px; }.offline-policy-panel b { padding: 5px 8px; border-radius: 999px; color: #8b3b44; background: var(--workspace-danger-soft); font-size: 8px; }.offline-policy-panel small { color: var(--workspace-danger); }
 
 .human-loop-workspace-grid {
   display: grid;

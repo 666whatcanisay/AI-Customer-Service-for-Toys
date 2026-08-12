@@ -12,7 +12,7 @@ def _load(name: str) -> dict:
 
 def test_contract_version_and_all_customer_catalog_schemas_are_json() -> None:
     version = json.loads((ROOT / "contracts" / "version.json").read_text(encoding="utf-8"))
-    assert version["contract_version"] == "0.13.0"
+    assert version["contract_version"] == "0.14.0"
     for name in (
         "customer-service-catalog.v1.schema.json",
         "customer-service-catalog-activation-request.v1.schema.json",

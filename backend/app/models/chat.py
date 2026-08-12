@@ -10,6 +10,54 @@ from pydantic import (
 )
 
 
+class VerifiedProductContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    product_reference: str | None = Field(default=None, max_length=255)
+    product_name: str | None = Field(default=None, max_length=512)
+    sku_reference: str | None = Field(default=None, max_length=255)
+    sku_name: str | None = Field(default=None, max_length=512)
+    attributes: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("attributes")
+    @classmethod
+    def attributes_are_bounded(cls, value: dict[str, str]) -> dict[str, str]:
+        if len(value) > 32:
+            raise ValueError("verified product attributes exceed the bounded context")
+        if any(
+            not key.strip() or len(key) > 80 or len(item) > 512
+            for key, item in value.items()
+        ):
+            raise ValueError("verified product attribute is invalid")
+        return value
+
+
+class VerifiedTransactionContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    order_reference: str | None = Field(default=None, max_length=255)
+    order_status: str | None = Field(default=None, max_length=128)
+    logistics_status: str | None = Field(default=None, max_length=128)
+    aftersales_status: str | None = Field(default=None, max_length=128)
+    payment_data_included: bool = False
+    address_data_included: bool = False
+
+    @model_validator(mode="after")
+    def reject_sensitive_transaction_fields(self) -> "VerifiedTransactionContext":
+        if self.payment_data_included or self.address_data_included:
+            raise ValueError("payment and address data are forbidden in AI context")
+        return self
+
+
+class VerifiedConversationEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    message_id: str = Field(min_length=1, max_length=255)
+    sender: str | None = Field(default=None, max_length=32)
+    content: str = Field(min_length=1, max_length=2_000)
+    timestamp: str = Field(min_length=1, max_length=64)
+
+
 class FrozenChatContext(BaseModel):
     """Caller-supplied business scope from the C-owned customer catalog.
 
@@ -24,6 +72,11 @@ class FrozenChatContext(BaseModel):
     store_code: str = Field(..., min_length=1, max_length=100)
     product_id: str = Field(..., min_length=1, max_length=100)
     sku_id: str | None = Field(default=None, max_length=100)
+    verified_product: VerifiedProductContext | None = None
+    verified_transaction: VerifiedTransactionContext | None = None
+    recent_conversation: tuple[VerifiedConversationEntry, ...] = Field(
+        default=(), max_length=20
+    )
 
     @field_validator("tenant_id", "platform", "store_code", "product_id")
     @classmethod
@@ -44,6 +97,22 @@ class FrozenChatContext(BaseModel):
         if "\r" in value or "\n" in value:
             raise ValueError("SKU 不能包含换行符")
         return value
+
+    @model_validator(mode="after")
+    def verified_context_matches_scope(self) -> "FrozenChatContext":
+        if self.verified_product is None:
+            return self
+        product_reference = self.verified_product.product_reference
+        if (
+            product_reference
+            and not self.product_id.startswith("__STORE_LEVEL_")
+            and product_reference != self.product_id
+        ):
+            raise ValueError("verified product does not match the frozen product scope")
+        sku_reference = self.verified_product.sku_reference
+        if sku_reference and self.sku_id and sku_reference != self.sku_id:
+            raise ValueError("verified SKU does not match the frozen SKU scope")
+        return self
 
 
 class ChatRequest(BaseModel):

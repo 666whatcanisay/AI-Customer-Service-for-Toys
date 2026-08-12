@@ -43,10 +43,10 @@
       <small>可在客服反馈记录中查看。</small>
     </section>
 
-    <section v-if="executionReceiptId" class="receipt-card" data-testid="execution-receipt">
-      <span>执行回执</span>
-      <strong>已确认发送到当前 PDD 会话</strong>
-      <small>回执 {{ executionReceiptId }}</small>
+    <section v-if="draft?.preparationId" class="receipt-card" data-testid="execution-preparation">
+      <span>执行准备</span>
+      <strong>已准备，尚未发送真实 PDD 消息</strong>
+      <small>准备编号 {{ draft.preparationId }}</small>
     </section>
 
     <section v-if="feedbackReceiptId" class="receipt-card issue-receipt" data-testid="decision-feedback-receipt">
@@ -57,7 +57,7 @@
 
     <section v-if="conversation" class="conversation-actions">
       <button
-        v-if="conversation.status === 'WAITING_REPLY'"
+        v-if="conversation.status === 'WAITING_REPLY' && !draft?.preparationId"
         type="button"
         data-testid="complete-conversation"
         @click="$emit('complete')"
@@ -68,7 +68,8 @@
         data-testid="reopen-conversation"
         @click="$emit('reopen')"
       >重新打开会话</button>
-      <small v-if="conversation.status === 'WAITING_REPLY'">复制不等于发送；请在外部渠道完成处理后再点击。</small>
+      <small v-if="conversation.status === 'WAITING_REPLY' && !draft?.preparationId">复制不等于发送；请在外部渠道完成处理后再点击。</small>
+      <small v-else-if="draft?.preparationId" data-testid="prepared-send-boundary">执行已准备；真实 PDD 发送未启用，不能标记为已发送。</small>
     </section>
 
     <section class="safety-card">
@@ -76,7 +77,8 @@
       <ul>
         <li>AI 只生成建议</li>
         <li>客服必须人工确认</li>
-        <li>仅在客服点击“确认发送”后执行单条回复</li>
+        <li>人工确认仅生成执行准备，不代表发送成功</li>
+        <li>真实 PDD 发送与真实 Receipt 当前均关闭</li>
         <li>不退款、不修改订单</li>
       </ul>
     </section>
@@ -93,7 +95,6 @@ const props = defineProps<{
   draft: ReplyDraft | null
   conversation: WorkspaceConversation | null
   receiptId: string
-  executionReceiptId: string
   feedbackReceiptId: string
 }>()
 
@@ -109,6 +110,7 @@ const conversationStatusLabel = computed(() => props.conversation
   : '未选择')
 const conversationNextStep = computed(() => {
   if (!props.conversation) return '从左侧选择会话。'
+  if (props.draft?.preparationId) return '执行准备已生成；真实 PDD 发送仍关闭。'
   if (props.conversation.status === 'NEW') return '打开会话开始处理。'
   if (props.conversation.status === 'PROCESSING') return '生成并人工审核回复。'
   if (props.conversation.status === 'WAITING_REPLY') return '等待客服确认并发送。'
@@ -116,6 +118,7 @@ const conversationNextStep = computed(() => {
 })
 
 const decisionLabel = computed(() => {
+  if (props.draft?.preparationId) return '执行已准备'
   if (props.draft?.decisionState === 'APPROVED') return isManualReply.value ? '人工回复已确认' : '已采用'
   if (props.draft?.decisionState === 'REJECTED') return '已拒绝'
   return '等待人工确认'
@@ -130,7 +133,9 @@ const nextStep = computed(() => {
   if (!props.draft) return '选择一条会话开始处理。'
   if (props.draft.decisionState === 'APPROVED') return isManualReply.value
     ? '请核对目标会话后完成发送。'
-    : props.executionReceiptId ? '已发送并生成不可变回执。' : '请核对目标会话后确认发送。'
+    : props.draft.preparationId
+      ? '已生成 EXECUTION_PREPARED；真实 PDD 消息尚未发送。'
+      : '请核对目标会话后准备执行。'
   if (props.draft.decisionState === 'REJECTED') return '已记录拒绝；问题进入反馈闭环。'
   if (props.draft.state === 'MESSAGE_RECEIVED') return '可生成 AI 建议，也可直接输入人工回复。'
   if (['UNDERSTANDING', 'GENERATING'].includes(props.draft.state)) return 'AI 正在处理，请等待。'

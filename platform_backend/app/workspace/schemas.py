@@ -5,6 +5,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.desktop_agent.schemas import ReplyPolicyMode
+
 from app.iam.schemas import RoleName
 
 
@@ -13,6 +15,32 @@ STORE_CONTEXT_SCHEMA_VERSION = "ai-cs.store-context.v1"
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class ReplyPolicyChangeRequest(StrictModel):
+    store_id: int = Field(ge=1)
+    mode: ReplyPolicyMode
+    expected_revision: int | None = Field(default=None, ge=1)
+    human_confirmed: bool
+
+    @model_validator(mode="after")
+    def require_human_confirmation(self) -> "ReplyPolicyChangeRequest":
+        if self.human_confirmed is not True:
+            raise ValueError("reply policy change requires human confirmation")
+        return self
+
+
+class ExecutionPreparationRequest(StrictModel):
+    store_id: int = Field(ge=1)
+    conversation_id: str = Field(min_length=1, max_length=255)
+    customer_reference: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+    human_confirmed: bool
+
+    @model_validator(mode="after")
+    def require_human_confirmation(self) -> "ExecutionPreparationRequest":
+        if self.human_confirmed is not True:
+            raise ValueError("execution preparation requires human confirmation")
+        return self
 
 
 class WorkspaceContextState(StrEnum):

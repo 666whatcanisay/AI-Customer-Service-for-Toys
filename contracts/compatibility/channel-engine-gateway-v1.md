@@ -38,6 +38,17 @@ the following additive profile:
 }
 ```
 
+Repository contract `0.14.0` additionally accepts bounded `product`,
+`transaction`, `conversation_history` and `visible_conversation_history`
+members beside `ai_cs_scope`. AI-CS validates their product/SKU alignment,
+rejects payment/address flags, keeps at most twenty recent entries, and does
+not place customer content in Gateway metadata or logs.
+
+Successful Decision metadata may now contain bounded `citations` descriptors
+(`reference`, `title`, `product_id`, `sku_id`, `source_kind`). This is an
+additive use of the existing flexible metadata object and does not change the
+Gateway `1.0` schema or required approval flag.
+
 `ai_cs_scope` is mandatory for a real AI-CS Decision. Missing or invalid scope
 returns `422 SCHEMA_VALIDATION_FAILED`. The server never calls the legacy
 unscoped `message` path.
@@ -89,10 +100,14 @@ is never serialized by the frozen V1 contract.
 ## Affected-line review
 
 - A: adds an isolated Gateway adapter over the existing answer service. RAG,
-  Prompt, retrieval, product knowledge and `/api/chat` semantics are unchanged.
+  Prompt, retrieval, product knowledge and `/api/chat` semantics are unchanged;
+  the Gateway adapter validates bounded Host context and projects citations.
 - B: no source or endpoint changes; it continues to call `/api/health` and
   `/api/chat` through `/rag-api`.
-- C/Admin: no change.
+- C: adds Store-scoped Workspace facades for reply-policy read/change and
+  human execution preparation. C enforces authenticated Store scope, requires
+  explicit human confirmation for mutations, and calls Host through the
+  existing signed service identity. Admin has no source or endpoint change.
 - OPS: Gateway remains disabled until an approved runtime supplies an HMAC
   secret and private state path. TLS and production Channel Engine connectivity
   require a later deployment Gate.

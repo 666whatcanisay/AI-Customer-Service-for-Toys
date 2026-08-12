@@ -13,9 +13,9 @@ def test_iam_contract_is_coordinated_0_13_0_and_valid_json_schema() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
     assert version == {
-        "contract_version": "0.13.0",
+        "contract_version": "0.14.0",
         "status": "coordinated",
-        "updated_at": "2026-08-06",
+        "updated_at": "2026-08-11",
     }
     Draft202012Validator.check_schema(schema)
 

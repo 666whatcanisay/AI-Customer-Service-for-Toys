@@ -22,6 +22,8 @@ from app.desktop_agent.schemas import (
     UpstreamAgentList,
     UpstreamEnrollmentGrant,
     UpstreamHostPairingCode,
+    UpstreamExecutionPreparation,
+    UpstreamReplyPolicy,
 )
 
 
@@ -69,6 +71,18 @@ class ChannelAgentUpstream(Protocol):
     def restore_agent_to_registered(
         self, *, agent_id: str, reason: str
     ) -> UpstreamAgentIdentity: ...
+
+    def get_reply_policy(self, *, store_id: str) -> UpstreamReplyPolicy: ...
+
+    def set_reply_policy(
+        self, *, store_id: str, mode: str, expected_revision: int | None,
+        actor_reference: str,
+    ) -> UpstreamReplyPolicy: ...
+
+    def prepare_execution(
+        self, *, decision_id: str, store_id: str, conversation_id: str,
+        customer_reference: str, actor_reference: str,
+    ) -> UpstreamExecutionPreparation: ...
 
 
 class HttpChannelAgentUpstream:
@@ -321,6 +335,63 @@ class HttpChannelAgentUpstream:
         except ValidationError as exc:
             raise ChannelAgentResponseInvalid(
                 "Channel Agent restore response is invalid"
+            ) from exc
+
+    def get_reply_policy(self, *, store_id: str) -> UpstreamReplyPolicy:
+        response = self._request(
+            "GET", f"/channel-agent/v2/service/reply-policies/{quote(store_id, safe='')}"
+        )
+        try:
+            return UpstreamReplyPolicy.model_validate(response)
+        except ValidationError as exc:
+            raise ChannelAgentResponseInvalid(
+                "Channel Agent reply-policy response is invalid"
+            ) from exc
+
+    def set_reply_policy(
+        self, *, store_id: str, mode: str, expected_revision: int | None,
+        actor_reference: str,
+    ) -> UpstreamReplyPolicy:
+        response = self._request(
+            "PUT",
+            f"/channel-agent/v2/service/reply-policies/{quote(store_id, safe='')}",
+            json={
+                "mode": mode,
+                "expected_revision": expected_revision,
+                "actor_reference": actor_reference,
+            },
+            extra_headers={"X-Operator-Intent": "AUTHORIZED_REPLY_POLICY_CHANGE"},
+        )
+        try:
+            return UpstreamReplyPolicy.model_validate(response)
+        except ValidationError as exc:
+            raise ChannelAgentResponseInvalid(
+                "Channel Agent reply-policy response is invalid"
+            ) from exc
+
+    def prepare_execution(
+        self, *, decision_id: str, store_id: str, conversation_id: str,
+        customer_reference: str, actor_reference: str,
+    ) -> UpstreamExecutionPreparation:
+        response = self._request(
+            "POST",
+            "/channel-agent/v2/service/decisions/"
+            f"{quote(decision_id, safe='')}/execution-preparations",
+            json={
+                "store_id": store_id,
+                "conversation_id": conversation_id,
+                "customer_reference": customer_reference,
+                "actor_reference": actor_reference,
+            },
+            extra_headers={
+                "X-Operator-Intent": "HUMAN_CONFIRMED_EXECUTION_PREPARATION"
+            },
+        )
+        try:
+            return UpstreamExecutionPreparation.model_validate(response)
+        except ValidationError as exc:
+            raise ChannelAgentResponseInvalid(
+                "Channel Agent execution-preparation response is invalid"
             ) from exc
 
 

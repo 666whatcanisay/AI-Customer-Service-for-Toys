@@ -117,6 +117,13 @@
         <p v-else-if="draft.state === 'EDITED'" class="edited-note">已修改：提交时将记录 AI 原稿与人工最终稿。</p>
         <p v-else-if="canComposeManually" class="manual-hint">商品无法识别也不影响处理：可直接在上方输入人工回复。</p>
         <p v-if="draft.warnings.length" class="warning-note">{{ draft.warnings.map(warningLabel).join('；') }}</p>
+        <dl v-if="draft.traceId || draft.hostState" class="chain-status" data-testid="chain-status">
+          <div><dt>链路状态</dt><dd>{{ draft.hostState ?? '处理中' }}</dd></div>
+          <div><dt>质量门</dt><dd>{{ draft.qualityStatus ?? '待检查' }}</dd></div>
+          <div><dt>策略</dt><dd>{{ draft.policyMode ?? 'MANUAL_CONFIRM' }}</dd></div>
+          <div v-if="draft.preparationId"><dt>执行准备</dt><dd>EXECUTION_PREPARED</dd></div>
+          <div v-if="draft.traceId"><dt>Trace</dt><dd>{{ draft.traceId.slice(0, 22) }}…</dd></div>
+        </dl>
       </div>
 
       <div v-else class="draft-empty">
@@ -132,7 +139,7 @@
           <span class="manual-boundary">不会自动发送，也不会计入 AI 采用数据。</span>
         </template>
         <template v-else>
-          <button type="button" class="accept" :disabled="actionBusy || draft?.state === 'EDITED' || !canSubmitFeedback" data-testid="direct-accept" @click="$emit('accept', 'DIRECT_ACCEPT')">{{ draft?.decisionId ? '确认并发送到当前 PDD 会话' : '采用回复' }}</button>
+          <button type="button" class="accept" :disabled="actionBusy || draft?.state === 'EDITED' || !canSubmitFeedback" data-testid="direct-accept" @click="$emit('accept', 'DIRECT_ACCEPT')">{{ draft?.decisionId ? '人工确认并准备执行（不发送）' : '采用回复' }}</button>
           <button v-if="draft?.state !== 'EDITED'" type="button" class="edit-accept" :disabled="actionBusy" data-testid="edit-draft" @click="$emit('startEdit')">修改回复</button>
           <button v-else type="button" class="edit-accept" :disabled="actionBusy || !hasEditedAnswer || !canSubmitFeedback" data-testid="edited-accept" @click="$emit('accept', 'EDITED_ACCEPT')">采用修改</button>
           <button type="button" class="reject" :disabled="actionBusy || !canSubmitFeedback" data-testid="reject-draft" @click="openFeedback('REJECT')">拒绝回复</button>
@@ -140,7 +147,7 @@
         </template>
       </footer>
       <footer v-else-if="draft?.decisionState === 'APPROVED'" class="approved-actions">
-        <span>{{ draft.decisionId ? '已由客服人工确认并通过 Channel Agent 发送。' : '采用结果已记录。请人工复制到渠道窗口，并再次核对后发送。' }}</span>
+        <span>{{ draft.decisionId ? '已完成人工确认并生成离线执行准备；真实发送仍关闭。' : '采用结果已记录。请人工复制到渠道窗口，并再次核对后发送。' }}</span>
         <button v-if="!draft.decisionId" type="button" data-testid="copy-approved-reply" @click="$emit('copy')">复制已确认回复</button>
       </footer>
       <footer v-else-if="draft?.decisionState === 'REJECTED'" class="rejected-actions">
@@ -291,14 +298,17 @@ const draftStateLabels: Record<string, string> = {
   EXPIRED: '建议已失效'
 }
 const draftStateLabel = computed(() => {
+  if (props.draft?.preparationId) return '执行已准备'
   if (props.draft?.replySource === 'MANUAL' && props.draft.state === 'EDITED') return '人工回复编辑中'
   if (props.draft?.replySource === 'MANUAL' && props.draft.decisionState === 'APPROVED') return '人工回复已确认'
   return draftStateLabels[props.draft?.state ?? ''] ?? '等待客户消息'
 })
 
 const canGenerate = computed(() => props.draft?.state === 'MESSAGE_RECEIVED')
-const canRegenerate = computed(() => ['HUMAN_REVIEW', 'EDITED', 'EXPIRED'].includes(props.draft?.state ?? ''))
-const canReview = computed(() => ['HUMAN_REVIEW', 'EDITED'].includes(props.draft?.state ?? ''))
+const canRegenerate = computed(() => !props.draft?.preparationId
+  && ['HUMAN_REVIEW', 'EDITED', 'EXPIRED'].includes(props.draft?.state ?? ''))
+const canReview = computed(() => !props.draft?.preparationId
+  && ['HUMAN_REVIEW', 'EDITED'].includes(props.draft?.state ?? ''))
 const canComposeManually = computed(() => ['MESSAGE_RECEIVED', 'EXPIRED'].includes(props.draft?.state ?? ''))
 const canEditText = computed(() => props.draft?.state === 'EDITED' || canComposeManually.value)
 const hasManualAnswer = computed(() => Boolean(props.draft?.editedAnswer.trim()))
@@ -443,6 +453,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .draft-body textarea:read-only { color: var(--workspace-text-soft); background: #f2f7f3; }
 .edited-note, .manual-note, .manual-hint, .warning-note, .action-error { margin: 7px 0 0; font-size: 9px; line-height: 1.5; }
 .edited-note { color: var(--workspace-warning); }.manual-note { color: #6e551b; }.manual-hint { color: var(--workspace-accent-strong); }.warning-note, .action-error { color: var(--workspace-danger); }
+.chain-status { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }.chain-status div { display: flex; gap: 4px; padding: 4px 7px; border-radius: 7px; background: #edf5ef; font-size: 8px; }.chain-status dt { color: var(--workspace-muted); }.chain-status dd { margin: 0; color: var(--workspace-accent-strong); font-weight: 800; }
 .draft-empty { display: grid; min-height: 58px; place-content: center; text-align: center; }
 .draft-empty strong { color: var(--workspace-text-soft); font-size: 12px; }.draft-empty p { margin: 7px 0 0; color: var(--workspace-muted); font-size: 9px; }
 .review-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--workspace-border); }

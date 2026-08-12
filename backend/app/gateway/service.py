@@ -27,7 +27,12 @@ from app.gateway.contract import (
     utc_now,
 )
 from app.gateway.store import DecisionClaimState, GatewayStateStore
-from app.models.chat import FrozenChatContext
+from app.models.chat import (
+    FrozenChatContext,
+    VerifiedConversationEntry,
+    VerifiedProductContext,
+    VerifiedTransactionContext,
+)
 from app.service.rag_service import (
     LLM_REQUEST_FAILED_MESSAGE,
     MODEL_NOT_CONFIGURED_MESSAGE,
@@ -211,7 +216,31 @@ class GatewayServer:
                 details={"field": "context.ai_cs_scope"},
             )
         try:
-            return FrozenChatContext.model_validate(raw_scope, strict=True)
+            product = request.context.get("product")
+            transaction = request.context.get("transaction")
+            raw_history = request.context.get("visible_conversation_history")
+            if not isinstance(raw_history, list) or not raw_history:
+                raw_history = request.context.get("conversation_history")
+            if not isinstance(raw_history, list):
+                raw_history = []
+            verified_history = tuple(
+                VerifiedConversationEntry.model_validate(
+                    GatewayServer._bounded_history_item(item)
+                )
+                for item in raw_history[-20:]
+                if isinstance(item, dict)
+            )
+            enriched_scope = dict(raw_scope)
+            if isinstance(product, dict):
+                enriched_scope["verified_product"] = VerifiedProductContext.model_validate(
+                    product
+                ).model_dump()
+            if isinstance(transaction, dict):
+                enriched_scope["verified_transaction"] = (
+                    VerifiedTransactionContext.model_validate(transaction).model_dump()
+                )
+            enriched_scope["recent_conversation"] = verified_history
+            return FrozenChatContext.model_validate(enriched_scope, strict=True)
         except ValidationError as exc:
             raise GatewayProblem(
                 status_code=422,
@@ -221,6 +250,18 @@ class GatewayServer:
                 correlation_id=request.correlation_id,
                 details={"field": "context.ai_cs_scope"},
             ) from exc
+
+    @staticmethod
+    def _bounded_history_item(item: dict[object, object]) -> dict[object, object]:
+        """Bound already-redacted context without weakening its strict schema."""
+
+        value = dict(item)
+        limits = {"message_id": 255, "sender": 32, "content": 2_000, "timestamp": 64}
+        for field, maximum in limits.items():
+            candidate = value.get(field)
+            if isinstance(candidate, str):
+                value[field] = candidate[:maximum]
+        return value
 
     @staticmethod
     def _map_response(
@@ -296,6 +337,7 @@ class GatewayServer:
             "warnings": warnings,
             "required_fields": required_fields,
             "source_count": source_count,
+            "citations": GatewayServer._citation_descriptors(sources),
         }
         ai_request_id = result.get("request_id")
         if isinstance(ai_request_id, str) and ai_request_id:
@@ -315,6 +357,42 @@ class GatewayServer:
             metadata=metadata,
             decided_at=utc_now(),
         )
+
+    @staticmethod
+    def _citation_descriptors(sources: Any) -> list[dict[str, Any]]:
+        if not isinstance(sources, list):
+            return []
+        citations: list[dict[str, Any]] = []
+        for item in sources[:32]:
+            if not isinstance(item, dict):
+                continue
+            chunk_id = item.get("chunk_id")
+            source_name = item.get("source_name")
+            if not isinstance(chunk_id, str) or not chunk_id.strip():
+                continue
+            title = (
+                source_name.strip()
+                if isinstance(source_name, str) and source_name.strip()
+                else "AI-CS knowledge"
+            )
+            citations.append(
+                {
+                    "reference": chunk_id.strip()[:512],
+                    "title": title[:256],
+                    "product_id": (
+                        str(item["product_id"])[:160]
+                        if item.get("product_id") is not None
+                        else None
+                    ),
+                    "sku_id": (
+                        str(item["sku_id"])[:160]
+                        if item.get("sku_id") is not None
+                        else None
+                    ),
+                    "source_kind": "RAG_KNOWLEDGE",
+                }
+            )
+        return citations
 
     def close(self) -> None:
         self.state_store.close()

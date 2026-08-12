@@ -9,13 +9,15 @@ import ChannelAgentDesktopLayout from './ChannelAgentDesktopLayout.vue'
 const desktopMocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
   safeStop: vi.fn(),
-  selectStore: vi.fn()
+  selectStore: vi.fn(),
+  openPdd: vi.fn()
 }))
 
 vi.mock('@/api/channelAgentDesktopClient', () => ({
   fetchChannelAgentBootstrap: desktopMocks.bootstrap,
   requestChannelAgentSafeStop: desktopMocks.safeStop,
-  selectChannelAgentActiveStore: desktopMocks.selectStore
+  selectChannelAgentActiveStore: desktopMocks.selectStore,
+  requestChannelAgentPddWindowOpen: desktopMocks.openPdd
 }))
 
 describe('ChannelAgentDesktopLayout', () => {
@@ -73,6 +75,49 @@ describe('ChannelAgentDesktopLayout', () => {
     })
   })
 
+  it('opens the dedicated PDD Edge only after the user clicks while stopped', async () => {
+    desktopMocks.bootstrap.mockResolvedValue({
+      schema_version: '1.0',
+      agent: { process_status: 'RUNNING', runtime_status: 'ONLINE', version: '1.4.0', node_id: 'agent-1' },
+      browser: { status: 'STOPPED', pdd_login_state: null, pdd_workspace_launch_available: true },
+      binding: {
+        authorized_store_ids: ['store-ref:1'],
+        active_store_id: 'store-ref:1',
+        observed_store_id: 'store-ref:1',
+        store_reference: 'store-ref:1'
+      },
+      safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
+    })
+    desktopMocks.openPdd.mockResolvedValue({
+      schema_version: 'channel-agent-pdd-window-launch.v1',
+      status: 'OPENING',
+      browser_status: 'WAITING_LOGIN',
+      pdd_login_state: 'PDD_LOGIN_PAGE',
+      human_login_required: true,
+      observer_started: false,
+      real_send_enabled: false
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(ChannelAgentDesktopLayout, {
+      global: { plugins: [router, ElementPlus] }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('PDD 已停止')
+    await wrapper.get('[data-testid="open-pdd-window"]').trigger('click')
+    await flushPromises()
+
+    expect(desktopMocks.openPdd).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('PDD 等待扫码')
+    expect(wrapper.find('[data-testid="open-pdd-window"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('shows only the customer desktop shell with Agent, PDD and safety status', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
@@ -87,7 +132,7 @@ describe('ChannelAgentDesktopLayout', () => {
 
     expect(wrapper.get('[data-testid="agent-desktop-shell"]').text()).toContain('AI 客服助手')
     expect(wrapper.text()).toContain('Agent 在线')
-    expect(wrapper.text()).toContain('PDD 已登录')
+    expect(wrapper.text()).toContain('PDD 客服工作台已就绪')
     expect(wrapper.text()).toContain('当前店铺 玩具乐园积木店 · PDD 328616090')
     expect(wrapper.get('[data-testid="active-store-status"]').classes()).toContain('healthy')
     expect(wrapper.get('select[aria-label="当前工作店铺"]').element).toBeInstanceOf(HTMLSelectElement)

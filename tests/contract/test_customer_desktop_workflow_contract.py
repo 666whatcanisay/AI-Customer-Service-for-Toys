@@ -15,9 +15,9 @@ def test_customer_desktop_workflow_schema_and_version_are_coordinated() -> None:
     version = json.loads((ROOT / "contracts" / "version.json").read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     assert version == {
-        "contract_version": "0.13.0",
+        "contract_version": "0.14.0",
         "status": "coordinated",
-        "updated_at": "2026-08-06",
+        "updated_at": "2026-08-11",
     }
     assert hashlib.sha256(GATEWAY_SCHEMA_PATH.read_bytes()).hexdigest() == (
         "fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80"
@@ -47,3 +47,19 @@ def test_binding_grant_remains_narrow_and_activation_is_not_exposed() -> None:
     assert "user_id" not in request["properties"]
     assert "store_references" not in request["properties"]
     assert "activate" not in request["properties"]
+
+
+def test_offline_reply_controls_are_store_scoped_human_confirmed_and_non_sending() -> None:
+    definitions = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))["$defs"]
+    policy_request = definitions["ReplyPolicyChangeRequest"]
+    preparation_request = definitions["ExecutionPreparationRequest"]
+    preparation = definitions["ExecutionPreparation"]
+
+    assert policy_request["properties"]["human_confirmed"] == {"const": True}
+    assert preparation_request["properties"]["human_confirmed"] == {"const": True}
+    assert preparation["properties"]["real_send_enabled"] == {"const": False}
+    assert preparation["properties"]["external_side_effect"] == {"const": False}
+    assert definitions["ReplyPolicyMode"]["enum"] == [
+        "MANUAL_CONFIRM",
+        "AUTO_LOW_RISK",
+    ]
