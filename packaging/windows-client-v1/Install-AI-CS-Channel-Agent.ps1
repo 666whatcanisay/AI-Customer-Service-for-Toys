@@ -115,9 +115,6 @@ if ($existingInstall) {
         catch { throw 'Installed or package version is invalid.' }
     }
 
-    # Do not touch the installed tree until the new package is fully staged and
-    # the exact known launcher has released its file handles.
-    Stop-KnownAgentLauncher $InstallRoot $DataRoot
 }
 
 $installParent = Split-Path -Parent $InstallRoot
@@ -132,6 +129,9 @@ try {
         Copy-Item -LiteralPath $_.FullName -Destination $stageRoot -Recurse -Force
     }
     Assert-PackageIntegrity $stageRoot $packageManifest
+    # Only after a complete staged copy has passed its own manifest check may
+    # the exact installed runtime be stopped and the directory switched.
+    if ($existingInstall) { Stop-KnownAgentLauncher $InstallRoot $DataRoot }
     if ($existingInstall) { Move-Item -LiteralPath $InstallRoot -Destination $rollbackRoot }
     try {
         Move-Item -LiteralPath $stageRoot -Destination $InstallRoot

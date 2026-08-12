@@ -546,6 +546,9 @@ def test_windows_installer_supports_in_place_upgrade_without_deleting_data() -> 
     assert ".inc-$transactionId" in installer
     assert ".bak-$transactionId" in installer
     assert "Move-Item -LiteralPath $InstallRoot -Destination $rollbackRoot" in installer
+    assert installer.index("Assert-PackageIntegrity $stageRoot") < installer.index(
+        "Stop-KnownAgentLauncher $InstallRoot $DataRoot"
+    )
     assert "Installed version" in installer
     assert "Remove-Item -LiteralPath $DataRoot" not in installer
 
