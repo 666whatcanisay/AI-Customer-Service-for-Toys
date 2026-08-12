@@ -144,9 +144,12 @@ foreach ($pattern in @('annotated_types-*.dist-info','anyio-*.dist-info','certif
 # Windows path limits; the embedded runtime executes the canonical .py files.
 Get-ChildItem -LiteralPath $runtime -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
     Sort-Object { $_.FullName.Length } -Descending |
-    Remove-Item -Recurse -Force
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
 Get-ChildItem -LiteralPath $runtime -Recurse -File -Include '*.pyc','*.pyo' -ErrorAction SilentlyContinue |
-    Remove-Item -Force
+    ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python.exe') -PathType Leaf)) {
+    throw 'Embedded Python runtime was removed while pruning build residue.'
+}
 
 $launcherSource = Join-Path $repoRoot 'packaging\windows-client-v1\ChannelAgentLauncher.cs'
 $versionMatch = [regex]::Match($version, '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:rc(?<rc>\d+))?$')

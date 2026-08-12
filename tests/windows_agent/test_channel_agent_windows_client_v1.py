@@ -550,6 +550,16 @@ def test_windows_installer_supports_in_place_upgrade_without_deleting_data() -> 
     assert "Remove-Item -LiteralPath $DataRoot" not in installer
 
 
+def test_windows_build_prunes_bytecode_without_pipeline_path_binding() -> None:
+    root = Path(__file__).resolve().parents[2]
+    build = (root / "scripts" / "build_channel_agent_windows_client.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ForEach-Object { Remove-Item -LiteralPath $_.FullName" in build
+    assert "Embedded Python runtime was removed while pruning build residue." in build
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows process validation")
 def test_windows_process_detection_does_not_signal_process() -> None:
     assert _process_exists(os.getpid()) is True
