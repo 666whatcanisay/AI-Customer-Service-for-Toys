@@ -27,12 +27,12 @@
 - Quality Gate：`PASS`；Risk：`LOW`；Policy：`MANUAL_CONFIRM`
 - 真实 execution/receipt/send：全部 `0`
 
-## 当前验收 UI 哈希
+## 当前候选及安装实例 UI 哈希
 
 | 文件 | SHA256 |
 |---|---|
-| `ui/index.html` | `1a34f5721b0b8454c6535c1a88a4ce9e06e9006f5ae09b42ad9782e09236c6d2` |
-| JavaScript | `2298c0d73d4325f7487e38c8c68f18924eeaa2ef453bba3cacb04ee9a3122835` |
-| CSS | `02cab63d59c65e3e780dc1811c9e8bc58d63c0cb5a5a397c04da213f41f7b25b` |
+| `ui/index.html` | `e4bf0e3a11ba1dbd3aff3555d8f5da459a0b0822604ae8e6251d91f748bc4efd` |
+| JavaScript | `7de0181e8876b2be52ea5c77391ecf0aa634f163d6bbde65bd5febdbdc56a91a` |
+| CSS | `fab18c8d7784ba2d79118fe8a98d23634029303cdc08f8d40896f66db213a91c` |
 
-最终候选包引用同一 JS/CSS；其 `index.html` 额外包含打包阶段注入的品牌 favicon，因此外壳 HTML SHA 不同，这是预期包装差异，不是应用代码差异。
+当前安装实例已事务式升级为最终候选包，UI 文件与候选包一致。人工联合验收使用同一绿色助手业务链；升级后又完成 214 项 UI 回归与类型检查。

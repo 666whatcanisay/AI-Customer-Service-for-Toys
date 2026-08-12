@@ -13,7 +13,7 @@
 | 客服助手界面 | PASS | 最终绿色界面和后端状态联合验收通过 |
 | 多会话/多店铺/恢复 | PASS | 黑盒覆盖 |
 | Windows 部署能力 | PASS | 隔离 13/13；候选 ZIP 已冻结 |
-| 数据库 | PASS | Head 0018；迁移矩阵通过 |
+| 数据库 | PASS | Head/运行库均为 0019；身份双向绑定与受控迁移通过 |
 | 安全与证据 | PASS | Secret 扫描、Receipt 隔离、零真实副作用 |
 | 文档资产 | PASS | 架构、BOM、部署、手册、Gate 已固化 |
 | 真实 PDD 读取 | NOT IN SCOPE | 下一阶段 REAL_PDD_READ_READY |

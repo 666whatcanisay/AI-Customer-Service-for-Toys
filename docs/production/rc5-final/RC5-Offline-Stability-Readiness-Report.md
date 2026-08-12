@@ -36,6 +36,8 @@ Synthetic/Replay
 | STAB-009 | `privacy_filtered=true` 定义过宽 | 手机、证件、支付、姓名、地址、社交号脱敏；订单/物流/售后 ID 转本地 HMAC Token | PASS |
 | STAB-010 | 回归入口分散、耗时不可见 | 增加 Quick/Full 分层验收脚本和逐 Gate 耗时证据 | PASS |
 | STAB-011 | 绿色助手 Gate 可能被治理工作覆盖 | 保留离线黑盒 + 前端组件 + ExecutionPrepared 安全边界验收 | PASS |
+| STAB-012 | Windows 覆盖升级可能形成混合目录 | 新包完整性预检并暂存；等待安装目录子进程退出；目录级切换；失败回滚 | PASS |
+| STAB-013 | Python bytecode 增大包并触发长路径失败 | 独立运行验证后剔除 `__pycache__`/`.pyc`，候选包缓存文件数为 0 | PASS |
 
 ## 数据库最终状态
 
@@ -51,7 +53,7 @@ Synthetic/Replay
 
 | Gate | 结果 |
 |---|---:|
-| Channel Engine | 771 PASS；1 项真实 Edge smoke 为 NOT IN SCOPE |
+| Channel Engine | 772 PASS；1 项真实 Edge smoke 为 NOT IN SCOPE |
 | AI-CS Backend | 153 PASS；3 项真实本地/外部服务 E2E 为 NOT IN SCOPE |
 | Platform Backend | 180 PASS |
 | Contracts | 16 PASS |
@@ -60,7 +62,7 @@ Synthetic/Replay
 | 绿色助手离线黑盒 | 12 PASS |
 | Windows 隔离部署 | 13/13 PASS；当前安装实例修改数 0 |
 | Quick stability gate | PASS，约 35 秒 |
-| Full stability gate | PASS，约 155 秒 |
+| Full stability gate | 最终实现冻结点 PASS，约 169 秒 |
 
 证据位于 `.runtime/rc5-offline-stability/`；其中运行日志和数据库备份均被 Git 忽略。
 
@@ -76,7 +78,7 @@ Synthetic/Replay
 
 ## 仍未完成但不阻塞本轮
 
-- 最终快照发现旧安装产物的 EXE/PYZ 与其 Manifest 声明不一致；已用隔离验证过的新候选包完成受控覆盖升级。升级后 Manifest、EXE、PYZ 与候选包一致，Agent ID、Device ID、Binding revision、Active Store、受保护配置、Profile identity 和 PDD Session 均保持不变。
+- 最终快照发现旧安装产物的 EXE/PYZ 与其 Manifest 声明不一致；已用事务式安装器完成受控覆盖升级。升级后 Manifest、EXE、PYZ 与候选包一致，运行实例保护对比 11/11 PASS。
 - PDD Snapshot 平行模型、大型模块拆分是维护性工作；没有真实 Replay 前不重构。
 - 真实 PDD Selector、读取、角色、商品/SKU、订单、真实发送均为 `NOT IN SCOPE`。
 - 代码签名、企业证书、Windows Service、正式 Release Tag 属商业发布阶段。

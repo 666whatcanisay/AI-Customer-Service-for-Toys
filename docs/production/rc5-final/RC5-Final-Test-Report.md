@@ -1,6 +1,6 @@
 # RC5 Final Test Report
 
-> 2026-08-12 离线稳定性回归更新：Engine `771 PASS`、AI-CS Backend `153 PASS`、Platform `180 PASS`、Contracts `16 PASS`、客服前端 `214 PASS`、Admin `90 PASS`、Windows 隔离部署 `13/13 PASS`。详见 [RC5 Offline Stability Readiness Report](RC5-Offline-Stability-Readiness-Report.md)。
+> 2026-08-12 最终离线稳定性回归：Engine `772 PASS`、AI-CS Backend `153 PASS`、Platform `180 PASS`、Contracts `16 PASS`、客服前端 `214 PASS`、Admin `90 PASS`、Windows 隔离部署 `13/13 PASS`。详见 [RC5 Offline Stability Readiness Report](RC5-Offline-Stability-Readiness-Report.md)。
 
 ## 总结
 
@@ -9,14 +9,14 @@ RC5 离线范围内没有未解决 P0/P1 阻塞。真实 PDD 和显式真实依�
 | 测试域 | 结果 | 说明 |
 |---|---:|---|
 | 后端黑盒 | 35/35 PASS | Synthetic + 真实格式 Replay、策略、恢复、隔离、安全 |
-| Channel Engine | 734 PASS | 另 1 项隔离真实 Edge smoke 为 NOT IN SCOPE |
-| AI-CS Backend | 151 PASS | 另 3 项需显式真实本地服务的 E2E 为 NOT IN SCOPE |
-| Platform Backend | 174/174 PASS | 会话、权限、店铺、工作台等 |
+| Channel Engine | 772 PASS | 另 1 项隔离真实 Edge smoke 为 NOT IN SCOPE |
+| AI-CS Backend | 153 PASS | 另 3 项需显式真实本地服务的 E2E 为 NOT IN SCOPE |
+| Platform Backend | 180/180 PASS | 会话、权限、店铺、数据库治理、工作台等 |
 | Contracts | 16/16 PASS | 跨仓合同 |
 | Platform Migration | 2/2 PASS | 并有独立 Migration Matrix |
-| 客服前端 | 213/213 PASS | Typecheck、agent build 同时 PASS |
+| 客服前端 | 214/214 PASS | Typecheck、agent build 同时 PASS |
 | Admin 前端 | 90/90 PASS | 全量 PASS |
-| Windows 隔离部署 | 13/13 PASS | 当前实例修改数 0 |
+| Windows 隔离部署 | 13/13 PASS | 候选包升级、回滚和数据保留均通过 |
 | 绿色 UI 联合验收 | PASS | 消息、会话、AI、风险、依据、人工确认、执行准备 |
 | 真实 PDD Selector/读取 | NOT IN SCOPE | 下一阶段 Gate |
 | 真实 PDD 发送/Receipt | NOT IN SCOPE | 下一阶段 Gate |

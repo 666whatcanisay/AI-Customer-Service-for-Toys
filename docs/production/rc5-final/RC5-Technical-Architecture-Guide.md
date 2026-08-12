@@ -185,10 +185,10 @@ flowchart LR
 数据库 Migration 当前 Head 是：
 
 ```text
-0018_store_platform_bindings_v1
+0019_runtime_database_identity_v1
 ```
 
-不要把测试用的历史 `0013` 数据库误认为当前运行库。
+普通启动不会自动迁移数据库；数据库路径、内部身份、sidecar 与 `0019` revision 必须全部匹配。不要把测试用的历史 `0013` 数据库误认为当前运行库。
 
 ### 5.5 绿色客服助手 Frontend
 

@@ -15,7 +15,7 @@
 
 ## 已知限制
 
-- 当前绿色 UI 验收实例是热刷新实例，不是最终候选 ZIP 的覆盖安装实例。
+- 当前安装实例已与最终候选 ZIP 对齐；真实 PDD 读取和发送仍未验收。
 - AI 响应速度取决于本地 Ollama/BGE/向量库；一次完整 UI 验收中 AI 阶段约 37 秒。
 - 真实 PDD Adapter 仍需验证平台字段、页面变更、UNKNOWN 处理和失败恢复。
 - AUTO_LOW_RISK 框架离线通过，但真实发送 Pilot 初期必须保持 MANUAL_CONFIRM。
