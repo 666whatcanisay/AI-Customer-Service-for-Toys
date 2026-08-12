@@ -87,6 +87,10 @@ class TransactionContext(CustomerAssistantModel):
 
 class PageContext(CustomerAssistantModel):
     store_id: str = Field(min_length=1, max_length=128)
+    catalog_tenant_id: str = Field(
+        default="CHANNEL-AGENT-PILOT", min_length=1, max_length=100
+    )
+    catalog_platform: str = Field(default="pdd", min_length=1, max_length=40)
     store_name: str | None = Field(default=None, min_length=1, max_length=128)
     conversation_id: str = Field(min_length=1, max_length=255)
     state: ContextPageState
@@ -268,8 +272,8 @@ class CustomerContext(CustomerAssistantModel):
             "knowledge_scopes": list(self.knowledge_scopes),
             "privacy_filtered": True,
             "ai_cs_scope": {
-                "tenant_id": "CHANNEL-AGENT-PILOT",
-                "platform": "pdd",
+                "tenant_id": self.page.catalog_tenant_id,
+                "platform": self.page.catalog_platform,
                 "store_code": self.store_id,
                 "product_id": product_reference,
                 "sku_id": self.page.product.sku_reference,
@@ -280,6 +284,9 @@ class CustomerContext(CustomerAssistantModel):
 class KnowledgeCitation(CustomerAssistantModel):
     reference: str = Field(min_length=1, max_length=512)
     title: str = Field(min_length=1, max_length=256)
+    product_id: str | None = Field(default=None, max_length=160)
+    sku_id: str | None = Field(default=None, max_length=160)
+    source_kind: str | None = Field(default=None, max_length=64)
 
 
 class AIReplyPackage(CustomerAssistantModel):
@@ -296,6 +303,9 @@ class AIReplyPackage(CustomerAssistantModel):
     reply_content: str | None = Field(default=None, min_length=1, max_length=8_000, repr=False)
     citations: tuple[KnowledgeCitation, ...] = Field(default=(), max_length=32)
     risk_level: GatewayRiskLevel
+    ai_cs_action: str = Field(default="UNKNOWN", min_length=1, max_length=64)
+    warnings: tuple[str, ...] = Field(default=(), max_length=32)
+    required_fields: tuple[str, ...] = Field(default=(), max_length=32)
     requires_human_approval: Literal[True] = True
     state: Literal["WAITING_APPROVAL", "MANUAL_INTERVENTION"] = "WAITING_APPROVAL"
     gateway_version: str = Field(min_length=1, max_length=128)

@@ -351,7 +351,11 @@ class ChannelAgentOperationsCenter:
         )
         _atomic_bytes(
             self.data_root / "runtime" / "restart-agent.request",
-            b"restart\n",
+            (
+                b"restart-preserve-assistant\n"
+                if preserve_browser
+                else b"restart\n"
+            ),
         )
 
     def _repair_worker(self, repair_id: str) -> None:

@@ -45,6 +45,8 @@ DESKTOP_API_VERSION = "1.0"
 _MAX_REQUEST_BYTES = 64 * 1024
 _MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 _BINDING_CODE = re.compile(r"^[A-F0-9]{32}$")
+_BOOTSTRAP_HANDOFF_MAX_AGE_SECONDS = 120.0
+_BOOTSTRAP_NONCE = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
 
 
 class DesktopAssistantError(RuntimeError):
@@ -70,6 +72,9 @@ class DesktopAssistantServer:
         approved_reply_handler: Callable[[dict[str, Any]], tuple[int, dict[str, Any]]]
         | None = None,
         active_store_handler: Callable[[str, str], dict[str, Any]] | None = None,
+        pdd_workspace_launch_handler: Callable[[], dict[str, Any]] | None = None,
+        pdd_workspace_status_handler: Callable[[], dict[str, Any]] | None = None,
+        pdd_workspace_close_handler: Callable[[], None] | None = None,
         platform_proxy_mode: str = "DIRECT_API",
         platform_ca_certificate: str | Path | None = None,
         config_path: str | Path | None = None,
@@ -85,6 +90,11 @@ class DesktopAssistantServer:
         self.platform_origin = self._validate_platform_origin(platform_origin)
         self.approved_reply_handler = approved_reply_handler
         self.active_store_handler = active_store_handler
+        self.pdd_workspace_launch_handler = pdd_workspace_launch_handler
+        self.pdd_workspace_status_handler = pdd_workspace_status_handler
+        self.pdd_workspace_close_handler = pdd_workspace_close_handler
+        self._manual_pdd_launch_state: dict[str, Any] | None = None
+        self._manual_pdd_launch_requested = False
         if platform_proxy_mode not in {"DIRECT_API", "SAME_ORIGIN_GATEWAY"}:
             raise DesktopAssistantError("unsupported platform proxy mode")
         self.platform_proxy_mode = platform_proxy_mode
@@ -110,7 +120,9 @@ class DesktopAssistantServer:
         self._thread: Thread | None = None
         self._lock = RLock()
         self._bootstrap_nonces: dict[str, float] = {}
+        self._handoff_bootstrap_nonce: str | None = None
         self._current_bootstrap_nonce = self._issue_bootstrap_locked()
+        self._load_bootstrap_handoff_locked()
         self._launcher_capability = secrets.token_urlsafe(32)
         self._local_session = secrets.token_urlsafe(32)
         self._csrf_token = secrets.token_urlsafe(32)
@@ -169,8 +181,82 @@ class DesktopAssistantServer:
             for nonce in tuple(self._bootstrap_nonces):
                 if hmac.compare_digest(value, nonce):
                     self._bootstrap_nonces.pop(nonce, None)
+                    if self._handoff_bootstrap_nonce is not None and hmac.compare_digest(
+                        value, self._handoff_bootstrap_nonce
+                    ):
+                        self._handoff_bootstrap_nonce = None
+                        self._record_bootstrap_handoff_consumed_locked()
                     return True
             return False
+
+    def prepare_reload_handoff(self) -> None:
+        """Let the already-open local workspace re-authenticate exactly once.
+
+        Only an explicit browser-preserving reload calls this method. The file
+        contains the nonce that is already present in the loopback workspace
+        URL, never a Cookie or CSRF token, and the next Runtime consumes it.
+        """
+
+        with self._lock:
+            payload = {
+                "schema_version": "channel-agent-desktop-bootstrap-handoff.v1",
+                "bootstrap_nonce": self._current_bootstrap_nonce,
+                "issued_at": datetime.now(UTC).isoformat(),
+            }
+            path = self._bootstrap_handoff_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._bootstrap_handoff_consumed_path().unlink(missing_ok=True)
+            atomic_write_bytes(
+                path,
+                (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"),
+            )
+
+    def _load_bootstrap_handoff_locked(self) -> None:
+        path = self._bootstrap_handoff_path()
+        try:
+            raw = path.read_bytes()
+            if len(raw) > 4096:
+                return
+            payload = json.loads(raw.decode("utf-8"))
+            nonce = payload.get("bootstrap_nonce")
+            issued_at = datetime.fromisoformat(str(payload.get("issued_at", "")))
+            if issued_at.tzinfo is None:
+                return
+            age = (datetime.now(UTC) - issued_at.astimezone(UTC)).total_seconds()
+            if (
+                not isinstance(nonce, str)
+                or _BOOTSTRAP_NONCE.fullmatch(nonce) is None
+                or age < 0
+                or age > _BOOTSTRAP_HANDOFF_MAX_AGE_SECONDS
+            ):
+                return
+            remaining = max(1.0, _BOOTSTRAP_HANDOFF_MAX_AGE_SECONDS - age)
+            self._bootstrap_nonces[nonce] = time.monotonic() + remaining
+            self._handoff_bootstrap_nonce = nonce
+        except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError):
+            return
+        finally:
+            path.unlink(missing_ok=True)
+
+    def _record_bootstrap_handoff_consumed_locked(self) -> None:
+        """Signal that the preserved assistant window recovered successfully.
+
+        The installed tray uses this non-secret marker to avoid opening a
+        duplicate window. If no preserved window consumes the handoff before
+        the bounded tray deadline, the tray still opens a fresh window.
+        """
+
+        path = self._bootstrap_handoff_consumed_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": "channel-agent-desktop-bootstrap-consumed.v1",
+            "consumed_at": datetime.now(UTC).isoformat(),
+            "pid": os.getpid(),
+        }
+        atomic_write_bytes(
+            path,
+            (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8"),
+        )
 
     def _issue_bootstrap_locked(self) -> str:
         self._prune_bootstrap_nonces_locked()
@@ -238,6 +324,8 @@ class DesktopAssistantServer:
             server.server_close()
         if thread is not None:
             thread.join(timeout=3)
+        if self.pdd_workspace_close_handler is not None:
+            self.pdd_workspace_close_handler()
         self._runtime_path().unlink(missing_ok=True)
 
     def bootstrap(self) -> dict[str, Any]:
@@ -254,6 +342,25 @@ class DesktopAssistantServer:
             # Bootstrap stays available for recovery even when configuration is
             # incomplete.  Only the non-sensitive readiness fact is exposed.
             pass
+        browser_status = state.get("browser_status", "STOPPED")
+        pdd_login_state = state.get("pdd_login_state")
+        with self._lock:
+            launch_requested = self._manual_pdd_launch_requested
+            manual_launch_state = self._manual_pdd_launch_state
+        if launch_requested and self.pdd_workspace_status_handler is not None:
+            try:
+                manual_launch_state = self.pdd_workspace_status_handler()
+                with self._lock:
+                    self._manual_pdd_launch_state = manual_launch_state
+            except Exception:
+                # A status refresh must not turn the whole local assistant into
+                # an error page. The last safe launch state remains visible.
+                pass
+        if manual_launch_state is not None:
+            browser_status = manual_launch_state.get("browser_status", browser_status)
+            pdd_login_state = manual_launch_state.get(
+                "pdd_login_state", pdd_login_state
+            )
         return {
             "schema_version": DESKTOP_API_VERSION,
             "csrf_token": self._csrf_token,
@@ -264,8 +371,11 @@ class DesktopAssistantServer:
                 "node_id": state.get("agent_id"),
             },
             "browser": {
-                "status": state.get("browser_status", "STOPPED"),
-                "pdd_login_state": state.get("pdd_login_state"),
+                "status": browser_status,
+                "pdd_login_state": pdd_login_state,
+                "pdd_workspace_launch_available": (
+                    self.pdd_workspace_launch_handler is not None
+                ),
             },
             "binding": {
                 "agent_id": state.get("agent_id"),
@@ -291,11 +401,57 @@ class DesktopAssistantServer:
             },
         }
 
+    def launch_pdd_workspace(self) -> tuple[int, dict[str, Any]]:
+        """Open the dedicated PDD Edge profile after an explicit local click.
+
+        This narrow capability only opens or reuses the dedicated browser and
+        navigates to the official login/workspace URL.  It does not enable the
+        observer, perform login, read customer messages, or send anything.
+        """
+
+        if self.pdd_workspace_launch_handler is None:
+            return HTTPStatus.SERVICE_UNAVAILABLE, {
+                "error": {
+                    "code": "PDD_WORKSPACE_LAUNCH_NOT_AVAILABLE",
+                    "message": "当前 Agent 未提供 PDD 专属窗口启动能力。",
+                }
+            }
+        try:
+            result = self.pdd_workspace_launch_handler()
+        except Exception:
+            return HTTPStatus.CONFLICT, {
+                "error": {
+                    "code": "PDD_WORKSPACE_LAUNCH_FAILED",
+                    "message": "PDD 专属窗口暂时无法启动，请检查 Edge 后重试。",
+                }
+            }
+        safe_result = {
+            "schema_version": "channel-agent-pdd-window-launch.v1",
+            "status": str(result.get("status", "OPENING")),
+            "browser_status": str(result.get("browser_status", "OPENED")),
+            "pdd_login_state": result.get("pdd_login_state"),
+            "human_login_required": True,
+            "observer_started": False,
+            "real_send_enabled": False,
+        }
+        with self._lock:
+            self._manual_pdd_launch_state = safe_result
+            self._manual_pdd_launch_requested = True
+        return HTTPStatus.ACCEPTED, safe_result
+
     def assistant_feed(self) -> dict[str, Any]:
         TransientBusinessDataPolicy().purge_expired(self.data_root)
+        snapshots_reader = getattr(self.event_journal, "assistant_snapshots", None)
+        snapshots = snapshots_reader() if callable(snapshots_reader) else ()
+        if snapshots:
+            return self._with_read_state(self._snapshots_feed(
+                tuple(item.model_dump(mode="json") for item in snapshots)
+            ))
         snapshot = self.event_journal.assistant_snapshot()
         if snapshot is not None:
-            return self._snapshot_feed(snapshot.model_dump(mode="json"))
+            return self._with_read_state(
+                self._snapshot_feed(snapshot.model_dump(mode="json"))
+            )
         value = self._read_json(
             self.data_root
             / "runtime"
@@ -326,6 +482,46 @@ class DesktopAssistantServer:
             },
         }
 
+    def _with_read_state(self, feed: dict[str, Any]) -> dict[str, Any]:
+        read_revision = getattr(self.event_journal, "read_revision", None)
+        if not callable(read_revision):
+            return feed
+        for conversation in feed.get("conversations", []):
+            if not isinstance(conversation, dict):
+                continue
+            conversation_id = conversation.get("conversationId")
+            revision = conversation.pop("_revision", 1)
+            if isinstance(conversation_id, str) and isinstance(revision, int):
+                conversation["unreadCount"] = int(
+                    revision > read_revision(conversation_id)
+                )
+                conversation["readRevision"] = read_revision(conversation_id)
+                conversation["revision"] = revision
+        return feed
+
+    def mark_conversation_read(self, conversation_id: str) -> dict[str, Any]:
+        snapshots_reader = getattr(self.event_journal, "assistant_snapshots", None)
+        snapshots = snapshots_reader() if callable(snapshots_reader) else ()
+        snapshot = next(
+            (item for item in snapshots if item.conversation_id == conversation_id),
+            None,
+        )
+        if snapshot is None:
+            single = self.event_journal.assistant_snapshot()
+            if single is not None and single.conversation_id == conversation_id:
+                snapshot = single
+        if snapshot is None:
+            raise DesktopAssistantError("assistant conversation does not exist")
+        marker = getattr(self.event_journal, "mark_conversation_read", None)
+        if not callable(marker):
+            raise DesktopAssistantError("assistant read cursor is unavailable")
+        revision = marker(conversation_id, snapshot.revision)
+        return {
+            "schema_version": DESKTOP_API_VERSION,
+            "conversation_id": conversation_id,
+            "read_revision": revision,
+        }
+
     @staticmethod
     def _snapshot_feed(snapshot: dict[str, Any]) -> dict[str, Any]:
         conversation_id = str(snapshot["conversation_id"])
@@ -346,8 +542,8 @@ class DesktopAssistantServer:
                     "distance": None,
                     "knowledgeVersion": None,
                     "sourceIds": [],
-                    "productId": None,
-                    "skuId": None,
+                    "productId": item.get("product_id"),
+                    "skuId": item.get("sku_id"),
                 }
             )
         reply_content = snapshot.get("reply_content")
@@ -355,6 +551,7 @@ class DesktopAssistantServer:
         if isinstance(reply_content, str) and reply_content:
             reply = {
                 "conversationId": conversation_id,
+                "customerReference": customer_reference,
                 "messageId": str(snapshot["turn_id"]),
                 "decisionId": decision_id,
                 "answer": reply_content,
@@ -363,18 +560,32 @@ class DesktopAssistantServer:
                 "riskLevel": snapshot["risk_level"],
                 "citations": citations,
                 "warnings": ["发送前必须人工核对店铺、会话、客户与回复内容"],
-                "requiredFields": [],
+                "requiredFields": list(snapshot.get("required_fields") or []),
+                "state": snapshot.get("status"),
+                "qualityStatus": snapshot.get("quality_status"),
+                "policyMode": snapshot.get("policy_mode"),
+                "preparationId": snapshot.get("preparation_id"),
+                "traceId": snapshot.get("trace_id"),
             }
         return {
-            "schemaVersion": "channel-agent-workspace-feed.v1",
+            "schemaVersion": "channel-agent-workspace-feed.v2",
             "source": "CHANNEL_AGENT_HOST_SNAPSHOT",
             "generatedAt": updated_at,
             "conversations": [
                 {
                     "conversationId": conversation_id,
                     "customerLabel": customer_label,
+                    "customerReference": customer_reference,
                     "unreadCount": 1,
+                    "_revision": int(snapshot.get("revision") or 1),
                     "source": "CHANNEL_AGENT",
+                    "state": snapshot.get("status"),
+                    "processingStage": snapshot.get("processing_stage"),
+                    "riskLevel": snapshot.get("risk_level"),
+                    "qualityStatus": snapshot.get("quality_status"),
+                    "policyMode": snapshot.get("policy_mode"),
+                    "preparationId": snapshot.get("preparation_id"),
+                    "traceId": snapshot.get("trace_id"),
                     "messages": [
                         {
                             "messageId": str(snapshot["turn_id"]),
@@ -391,12 +602,56 @@ class DesktopAssistantServer:
             "reply": reply,
             "safety": {
                 "readOnly": True,
-                "autoReply": False,
+                "autoReply": bool(snapshot.get("safety", {}).get("auto_reply")),
                 "realSend": False,
                 "browserWriteOperations": 0,
                 "executionCount": 0,
                 "receiptCount": 0,
                 "sendCount": 0,
+                "executionPrepared": bool(
+                    snapshot.get("safety", {}).get("execution_prepared")
+                ),
+            },
+        }
+
+    @classmethod
+    def _snapshots_feed(
+        cls, snapshots: tuple[dict[str, Any], ...]
+    ) -> dict[str, Any]:
+        projected = [cls._snapshot_feed(item) for item in snapshots[:100]]
+        conversations: list[dict[str, Any]] = []
+        replies: dict[str, dict[str, Any]] = {}
+        for feed in projected:
+            for conversation in feed.get("conversations", []):
+                if isinstance(conversation, dict):
+                    reply = feed.get("reply")
+                    if isinstance(reply, dict):
+                        conversation = {**conversation, "reply": reply}
+                        replies[str(conversation.get("conversationId"))] = reply
+                    conversations.append(conversation)
+        latest = projected[0] if projected else {}
+        return {
+            "schemaVersion": "channel-agent-workspace-feed.v2",
+            "source": "CHANNEL_AGENT_HOST_CONVERSATIONS",
+            "generatedAt": latest.get("generatedAt"),
+            "conversations": conversations,
+            "reply": latest.get("reply"),
+            "replies": replies,
+            "safety": {
+                "readOnly": True,
+                "autoReply": any(
+                    bool(item.get("safety", {}).get("auto_reply"))
+                    for item in snapshots
+                ),
+                "realSend": False,
+                "browserWriteOperations": 0,
+                "executionCount": 0,
+                "receiptCount": 0,
+                "sendCount": 0,
+                "executionPrepared": any(
+                    bool(item.get("safety", {}).get("execution_prepared"))
+                    for item in snapshots
+                ),
             },
         }
 
@@ -759,7 +1014,28 @@ class DesktopAssistantServer:
         return b"""(() => {
   if (window.__channelAgentAssistantEventsStarted) return;
   window.__channelAgentAssistantEventsStarted = true;
+  const recoveryKey = 'channel-agent-local-session-recovery-v1';
+  const checkLocalSession = async () => {
+    try {
+      const response = await fetch('/local-api/v1/bootstrap', { cache: 'no-store' });
+      if (response.ok) {
+        sessionStorage.removeItem(recoveryKey);
+      } else if (response.status === 401) {
+        const bootstrap = new URLSearchParams(window.location.search).get('bootstrap');
+        const attempted = sessionStorage.getItem(recoveryKey);
+        if (bootstrap && attempted !== bootstrap) {
+          sessionStorage.setItem(recoveryKey, bootstrap);
+          window.location.reload();
+          return;
+        }
+      }
+    } catch (_) {
+      // The loopback Runtime may still be restarting. Retry without navigating.
+    }
+    window.setTimeout(checkLocalSession, 2000);
+  };
   const connect = () => {
+    checkLocalSession();
     const source = new EventSource('/local-api/v1/events');
     source.addEventListener('assistant', (message) => {
       let detail;
@@ -811,6 +1087,12 @@ class DesktopAssistantServer:
 
     def _runtime_path(self) -> Path:
         return self.data_root / "runtime" / "desktop-assistant.json"
+
+    def _bootstrap_handoff_path(self) -> Path:
+        return self.data_root / "runtime" / "desktop-bootstrap-handoff.json"
+
+    def _bootstrap_handoff_consumed_path(self) -> Path:
+        return self.data_root / "runtime" / "desktop-bootstrap-handoff-consumed.json"
 
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any]:
@@ -1032,6 +1314,37 @@ class _DesktopHandler(BaseHTTPRequestHandler):
             self._discard_request_body()
             self.server.runtime.request_safe_stop()
             self._json(HTTPStatus.ACCEPTED, {"status": "STOPPING"})
+            return
+        if path == "/local-api/v1/browser/pdd/open":
+            self._discard_request_body()
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_REQUESTED_PDD_WINDOW"
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            status, response = self.server.runtime.launch_pdd_workspace()
+            self._json(status, response)
+            return
+        read_match = re.fullmatch(
+            r"/local-api/v1/conversations/([^/]+)/read", path
+        )
+        if read_match is not None:
+            self._discard_request_body()
+            try:
+                conversation_id = unquote(read_match.group(1))
+                self._json(
+                    HTTPStatus.OK,
+                    self.server.runtime.mark_conversation_read(conversation_id),
+                )
+            except DesktopAssistantError:
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": {"code": "ASSISTANT_CONVERSATION_NOT_FOUND"}},
+                )
             return
         if path == "/local-api/v1/enrollment":
             if self.headers.get("X-Channel-Agent-Intent") != "HUMAN_CONFIRMED_DEVICE_BINDING":

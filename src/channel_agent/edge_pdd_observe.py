@@ -56,7 +56,21 @@ class PDDWorkspaceMessage(EdgePDDObserveModel):
     sender: Literal["CUSTOMER", "OPERATOR", "BOT", "SYSTEM", "UNKNOWN"]
     content: str = Field(min_length=1, max_length=8_000, repr=False)
     timestamp: AwareDatetime
-    sequence: int = Field(ge=1)
+    # Zero means the page exposes no stable sequence.  The Observer must replace
+    # it with its durable per-conversation monotonic sequence before mapping.
+    sequence: int = Field(ge=0)
+
+
+class PDDVisibleHistoryItem(EdgePDDObserveModel):
+    """Privacy-filtered page history carried by Observation v2.2."""
+
+    message_id: str = Field(min_length=1, max_length=255)
+    sender: Literal["CUSTOMER", "OPERATOR", "BOT", "SYSTEM"]
+    source: Literal["REAL_PDD", "SYNTHETIC"]
+    content: str = Field(min_length=1, max_length=8_000, repr=False)
+    content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    timestamp: AwareDatetime
+    privacy_filtered: Literal[True] = True
 
 
 class PDDWorkspaceSnapshot(EdgePDDObserveModel):
@@ -99,9 +113,16 @@ class PDDWorkspaceSnapshot(EdgePDDObserveModel):
 class PDDWorkspaceObservationMapper:
     """Map privacy-filtered customer messages into the durable edge contract."""
 
-    def __init__(self, *, agent_id: str, device_id: str) -> None:
+    def __init__(
+        self,
+        *,
+        agent_id: str,
+        device_id: str,
+        provider_id: str = "pdd-readonly",
+    ) -> None:
         self.agent_id = agent_id
         self.device_id = device_id
+        self.provider_id = provider_id
 
     def map_customer_messages(
         self,
@@ -109,18 +130,39 @@ class PDDWorkspaceObservationMapper:
         *,
         after_sequence: int = 0,
         origin: Literal["LIVE_PDD", "STARTUP_UNREAD", "SYNTHETIC"] = "LIVE_PDD",
+        selected_message_ids: frozenset[str] | None = None,
         now: datetime | None = None,
     ) -> tuple[EdgeObservation, ...]:
         captured = (now or snapshot.captured_at).astimezone(UTC)
+        is_real = origin != "SYNTHETIC"
+        provider_kind = "REAL_PDD" if is_real else "RECORDED_REPLAY"
+        history_source = "REAL_PDD" if is_real else "SYNTHETIC"
+        visible_history = tuple(
+            PDDVisibleHistoryItem(
+                message_id=item.external_message_id,
+                sender=item.sender,
+                source=history_source,
+                content=filtered,
+                content_sha256=hashlib.sha256(filtered.encode("utf-8")).hexdigest(),
+                timestamp=item.timestamp,
+            )
+            for item in snapshot.messages[-20:]
+            if item.sender != "UNKNOWN" and (filtered := privacy_filter(item.content))
+        )
         results: list[EdgeObservation] = []
         for message in snapshot.messages:
             if message.sender != "CUSTOMER" or message.sequence <= after_sequence:
+                continue
+            if (
+                selected_message_ids is not None
+                and message.external_message_id not in selected_message_ids
+            ):
                 continue
             content = privacy_filter(message.content)
             if not content:
                 continue
             payload = {
-                "schema_version": "channel-agent-pdd-observation.v2.1",
+                "schema_version": "channel-agent-pdd-observation.v2.2",
                 "platform": "PDD",
                 "store_id": snapshot.store_id,
                 "platform_store_id": snapshot.platform_store_id,
@@ -137,6 +179,18 @@ class PDDWorkspaceObservationMapper:
                 "page_fingerprint": snapshot.page_fingerprint,
                 "selector_evidence_hash": snapshot.selector_evidence_hash,
                 "privacy_filtered": True,
+                "provider_id": self.provider_id,
+                "provider_kind": provider_kind,
+                "trace_id": "trace:"
+                + hashlib.sha256(
+                    (
+                        f"{self.provider_id}\0{snapshot.store_id}\0"
+                        f"{snapshot.conversation_id}\0{message.external_message_id}"
+                    ).encode("utf-8")
+                ).hexdigest(),
+                "visible_history": [
+                    item.model_dump(mode="json") for item in visible_history
+                ],
             }
             digest = hashlib.sha256(
                 json.dumps(
@@ -190,5 +244,6 @@ __all__ = [
     "PDDWorkspaceOrder",
     "PDDWorkspaceProduct",
     "PDDWorkspaceSnapshot",
+    "PDDVisibleHistoryItem",
     "privacy_filter",
 ]

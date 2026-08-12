@@ -1,0 +1,449 @@
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import cast
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from channel_agent.control_v2 import ServiceRequestSigner, ServiceRequestVerifier
+from channel_agent.providers import RecordedReplayProvider, SyntheticPDDProvider
+from channel_engine.gateway import (
+    DecisionRequest,
+    DecisionResponse,
+    GatewayRiskLevel,
+)
+from channel_engine.models import DecisionAction
+from channel_engine.offline_runtime import OfflineCompleteRuntime
+from channel_engine.agent.control_v2 import create_channel_agent_service_v2_router
+from channel_engine.agent.node_api import ChannelAgentNodeRegistry
+from channel_engine.provider import NormalizedChannelObservation
+from channel_engine.customer_assistant import ReplyPolicyMode
+
+
+NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
+
+
+class OfflineAICSGateway:
+    version = "offline-ai-cs.v1"
+
+    def __init__(self) -> None:
+        self.requests: list[DecisionRequest] = []
+
+    def decide(self, request: DecisionRequest) -> DecisionResponse:
+        self.requests.append(request)
+        scope = request.context["ai_cs_scope"]
+        product = request.context["product"]
+        return DecisionResponse(
+            contract_version="1.0",
+            request_id=request.request_id,
+            idempotency_key=request.idempotency_key,
+            correlation_id=request.correlation_id,
+            decision_id=f"decision-{request.message_id[-32:]}",
+            action=DecisionAction.SUGGEST_REPLY,
+            proposed_content="这款合成商品有现货知识记录，请在确认当前款式后回复买家。",
+            requires_approval=True,
+            risk_level=GatewayRiskLevel.LOW,
+            gateway_version=self.version,
+            metadata={
+                "ai_cs_action": "DIRECT_ANSWER",
+                "warnings": [],
+                "required_fields": [],
+                "citations": [
+                    {
+                        "reference": "synthetic-faq-001",
+                        "title": "合成商品 FAQ",
+                        "product_id": scope["product_id"],
+                        "sku_id": scope["sku_id"],
+                        "source_kind": "RAG_KNOWLEDGE",
+                    }
+                ],
+                "verified_product_name": product.get("product_name"),
+            },
+            decided_at=NOW,
+        )
+
+
+def _signed_service_request(
+    client: TestClient,
+    signer: ServiceRequestSigner,
+    method: str,
+    path: str,
+    *,
+    nonce: str,
+    payload: dict[str, object] | None = None,
+    intent: str | None = None,
+):
+    body = b"" if payload is None else json.dumps(payload, separators=(",", ":")).encode()
+    headers = signer.headers(
+        method,
+        path,
+        body,
+        timestamp=int(NOW.timestamp()),
+        nonce=nonce,
+    )
+    if intent is not None:
+        headers["X-Operator-Intent"] = intent
+    return client.request(method, path, content=body or None, headers=headers)
+
+
+def observation(
+    *,
+    message_id: str,
+    conversation_id: str = "conversation-001",
+    store_id: str = "store-001",
+    product_id: str = "product-001",
+):
+    return NormalizedChannelObservation.synthetic(
+        provider_id="synthetic-pdd-blackbox",
+        store_id=store_id,
+        store_name="离线验收店铺",
+        conversation_id=conversation_id,
+        external_message_id=message_id,
+        source_sequence=int(message_id.rsplit("-", 1)[-1]),
+        content="这款商品现在有货吗？",
+        timestamp=NOW - timedelta(seconds=1),
+        product={
+            "product_id": product_id,
+            "product_name": "合成验收商品",
+            "sku_id": "sku-001",
+            "sku_name": "标准款",
+            "attributes": {"color": "violet"},
+        },
+        order={
+            "order_reference": "synthetic-order-001",
+            "order_status": "PAID",
+            "logistics_status": "NOT_SHIPPED",
+            "payment_data_included": False,
+            "address_data_included": False,
+        },
+    )
+
+
+def test_black_box_manual_confirm_reaches_execution_prepared_without_real_send(
+    tmp_path: Path,
+) -> None:
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "manual", OfflineAICSGateway(), clock=lambda: NOW
+    )
+    value = observation(message_id="synthetic-message-1")
+    try:
+        assert runtime.ingest_provider(SyntheticPDDProvider((value,))) == 1
+        result = runtime.drain()
+        assert result.observations_ingested == 1
+        assert result.replies_generated == 1
+
+        snapshot = runtime.conversations()[0]
+        assert snapshot.status == "WAITING_APPROVAL"
+        assert snapshot.policy_mode == "MANUAL_CONFIRM"
+        assert snapshot.quality_status == "PASS"
+        assert snapshot.safety.real_send is False
+        assert snapshot.safety.execution_count == 0
+        assert snapshot.safety.receipt_count == 0
+
+        prepared = runtime.prepare_manually(
+            snapshot.decision_id,
+            authorized_by="operator:offline-acceptance",
+            store_id=snapshot.store_id,
+            conversation_id=snapshot.conversation_id,
+            customer_reference=snapshot.customer_reference,
+        )
+        refreshed = runtime.conversations()[0]
+        assert prepared.state == "READY"
+        assert prepared.authorization_kind == "HUMAN"
+        assert refreshed.status == "EXECUTION_PREPARED"
+        assert refreshed.safety.execution_prepared is True
+        assert refreshed.safety.execution_count == 0
+        assert refreshed.safety.send_count == 0
+
+        stages = {item.stage.value: item for item in runtime.trace(value.trace_id)}
+        assert {
+            "PROVIDER_READ",
+            "EDGE_SPOOL",
+            "HOST_PERSIST",
+            "BUFFERING",
+            "CUSTOMER_CONTEXT",
+            "AI_GENERATING",
+            "QUALITY_GATE",
+            "WAITING_CONFIRMATION",
+            "EXECUTION_PREPARED",
+        } <= stages.keys()
+        assert stages["EXECUTION_PREPARED"].reason_code == "REAL_SEND_BLOCKED"
+        assert runtime.offline_control.real_success_count() == 0
+    finally:
+        runtime.close()
+
+
+def test_black_box_auto_low_risk_switch_and_new_message_invalidation(
+    tmp_path: Path,
+) -> None:
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "auto", OfflineAICSGateway(), clock=lambda: NOW
+    )
+    first = observation(message_id="synthetic-message-1")
+    try:
+        policy = runtime.set_policy("store-001", ReplyPolicyMode.AUTO_LOW_RISK)
+        assert policy.mode == "AUTO_LOW_RISK"
+        runtime.ingest_provider(SyntheticPDDProvider((first,)))
+        runtime.drain()
+
+        snapshot = runtime.conversations()[0]
+        prepared = runtime.offline_control.preparation(snapshot.decision_id)
+        assert snapshot.status == "EXECUTION_PREPARED"
+        assert prepared is not None
+        assert prepared.authorization_kind == "AUTO_POLICY"
+        assert snapshot.safety.auto_reply is True
+        assert snapshot.safety.execution_count == 0
+
+        second = observation(message_id="synthetic-message-2")
+        runtime.ingest_provider(SyntheticPDDProvider((second,)))
+        runtime.drain()
+        assert runtime.offline_control.preparation(snapshot.decision_id).state == "INVALIDATED"
+
+        manual = runtime.set_policy("store-001", ReplyPolicyMode.MANUAL_CONFIRM)
+        assert manual.mode == "MANUAL_CONFIRM"
+        assert manual.revision > policy.revision
+    finally:
+        runtime.close()
+
+
+def test_black_box_manual_multiturn_projects_only_authorized_reply_history(
+    tmp_path: Path,
+) -> None:
+    gateway = OfflineAICSGateway()
+    runtime = OfflineCompleteRuntime(tmp_path / "multiturn-human", gateway, clock=lambda: NOW)
+    first = observation(message_id="synthetic-message-1")
+    second = observation(message_id="synthetic-message-2")
+    try:
+        runtime.ingest_provider(SyntheticPDDProvider((first,)))
+        runtime.drain()
+        initial = runtime.conversations()[0]
+        assert gateway.requests[0].context["visible_conversation_history"] == []
+        runtime.prepare_manually(
+            initial.decision_id,
+            authorized_by="operator:multiturn",
+            store_id=initial.store_id,
+            conversation_id=initial.conversation_id,
+            customer_reference=initial.customer_reference,
+        )
+
+        runtime.ingest_provider(SyntheticPDDProvider((second,)))
+        runtime.drain()
+
+        history = gateway.requests[1].context["visible_conversation_history"]
+        assert [item["sender"] for item in history] == ["customer", "operator"]
+        assert history[0]["message_id"] == first.external_message_id
+        assert history[1]["message_id"].startswith("authorized-reply:")
+        audit = runtime.offline_control.history_audit(second.trace_id)
+        assert audit is not None
+        assert [item["source"] for item in audit["entries"]] == [
+            "SYNTHETIC",
+            "HUMAN",
+        ]
+        assert audit["external_message_id"] == second.external_message_id
+        assert audit["source_sequence"] == 2
+        assert audit["excluded_current_turn_message_ids"] == [
+            second.external_message_id
+        ]
+    finally:
+        runtime.close()
+
+
+def test_black_box_unconfirmed_draft_never_enters_next_turn_history(
+    tmp_path: Path,
+) -> None:
+    gateway = OfflineAICSGateway()
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "multiturn-unconfirmed", gateway, clock=lambda: NOW
+    )
+    first = observation(message_id="synthetic-message-1")
+    second = observation(message_id="synthetic-message-2")
+    try:
+        runtime.ingest_provider(SyntheticPDDProvider((first,)))
+        runtime.drain()
+        runtime.ingest_provider(SyntheticPDDProvider((second,)))
+        runtime.drain()
+
+        history = gateway.requests[1].context["visible_conversation_history"]
+        assert [item["sender"] for item in history] == ["customer"]
+        assert all(
+            not item["message_id"].startswith("authorized-reply:")
+            for item in history
+        )
+    finally:
+        runtime.close()
+
+
+def test_black_box_auto_policy_reply_is_preserved_as_operator_history(
+    tmp_path: Path,
+) -> None:
+    gateway = OfflineAICSGateway()
+    runtime = OfflineCompleteRuntime(tmp_path / "multiturn-auto", gateway, clock=lambda: NOW)
+    first = observation(message_id="synthetic-message-1")
+    second = observation(message_id="synthetic-message-2")
+    try:
+        runtime.set_policy("store-001", ReplyPolicyMode.AUTO_LOW_RISK)
+        runtime.ingest_provider(SyntheticPDDProvider((first,)))
+        runtime.drain()
+        runtime.ingest_provider(SyntheticPDDProvider((second,)))
+        runtime.drain()
+
+        history = gateway.requests[1].context["visible_conversation_history"]
+        assert [item["sender"] for item in history] == ["customer", "operator"]
+        audit = runtime.offline_control.history_audit(second.trace_id)
+        assert audit is not None
+        assert [item["source"] for item in audit["entries"]] == [
+            "SYNTHETIC",
+            "AUTO_POLICY",
+        ]
+    finally:
+        runtime.close()
+
+
+def test_signed_workspace_service_controls_policy_and_manual_preparation(
+    tmp_path: Path,
+) -> None:
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "signed-service", OfflineAICSGateway(), clock=lambda: NOW
+    )
+    secret = b"offline-service-control-secret-32-bytes-minimum"
+    signer = ServiceRequestSigner("ai-cs", "service-key-1", secret)
+    verifier = ServiceRequestVerifier(
+        lambda service, key: secret
+        if (service, key) == ("ai-cs", "service-key-1")
+        else b"",
+        clock=lambda: NOW.timestamp(),
+    )
+    value = observation(message_id="synthetic-message-1")
+    try:
+        runtime.ingest_provider(SyntheticPDDProvider((value,)))
+        runtime.drain()
+        snapshot = runtime.conversations()[0]
+
+        app = FastAPI()
+        app.include_router(
+            create_channel_agent_service_v2_router(
+                cast(ChannelAgentNodeRegistry, object()),
+                verifier,
+                runtime.control_store,
+                offline_control=runtime.offline_control,
+            )
+        )
+        client = TestClient(app, base_url="https://testserver")
+
+        policy_path = "/channel-agent/v2/service/reply-policies/store-001"
+        policy = _signed_service_request(
+            client, signer, "GET", policy_path, nonce="1" * 32
+        )
+        assert policy.status_code == 200
+        assert policy.json()["mode"] == "MANUAL_CONFIRM"
+
+        changed = _signed_service_request(
+            client,
+            signer,
+            "PUT",
+            policy_path,
+            nonce="2" * 32,
+            payload={
+                "mode": "AUTO_LOW_RISK",
+                "expected_revision": 1,
+                "actor_reference": "11111111-1111-4111-8111-111111111111",
+            },
+            intent="AUTHORIZED_REPLY_POLICY_CHANGE",
+        )
+        assert changed.status_code == 200
+        assert changed.json()["mode"] == "AUTO_LOW_RISK"
+        assert "11111111" not in changed.json()["updated_by"]
+
+        preparation_path = (
+            "/channel-agent/v2/service/decisions/"
+            f"{snapshot.decision_id}/execution-preparations"
+        )
+        prepared = _signed_service_request(
+            client,
+            signer,
+            "POST",
+            preparation_path,
+            nonce="3" * 32,
+            payload={
+                "store_id": snapshot.store_id,
+                "conversation_id": snapshot.conversation_id,
+                "customer_reference": snapshot.customer_reference,
+                "actor_reference": "11111111-1111-4111-8111-111111111111",
+            },
+            intent="HUMAN_CONFIRMED_EXECUTION_PREPARATION",
+        )
+        assert prepared.status_code == 201, prepared.text
+        assert prepared.json()["authorization_kind"] == "HUMAN"
+        assert prepared.json()["real_send_enabled"] is False
+        assert runtime.conversations()[0].status == "EXECUTION_PREPARED"
+        events = runtime.control_store.poll_assistant_events(
+            "offline-agent", "offline-device", after_sequence_id=0, limit=100
+        )
+        assert any(item.event_type == "EXECUTION_PREPARED" for item in events)
+    finally:
+        runtime.close()
+
+
+def test_provider_implementations_are_substitutable_at_the_external_boundary(
+    tmp_path: Path,
+) -> None:
+    value = observation(message_id="synthetic-message-1")
+    fixture = tmp_path / "recorded-replay.json"
+    fixture.write_text(
+        json.dumps(
+            {"observations": [value.model_dump(mode="json")]},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    synthetic = SyntheticPDDProvider((value,)).poll()[0]
+    replay = RecordedReplayProvider(fixture).poll()[0]
+
+    ignored = {"provider_id", "provider_kind"}
+    assert {
+        key: item
+        for key, item in synthetic.model_dump(mode="json").items()
+        if key not in ignored
+    } == {
+        key: item
+        for key, item in replay.model_dump(mode="json").items()
+        if key not in ignored
+    }
+
+    assert "channel_agent.providers" not in (
+        Path(__file__).parents[2] / "src" / "channel_engine" / "offline_runtime.py"
+    ).read_text(encoding="utf-8")
+
+
+def test_black_box_two_stores_and_four_conversations_never_cross_scope(
+    tmp_path: Path,
+) -> None:
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "isolation", OfflineAICSGateway(), clock=lambda: NOW
+    )
+    values = tuple(
+        observation(
+            message_id=f"synthetic-message-{index}",
+            store_id=f"store-{1 if index <= 2 else 2:03d}",
+            conversation_id=f"conversation-{index:03d}",
+            product_id=f"product-{index:03d}",
+        )
+        for index in range(1, 5)
+    )
+    try:
+        assert runtime.ingest_provider(SyntheticPDDProvider(values)) == 4
+        result = runtime.drain()
+        assert result.observations_ingested == 4
+        assert result.replies_generated == 4
+        snapshots = runtime.conversations()
+        assert len(snapshots) == 4
+        assert len(
+            {(item.store_id, item.conversation_id) for item in snapshots}
+        ) == 4
+        assert all(item.status == "WAITING_APPROVAL" for item in snapshots)
+        assert all(item.safety.execution_count == 0 for item in snapshots)
+    finally:
+        runtime.close()

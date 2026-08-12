@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import datetime, timedelta
+from threading import Lock
 from time import perf_counter
 from typing import Protocol
 
@@ -116,6 +118,8 @@ class HeartbeatManager:
         self._store = store
         self._probes = dict(probes)
         self._clock = clock
+        self._clock_lock = Lock()
+        self._last_checked_at: datetime | None = None
 
     def run_once(self) -> HeartbeatReport:
         cycle_id = new_id("heartbeat-cycle")
@@ -143,7 +147,7 @@ class HeartbeatManager:
                     page_available=reading.page_available,
                     reason_code=reading.reason_code,
                     latency_ms=latency_ms,
-                    checked_at=self._clock(),
+                    checked_at=self._next_checked_at(),
                 )
             )
         values = tuple(item.health for item in components)
@@ -165,6 +169,18 @@ class HeartbeatManager:
         )
         self._store.append_heartbeat(report)
         return report
+
+    def _next_checked_at(self) -> datetime:
+        """Keep persisted heartbeat ordering monotonic on coarse Windows clocks."""
+        with self._clock_lock:
+            checked_at = self._clock()
+            if (
+                self._last_checked_at is not None
+                and checked_at <= self._last_checked_at
+            ):
+                checked_at = self._last_checked_at + timedelta(microseconds=1)
+            self._last_checked_at = checked_at
+            return checked_at
 
 
 __all__ = [

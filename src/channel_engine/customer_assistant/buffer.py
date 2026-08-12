@@ -432,6 +432,47 @@ class SQLiteConversationBuffer:
             ).fetchall()
         return tuple(self._row_to_message(row) for row in reversed(rows))
 
+    def purge_expired(
+        self, *, retention: timedelta = timedelta(hours=24)
+    ) -> dict[str, int]:
+        """Delete expired terminal content while preserving all recoverable work."""
+
+        if retention <= timedelta(0) or retention > timedelta(days=30):
+            raise ValueError("assistant buffer retention is outside policy")
+        cutoff = _utc(self._clock()) - retention
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            terminal = connection.execute(
+                """
+                SELECT turn_id FROM assistant_buffer_turns
+                WHERE updated_at<=?
+                  AND state IN ('WAITING_APPROVAL', 'COMPLETED',
+                                'MANUAL_INTERVENTION', 'RELEASED')
+                """,
+                (cutoff.isoformat(),),
+            ).fetchall()
+            turn_ids = tuple(str(row[0]) for row in terminal)
+            messages = 0
+            turns = 0
+            if turn_ids:
+                placeholders = ",".join("?" for _item in turn_ids)
+                messages = int(
+                    connection.execute(
+                        f"DELETE FROM assistant_buffer_messages WHERE turn_id IN ({placeholders})",
+                        turn_ids,
+                    ).rowcount
+                    or 0
+                )
+                turns = int(
+                    connection.execute(
+                        f"DELETE FROM assistant_buffer_turns WHERE turn_id IN ({placeholders})",
+                        turn_ids,
+                    ).rowcount
+                    or 0
+                )
+            connection.commit()
+        return {"messages": messages, "turns": turns}
+
     def _transition(self, turn_id: str, before: str, after: str) -> None:
         with self._lock, self._connect() as connection:
             changed = connection.execute(

@@ -149,6 +149,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private bool openWhenReady = true;
     private bool agentStartRequested;
     private bool restartPending;
+    private bool waitingForAssistantRecovery;
+    private DateTime assistantRecoveryDeadlineUtc = DateTime.MinValue;
 
     internal TrayApplicationContext()
     {
@@ -182,6 +184,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
         tray.BalloonTipTitle = "AI-CS Channel Agent";
         tray.BalloonTipText = "Agent 已在后台启动。双击托盘图标打开客服助手。";
         tray.ShowBalloonTip(3000);
+
+        var preserveOnLaunch = Path.Combine(
+            ChannelAgentLauncher.DataRoot,
+            "runtime",
+            "preserve-assistant-on-launch.request");
+        if (File.Exists(preserveOnLaunch))
+        {
+            try { File.Delete(preserveOnLaunch); } catch { }
+            openWhenReady = false;
+        }
 
         if (ConfigurationExists())
         {
@@ -238,9 +250,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ChannelAgentLauncher.DataRoot, "runtime", "restart-agent.request");
         if (File.Exists(restartRequest))
         {
+            var restartInstruction = ReadText(restartRequest);
+            var preserveAssistant = restartInstruction.IndexOf(
+                "preserve-assistant", StringComparison.OrdinalIgnoreCase) >= 0;
             try { File.Delete(restartRequest); } catch { }
             restartPending = true;
-            openWhenReady = true;
+            openWhenReady = !preserveAssistant;
+            waitingForAssistantRecovery = preserveAssistant;
+            assistantRecoveryDeadlineUtc = DateTime.MinValue;
+            if (preserveAssistant)
+            {
+                var staleMarker = Path.Combine(
+                    ChannelAgentLauncher.DataRoot,
+                    "runtime",
+                    "desktop-bootstrap-handoff-consumed.json");
+                try { File.Delete(staleMarker); } catch { }
+            }
         }
         if (restartPending
             && (status == "STOPPED" || status == "FAILED")
@@ -248,8 +273,35 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             agentStartRequested = false;
             restartPending = false;
+            if (waitingForAssistantRecovery)
+            {
+                assistantRecoveryDeadlineUtc = DateTime.UtcNow.AddSeconds(15);
+            }
             StartAgent();
             return;
+        }
+
+        if (waitingForAssistantRecovery
+            && !restartPending
+            && DesktopAssistantAvailable())
+        {
+            var recoveryMarker = Path.Combine(
+                ChannelAgentLauncher.DataRoot,
+                "runtime",
+                "desktop-bootstrap-handoff-consumed.json");
+            if (File.Exists(recoveryMarker))
+            {
+                try { File.Delete(recoveryMarker); } catch { }
+                waitingForAssistantRecovery = false;
+                openWhenReady = false;
+            }
+            else if (assistantRecoveryDeadlineUtc != DateTime.MinValue
+                && DateTime.UtcNow >= assistantRecoveryDeadlineUtc)
+            {
+                waitingForAssistantRecovery = false;
+                OpenAssistant(true);
+            }
+            if (waitingForAssistantRecovery) return;
         }
 
         var request = Path.Combine(

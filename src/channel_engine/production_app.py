@@ -33,6 +33,10 @@ from channel_engine.agent.observation_worker import (
     AgentObservationWorker,
     AgentObservationWorkerRunner,
 )
+from channel_engine.agent.assistant_factory import (
+    HostAssistantComposition,
+    build_host_assistant_composition,
+)
 from channel_engine.config import Settings
 from channel_engine.storage import SqlAlchemyUnitOfWork, create_engine_and_session, create_schema
 
@@ -77,19 +81,17 @@ def create_host_control_app(
         active_store_guard=SqlAlchemyActiveStoreGuard(session_factory),
     )
     configured_stage = _observation_stage_from_env()
-    if observation_worker is None and configured_stage is ObservationStage.HOST_INGEST:
-        observation_worker = AgentObservationWorker(
-            control_store,
-            None,
+    assistant_composition: HostAssistantComposition | None = None
+    if (
+        observation_worker is None
+        and configured_stage.allows(ObservationStage.HOST_INGEST)
+    ):
+        assistant_composition = build_host_assistant_composition(
+            control_store=control_store,
+            uow_factory=uow_factory,
             stage=configured_stage,
         )
-    elif (
-        observation_worker is None
-        and configured_stage.allows(ObservationStage.ASSISTANT_FEED)
-    ):
-        raise ValueError(
-            "ASSISTANT_FEED/AI_SUGGESTIONS requires an injected local assistant runtime"
-        )
+        observation_worker = assistant_composition.worker
     worker_runner = (
         AgentObservationWorkerRunner(observation_worker)
         if observation_worker is not None
@@ -106,6 +108,8 @@ def create_host_control_app(
         finally:
             if worker_runner is not None:
                 worker_runner.stop()
+            if assistant_composition is not None:
+                assistant_composition.close()
             engine.dispose()
 
     application = FastAPI(
@@ -138,6 +142,11 @@ def create_host_control_app(
                 control_store,
                 receipt_reconciler,
                 observation_handler,
+                offline_control=(
+                    assistant_composition.offline_control
+                    if assistant_composition is not None
+                    else None
+                ),
             )
         )
         application.state.channel_agent_control_v2_pairing = pairing
@@ -154,6 +163,11 @@ def create_host_control_app(
                 control_store,
                 pairing=pairing,
                 approval_command_factory=approval_command_factory,
+                offline_control=(
+                    assistant_composition.offline_control
+                    if assistant_composition is not None
+                    else None
+                ),
             )
         )
         application.state.channel_agent_service_v2_verifier = service_verifier
@@ -161,6 +175,11 @@ def create_host_control_app(
     application.state.channel_agent_node_registry = registry
     application.state.channel_agent_control_store = control_store
     application.state.channel_agent_observation_worker = worker_runner
+    application.state.channel_agent_offline_control = (
+        assistant_composition.offline_control
+        if assistant_composition is not None
+        else None
+    )
     application.state.channel_agent_observation_stage = (
         ObservationStage.AI_SUGGESTIONS.value
         if worker_injected

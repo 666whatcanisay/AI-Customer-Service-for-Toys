@@ -133,6 +133,10 @@ class FakeExecutionAdapter:
                 error_code=error_code,
                 details={
                     "mode": "FAKE",
+                    "receipt_kind": "SYNTHETIC",
+                    "transport_kind": "SYNTHETIC_PDD",
+                    "environment": "SIMULATOR",
+                    "external_side_effect": False,
                     "real_channel_called": False,
                     "customer_message_sent": False,
                     "idempotency_key": command.idempotency_key,

@@ -292,6 +292,82 @@ class DurableEdgeSpool:
             )
             connection.commit()
 
+    def resolve_message_sequence(
+        self,
+        *,
+        store_id: str,
+        platform_store_id: str | None,
+        conversation_id: str,
+        external_message_id: str,
+        page_sequence: int,
+    ) -> int:
+        """Persist a stable monotonic sequence when the page does not expose one."""
+
+        if page_sequence < 0:
+            raise EdgeSpoolError("page message sequence cannot be negative")
+        scope = (store_id, platform_store_id or "", conversation_id)
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                """
+                SELECT source_sequence FROM edge_message_sequences
+                WHERE store_id = ? AND platform_store_id = ?
+                  AND conversation_id = ? AND external_message_id = ?
+                """,
+                (*scope, external_message_id),
+            ).fetchone()
+            if existing is not None:
+                resolved = int(existing[0])
+                if page_sequence and resolved != page_sequence:
+                    connection.rollback()
+                    raise EdgeSpoolConflict(
+                        "stable PDD message id changed its page sequence"
+                    )
+                connection.commit()
+                return resolved
+            if page_sequence:
+                collision = connection.execute(
+                    """
+                    SELECT external_message_id FROM edge_message_sequences
+                    WHERE store_id = ? AND platform_store_id = ?
+                      AND conversation_id = ? AND source_sequence = ?
+                    """,
+                    (*scope, page_sequence),
+                ).fetchone()
+                if collision is not None:
+                    connection.rollback()
+                    raise EdgeSpoolConflict(
+                        "two PDD message ids share the same page sequence"
+                    )
+                resolved = page_sequence
+            else:
+                row = connection.execute(
+                    """
+                    SELECT COALESCE(MAX(source_sequence), 0)
+                    FROM edge_message_sequences
+                    WHERE store_id = ? AND platform_store_id = ?
+                      AND conversation_id = ?
+                    """,
+                    scope,
+                ).fetchone()
+                resolved = int(row[0]) + 1
+            connection.execute(
+                """
+                INSERT INTO edge_message_sequences (
+                    store_id, platform_store_id, conversation_id,
+                    external_message_id, source_sequence, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    *scope,
+                    external_message_id,
+                    resolved,
+                    self._clock().astimezone(UTC).isoformat(),
+                ),
+            )
+            connection.commit()
+            return resolved
+
     def purge_expired(self) -> int:
         with self._lock, self._connect() as connection:
             cursor = connection.execute(
@@ -338,6 +414,22 @@ class DurableEdgeSpool:
                     observation_id TEXT,
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(store_id, platform_store_id, conversation_id)
+                );
+                CREATE TABLE IF NOT EXISTS edge_message_sequences (
+                    store_id TEXT NOT NULL,
+                    platform_store_id TEXT NOT NULL DEFAULT '',
+                    conversation_id TEXT NOT NULL,
+                    external_message_id TEXT NOT NULL,
+                    source_sequence INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(
+                        store_id, platform_store_id, conversation_id,
+                        external_message_id
+                    ),
+                    UNIQUE(
+                        store_id, platform_store_id, conversation_id,
+                        source_sequence
+                    )
                 );
                 """
             )

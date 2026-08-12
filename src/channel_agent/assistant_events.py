@@ -25,6 +25,7 @@ class AssistantEventJournal:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._changed = Condition()
         self._snapshot: AgentAssistantSnapshot | None = None
+        self._snapshots: tuple[AgentAssistantSnapshot, ...] = ()
         self._initialize()
 
     def append(self, event: AgentAssistantEvent) -> None:
@@ -80,11 +81,59 @@ class AssistantEventJournal:
             if snapshot == self._snapshot:
                 return
             self._snapshot = snapshot
+            self._snapshots = () if snapshot is None else (snapshot,)
+            self._changed.notify_all()
+
+    def update_snapshots(
+        self, snapshots: tuple[AgentAssistantSnapshot, ...]
+    ) -> None:
+        with self._changed:
+            if snapshots == self._snapshots:
+                return
+            self._snapshots = snapshots
+            self._snapshot = snapshots[0] if snapshots else None
             self._changed.notify_all()
 
     def assistant_snapshot(self) -> AgentAssistantSnapshot | None:
         with self._changed:
             return self._snapshot
+
+    def assistant_snapshots(self) -> tuple[AgentAssistantSnapshot, ...]:
+        with self._changed:
+            return self._snapshots
+
+    def mark_conversation_read(self, conversation_id: str, revision: int) -> int:
+        """Advance the metadata-only local read cursor for one conversation."""
+
+        if not conversation_id.strip() or len(conversation_id) > 255:
+            raise ValueError("assistant conversation id is invalid")
+        if revision < 1:
+            raise ValueError("assistant conversation revision is invalid")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO assistant_read_cursors(conversation_id, revision)
+                VALUES(?, ?)
+                ON CONFLICT(conversation_id) DO UPDATE SET
+                    revision=MAX(assistant_read_cursors.revision, excluded.revision)
+                """,
+                (conversation_id, revision),
+            )
+            row = connection.execute(
+                "SELECT revision FROM assistant_read_cursors WHERE conversation_id=?",
+                (conversation_id,),
+            ).fetchone()
+        with self._changed:
+            self._changed.notify_all()
+        return int(row[0])
+
+    def read_revision(self, conversation_id: str) -> int:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT revision FROM assistant_read_cursors WHERE conversation_id=?",
+                (conversation_id,),
+            ).fetchone()
+        return 0 if row is None else int(row[0])
 
     def _initialize(self) -> None:
         with self._connect() as connection:
@@ -94,6 +143,14 @@ class AssistantEventJournal:
                     sequence_id INTEGER PRIMARY KEY,
                     event_id TEXT NOT NULL UNIQUE,
                     payload_json TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS assistant_read_cursors(
+                    conversation_id TEXT PRIMARY KEY,
+                    revision INTEGER NOT NULL CHECK(revision >= 1)
                 )
                 """
             )
@@ -142,10 +199,17 @@ class AssistantEventPoller:
         )
         for event in response.events:
             self._journal.append(event)
-        fetch_snapshot = getattr(self._client, "fetch_assistant_snapshot", None)
-        if callable(fetch_snapshot):
-            snapshot_response = fetch_snapshot()
-            self._journal.update_snapshot(snapshot_response.snapshot)
+        fetch_conversations = getattr(
+            self._client, "fetch_assistant_conversations", None
+        )
+        if callable(fetch_conversations):
+            conversation_response = fetch_conversations(limit=100)
+            self._journal.update_snapshots(conversation_response.conversations)
+        else:
+            fetch_snapshot = getattr(self._client, "fetch_assistant_snapshot", None)
+            if callable(fetch_snapshot):
+                snapshot_response = fetch_snapshot()
+                self._journal.update_snapshot(snapshot_response.snapshot)
         return len(response.events)
 
     def _run(self) -> None:

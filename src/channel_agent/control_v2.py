@@ -181,6 +181,8 @@ AssistantEventType = Literal[
     "AI_SUGGESTION_READY",
     "WAITING_APPROVAL",
     "OBSERVATION_FAILED",
+    "QUALITY_GATE",
+    "EXECUTION_PREPARED",
 ]
 
 
@@ -207,13 +209,15 @@ class AgentAssistantEventPollResponse(ControlV2Model):
 
 class AgentAssistantSafetyFacts(ControlV2Model):
     read_only: Literal[True] = True
-    manual_approval_required: Literal[True] = True
-    auto_reply: Literal[False] = False
+    manual_approval_required: bool = True
+    auto_reply: bool = False
     real_send: Literal[False] = False
     browser_write_operations: Literal[0] = 0
     execution_count: Literal[0] = 0
     receipt_count: Literal[0] = 0
     send_count: Literal[0] = 0
+    execution_prepared: bool = False
+    preparation_count: int = Field(default=0, ge=0, le=1)
 
 
 class AgentAssistantSnapshot(ControlV2Model):
@@ -225,7 +229,7 @@ class AgentAssistantSnapshot(ControlV2Model):
     store_id: str = Field(min_length=1, max_length=160)
     conversation_id: str = Field(min_length=1, max_length=255)
     revision: int = Field(ge=1)
-    status: Literal["WAITING_APPROVAL", "MANUAL_INTERVENTION"]
+    status: Literal["WAITING_APPROVAL", "MANUAL_INTERVENTION", "EXECUTION_PREPARED"]
     turn_id: str = Field(min_length=1, max_length=160)
     decision_id: str = Field(min_length=1, max_length=160)
     request_id: str = Field(min_length=1, max_length=255)
@@ -235,6 +239,14 @@ class AgentAssistantSnapshot(ControlV2Model):
     reply_content: str | None = Field(default=None, max_length=24_000, repr=False)
     risk_level: Literal["LOW", "MEDIUM", "HIGH"]
     citations: tuple[dict[str, Any], ...] = Field(default=(), max_length=32)
+    ai_cs_action: str = Field(default="UNKNOWN", min_length=1, max_length=64)
+    warnings: tuple[str, ...] = Field(default=(), max_length=32)
+    required_fields: tuple[str, ...] = Field(default=(), max_length=32)
+    policy_mode: Literal["MANUAL_CONFIRM", "AUTO_LOW_RISK"] = "MANUAL_CONFIRM"
+    quality_status: Literal["PASS", "BLOCKED"] = "PASS"
+    preparation_id: str | None = Field(default=None, max_length=160)
+    trace_id: str | None = Field(default=None, pattern=r"^trace:[a-f0-9]{64}$")
+    processing_stage: str | None = Field(default=None, max_length=64)
     safety: AgentAssistantSafetyFacts = Field(default_factory=AgentAssistantSafetyFacts)
     updated_at: AwareDatetime
     expires_at: AwareDatetime
@@ -242,6 +254,51 @@ class AgentAssistantSnapshot(ControlV2Model):
 
 class AgentAssistantSnapshotResponse(ControlV2Model):
     snapshot: AgentAssistantSnapshot | None
+    server_time: AwareDatetime
+
+
+class AgentAssistantConversationListResponse(ControlV2Model):
+    schema_version: Literal["channel-agent-assistant-conversations.v2"] = (
+        "channel-agent-assistant-conversations.v2"
+    )
+    conversations: tuple[AgentAssistantSnapshot, ...] = Field(max_length=100)
+    server_time: AwareDatetime
+
+
+AssistantPipelineStage = Literal[
+    "PROVIDER_READ",
+    "EDGE_SPOOL",
+    "HOST_PERSIST",
+    "BUFFERING",
+    "CUSTOMER_CONTEXT",
+    "AI_GENERATING",
+    "QUALITY_GATE",
+    "WAITING_CONFIRMATION",
+    "EXECUTION_PREPARED",
+    "RECEIPT",
+]
+AssistantPipelineStageState = Literal[
+    "PENDING",
+    "RUNNING",
+    "SUCCEEDED",
+    "FAILED",
+    "WAITING_HUMAN",
+]
+
+
+class AgentAssistantTraceStep(ControlV2Model):
+    trace_id: str = Field(pattern=r"^trace:[a-f0-9]{64}$")
+    stage: AssistantPipelineStage
+    state: AssistantPipelineStageState
+    reason_code: str = Field(min_length=1, max_length=128)
+    started_at: AwareDatetime
+    updated_at: AwareDatetime
+    duration_ms: float = Field(ge=0)
+
+
+class AgentAssistantTraceResponse(ControlV2Model):
+    trace_id: str = Field(pattern=r"^trace:[a-f0-9]{64}$")
+    steps: tuple[AgentAssistantTraceStep, ...]
     server_time: AwareDatetime
 
 
@@ -731,6 +788,7 @@ __all__ = [
     "AgentAssistantEventPollResponse",
     "AgentAssistantSafetyFacts",
     "AgentAssistantSnapshot",
+    "AgentAssistantConversationListResponse",
     "AgentAssistantSnapshotResponse",
     "AgentCommandEnvelope",
     "AgentCommandPollResponse",

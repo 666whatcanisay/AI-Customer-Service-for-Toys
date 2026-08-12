@@ -29,6 +29,7 @@ from channel_agent.contract import (
 )
 from channel_agent.control_v2 import (
     AgentAssistantEventPollResponse,
+    AgentAssistantConversationListResponse,
     AgentAssistantSnapshotResponse,
     AgentCommandEnvelope,
     AgentCommandPollResponse,
@@ -76,6 +77,12 @@ from .execution_commands import (
     delivery_matches_command,
 )
 from channel_engine.security.rbac import OperatorPrincipal, OperatorRole
+from channel_engine.customer_assistant import (
+    AuthorizationKind,
+    OfflineControlError,
+    OfflineReplyControlStore,
+    ReplyPolicyMode,
+)
 
 
 class DeviceCredentialRecord(BaseModel):
@@ -266,6 +273,7 @@ def create_channel_agent_control_v2_router(
     control_store: AgentControlStore | None = None,
     receipt_handler: Callable[[AgentReceiptSubmission], object] | None = None,
     observation_handler: Callable[[AgentObservationSubmission], object] | None = None,
+    offline_control: OfflineReplyControlStore | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/channel-agent/v2", tags=["channel-agent-control-v2"])
 
@@ -474,6 +482,52 @@ def create_channel_agent_control_v2_router(
             server_time=datetime.now(UTC),
         )
 
+    @router.get(
+        "/assistant-conversations",
+        response_model=AgentAssistantConversationListResponse,
+    )
+    async def get_assistant_conversations(
+        request: Request,
+        limit: int = 100,
+    ) -> AgentAssistantConversationListResponse:
+        _body, agent_id, device_id = await _authenticated(request, verifier)
+        if control_store is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "AGENT_CONTROL_STORE_UNAVAILABLE"},
+            )
+        if not 1 <= limit <= 100:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "ASSISTANT_CONVERSATION_LIMIT_INVALID"},
+            )
+        return AgentAssistantConversationListResponse(
+            conversations=control_store.assistant_snapshots(
+                agent_id, device_id, limit=limit
+            ),
+            server_time=datetime.now(UTC),
+        )
+
+    @router.get("/assistant-traces/{trace_id}")
+    async def get_assistant_trace(trace_id: str, request: Request):  # type: ignore[no-untyped-def]
+        await _authenticated(request, verifier)
+        if not _valid_trace_id(trace_id):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "ASSISTANT_TRACE_ID_INVALID"},
+            )
+        if offline_control is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "ASSISTANT_TRACE_UNAVAILABLE"},
+            )
+        steps = offline_control.trace(trace_id)
+        return {
+            "trace_id": trace_id,
+            "steps": [item.model_dump(mode="json") for item in steps],
+            "server_time": datetime.now(UTC),
+        }
+
     @router.get("/commands/next", response_model=AgentCommandPollResponse)
     async def poll_command(request: Request) -> AgentCommandPollResponse:
         _body, agent_id, device_id = await _authenticated(request, verifier)
@@ -512,6 +566,7 @@ def create_channel_agent_service_v2_router(
     pairing: HostPairingService | None = None,
     approval_command_factory: Callable[[ServiceApprovalDelivery], AgentCommandEnvelope]
     | None = None,
+    offline_control: OfflineReplyControlStore | None = None,
 ) -> APIRouter:
     """Signed AI-CS service surface. Browser clients can never call this directly."""
 
@@ -737,6 +792,91 @@ def create_channel_agent_service_v2_router(
             raise HTTPException(status_code=404, detail={"code": "AGENT_RECEIPT_NOT_FOUND"})
         return value
 
+    @router.get("/reply-policies/{store_id}")
+    async def get_reply_policy(store_id: str, request: Request):  # type: ignore[no-untyped-def]
+        await _service_authenticated(request, verifier)
+        if offline_control is None:
+            raise HTTPException(status_code=503, detail={"code": "REPLY_POLICY_UNAVAILABLE"})
+        return offline_control.policy(store_id).model_dump(mode="json")
+
+    @router.put("/reply-policies/{store_id}")
+    async def put_reply_policy(store_id: str, request: Request):  # type: ignore[no-untyped-def]
+        body, service_id = await _service_authenticated(request, verifier)
+        if offline_control is None:
+            raise HTTPException(status_code=503, detail={"code": "REPLY_POLICY_UNAVAILABLE"})
+        if request.headers.get("X-Operator-Intent") != "AUTHORIZED_REPLY_POLICY_CHANGE":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "REPLY_POLICY_CHANGE_INTENT_REQUIRED"},
+            )
+        try:
+            raw = json.loads(body or b"{}")
+            mode = ReplyPolicyMode(raw["mode"])
+            expected_revision = raw.get("expected_revision")
+            if expected_revision is not None and not isinstance(expected_revision, int):
+                raise ValueError("expected_revision must be an integer")
+            return offline_control.set_policy(
+                store_id,
+                mode,
+                authorized_by=_service_actor(service_id, raw.get("actor_reference")),
+                expected_revision=expected_revision,
+            ).model_dump(mode="json")
+        except OfflineControlError as exc:
+            raise HTTPException(status_code=409, detail={"code": exc.error_code}) from exc
+        except (KeyError, ValueError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=422, detail={"code": "REPLY_POLICY_CHANGE_INVALID"}) from exc
+
+    @router.post("/decisions/{decision_id}/execution-preparations", status_code=201)
+    async def prepare_execution(decision_id: str, request: Request):  # type: ignore[no-untyped-def]
+        body, service_id = await _service_authenticated(request, verifier)
+        if offline_control is None:
+            raise HTTPException(status_code=503, detail={"code": "EXECUTION_PREPARATION_UNAVAILABLE"})
+        if request.headers.get("X-Operator-Intent") != "HUMAN_CONFIRMED_EXECUTION_PREPARATION":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "EXECUTION_PREPARATION_HUMAN_INTENT_REQUIRED"},
+            )
+        try:
+            raw = json.loads(body or b"{}")
+            prepared = offline_control.prepare(
+                decision_id,
+                authorization_kind=AuthorizationKind.HUMAN,
+                authorized_by=_service_actor(service_id, raw.get("actor_reference")),
+                expected_store_id=raw.get("store_id"),
+                expected_conversation_id=raw.get("conversation_id"),
+                expected_customer_reference=raw.get("customer_reference"),
+            )
+            snapshot = control_store.mark_snapshot_execution_prepared(prepared)
+            if snapshot is not None:
+                event_digest = hashlib.sha256(
+                    f"EXECUTION_PREPARED_MANUAL:{prepared.preparation_id}".encode(
+                        "utf-8"
+                    )
+                ).hexdigest()
+                control_store.append_assistant_event(
+                    event_id=f"assistant-event:{event_digest}",
+                    event_type="EXECUTION_PREPARED",
+                    agent_id=snapshot.agent_id,
+                    device_id=snapshot.device_id,
+                    store_id=snapshot.store_id,
+                    conversation_id=snapshot.conversation_id,
+                    turn_id=snapshot.turn_id,
+                    decision_id=snapshot.decision_id,
+                    status="EXECUTION_PREPARED",
+                    metadata={
+                        "trace_id": prepared.trace_id,
+                        "preparation_id": prepared.preparation_id,
+                        "authorization_kind": "HUMAN",
+                        "real_send_enabled": False,
+                        "contains_customer_content": False,
+                    },
+                )
+            return prepared.model_dump(mode="json")
+        except OfflineControlError as exc:
+            raise HTTPException(status_code=409, detail={"code": exc.error_code}) from exc
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=422, detail={"code": "EXECUTION_PREPARATION_INVALID"}) from exc
+
     return router
 
 
@@ -799,6 +939,27 @@ def _assert_device(
 
 def _code_digest(code: str) -> bytes:
     return hashlib.sha256(normalize_pairing_code(code).encode("ascii")).digest()
+
+
+def _service_actor(service_id: str, actor_reference: object) -> str:
+    if actor_reference is None:
+        return f"service:{service_id}"[:160]
+    if (
+        not isinstance(actor_reference, str)
+        or not actor_reference.strip()
+        or len(actor_reference) > 128
+        or "\r" in actor_reference
+        or "\n" in actor_reference
+    ):
+        raise ValueError("service actor reference is invalid")
+    digest = hashlib.sha256(actor_reference.strip().encode("utf-8")).hexdigest()
+    return f"service:{service_id[:64]}:actor-sha256:{digest}"[:160]
+
+
+def _valid_trace_id(value: str) -> bool:
+    if not value.startswith("trace:") or len(value) != 70:
+        return False
+    return all(character in "0123456789abcdef" for character in value[6:])
 
 
 __all__ = [

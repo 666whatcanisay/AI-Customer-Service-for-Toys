@@ -132,6 +132,37 @@ def test_heartbeat_records_all_components_and_degrades_runtime(foundation) -> No
     assert persisted.for_component(RuntimeComponent.BROWSER).available is False
 
 
+def test_heartbeat_cycles_remain_ordered_when_windows_clock_does_not_advance(
+    foundation,
+) -> None:
+    fixed = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
+    store = RuntimeReliabilityStore(foundation["uow_factory"])
+    browser = FakeBrowserAdapter(clock=lambda: fixed)
+    browser.start()
+    heartbeat = HeartbeatManager(
+        "coarse-clock-runtime",
+        store,
+        {
+            RuntimeComponent.CHANNEL: StaticHealthProbe(),
+            RuntimeComponent.BROWSER: BrowserHealthProbe(browser),
+            RuntimeComponent.GATEWAY: StaticHealthProbe(),
+            RuntimeComponent.STORAGE: StorageHealthProbe(foundation["uow_factory"]),
+        },
+        clock=lambda: fixed,
+    )
+    healthy = heartbeat.run_once()
+    browser.simulate_failure("FAKE_PAGE_CRASHED")
+    unhealthy = heartbeat.run_once()
+
+    persisted = store.latest_heartbeat("coarse-clock-runtime")
+    assert persisted is not None
+    assert persisted.cycle_id == unhealthy.cycle_id
+    assert persisted.cycle_id != healthy.cycle_id
+    assert persisted.for_component(RuntimeComponent.BROWSER).health is (
+        ComponentHealth.UNHEALTHY
+    )
+
+
 def test_browser_start_failure_is_fail_closed(foundation) -> None:
     manager, _, browser, _, _ = build_runtime(foundation)
     browser.fail_start = True

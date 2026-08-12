@@ -24,6 +24,8 @@ $compositionPath = Join-Path $repoRoot 'packaging\windows-client-v2\production-c
 $composition = Get-Content -LiteralPath $compositionPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $version = ([string]$composition.release -split ' ')[-1]
 if ($version -notmatch '^\d+\.\d+\.\d+(?:rc\d+)?$') { throw "Unsupported version: $version" }
+$engineCompatibility = '0.2.0rc3'
+$gatewayContractSha = 'e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5'
 & $PythonExecutable (Join-Path $repoRoot 'scripts\validate_channel_agent_composition.py') $repoRoot $compositionPath
 if ($LASTEXITCODE -ne 0) { throw 'Production composition validation failed.' }
 $stageRoot = Join-Path $resolvedOutput '.stage'
@@ -264,9 +266,12 @@ $files = Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Sort-Object Fu
     }
 }
 [ordered]@{
-    schema_version = '2.0'
+    schema_version = '2.1'
     product = 'AI-CS Channel Agent Windows Client'
     version = $version
+    client_resource_version = $version
+    agent_runtime_version = $version
+    channel_engine_compatibility = $engineCompatibility
     architecture = 'windows-x64'
     executable = 'ChannelAgent.exe'
     branding_status = $BrandingMode
@@ -296,6 +301,7 @@ $files = Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Sort-Object Fu
     }
     config_contains_credentials = $false
     agent_control_protocol = '2.1'
+    gateway_contract_sha256 = $gatewayContractSha
     capabilities = @('first-launch-wizard','human-confirmed-lan-pairing','device-hmac-auth-v2.1','credential-manager-reference','tray-resident','versioned-brand-assets','desktop-assistant-ui','configuration-center','runtime-doctor','bounded-one-click-repair','atomic-config-rollback','browser-preserving-reload','start','stop','status','heartbeat','autostart','version','upgrade-check','enroll','binding-status','authorized-stores','single-active-store','engine-restart-recovery','encrypted-edge-spool','persist-before-ack','offline-replay-hard-lock','conversation-list-stage','message-capture-stage','host-ingest-stage','assistant-feed-stage','ai-suggestion-stage','signed-assistant-snapshot','offline-status','browser-open','browser-close','browser-status','isolated-browser-profile','pdd-login-open','pdd-login-status','pdd-login-observe-only')
     excluded = $composition.excluded
     files = $files

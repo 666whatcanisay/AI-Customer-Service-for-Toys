@@ -344,6 +344,36 @@ class ChannelEngineClient:
             response, AgentAssistantSnapshotResponse
         )
 
+    def fetch_assistant_conversations(self, *, limit: int = 100):
+        from .control_v2 import AgentAssistantConversationListResponse
+
+        self._assert_v21_ready()
+        response = self._request(
+            "GET",
+            "/channel-agent/v2/assistant-conversations",
+            params={"limit": max(1, min(limit, 100))},
+        )
+        return self._validate_control_response(
+            response, AgentAssistantConversationListResponse
+        )
+
+    def fetch_assistant_trace(self, trace_id: str):
+        """Return the signed Host pipeline trace for one assistant turn."""
+        from .control_v2 import AgentAssistantTraceResponse
+
+        self._assert_v21_ready()
+        response = self._request(
+            "GET",
+            # ':' is part of the validated trace-id grammar and FastAPI exposes
+            # it decoded in request.url.path.  Keep it literal so the client
+            # and Host sign/verify the same canonical path.
+            "/channel-agent/v2/assistant-traces/" + quote(trace_id, safe=":"),
+        )
+        result = self._validate_control_response(response, AgentAssistantTraceResponse)
+        if result.trace_id != trace_id:
+            raise AgentProtocolError("Host returned a different assistant trace")
+        return result
+
     def submit_receipt(self, submission):
         AgentReceiptAck = _execution_model("AgentReceiptAck")
 

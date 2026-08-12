@@ -232,7 +232,7 @@ class ChannelAgentConfig(BaseModel):
             )
         if self.observer_mode != "OBSERVE_ONLY":
             raise ValueError(
-                "ChannelAgent 2.0.0rc4 only permits OBSERVE_ONLY; controlled send "
+                "ChannelAgent 2.0.0rc5 only permits OBSERVE_ONLY; controlled send "
                 "requires a separate safety-gated release"
             )
         if not self.manual_approval_required:

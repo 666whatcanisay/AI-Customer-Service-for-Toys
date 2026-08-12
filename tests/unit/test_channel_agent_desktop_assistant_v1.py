@@ -6,6 +6,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 import pytest
@@ -188,6 +189,61 @@ def test_exe_restart_reestablishes_cookie_and_csrf_without_reusing_old_runtime(
         restarted.stop()
 
 
+def test_browser_preserving_reload_hands_old_workspace_to_new_runtime_once(
+    tmp_path: Path,
+) -> None:
+    browser = build_opener(HTTPCookieProcessor(CookieJar()))
+    first = DesktopAssistantServer(data_root=tmp_path)
+    first_url = first.start()
+    first_port = urlsplit(first_url).port
+    assert first_port is not None
+    try:
+        with browser.open(first_url, timeout=2) as response:  # noqa: S310
+            response.read()
+        first_origin = first.origin
+        assert first_origin is not None
+        with browser.open(f"{first_origin}/local-api/v1/bootstrap", timeout=2) as response:  # noqa: S310
+            first_csrf = json.loads(response.read().decode("utf-8"))["csrf_token"]
+        first.prepare_reload_handoff()
+    finally:
+        first.stop()
+
+    restarted = DesktopAssistantServer(data_root=tmp_path, port=first_port)
+    try:
+        restarted.start()
+        assert not (tmp_path / "runtime" / "desktop-bootstrap-handoff.json").exists()
+        with browser.open(first_url, timeout=2) as response:  # noqa: S310
+            response.read()
+        consumed = json.loads(
+            (
+                tmp_path
+                / "runtime"
+                / "desktop-bootstrap-handoff-consumed.json"
+            ).read_text(encoding="utf-8")
+        )
+        assert consumed["schema_version"] == (
+            "channel-agent-desktop-bootstrap-consumed.v1"
+        )
+        assert consumed["pid"] > 0
+        restarted_origin = restarted.origin
+        assert restarted_origin == first_origin
+        with browser.open(f"{restarted_origin}/local-api/v1/bootstrap", timeout=2) as response:  # noqa: S310
+            restarted_csrf = json.loads(response.read().decode("utf-8"))["csrf_token"]
+        assert restarted_csrf != first_csrf
+    finally:
+        restarted.stop()
+
+
+def test_assistant_event_client_has_bounded_local_session_reload_recovery() -> None:
+    script = DesktopAssistantServer._assistant_event_script().decode("utf-8")
+
+    assert "response.status === 401" in script
+    assert "sessionStorage.getItem(recoveryKey)" in script
+    assert "attempted !== bootstrap" in script
+    assert "window.location.reload()" in script
+    assert "window.setTimeout(checkLocalSession, 2000)" in script
+
+
 def test_desktop_server_rejects_send_without_origin_intent_or_handler(tmp_path: Path) -> None:
     server = DesktopAssistantServer(data_root=tmp_path)
     try:
@@ -247,6 +303,74 @@ def test_safe_stop_endpoint_only_writes_stop_marker_after_same_origin_post(
         with opener.open(request, timeout=2) as response:  # noqa: S310
             assert response.status == 202
         assert (tmp_path / "runtime" / "stop.request").read_text(encoding="ascii") == "stop\n"
+    finally:
+        server.stop()
+
+
+def test_pdd_window_launch_requires_explicit_human_intent_and_starts_no_observer(
+    tmp_path: Path,
+) -> None:
+    launched: list[bool] = []
+    server = DesktopAssistantServer(
+        data_root=tmp_path,
+        pdd_workspace_launch_handler=lambda: (
+            launched.append(True)
+            or {
+                "status": "OPENING",
+                "browser_status": "WAITING_LOGIN",
+                "pdd_login_state": "PDD_LOGIN_PAGE",
+            }
+        ),
+        pdd_workspace_status_handler=lambda: {
+            "status": "READY",
+            "browser_status": "READY",
+            "pdd_login_state": "CUSTOMER_SERVICE_READY",
+        },
+    )
+    try:
+        server.start()
+        opener, origin, csrf = _authenticated_client(server)
+        blocked = Request(
+            f"{origin}/local-api/v1/browser/pdd/open",
+            data=b"{}",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+            },
+        )
+        with pytest.raises(HTTPError) as forbidden:
+            opener.open(blocked, timeout=2)  # noqa: S310
+        assert forbidden.value.code == 403
+        assert launched == []
+
+        request = Request(
+            f"{origin}/local-api/v1/browser/pdd/open",
+            data=b"{}",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+                "X-Channel-Agent-Intent": "HUMAN_REQUESTED_PDD_WINDOW",
+            },
+        )
+        with opener.open(request, timeout=2) as response:  # noqa: S310
+            assert response.status == 202
+            result = json.loads(response.read().decode("utf-8"))
+        assert launched == [True]
+        assert result["human_login_required"] is True
+        assert result["observer_started"] is False
+        assert result["real_send_enabled"] is False
+
+        with opener.open(f"{origin}/local-api/v1/bootstrap", timeout=2) as response:  # noqa: S310
+            bootstrap = json.loads(response.read().decode("utf-8"))
+        assert bootstrap["browser"] == {
+            "status": "READY",
+            "pdd_login_state": "CUSTOMER_SERVICE_READY",
+            "pdd_workspace_launch_available": True,
+        }
     finally:
         server.stop()
 

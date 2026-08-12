@@ -1,6 +1,6 @@
 {
   "schema_version": "2.0",
-  "release": "AI-CS Channel Agent Windows Client 2.0.0rc4",
+  "release": "AI-CS Channel Agent Windows Client 2.0.0rc5",
   "entrypoint": "channel_agent.windows_app:main",
   "source_allowlist": [
     "src/channel_agent/__init__.py",

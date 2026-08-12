@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_GATEWAY_SHA256 = (
     "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5"
 )
-EXPECTED_ENGINE_VERSION = "0.2.0rc2"
-EXPECTED_AGENT_VERSION = "2.0.0rc4"
+EXPECTED_ENGINE_VERSION = "0.2.0rc3"
+EXPECTED_AGENT_VERSION = "2.0.0rc5"
 EXPECTED_CONTROL_VERSION = "2.1"
 
 
@@ -58,7 +58,10 @@ def _package_gate() -> tuple[bool, str, str | None]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     if (
         manifest.get("version") != EXPECTED_AGENT_VERSION
+        or manifest.get("agent_runtime_version") != EXPECTED_AGENT_VERSION
         or manifest.get("agent_control_protocol") != EXPECTED_CONTROL_VERSION
+        or manifest.get("channel_engine_compatibility") != EXPECTED_ENGINE_VERSION
+        or manifest.get("gateway_contract_sha256") != EXPECTED_GATEWAY_SHA256
     ):
         return False, "package manifest version is inconsistent", None
     paths = {str(item["path"]) for item in manifest.get("files", ())}

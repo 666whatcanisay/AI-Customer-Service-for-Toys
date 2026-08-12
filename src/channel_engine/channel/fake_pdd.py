@@ -179,6 +179,10 @@ class FakePDDAdapter:
                 error_code=error_code,
                 details={
                     "mode": "FAKE",
+                    "receipt_kind": "SYNTHETIC",
+                    "transport_kind": "SYNTHETIC_PDD",
+                    "environment": "SIMULATOR",
+                    "external_side_effect": False,
                     "adapter": self.adapter_name,
                     "approved_by": message.approved_by,
                     "real_platform_called": False,

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 
@@ -70,6 +73,150 @@ def load_pdd_replay_fixture(path: str | Path) -> PDDReadReplayFixture:
         raise PDDPageReadPortError("PDD replay fixture is invalid") from exc
 
 
+_PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+_ID_CARD = re.compile(r"(?<!\d)\d{17}[0-9Xx](?!\w)")
+_PAYMENT = re.compile(r"(?<!\d)\d{12,19}(?!\d)")
+_EMAIL = re.compile(r"(?<![\w.])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.])")
+
+
+def build_sanitized_pdd_replay_fixture(
+    *,
+    scan: dict[str, Any],
+    capture: dict[str, Any],
+    role_map: dict[str, Literal["CUSTOMER", "OPERATOR", "BOT", "SYSTEM"]],
+    target_conversation_id: str,
+    allowed_message_ids: tuple[str, ...],
+    captured_at: datetime | None = None,
+) -> PDDReadReplayFixture:
+    """Build a minimal replay without retaining real identifiers or credentials."""
+
+    if not target_conversation_id.strip():
+        raise PDDPageReadPortError("target conversation id is required")
+    if not allowed_message_ids or len(allowed_message_ids) > 100:
+        raise PDDPageReadPortError("an explicit bounded test-message allowlist is required")
+    if len(allowed_message_ids) != len(set(allowed_message_ids)):
+        raise PDDPageReadPortError("allowed replay message ids must be unique")
+    rows = scan.get("conversations")
+    messages = capture.get("messages")
+    if not isinstance(rows, list) or not isinstance(messages, list):
+        raise PDDPageReadPortError("raw PDD read result is invalid")
+    selected_rows = [
+        row
+        for row in rows
+        if isinstance(row, dict) and row.get("conversation_id") == target_conversation_id
+    ]
+    if len(selected_rows) != 1 or capture.get("active_conversation_id") != target_conversation_id:
+        raise PDDPageReadPortError("target PDD conversation is not unique and active")
+    allowed = set(allowed_message_ids)
+    selected_messages = [
+        row
+        for row in messages
+        if isinstance(row, dict) and row.get("message_id") in allowed
+    ]
+    if len(selected_messages) != len(allowed):
+        raise PDDPageReadPortError("one or more explicitly allowed messages are unavailable")
+
+    synthetic_fingerprint = "sha256:" + hashlib.sha256(
+        json.dumps(
+            {
+                "conversation_count": 1,
+                "message_roles": [item.get("role") for item in selected_messages],
+                "message_count": len(selected_messages),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    row = selected_rows[0]
+    synthetic_conversation = "replay-conversation-001"
+    synthetic_customer = "replay-customer-001"
+    message_map = {
+        raw_id: f"replay-message-{index:03d}"
+        for index, raw_id in enumerate(allowed_message_ids, start=1)
+    }
+    safe_messages = []
+    for item in selected_messages:
+        raw_id = str(item["message_id"])
+        safe_messages.append(
+            {
+                "message_id": message_map[raw_id],
+                "role": str(item.get("role") or ""),
+                "content": _sanitize_fixture_text(item.get("content")),
+                "timestamp": item.get("timestamp"),
+                "sequence": item.get("sequence"),
+            }
+        )
+    product = capture.get("product") if isinstance(capture.get("product"), dict) else {}
+    safe_product = {
+        "product_id": "replay-product-001" if product.get("product_id") else None,
+        "product_name": _sanitize_fixture_text(product.get("product_name"), optional=True),
+        "sku_id": "replay-sku-001" if product.get("sku_id") else None,
+        "sku_name": _sanitize_fixture_text(product.get("sku_name"), optional=True),
+        "attributes_text": _sanitize_fixture_text(
+            product.get("attributes_text"), optional=True
+        ),
+    }
+    safe_scan = {
+        "fingerprint": synthetic_fingerprint,
+        "conversations": [
+            {
+                "conversation_id": synthetic_conversation,
+                "customer_reference": synthetic_customer,
+                "unread_count": row.get("unread_count"),
+                "last_activity": row.get("last_activity"),
+                "latest_sequence": row.get("latest_sequence"),
+            }
+        ],
+    }
+    safe_capture = {
+        "fingerprint": synthetic_fingerprint,
+        "active_conversation_id": synthetic_conversation,
+        "customer_reference": synthetic_customer,
+        "store_name": "脱敏测试店铺",
+        "product": safe_product,
+        "order": {
+            "order_reference": None,
+            "order_status": None,
+            "logistics_status": None,
+            "aftersales_status": None,
+        },
+        "messages": safe_messages,
+    }
+    material = json.dumps(
+        [synthetic_fingerprint, safe_scan, safe_capture],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return PDDReadReplayFixture(
+        schema_version="pdd-readonly-page-fixture.v1",
+        fixture_id="real-pdd-sanitized:" + hashlib.sha256(material.encode("utf-8")).hexdigest(),
+        source="SYNTHETIC_SANITIZED",
+        sanitized=True,
+        captured_at=(captured_at or datetime.now(UTC)).astimezone(UTC),
+        page_fingerprint=synthetic_fingerprint,
+        role_map=role_map,
+        scan=safe_scan,
+        capture=safe_capture,
+    )
+
+
+def _sanitize_fixture_text(value: object, *, optional: bool = False) -> str | None:
+    if value is None and optional:
+        return None
+    if not isinstance(value, str):
+        raise PDDPageReadPortError("replay text field is invalid")
+    safe = _PHONE.sub("[手机号已脱敏]", value)
+    safe = _ID_CARD.sub("[证件号已脱敏]", safe)
+    safe = _PAYMENT.sub("[支付信息已脱敏]", safe)
+    safe = _EMAIL.sub("[邮箱已脱敏]", safe)
+    safe = " ".join(safe.split()).strip()
+    if not safe and not optional:
+        raise PDDPageReadPortError("replay text field is empty")
+    return safe or None
+
+
 class ReplayPDDPageReadPort:
     """Deterministic zero-network implementation of ``PDDPageReadPort``."""
 
@@ -114,5 +261,6 @@ __all__ = [
     "PDDPageReadPortError",
     "PDDReadReplayFixture",
     "ReplayPDDPageReadPort",
+    "build_sanitized_pdd_replay_fixture",
     "load_pdd_replay_fixture",
 ]

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from threading import Event, Thread
+import time
 from typing import Callable, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
@@ -164,6 +165,7 @@ class PDDMessageObserver:
                 continue
             captured += 1
             self._validate_capture(summary, snapshot, evidence)
+            snapshot = self._resolve_message_sequences(snapshot)
             latest_sequence = max(
                 (message.sequence for message in snapshot.messages), default=0
             )
@@ -210,11 +212,13 @@ class PDDMessageObserver:
                 # tail is safer than inventing an acknowledgement locally.
                 continue
 
-            customer_snapshot = snapshot.model_copy(update={"messages": pending})
             observations = self._mapper.map_customer_messages(
-                customer_snapshot,
+                snapshot,
                 after_sequence=after_sequence,
                 origin=origin.value,
+                selected_message_ids=frozenset(
+                    item.external_message_id for item in pending
+                ),
                 now=now,
             )
             for observation in observations:
@@ -228,6 +232,25 @@ class PDDMessageObserver:
             baselines_established=baselines,
             manual_review_required=manual,
         )
+
+    def _resolve_message_sequences(
+        self, snapshot: PDDWorkspaceSnapshot
+    ) -> PDDWorkspaceSnapshot:
+        messages = tuple(
+            message.model_copy(
+                update={
+                    "sequence": self._spool.resolve_message_sequence(
+                        store_id=snapshot.store_id,
+                        platform_store_id=snapshot.platform_store_id,
+                        conversation_id=snapshot.conversation_id,
+                        external_message_id=message.external_message_id,
+                        page_sequence=message.sequence,
+                    )
+                }
+            )
+            for message in snapshot.messages
+        )
+        return snapshot.model_copy(update={"messages": messages})
 
     @staticmethod
     def _validate_capture(
@@ -292,21 +315,43 @@ class PDDObserverRunner:
         *,
         interval_seconds: float = 1.0,
         error_sink: Callable[[str], None] | None = None,
+        session_event_sink: Callable[[str], None] | None = None,
+        maximum_session_seconds: float = 30 * 60,
+        warning_seconds: float = 25 * 60,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
+        if maximum_session_seconds <= 0:
+            raise ValueError("PDD Observer maximum session must be positive")
+        if warning_seconds < 0 or warning_seconds >= maximum_session_seconds:
+            raise ValueError("PDD Observer warning must precede the session limit")
         self._observer = observer
         self._interval = max(0.25, min(interval_seconds, 10.0))
         self._error_sink = error_sink or (lambda _code: None)
+        self._session_event_sink = session_event_sink or (lambda _code: None)
+        self._maximum_session_seconds = maximum_session_seconds
+        self._warning_seconds = warning_seconds
+        self._monotonic = monotonic
         self._stop = Event()
         self._thread: Thread | None = None
+        self._session_started_at: float | None = None
+        self._warning_emitted = False
+        self._stop_reason: str | None = None
 
     @property
     def running(self) -> bool:
         return bool(self._thread is not None and self._thread.is_alive())
 
+    @property
+    def stop_reason(self) -> str | None:
+        return self._stop_reason
+
     def start(self) -> None:
         if self.running:
             return
         self._stop.clear()
+        self._session_started_at = self._monotonic()
+        self._warning_emitted = False
+        self._stop_reason = None
         self._thread = Thread(
             target=self._run,
             name="channel-agent-pdd-observer",
@@ -323,6 +368,14 @@ class PDDObserverRunner:
 
     def _run(self) -> None:
         while not self._stop.is_set():
+            session_event = self._session_event(self._monotonic())
+            if session_event == "PDD_OBSERVER_SESSION_LIMIT_REACHED":
+                self._stop_reason = session_event
+                self._session_event_sink(session_event)
+                self._stop.set()
+                break
+            if session_event == "PDD_OBSERVER_SESSION_WARNING":
+                self._session_event_sink(session_event)
             try:
                 self._observer.scan_once()
             except PDDObserverFatalError as exc:
@@ -334,6 +387,18 @@ class PDDObserverRunner:
                 code = f"PDD_OBSERVER_{type(exc).__name__.upper()}"[:120]
                 self._error_sink(code)
             self._stop.wait(self._interval)
+
+    def _session_event(self, now: float) -> str | None:
+        started = self._session_started_at
+        if started is None:
+            return None
+        elapsed = max(0.0, now - started)
+        if elapsed >= self._maximum_session_seconds:
+            return "PDD_OBSERVER_SESSION_LIMIT_REACHED"
+        if elapsed >= self._warning_seconds and not self._warning_emitted:
+            self._warning_emitted = True
+            return "PDD_OBSERVER_SESSION_WARNING"
+        return None
 
 
 __all__ = [

@@ -215,6 +215,74 @@ class AgentControlStore:
             )
             return None if row is None else (row.agent_id, row.device_id)
 
+    def latest_observation_payload(
+        self,
+        store_id: str,
+        conversation_id: str,
+    ) -> dict[str, object] | None:
+        """Return the newest verified observation context for one isolated scope."""
+
+        value = self.latest_observation(store_id, conversation_id)
+        return None if value is None else dict(value.payload)
+
+    def latest_observation(
+        self,
+        store_id: str,
+        conversation_id: str,
+    ) -> AgentObservationSubmission | None:
+        """Return the newest verified envelope and payload for internal audit."""
+
+        with self._session_factory() as session:
+            row = session.scalar(
+                select(ChannelAgentObservationRow)
+                .where(
+                    ChannelAgentObservationRow.store_id == store_id,
+                    ChannelAgentObservationRow.conversation_id == conversation_id,
+                )
+                .order_by(
+                    ChannelAgentObservationRow.persisted_at.desc(),
+                    ChannelAgentObservationRow.source_sequence.desc(),
+                    ChannelAgentObservationRow.observation_id.desc(),
+                )
+                .limit(1)
+            )
+            if row is None:
+                return None
+            return AgentObservationSubmission(
+                observation_id=row.observation_id,
+                agent_id=row.agent_id,
+                device_id=row.device_id,
+                store_id=row.store_id,
+                conversation_id=row.conversation_id,
+                external_message_id=row.external_message_id,
+                source_cursor=row.source_cursor,
+                source_sequence=row.source_sequence,
+                payload_digest=row.payload_digest,
+                payload=dict(row.payload),
+                captured_at=_aware(row.captured_at),
+            )
+
+    def observation_provider_kinds(
+        self,
+        store_id: str,
+        conversation_id: str,
+    ) -> dict[str, str]:
+        """Map message identities to verified provider kinds within one scope."""
+
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(ChannelAgentObservationRow).where(
+                    ChannelAgentObservationRow.store_id == store_id,
+                    ChannelAgentObservationRow.conversation_id == conversation_id,
+                )
+            ).all()
+        result: dict[str, str] = {}
+        for row in rows:
+            value = row.payload.get("provider_kind")
+            if isinstance(value, str):
+                result[row.external_message_id] = value
+        return result
+
     def append_assistant_event(
         self,
         *,
@@ -400,6 +468,80 @@ class AgentControlStore:
             return AgentAssistantSnapshot.model_validate_json(
                 json.dumps(row.snapshot_json, ensure_ascii=False, separators=(",", ":"))
             )
+
+    def assistant_snapshots(
+        self,
+        agent_id: str,
+        device_id: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[AgentAssistantSnapshot, ...]:
+        """Return the bounded active multi-conversation projection for one device."""
+
+        now = self._clock().astimezone(UTC)
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(ChannelAgentAssistantSnapshotRow)
+                .where(
+                    ChannelAgentAssistantSnapshotRow.agent_id == agent_id,
+                    ChannelAgentAssistantSnapshotRow.device_id == device_id,
+                    ChannelAgentAssistantSnapshotRow.expires_at > now,
+                )
+                .order_by(
+                    ChannelAgentAssistantSnapshotRow.updated_at.desc(),
+                    ChannelAgentAssistantSnapshotRow.scope_key,
+                )
+                .limit(max(1, min(limit, 100)))
+            ).all()
+        return tuple(
+            AgentAssistantSnapshot.model_validate_json(
+                json.dumps(row.snapshot_json, ensure_ascii=False, separators=(",", ":"))
+            )
+            for row in rows
+        )
+
+    def assistant_snapshot_for_decision(
+        self, decision_id: str
+    ) -> AgentAssistantSnapshot | None:
+        now = self._clock().astimezone(UTC)
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(ChannelAgentAssistantSnapshotRow)
+                .where(ChannelAgentAssistantSnapshotRow.expires_at > now)
+                .order_by(ChannelAgentAssistantSnapshotRow.updated_at.desc())
+            ).all()
+        for row in rows:
+            value = AgentAssistantSnapshot.model_validate_json(
+                json.dumps(row.snapshot_json, ensure_ascii=False, separators=(",", ":"))
+            )
+            if value.decision_id == decision_id:
+                return value
+        return None
+
+    def mark_snapshot_execution_prepared(
+        self, preparation,
+    ) -> AgentAssistantSnapshot | None:
+        current = self.assistant_snapshot_for_decision(preparation.decision_id)
+        if current is None:
+            return None
+        return self.persist_assistant_snapshot(
+            current.model_copy(
+                update={
+                    "status": "EXECUTION_PREPARED",
+                    "preparation_id": preparation.preparation_id,
+                    "processing_stage": "EXECUTION_PREPARED",
+                    "safety": current.safety.model_copy(
+                        update={
+                            "manual_approval_required": False,
+                            "auto_reply": preparation.authorization_kind.value
+                            == "AUTO_POLICY",
+                            "execution_prepared": True,
+                            "preparation_count": 1,
+                        }
+                    ),
+                }
+            )
+        )
 
     def purge_expired(self) -> dict[str, int]:
         now = self._clock().astimezone(UTC)

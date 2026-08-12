@@ -16,6 +16,7 @@ from channel_agent.assistant_bridge import (
     ApprovedReplyRequest,
     ApprovedReplyService,
 )
+from channel_agent.controlled_send_grant import ControlledSendGrantStore
 from channel_agent.browser import ChannelAgentBrowserManager
 from channel_agent.config import load_agent_config
 from channel_agent.logger import SafeAgentLogger
@@ -120,6 +121,9 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
             uow_factory=uow_factory,
             observer=observer,
             browser_sender=sender,
+            controlled_send_grant_store=ControlledSendGrantStore(
+                assistant_root / "controlled-send-grants.sqlite3"
+            ),
             controlled_send_enabled=enabled,
         ),
         engine,

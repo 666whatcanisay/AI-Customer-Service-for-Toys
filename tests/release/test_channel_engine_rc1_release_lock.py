@@ -14,7 +14,7 @@ from channel_engine.security.rbac import OperatorRole
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_VERSION = "0.2.0rc2"
+EXPECTED_VERSION = "0.2.0rc3"
 EXPECTED_CONTRACT_SHA256 = (
     "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5"
 )

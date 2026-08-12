@@ -7,8 +7,17 @@ from datetime import UTC, datetime, timedelta
 from threading import Event, Lock, Thread
 from typing import Callable, Literal
 
-from channel_engine.customer_assistant import CustomerAssistantRuntime
-from channel_engine.customer_assistant.models import ConversationTurn
+from channel_engine.customer_assistant import (
+    CustomerAssistantRuntime,
+    OfflineReplyControlStore,
+    PipelineStage,
+    PipelineStageState,
+)
+from channel_engine.customer_assistant.buffer import ConversationBufferError
+from channel_engine.customer_assistant.models import (
+    BufferedMessageDisposition,
+    ConversationTurn,
+)
 from channel_engine.pdd_adapter import PDDPrivacyFilteredMessage
 from channel_agent.control_v2 import AgentAssistantSnapshot
 from channel_agent.observation_stages import ObservationStage
@@ -43,6 +52,7 @@ class AgentObservationWorker:
         *,
         observer_mode: Literal["OBSERVE_ONLY"] = "OBSERVE_ONLY",
         stage: ObservationStage = ObservationStage.AI_SUGGESTIONS,
+        offline_control: OfflineReplyControlStore | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         if observer_mode != "OBSERVE_ONLY":
@@ -52,10 +62,17 @@ class AgentObservationWorker:
         self._store = store
         self._assistant = assistant
         self._stage = stage
+        self._offline_control = offline_control
         self._clock = clock
 
     def run_once(self, *, limit: int = 100) -> AgentObservationWorkerResult:
         self._store.purge_expired()
+        if self._assistant is not None:
+            purge_content = getattr(self._assistant, "purge_expired_content", None)
+            if callable(purge_content):
+                purge_content()
+        if self._offline_control is not None:
+            self._offline_control.purge_expired_content()
         ingested = rejected = generated = 0
         for submission in self._store.pending_observations(limit=limit):
             try:
@@ -83,12 +100,59 @@ class AgentObservationWorker:
                         payload.content.encode("utf-8")
                     ).hexdigest(),
                 )
-                if self._assistant is not None:
-                    self._assistant.ingest_redacted(filtered)
+                if self._assistant is None:
+                    raise AgentObservationWorkerError(
+                        "HOST_INGEST requires a durable assistant buffer"
+                    )
+                disposition = self._assistant.ingest_redacted(filtered)
+                trace_id = _trace_id(payload, submission.observation_id)
+                if self._offline_control is not None:
+                    self._offline_control.record_trace(
+                        trace_id,
+                        PipelineStage.HOST_PERSIST,
+                        PipelineStageState.SUCCEEDED,
+                        "HOST_ACK_COMMITTED",
+                    )
+                    self._offline_control.register_observation(
+                        observation_id=submission.observation_id,
+                        store_id=payload.store_id,
+                        conversation_id=payload.conversation_id,
+                        trace_id=trace_id,
+                    )
+                    self._offline_control.record_trace(
+                        trace_id,
+                        PipelineStage.BUFFERING,
+                        PipelineStageState.SUCCEEDED,
+                        (
+                            "BUFFER_DUPLICATE"
+                            if disposition is BufferedMessageDisposition.DUPLICATE
+                            else "BUFFER_COMMITTED"
+                        ),
+                    )
                 self._store.mark_observation_forwarded(submission.observation_id)
                 ingested += 1
             except Exception as exc:
                 rejected += 1
+                permanent = _permanent_observation_error(exc)
+                if self._offline_control is not None:
+                    self._offline_control.record_trace(
+                        _submission_trace_id(submission.payload, submission.observation_id),
+                        PipelineStage.HOST_PERSIST,
+                        (
+                            PipelineStageState.FAILED
+                            if permanent
+                            else PipelineStageState.RUNNING
+                        ),
+                        (
+                            f"HOST_REJECTED_{_error_code(exc)}"
+                            if permanent
+                            else f"HOST_RETRY_{_error_code(exc)}"
+                        ),
+                    )
+                if not permanent:
+                    # Buffer/database/service outages remain pending.  Host ACK
+                    # durability is preserved and the worker retries after recovery.
+                    continue
                 self._store.append_assistant_event(
                     event_id=_event_id("OBSERVATION_FAILED", submission.observation_id),
                     event_type="OBSERVATION_FAILED",
@@ -123,6 +187,20 @@ class AgentObservationWorker:
                 if scope is None:
                     raise AgentObservationWorkerError("assistant event route is unavailable")
                 agent_id, device_id = scope
+                trace_id = self._trace_id(turn.store_id, turn.conversation_id)
+                if self._offline_control is not None:
+                    self._offline_control.record_trace(
+                        trace_id,
+                        PipelineStage.CUSTOMER_CONTEXT,
+                        PipelineStageState.RUNNING,
+                        "CONTEXT_ASSEMBLY_STARTED",
+                    )
+                    self._offline_control.record_trace(
+                        trace_id,
+                        PipelineStage.AI_GENERATING,
+                        PipelineStageState.RUNNING,
+                        "AI_REQUEST_STARTED",
+                    )
                 metadata = {
                     "message_count": len(turn.messages),
                     "contains_customer_content": False,
@@ -159,6 +237,14 @@ class AgentObservationWorker:
                 if claimed:
                     turn = claimed[0]
                     scope = self._scope(turn.store_id, turn.conversation_id)
+                    trace_id = self._trace_id(turn.store_id, turn.conversation_id)
+                    if self._offline_control is not None:
+                        self._offline_control.record_trace(
+                            trace_id,
+                            PipelineStage.AI_GENERATING,
+                            PipelineStageState.FAILED,
+                            f"AI_FAILED_{_error_code(exc)}",
+                        )
                     if scope is not None:
                         self._store.append_assistant_event(
                             event_id=_event_id("OBSERVATION_FAILED", turn.turn_id),
@@ -189,6 +275,38 @@ class AgentObservationWorker:
                 decision_id=package.decision_id,
             )
             now = self._clock().astimezone(UTC)
+            trace_id = self._trace_id(package.store_id, package.conversation_id)
+            control_outcome = None
+            if self._offline_control is not None:
+                stored = self._assistant.stored_reply(package.decision_id)
+                if stored is None:
+                    raise AgentObservationWorkerError(
+                        "durable reply context is unavailable for quality gate"
+                    )
+                context, _stored_package = stored
+                self._offline_control.record_trace(
+                    trace_id,
+                    PipelineStage.CUSTOMER_CONTEXT,
+                    PipelineStageState.SUCCEEDED,
+                    "CONTEXT_ASSEMBLED",
+                )
+                self._offline_control.record_trace(
+                    trace_id,
+                    PipelineStage.AI_GENERATING,
+                    PipelineStageState.SUCCEEDED,
+                    "AI_REPLY_CREATED",
+                )
+                control_outcome = self._offline_control.register_reply(
+                    context,
+                    package,
+                    trace_id=trace_id,
+                )
+            status = package.state
+            if control_outcome is not None:
+                if control_outcome.preparation is not None:
+                    status = "EXECUTION_PREPARED"
+                elif control_outcome.quality.status.value == "BLOCKED":
+                    status = "MANUAL_INTERVENTION"
             self._store.persist_assistant_snapshot(
                 AgentAssistantSnapshot(
                     agent_id=scope[0],
@@ -196,7 +314,7 @@ class AgentObservationWorker:
                     store_id=package.store_id,
                     conversation_id=package.conversation_id,
                     revision=1,
-                    status=package.state,
+                    status=status,
                     turn_id=package.turn_id,
                     decision_id=package.decision_id,
                     request_id=package.request_id,
@@ -205,6 +323,42 @@ class AgentObservationWorker:
                     action=package.action,
                     reply_content=package.reply_content,
                     risk_level=package.risk_level.value,
+                    ai_cs_action=getattr(package, "ai_cs_action", "UNKNOWN"),
+                    warnings=getattr(package, "warnings", ()),
+                    required_fields=getattr(package, "required_fields", ()),
+                    policy_mode=(
+                        control_outcome.policy.mode.value
+                        if control_outcome is not None
+                        else "MANUAL_CONFIRM"
+                    ),
+                    quality_status=(
+                        control_outcome.quality.status.value
+                        if control_outcome is not None
+                        else "PASS"
+                    ),
+                    preparation_id=(
+                        control_outcome.preparation.preparation_id
+                        if control_outcome is not None
+                        and control_outcome.preparation is not None
+                        else None
+                    ),
+                    trace_id=trace_id,
+                    processing_stage=(
+                        "EXECUTION_PREPARED"
+                        if status == "EXECUTION_PREPARED"
+                        else "WAITING_CONFIRMATION"
+                    ),
+                    safety={
+                        "manual_approval_required": status != "EXECUTION_PREPARED",
+                        "auto_reply": bool(
+                            control_outcome is not None
+                            and control_outcome.preparation is not None
+                            and control_outcome.preparation.authorization_kind.value
+                            == "AUTO_POLICY"
+                        ),
+                        "execution_prepared": status == "EXECUTION_PREPARED",
+                        "preparation_count": 1 if status == "EXECUTION_PREPARED" else 0,
+                    },
                     citations=tuple(
                         citation.model_dump(mode="json")
                         for citation in package.citations
@@ -224,16 +378,41 @@ class AgentObservationWorker:
                 },
                 **common,
             )
+            if control_outcome is not None:
+                self._store.append_assistant_event(
+                    event_id=_event_id("QUALITY_GATE", package.decision_id),
+                    event_type="QUALITY_GATE",
+                    status=control_outcome.quality.status.value,
+                    metadata={
+                        "trace_id": trace_id,
+                        "reason_code": control_outcome.quality.reason_codes[0],
+                        "contains_customer_content": False,
+                    },
+                    **common,
+                )
+                if control_outcome.preparation is not None:
+                    self._store.append_assistant_event(
+                        event_id=_event_id("EXECUTION_PREPARED", package.decision_id),
+                        event_type="EXECUTION_PREPARED",
+                        status="EXECUTION_PREPARED",
+                        metadata={
+                            "trace_id": trace_id,
+                            "preparation_id": control_outcome.preparation.preparation_id,
+                            "authorization_kind": control_outcome.preparation.authorization_kind.value,
+                            "real_send_enabled": False,
+                            "contains_customer_content": False,
+                        },
+                        **common,
+                    )
             self._store.append_assistant_event(
                 event_id=_event_id("WAITING_APPROVAL", package.decision_id),
                 event_type="WAITING_APPROVAL",
                 status=(
-                    "WAITING_APPROVAL"
-                    if package.state == "WAITING_APPROVAL"
-                    else "MANUAL_INTERVENTION"
+                    status
                 ),
                 metadata={
-                    "manual_approval_required": True,
+                    "manual_approval_required": status != "EXECUTION_PREPARED",
+                    "execution_prepared": status == "EXECUTION_PREPARED",
                     "execution_created": 0,
                     "transport_calls": 0,
                     "send_receipts": 0,
@@ -247,6 +426,13 @@ class AgentObservationWorker:
 
     def _scope(self, store_id: str, conversation_id: str) -> tuple[str, str] | None:
         return self._store.assistant_scope_for_conversation(store_id, conversation_id)
+
+    def _trace_id(self, store_id: str, conversation_id: str) -> str:
+        raw = self._store.latest_observation_payload(store_id, conversation_id) or {}
+        value = raw.get("trace_id")
+        if isinstance(value, str) and value.startswith("trace:"):
+            return value
+        return _derived_trace_id(store_id, conversation_id)
 
 
 class AgentObservationWorkerRunner:
@@ -310,6 +496,37 @@ def _event_id(event_type: str, source_id: str) -> str:
 def _error_code(exc: Exception) -> str:
     value = "".join(character if character.isalnum() else "_" for character in type(exc).__name__)
     return (value.upper() or "OBSERVATION_WORKER_FAILURE")[:80]
+
+
+def _trace_id(payload: PDDObservationPayload, observation_id: str) -> str:
+    return payload.trace_id or _derived_trace_id(
+        payload.store_id, payload.conversation_id, observation_id
+    )
+
+
+def _derived_trace_id(*parts: str) -> str:
+    return "trace:" + hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
+
+
+def _permanent_observation_error(exc: Exception) -> bool:
+    from pydantic import ValidationError
+
+    if isinstance(exc, ConversationBufferError):
+        return exc.error_code in {
+            "CUSTOMER_MESSAGE_IDEMPOTENCY_CONFLICT",
+            "CUSTOMER_MESSAGE_NOT_PRIVACY_FILTERED",
+        }
+    return isinstance(exc, (ValidationError, ValueError)) and not isinstance(
+        exc, AgentObservationWorkerError
+    )
+
+
+def _submission_trace_id(payload: object, observation_id: str) -> str:
+    if isinstance(payload, dict):
+        value = payload.get("trace_id")
+        if isinstance(value, str) and value.startswith("trace:"):
+            return value
+    return _derived_trace_id(observation_id)
 
 
 __all__ = [

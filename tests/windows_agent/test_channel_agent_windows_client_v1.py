@@ -492,6 +492,11 @@ def test_windows_launcher_opens_local_assistant_even_when_agent_is_degraded() ->
     assert 'JsonValue(runtime, "launcher_url")' in launcher
     assert 'request.Headers["X-Channel-Agent-Launcher"]' in launcher
     assert 'endpoint.AbsolutePath != "/launcher-api/v1/open"' in launcher
+    assert '"preserve-assistant"' in launcher
+    assert '"desktop-bootstrap-handoff-consumed.json"' in launcher
+    assert '"preserve-assistant-on-launch.request"' in launcher
+    assert "DateTime.UtcNow.AddSeconds(15)" in launcher
+    assert "waitingForAssistantRecovery" in launcher
 
 
 def test_failed_reloaded_config_rolls_back_once_without_touching_identity_data(
@@ -515,7 +520,11 @@ def test_failed_reloaded_config_rolls_back_once_without_touching_identity_data(
     assert host._rollback_pending_configuration() is True
     assert ChannelAgentConfig.model_validate_json(config_path.read_bytes()).heartbeat_interval_seconds == previous.heartbeat_interval_seconds
     assert pending.exists() is False
-    assert (data_root / "runtime" / "restart-agent.request").is_file()
+    restart_request = data_root / "runtime" / "restart-agent.request"
+    assert restart_request.is_file()
+    assert restart_request.read_text(encoding="ascii") == (
+        "rollback-preserve-assistant\n"
+    )
     assert identity.read_text(encoding="utf-8") == '{"preserve":true}'
     assert host._rollback_pending_configuration() is False
 

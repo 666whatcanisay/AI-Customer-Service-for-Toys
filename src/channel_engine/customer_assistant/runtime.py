@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Mapping
+from datetime import timedelta
 from typing import Protocol, runtime_checkable
 
 from pydantic import AwareDatetime
@@ -149,6 +150,20 @@ class AICustomerReplyService:
             citations = self._citations(response.metadata)
             gateway_version = response.gateway_version
             action = response.action.value
+        metadata = response.metadata if response is not None else {}
+        ai_cs_action = metadata.get("ai_cs_action")
+        if not isinstance(ai_cs_action, str) or not ai_cs_action.strip():
+            ai_cs_action = "UNKNOWN"
+        warnings = metadata.get("warnings")
+        if not isinstance(warnings, list) or not all(
+            isinstance(item, str) and item.strip() for item in warnings
+        ):
+            warnings = []
+        required_fields = metadata.get("required_fields")
+        if not isinstance(required_fields, list) or not all(
+            isinstance(item, str) and item.strip() for item in required_fields
+        ):
+            required_fields = []
         return AIReplyPackage(
             turn_id=context.turn_id,
             context_id=context.context_id,
@@ -162,6 +177,9 @@ class AICustomerReplyService:
             reply_content=intake.proposed_content,
             citations=citations,
             risk_level=risk_level,
+            ai_cs_action=ai_cs_action.strip()[:64],
+            warnings=tuple(item.strip()[:128] for item in warnings[:32]),
+            required_fields=tuple(item.strip()[:128] for item in required_fields[:32]),
             state=(
                 "WAITING_APPROVAL"
                 if action == "SUGGEST_REPLY"
@@ -186,10 +204,28 @@ class AICustomerReplyService:
                 reference = item.get("reference") or item.get("id")
                 title = item.get("title")
                 if isinstance(reference, str) and isinstance(title, str):
+                    product_id = item.get("product_id")
+                    sku_id = item.get("sku_id")
+                    source_kind = item.get("source_kind")
                     results.append(
                         KnowledgeCitation(
                             reference=reference.strip()[:512],
                             title=title.strip()[:256],
+                            product_id=(
+                                product_id.strip()[:160]
+                                if isinstance(product_id, str) and product_id.strip()
+                                else None
+                            ),
+                            sku_id=(
+                                sku_id.strip()[:160]
+                                if isinstance(sku_id, str) and sku_id.strip()
+                                else None
+                            ),
+                            source_kind=(
+                                source_kind.strip()[:64]
+                                if isinstance(source_kind, str) and source_kind.strip()
+                                else None
+                            ),
                         )
                     )
         return tuple(results)
@@ -274,6 +310,18 @@ class CustomerAssistantRuntime:
             )[:80]
             self._buffer.release(turn.turn_id, reason_code=reason or "ASSISTANT_FAILURE")
             raise
+
+    def stored_reply(
+        self, decision_id: str
+    ) -> tuple[CustomerContext, AIReplyPackage] | None:
+        """Read the durable context/package pair for quality and preparation gates."""
+
+        return self._buffer.load_reply(decision_id)
+
+    def purge_expired_content(
+        self, *, retention: timedelta = timedelta(hours=24)
+    ) -> dict[str, int]:
+        return self._buffer.purge_expired(retention=retention)
 
     def confirm_and_execute(
         self, confirmation: HumanSendConfirmation

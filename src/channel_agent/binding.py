@@ -158,6 +158,42 @@ class AgentVerifiedActiveStoreSelectionRequest(AgentBindingModel):
     reason: str = Field(min_length=1, max_length=512)
 
 
+class PDDStoreBindingV1(AgentBindingModel):
+    """Public-identifier-only projection of the server-verified PDD binding."""
+
+    schema_version: Literal["pdd-store-binding.v1"] = "pdd-store-binding.v1"
+    ai_cs_store_reference: str = Field(pattern=_REFERENCE_PATTERN)
+    observed_pdd_store_id: str = Field(min_length=1, max_length=96)
+    platform_binding_id: str = Field(min_length=1, max_length=128)
+    verified_at: AwareDatetime
+    human_confirmed: Literal[True]
+
+    @classmethod
+    def from_verified_selection(
+        cls, request: AgentVerifiedActiveStoreSelectionRequest
+    ) -> "PDDStoreBindingV1":
+        if request.platform != "pdd":
+            raise ValueError("PDD store binding requires the pdd platform")
+        return cls(
+            ai_cs_store_reference=request.store_reference,
+            observed_pdd_store_id=request.observed_platform_store_id,
+            platform_binding_id=request.platform_binding_id,
+            verified_at=request.platform_binding_verified_at,
+            human_confirmed=request.human_confirmed,
+        )
+
+    def assert_current_page(
+        self,
+        *,
+        observed_pdd_store_id: str,
+        ai_cs_store_reference: str,
+    ) -> None:
+        if observed_pdd_store_id != self.observed_pdd_store_id:
+            raise ValueError("current PDD page store does not match the verified binding")
+        if ai_cs_store_reference != self.ai_cs_store_reference:
+            raise ValueError("AI-CS store does not match the verified PDD binding")
+
+
 class AgentBindingStore:
     """Atomic local storage for public binding references only."""
 
@@ -313,5 +349,6 @@ __all__ = [
     "AgentEnrollmentResponse",
     "AgentRuntimeBinding",
     "AgentStoreBindingUpdateRequest",
+    "PDDStoreBindingV1",
     "atomic_write_bytes",
 ]

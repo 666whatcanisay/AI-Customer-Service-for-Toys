@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-cs.local/schemas/pdd-observation-v2.2.schema.json",
+  "title": "AI-CS PDD Observation v2.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "platform",
+    "store_id",
+    "conversation_id",
+    "customer_reference",
+    "external_message_id",
+    "sender",
+    "origin",
+    "content",
+    "timestamp",
+    "product",
+    "order",
+    "page_fingerprint",
+    "privacy_filtered",
+    "provider_id",
+    "provider_kind",
+    "trace_id",
+    "visible_history"
+  ],
+  "properties": {
+    "schema_version": {"const": "channel-agent-pdd-observation.v2.2"},
+    "platform": {"const": "PDD"},
+    "catalog_tenant_id": {"type": "string", "minLength": 1, "maxLength": 100},
+    "catalog_platform": {"type": "string", "minLength": 1, "maxLength": 40},
+    "store_id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "platform_store_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 160},
+    "store_name": {"type": ["string", "null"], "maxLength": 160},
+    "conversation_id": {"type": "string", "minLength": 1, "maxLength": 255},
+    "customer_reference": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "external_message_id": {"type": "string", "minLength": 1, "maxLength": 255},
+    "sender": {"const": "CUSTOMER"},
+    "origin": {"enum": ["LIVE_PDD", "STARTUP_UNREAD", "SYNTHETIC"]},
+    "content": {"type": "string", "minLength": 1, "maxLength": 8000},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "product": {"type": "object"},
+    "order": {"type": "object"},
+    "page_fingerprint": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "selector_evidence_hash": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+    "privacy_filtered": {"const": true},
+    "provider_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "provider_kind": {"enum": ["SYNTHETIC_PDD", "RECORDED_REPLAY", "REAL_PDD"]},
+    "trace_id": {"type": "string", "pattern": "^trace:[a-f0-9]{64}$"},
+    "visible_history": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message_id", "sender", "source", "content", "content_sha256", "timestamp", "privacy_filtered"],
+        "properties": {
+          "message_id": {"type": "string", "minLength": 1, "maxLength": 255},
+          "sender": {"enum": ["CUSTOMER", "OPERATOR", "BOT", "SYSTEM"]},
+          "source": {"enum": ["REAL_PDD", "SYNTHETIC"]},
+          "content": {"type": "string", "minLength": 1, "maxLength": 8000},
+          "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "privacy_filtered": {"const": true}
+        }
+      }
+    }
+  }
+}

@@ -172,6 +172,10 @@ def validate(
     if not ai_cs_python.is_file():
         raise FileNotFoundError("AI-CS isolated Python runtime is unavailable")
 
+    channel_engine_src = channel_engine_root / "src"
+    if str(channel_engine_src) not in sys.path:
+        sys.path.insert(0, str(channel_engine_src))
+
     from channel_engine.gateway.auth import GatewayRequestSigner
     from channel_engine.gateway.client import (
         AICSGatewayRequestFailed,

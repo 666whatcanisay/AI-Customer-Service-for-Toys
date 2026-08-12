@@ -638,6 +638,8 @@ class ControlledPDDWorkspaceExecutionAdapter:
             error_code=result.error_code,
             details={
                 "mode": "PDD_WORKSPACE_CONTROLLED_SEND",
+                "transport_kind": "REAL_PDD_BROWSER",
+                "simulation_only": False,
                 "selector_contract_version": self._sender.contract.contract_version,
                 "manual_approval": True,
                 "automatic_reply": False,
@@ -659,6 +661,8 @@ class ControlledPDDWorkspaceExecutionAdapter:
             error_code=error_code,
             details={
                 "mode": "PDD_WORKSPACE_CONTROLLED_SEND",
+                "transport_kind": "REAL_PDD_BROWSER",
+                "simulation_only": False,
                 "manual_approval": False,
                 "automatic_reply": False,
                 "automatic_retry_allowed": False,
@@ -676,6 +680,8 @@ class ControlledPDDWorkspaceExecutionAdapter:
             error_code=error_code,
             details={
                 "mode": "PDD_WORKSPACE_CONTROLLED_SEND",
+                "transport_kind": "REAL_PDD_BROWSER",
+                "simulation_only": False,
                 "manual_approval": True,
                 "automatic_reply": False,
                 "automatic_retry_allowed": False,

@@ -138,6 +138,9 @@ def test_config_save_is_atomic_backed_up_and_requests_browser_preserving_reload(
     assert (tmp_path / "runtime" / "config-backups" / "agent.previous.json").is_file()
     reload_request = json.loads((tmp_path / "runtime" / "reload.request").read_text(encoding="utf-8"))
     assert reload_request["preserve_browser"] is True
+    assert (
+        tmp_path / "runtime" / "restart-agent.request"
+    ).read_text(encoding="ascii") == "restart-preserve-assistant\n"
     saved = json.loads(path.read_text(encoding="utf-8"))
     assert saved["manual_approval_required"] is True
     assert saved["auto_reply_enabled"] is False

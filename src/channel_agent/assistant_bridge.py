@@ -26,6 +26,11 @@ from .pdd_workspace_send import (
     ControlledPDDWorkspaceBrowserSender,
     ControlledPDDWorkspaceExecutionAdapter,
 )
+from .controlled_send_grant import (
+    ControlledSendGrantError,
+    ControlledSendGrantStore,
+    ControlledSendGrantV1,
+)
 
 
 class ApprovedReplyBridgeError(RuntimeError):
@@ -40,7 +45,7 @@ class ApprovedReplyModel(BaseModel):
 
 
 class ApprovedReplyRequest(ApprovedReplyModel):
-    contract_version: Literal["1.0"] = "1.0"
+    contract_version: Literal["1.1"] = "1.1"
     decision_id: str = Field(min_length=1, max_length=128)
     conversation_id: str = Field(min_length=1, max_length=255)
     customer_message_id: str = Field(min_length=1, max_length=255)
@@ -49,10 +54,11 @@ class ApprovedReplyRequest(ApprovedReplyModel):
     confirmation_phrase: str = Field(min_length=1, max_length=512, repr=False)
     idempotency_key: str = Field(min_length=1, max_length=255)
     confirmed_at: AwareDatetime
+    controlled_send_grant: ControlledSendGrantV1
 
 
 class ApprovedReplyResponse(ApprovedReplyModel):
-    contract_version: Literal["1.0"] = "1.0"
+    contract_version: Literal["1.1"] = "1.1"
     decision_id: str
     approval_id: str
     execution_id: str
@@ -75,6 +81,7 @@ class ApprovedReplyService:
         uow_factory: Callable[[], SqlAlchemyUnitOfWork],
         observer: ExistingPDDWorkspaceObserver,
         browser_sender: ControlledPDDWorkspaceBrowserSender,
+        controlled_send_grant_store: ControlledSendGrantStore,
         controlled_send_enabled: bool,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
@@ -83,6 +90,7 @@ class ApprovedReplyService:
         self._uow_factory = uow_factory
         self._observer = observer
         self._browser_sender = browser_sender
+        self._grant_store = controlled_send_grant_store
         self._enabled = controlled_send_enabled
         self._clock = clock
         self._lock = RLock()
@@ -90,7 +98,7 @@ class ApprovedReplyService:
     def health(self) -> dict[str, object]:
         return {
             "service": "channel-agent-approved-reply-bridge",
-            "version": "1.0",
+            "version": "1.1",
             "controlled_send_enabled": self._enabled,
             "auto_reply_enabled": False,
             "manual_approval_required": True,
@@ -189,6 +197,24 @@ class ApprovedReplyService:
                     error_code="PDD_SEND_PRODUCT_CHANGED",
                     status_code=409,
                 )
+
+            try:
+                self._grant_store.consume_once(
+                    request.controlled_send_grant,
+                    store_id=package.store_id,
+                    test_buyer_hash=package.customer_reference,
+                    conversation_id=package.conversation_id,
+                    customer_message_id=request.customer_message_id,
+                    decision_id=request.decision_id,
+                    reply_content=request.reply_text,
+                    now=self._clock(),
+                )
+            except ControlledSendGrantError as exc:
+                raise ApprovedReplyBridgeError(
+                    "controlled send grant is invalid or already consumed",
+                    error_code="PDD_CONTROLLED_SEND_GRANT_REJECTED",
+                    status_code=409,
+                ) from exc
 
             coordinator = ExecutionCoordinator(
                 self._uow_factory,

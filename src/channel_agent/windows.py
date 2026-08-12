@@ -54,7 +54,7 @@ from .security import WindowsDPAPITransientPayloadProtector
 from .version import AGENT_VERSION
 
 
-WINDOWS_CLIENT_VERSION = "2.0.0rc4"
+WINDOWS_CLIENT_VERSION = "2.0.0rc5"
 WINDOWS_STATE_VERSION = "1.0"
 WINDOWS_STATE_READ_ATTEMPTS = 8
 WINDOWS_STATE_READ_INITIAL_DELAY_SECONDS = 0.02
@@ -427,6 +427,8 @@ class WindowsAgentHost:
                     browser_state = browser.browser_status()
             else:
                 browser_state = browser.browser_status()
+            if reload_requested and preserve_browser_on_reload and desktop is not None:
+                desktop.prepare_reload_handoff()
             final = runtime.stop()
             self._save_snapshot(
                 final,
@@ -540,7 +542,7 @@ class WindowsAgentHost:
             pending.unlink(missing_ok=True)
             restart = self.data_root / "runtime" / "restart-agent.request"
             restart.parent.mkdir(parents=True, exist_ok=True)
-            restart.write_text("rollback\n", encoding="ascii")
+            restart.write_text("rollback-preserve-assistant\n", encoding="ascii")
             return True
         except AgentConfigError:
             return False
@@ -841,6 +843,11 @@ class WindowsAgentHost:
         mapper = PDDWorkspaceObservationMapper(
             agent_id=config.agent_id,
             device_id=config.device_id,
+            provider_id=(
+                "recorded-replay"
+                if config.development_profile == "OFFLINE_REPLAY"
+                else "real-pdd-readonly"
+            ),
         )
         observer = PDDMessageObserver(
             driver=driver,
@@ -850,7 +857,13 @@ class WindowsAgentHost:
             diagnostic=lambda code, _summary, _details: error_sink(code),
             stage=config.observation_stage,
         )
-        runner = PDDObserverRunner(observer, error_sink=error_sink)
+        runner = PDDObserverRunner(
+            observer,
+            error_sink=error_sink,
+            session_event_sink=error_sink,
+            maximum_session_seconds=30 * 60,
+            warning_seconds=25 * 60,
+        )
         assistant_events = (
             AssistantEventPoller(
                 client,
@@ -906,6 +919,52 @@ class WindowsAgentHost:
     ) -> DesktopAssistantServer:
         packaged_root = WindowsAgentHost._desktop_static_root()
         static_root = packaged_root
+        manual_pdd_browser = ChannelAgentBrowserManager(
+            agent_id=config.agent_id,
+            data_root=data_root,
+            enabled=True,
+            logger=SafeAgentLogger(
+                data_root / "logs" / "pdd-manual-window-browser.jsonl"
+            ),
+        )
+        manual_pdd_login = PDDLoginObservationAdapter(
+            agent_id=config.agent_id,
+            data_root=data_root,
+            login_url="https://mms.pinduoduo.com/login/",
+            customer_service_url=(
+                "https://mms.pinduoduo.com/chat-merchant/index.html#/"
+            ),
+            browser=manual_pdd_browser,
+            logger=SafeAgentLogger(
+                data_root / "logs" / "pdd-manual-window-login.jsonl"
+            ),
+        )
+
+        def project_pdd_window(
+            observation: PDDLoginObservation,
+        ) -> dict[str, object]:
+            browser_state = manual_pdd_browser.browser_status()
+            return {
+                "status": (
+                    "READY"
+                    if observation.login_state
+                    is PDDLoginState.CUSTOMER_SERVICE_READY
+                    else "OPENING"
+                ),
+                "browser_status": browser_state.status.value,
+                "pdd_login_state": observation.login_state.value,
+            }
+
+        def launch_pdd_window() -> dict[str, object]:
+            return project_pdd_window(manual_pdd_login.launch())
+
+        def refresh_pdd_window() -> dict[str, object]:
+            return project_pdd_window(manual_pdd_login.observe())
+
+        def close_pdd_window_resources() -> None:
+            manual_pdd_login.close_resources()
+            manual_pdd_browser.close_resources()
+
         def select_active_store(store_reference: str, reason: str) -> dict[str, object]:
             state = WindowsStateStore(
                 data_root / "runtime" / "channel-agent-state.json"
@@ -939,6 +998,9 @@ class WindowsAgentHost:
             port=config.desktop_ui_port,
             platform_origin=config.ai_cs_platform_url,
             active_store_handler=select_active_store,
+            pdd_workspace_launch_handler=launch_pdd_window,
+            pdd_workspace_status_handler=refresh_pdd_window,
+            pdd_workspace_close_handler=close_pdd_window_resources,
             platform_proxy_mode=config.ai_cs_platform_proxy_mode,
             platform_ca_certificate=config.ai_cs_ca_certificate_path,
         )

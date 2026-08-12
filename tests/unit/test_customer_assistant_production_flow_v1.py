@@ -284,6 +284,37 @@ def test_buffer_recovers_a_stale_claim_without_losing_or_reordering_messages(tmp
     assert recovered.combined_question == "第一句\n第二句"
 
 
+def test_buffer_purges_only_expired_terminal_customer_content(tmp_path):
+    current = [NOW - timedelta(days=2)]
+    buffer = SQLiteConversationBuffer(
+        tmp_path / "retention.sqlite3",
+        quiet_window=timedelta(seconds=1),
+        processing_lease=timedelta(minutes=1),
+        maximum_turn_messages=32,
+        clock=lambda: current[0],
+    )
+    message = BufferedCustomerMessage.from_redacted(
+        store_id="store-retention",
+        conversation_id="conversation-expired",
+        external_message_id="message-expired",
+        content="privacy filtered expired content",
+        timestamp=current[0],
+        received_at=current[0],
+    )
+    assert buffer.append(message) is BufferedMessageDisposition.ACCEPTED
+    turn = buffer.claim_ready(now=current[0] + timedelta(seconds=2))
+    assert turn is not None
+    buffer.mark_manual_intervention(turn.turn_id, reason_code="TEST_TERMINAL")
+
+    current[0] = NOW
+    assert buffer.purge_expired() == {"messages": 1, "turns": 1}
+    assert buffer.load_history(
+        store_id="store-retention",
+        conversation_id="conversation-expired",
+        limit=10,
+    ) == ()
+
+
 def test_send_requires_exact_human_confirmation_and_produces_receipt(foundation, tmp_path):
     runtime, _buffer, _gateway, worker = build_assistant(foundation, tmp_path)
     runtime.ingest_redacted(redacted_message("m-001", "请问有现货吗？", timestamp=NOW))

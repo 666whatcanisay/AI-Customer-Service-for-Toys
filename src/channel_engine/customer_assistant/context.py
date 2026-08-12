@@ -15,6 +15,7 @@ from .models import (
     PageContext,
     TransactionContext,
 )
+from .history import VISIBLE_HISTORY_LIMIT
 
 
 @runtime_checkable
@@ -64,10 +65,13 @@ class CustomerContextCollector:
         *,
         clock: Callable[[], AwareDatetime],
         history_limit: int = 50,
+        visible_history_limit: int = VISIBLE_HISTORY_LIMIT,
         visible_history_provider: VisibleConversationHistoryProvider | None = None,
     ) -> None:
         if not 1 <= history_limit <= 50:
             raise ValueError("assistant history limit must be between 1 and 50")
+        if not 1 <= visible_history_limit <= VISIBLE_HISTORY_LIMIT:
+            raise ValueError("visible conversation history limit must be between 1 and 20")
         self._page = page_provider
         self._transaction = transaction_provider
         self._history = history_provider
@@ -75,6 +79,7 @@ class CustomerContextCollector:
         self._visible_history = visible_history_provider
         self._clock = clock
         self._history_limit = history_limit
+        self._visible_history_limit = visible_history_limit
 
     def collect(self, turn: ConversationTurn) -> CustomerContext:
         page = self._page.capture_page_context(
@@ -99,15 +104,26 @@ class CustomerContextCollector:
                 key=lambda item: (item.timestamp, item.external_message_id),
             )[-self._history_limit :]
         )
-        visible_history = (
-            self._visible_history.load_visible_history(
-                store_id=turn.store_id,
-                conversation_id=turn.conversation_id,
-                limit=min(self._history_limit * 2, 100),
+        visible_history: tuple[ConversationHistoryEntry, ...] = ()
+        if self._visible_history is not None:
+            turn_loader = getattr(
+                self._visible_history, "load_visible_history_for_turn", None
             )
-            if self._visible_history is not None
-            else ()
-        )
+            if callable(turn_loader):
+                visible_history = turn_loader(
+                    store_id=turn.store_id,
+                    conversation_id=turn.conversation_id,
+                    limit=self._visible_history_limit,
+                    excluded_external_message_ids=tuple(
+                        item.external_message_id for item in turn.messages
+                    ),
+                )
+            else:
+                visible_history = self._visible_history.load_visible_history(
+                    store_id=turn.store_id,
+                    conversation_id=turn.conversation_id,
+                    limit=self._visible_history_limit,
+                )
         material = json.dumps(
             [
                 turn.turn_id,

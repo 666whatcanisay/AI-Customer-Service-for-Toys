@@ -96,6 +96,7 @@ class PDDObserverEvidence(_StrictModel):
                 "product_name",
                 "sku_id",
                 "sku_name",
+                "product_attributes",
                 "order_reference",
                 "order_status",
                 "logistics_status",
@@ -180,13 +181,31 @@ def build_replay_observer_evidence(
         "verified_by": "offline-replay-fixture-builder",
         "page_fingerprint": fixture.page_fingerprint,
     }
+    # Hash the same Pydantic-normalized JSON representation that
+    # ``PDDObserverEvidence.validate_contract`` verifies.  Hashing raw Python
+    # datetimes here would emit ``+00:00`` while Pydantic emits ``Z`` and make
+    # every otherwise-valid OFFLINE_REPLAY fixture fail initialization.
+    unverified = PDDObserverEvidence.model_construct(
+        **{
+            **provisional,
+            "selectors": {
+                key: PDDDOMBinding.model_validate(value)
+                for key, value in selectors.items()
+            },
+            "fingerprint_probes": tuple(
+                PDDFingerprintProbe.model_validate(value)
+                for value in provisional["fingerprint_probes"]
+            ),
+        },
+        evidence_hash="sha256:" + "0" * 64,
+    )
+    canonical = unverified.model_dump(mode="json", exclude={"evidence_hash"})
     evidence_hash = "sha256:" + hashlib.sha256(
         json.dumps(
-            provisional,
+            canonical,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
-            default=lambda value: value.isoformat(),
         ).encode("utf-8")
     ).hexdigest()
     return PDDObserverEvidence.model_validate(
@@ -422,6 +441,13 @@ class EvidenceBackedPDDReadOnlyDriver:
                 product_name=_optional_text(product.get("product_name"), 512),
                 sku_id=_optional_text(product.get("sku_id"), 160),
                 sku_name=_optional_text(product.get("sku_name"), 512),
+                attributes=(
+                    {"visible_specification": attributes}
+                    if (attributes := _optional_text(
+                        product.get("attributes_text"), 512
+                    ))
+                    else {}
+                ),
             ),
             order=PDDWorkspaceOrder(
                 order_reference=_optional_text(order.get("order_reference"), 255),
@@ -507,7 +533,7 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
   const pick = (name) => one(document,name);
   return {{fingerprint, active_conversation_id: pick('active_conversation_id'), customer_reference: pick('customer_reference'),
     store_name: pick('store_name'),
-    product: {{product_id:pick('product_id'),product_name:pick('product_name'),sku_id:pick('sku_id'),sku_name:pick('sku_name')}},
+    product: {{product_id:pick('product_id'),product_name:pick('product_name'),sku_id:pick('sku_id'),sku_name:pick('sku_name'),attributes_text:pick('product_attributes')}},
     order: {{order_reference:pick('order_reference'),order_status:pick('order_status'),logistics_status:pick('logistics_status'),aftersales_status:pick('aftersales_status')}},
     messages: rows.map((row) => ({{message_id:one(row,'message_id'),role:one(row,'message_role'),content:one(row,'message_content'),timestamp:one(row,'message_timestamp'),sequence:one(row,'message_sequence')}}))}};
 }})()
