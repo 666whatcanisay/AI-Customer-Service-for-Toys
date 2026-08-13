@@ -1,11 +1,12 @@
 {
   "schema": "rc5-offline-stability-version-matrix.v3",
-  "generated_at": "2026-08-13T09:53:41+08:00",
+  "generated_at": "2026-08-13T10:14:17+08:00",
   "scope": "OFFLINE_NO_REAL_PDD",
   "source": {
     "identity_semantics": "FROZEN_IMPLEMENTATION_COMMITS_PLUS_EVIDENCE_COMMIT_RESOLVED_FROM_GIT",
-    "engine_implementation_commit": "476a02e8a87bb972a7e94d743e3b4567327bcd00",
-    "engine_implementation_tree": "d1a8286d9f00231f1e6b1acd99afb89b364da5b6",
+    "engine_base_implementation_commit": "476a02e8a87bb972a7e94d743e3b4567327bcd00",
+    "engine_implementation_commit": "bc6aee32babdcb142ad13faaab9ed56ad305f455",
+    "engine_implementation_tree": "e88ba514030c8f396f884b08f2f2529534b83bcf",
     "engine_evidence_commit_resolution": "git log -1 -- docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json",
     "ai_cs_implementation_commit": "84154f56b2d165a8983b678460a24fb94cc29103",
     "ai_cs_implementation_tree": "1db7c71a1de04900a8732070761f893b66acf05d",
@@ -51,6 +52,7 @@
     "backend_blackbox": "35/35 PASS",
     "windows_deployment": "13/13 PASS",
     "production_architecture_software_rc": "PASS",
+    "pilot_governance_change_gate": "23/23 PASS",
     "production_selector_evidence": "BLOCKED_EXPECTED_REAL_PDD_NOT_VERIFIED",
     "real_execution_attempts": 0,
     "real_sends": 0,

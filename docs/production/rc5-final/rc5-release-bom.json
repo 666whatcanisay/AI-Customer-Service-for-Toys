@@ -1,6 +1,6 @@
 {
   "schema_version": "rc5-release-bom.v3",
-  "generated_at": "2026-08-13T09:53:41+08:00",
+  "generated_at": "2026-08-13T10:14:17+08:00",
   "release_name": "AI-CS RC5 Pilot Governance Freeze Candidate",
   "scope": "OFFLINE_COMPLETE_NO_REAL_PDD_ACCESS_OR_SEND",
   "status": {
@@ -13,8 +13,9 @@
   "source": {
     "engine": {
       "branch": "codex/rc5-offline-stability",
-      "implementation_commit": "476a02e8a87bb972a7e94d743e3b4567327bcd00",
-      "implementation_tree": "d1a8286d9f00231f1e6b1acd99afb89b364da5b6",
+      "base_implementation_commit": "476a02e8a87bb972a7e94d743e3b4567327bcd00",
+      "implementation_commit": "bc6aee32babdcb142ad13faaab9ed56ad305f455",
+      "implementation_tree": "e88ba514030c8f396f884b08f2f2529534b83bcf",
       "evidence_commit_resolution": "git log -1 -- docs/production/rc5-final/rc5-release-bom.json",
       "expected_workspace_state_after_evidence_commit": "CLEAN"
     },
@@ -81,6 +82,7 @@
     "admin_frontend": "92 PASS; typecheck PASS",
     "backend_blackbox": "35/35 PASS",
     "production_architecture_software_rc": "PASS",
+    "pilot_governance_change_gate": "23/23 PASS",
     "production_selector_evidence": "BLOCKED_EXPECTED_REAL_PDD_NOT_VERIFIED",
     "real_pdd_accessed": false,
     "real_execution_attempts": 0,
@@ -92,6 +94,7 @@
     "required_runtime_activations": ["CHANNEL_ENGINE_HOST", "AI_CS_PLATFORM", "AI_CS_RAG"],
     "required_storage": ["HOST_CONTROL", "CONVERSATION_BUFFER", "OFFLINE_CONTROL", "AGENT_SPOOL"],
     "legacy_gate_fact_fields": "DEPRECATED_IGNORED_PARSE_ONLY",
+    "false_negative_fix_commit": "bc6aee32babdcb142ad13faaab9ed56ad305f455",
     "runtime_recovery": "REQUIRED_AFTER_EVIDENCE_COMMIT_BEFORE_FINAL_PREFLIGHT",
     "may_enter_read_only_pilot_semantics": "TECHNICAL_PREFLIGHT_ONLY; GREEN_UI_PASS_AND_MANUAL_TRIGGER_STILL_REQUIRED",
     "real_send_enabled": false
