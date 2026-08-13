@@ -171,18 +171,36 @@ def build_catalog(
     )
 
 
+def _parse_netstat_listening_ports(output: str, pid: int) -> tuple[int, ...]:
+    ports: set[int] = set()
+    for line in output.splitlines():
+        columns = line.strip().split()
+        if (
+            len(columns) < 5
+            or columns[0].upper() != "TCP"
+            or columns[3].upper() != "LISTENING"
+        ):
+            continue
+        try:
+            owner_pid = int(columns[4])
+            port = int(columns[1].rsplit(":", 1)[1])
+        except (ValueError, IndexError):
+            continue
+        if owner_pid == pid:
+            ports.add(port)
+    return tuple(sorted(ports))
+
+
 def _live_process(pid: int) -> LiveProcessSnapshot | None:
     if os.name != "nt":
         return None
     command = (
         "$p=Get-Process -Id %d -ErrorAction SilentlyContinue;"
         "if($null -eq $p){exit 3};"
-        "$ports=@(Get-NetTCPConnection -State Listen -OwningProcess %d "
-        "-ErrorAction SilentlyContinue|Select-Object -ExpandProperty LocalPort -Unique);"
         "[pscustomobject]@{pid=[int]$p.Id;path=[string]$p.Path;"
-        "started=$p.StartTime.ToUniversalTime().ToString('o');ports=$ports}"
+        "started=$p.StartTime.ToUniversalTime().ToString('o')}"
         "|ConvertTo-Json -Compress"
-    ) % (pid, pid)
+    ) % pid
     result = subprocess.run(
         ["powershell.exe", "-NoProfile", "-Command", command],
         capture_output=True,
@@ -195,14 +213,22 @@ def _live_process(pid: int) -> LiveProcessSnapshot | None:
     if result.returncode != 0 or not result.stdout.strip():
         return None
     value = json.loads(result.stdout)
-    ports = value.get("ports", [])
-    if isinstance(ports, int):
-        ports = [ports]
+    netstat = subprocess.run(
+        ["netstat.exe", "-ano", "-p", "tcp"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=10,
+        check=False,
+    )
+    if netstat.returncode != 0:
+        return None
     return LiveProcessSnapshot(
         pid=int(value["pid"]),
         executable_path=str(value["path"]),
         process_started_at=datetime.fromisoformat(str(value["started"])),
-        listening_ports=tuple(sorted(int(item) for item in ports)),
+        listening_ports=_parse_netstat_listening_ports(netstat.stdout, pid),
     )
 
 
@@ -262,12 +288,23 @@ def _source_identity(repository: Path) -> dict[str, str]:
     }
 
 
-def _rag_live_snapshot(activation: RuntimeActivationV1) -> RagLiveSnapshot | None:
-    if activation.component != "AI_CS_RAG" or len(activation.ports) != 1:
+def _rag_live_snapshot(
+    activation: RuntimeActivationV1,
+    internal_service_token: str | None,
+) -> RagLiveSnapshot | None:
+    if (
+        activation.component != "AI_CS_RAG"
+        or len(activation.ports) != 1
+        or not internal_service_token
+    ):
         return None
     url = f"http://127.0.0.1:{activation.ports[0]}/api/status"
+    request = urllib.request.Request(
+        url,
+        headers={"X-AI-CS-Service-Token": internal_service_token},
+    )
     try:
-        with urllib.request.urlopen(url, timeout=3.0) as response:
+        with urllib.request.urlopen(request, timeout=3.0) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (OSError, ValueError, urllib.error.URLError):
         return None
@@ -389,6 +426,8 @@ def build_status(
     catalog_path: Path,
     activation_paths: list[Path],
     agent_config_path: Path,
+    *,
+    rag_internal_service_token: str | None = None,
 ) -> dict[str, Any]:
     facts = load_gate_facts(facts_path)
     catalog = RuntimeCatalogV1.model_validate(_read_json(catalog_path))
@@ -441,7 +480,10 @@ def build_status(
                 current_config_sha256=sha256_file(activation.config_source_path),
                 current_source_revision=current_source["head"],
                 current_source_fingerprint=current_source["source_fingerprint"],
-                live_rag=_rag_live_snapshot(activation),
+                live_rag=_rag_live_snapshot(
+                    activation,
+                    rag_internal_service_token,
+                ),
             )
         if activation.component in activation_results:
             validation = ActivationValidationResult(
@@ -671,11 +713,16 @@ def main() -> int:
         _write_json(Path(args.output).resolve(strict=False), value.model_dump(mode="json"))
         print(value.model_dump_json())
         return 0
+    internal_service_token = os.environ.pop(
+        "AI_CS_PILOT_INTERNAL_SERVICE_TOKEN",
+        None,
+    )
     value = build_status(
         Path(args.facts).resolve(strict=True),
         Path(args.catalog).resolve(strict=True),
         [Path(item).resolve(strict=True) for item in args.activation],
         Path(args.agent_config).resolve(strict=True),
+        rag_internal_service_token=internal_service_token,
     )
     if args.output:
         _write_json(Path(args.output).resolve(strict=False), value)

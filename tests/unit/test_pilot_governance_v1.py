@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -15,12 +17,123 @@ from channel_engine.pilot_governance import (
     RuntimeCatalogV1,
     validate_activation,
 )
-from scripts.rc5_pilot_governance import evaluate_preflight
+from scripts.rc5_pilot_governance import (
+    _live_process,
+    _parse_netstat_listening_ports,
+    _rag_live_snapshot,
+    evaluate_preflight,
+)
 
 
 NOW = datetime(2026, 8, 12, 8, 0, tzinfo=UTC)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
+
+
+@pytest.mark.parametrize(
+    ("pid", "expected_port"),
+    [(31376, 8420), (55776, 8422), (36164, 18443)],
+)
+def test_netstat_port_owner_regression_for_recovered_runtime_pids(
+    pid: int,
+    expected_port: int,
+) -> None:
+    output = """
+      TCP    127.0.0.1:8420         0.0.0.0:0              LISTENING       31376
+      TCP    127.0.0.1:8422         0.0.0.0:0              LISTENING       55776
+      TCP    127.0.0.1:18443        0.0.0.0:0              LISTENING       36164
+      TCP    127.0.0.1:57632        127.0.0.1:8420         TIME_WAIT       0
+    """
+    assert _parse_netstat_listening_ports(output, pid) == (expected_port,)
+
+
+def test_live_process_uses_netstat_owner_instead_of_get_nettcpconnection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(arguments: list[str], **_kwargs: object) -> SimpleNamespace:
+        calls.append(arguments)
+        if arguments[0] == "powershell.exe":
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "pid": 31376,
+                        "path": "C:/Python/python.exe",
+                        "started": "2026-08-13T02:03:09.3192778+00:00",
+                    }
+                ),
+            )
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "TCP 127.0.0.1:8420 0.0.0.0:0 LISTENING 31376\n"
+            ),
+        )
+
+    monkeypatch.setattr("scripts.rc5_pilot_governance.subprocess.run", fake_run)
+    live = _live_process(31376)
+    assert live is not None
+    assert live.listening_ports == (8420,)
+    assert calls[1] == ["netstat.exe", "-ano", "-p", "tcp"]
+
+
+def test_rag_status_reuses_internal_service_token_only_as_request_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    activation = RuntimeActivationV1(
+        activation_id="activation:rag-auth",
+        component="AI_CS_RAG",
+        activation_kind="RAG",
+        pid=31376,
+        executable_path="C:/Python/python.exe",
+        manifest_created_at=NOW,
+        service_started_at=NOW,
+        process_started_at=NOW,
+        config_source_path="C:/runtime/ai-cs.ps1",
+        config_sha256=SHA_A,
+        source_repository_path="C:/src/AI-CS",
+        source_revision="c" * 40,
+        source_fingerprint=SHA_B,
+        rag_identity={
+            "model": "qwen3.5:9b",
+            "vector_database_path": "C:/runtime/vector_db",
+            "active_collection_name": "test_knowledge_v031",
+            "ready": True,
+            "model_configured": True,
+        },
+        ports=(8420,),
+    )
+    token = "existing-internal-service-token-32-bytes"
+    observed: dict[str, str | None] = {}
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {"data": {"ready": True, "model_configured": True}}
+            ).encode("utf-8")
+
+    def fake_urlopen(request: object, timeout: float) -> Response:
+        observed["url"] = getattr(request, "full_url")
+        observed["token"] = request.get_header("X-ai-cs-service-token")
+        observed["timeout"] = str(timeout)
+        return Response()
+
+    monkeypatch.setattr(
+        "scripts.rc5_pilot_governance.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    snapshot = _rag_live_snapshot(activation, token)
+    assert snapshot == RagLiveSnapshot(ready=True, model_configured=True)
+    assert observed["token"] == token
+    assert token not in str(observed["url"])
 
 
 def _entry(*, lifecycle: str = "ACTIVE") -> RuntimeCatalogEntryV1:
