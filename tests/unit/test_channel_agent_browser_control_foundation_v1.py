@@ -9,6 +9,8 @@ from threading import Event, Thread
 
 import pytest
 
+import channel_agent.browser as browser_module
+
 from channel_agent.browser import (
     BrowserDisabledError,
     BrowserNavigationError,
@@ -65,6 +67,7 @@ class FakeProcessController:
         self.navigations: list[str] = []
         self.stops: list[int] = []
         self.profile_pid: int | None = None
+        self.finds = 0
 
     def start(self, executable: Path, profile_path: Path, url: str) -> int:
         self.next_pid += 1
@@ -76,6 +79,7 @@ class FakeProcessController:
         return self.running.get(pid, False)
 
     def find_running(self, executable: Path, profile_path: Path) -> int | None:
+        self.finds += 1
         if self.profile_pid is None or not self.running.get(self.profile_pid, False):
             return None
         return self.profile_pid
@@ -239,6 +243,68 @@ def test_abnormal_exit_is_detected_and_recovered_once(tmp_path: Path) -> None:
             manager.recover()
     finally:
         manager.close_resources()
+
+
+def test_degraded_status_poll_does_not_repeat_profile_process_discovery(
+    tmp_path: Path,
+) -> None:
+    manager, process, _logger = make_manager(tmp_path)
+    try:
+        opened = manager.open_browser()
+        assert opened.pid is not None
+        process.running[opened.pid] = False
+
+        degraded = manager.browser_status()
+        finds_after_exit = process.finds
+        polled_again = manager.browser_status()
+
+        assert degraded.status is BrowserSessionStatus.DEGRADED
+        assert polled_again.status is BrowserSessionStatus.DEGRADED
+        assert process.finds == finds_after_exit
+    finally:
+        manager.close_resources()
+
+
+def test_explicit_open_restarts_a_degraded_dedicated_browser(tmp_path: Path) -> None:
+    manager, process, _logger = make_manager(tmp_path)
+    try:
+        opened = manager.open_browser()
+        assert opened.pid is not None
+        process.running[opened.pid] = False
+        assert manager.browser_status().status is BrowserSessionStatus.DEGRADED
+
+        restarted = manager.open_browser()
+
+        assert restarted.status is BrowserSessionStatus.OPENED
+        assert restarted.pid is not None
+        assert restarted.pid != opened.pid
+        assert len(process.starts) == 2
+    finally:
+        manager.close_resources()
+
+
+def test_windows_profile_discovery_runs_without_a_visible_console(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "msedge.exe"
+    executable.write_bytes(b"edge")
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    controller = WindowsBrowserProcessController()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(controller, "_require_windows", lambda _executable: None)
+
+    def fake_run(*_args: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return type("Completed", (), {"stdout": "", "returncode": 0})()
+
+    monkeypatch.setattr(browser_module.subprocess, "run", fake_run)
+
+    assert controller.find_running(executable, profile) is None
+    assert captured["creationflags"] == getattr(
+        browser_module.subprocess, "CREATE_NO_WINDOW", 0
+    )
 
 
 def test_browser_status_reattaches_to_existing_agent_profile_process(

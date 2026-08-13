@@ -343,6 +343,7 @@ if ($null -ne $main) { [Console]::Out.Write([string]$main.ProcessId) }
                 check=False,
                 timeout=5.0,
                 env=environment,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except (OSError, subprocess.TimeoutExpired):
             return None
@@ -368,6 +369,7 @@ if ($null -ne $main) { [Console]::Out.Write([string]$main.ProcessId) }
                     stderr=subprocess.DEVNULL,
                     check=False,
                     timeout=max(timeout_seconds, 0.5),
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except (OSError, subprocess.TimeoutExpired):
                 continue
@@ -545,10 +547,6 @@ class ChannelAgentBrowserManager:
     def browser_status(self) -> BrowserSessionState:
         with self._lock:
             state = self._load_checked() or self._initial_stopped_state()
-            if state.status is not BrowserSessionStatus.STOPPED:
-                reattached = self._reattach(state, Path(state.profile_path))
-                if reattached is not None:
-                    return reattached
             active = state.status in {
                 BrowserSessionStatus.STARTING,
                 BrowserSessionStatus.OPENED,
@@ -556,6 +554,14 @@ class ChannelAgentBrowserManager:
                 BrowserSessionStatus.READY,
                 BrowserSessionStatus.RECOVERING,
             }
+            # A status poll may try one profile reattachment while the session is
+            # expected to be alive.  Once an operator has closed Edge and the
+            # session is DEGRADED, subsequent UI polls must remain side-effect-free;
+            # an explicit launch click owns the next reattachment/start attempt.
+            if active:
+                reattached = self._reattach(state, Path(state.profile_path))
+                if reattached is not None:
+                    return reattached
             if active and (state.pid is None or not self._is_running(state.pid)):
                 state = state.model_copy(
                     update={

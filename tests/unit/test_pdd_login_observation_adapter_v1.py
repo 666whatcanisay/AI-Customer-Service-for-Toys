@@ -108,8 +108,10 @@ class FakeBrowser:
 class MutableTargetResolver:
     def __init__(self, target: PDDCDPPageTarget) -> None:
         self.target = target
+        self.calls = 0
 
     def resolve(self, profile_path: Path) -> PDDCDPPageTarget:
+        self.calls += 1
         assert profile_path.is_absolute()
         return self.target
 
@@ -210,6 +212,34 @@ def test_launch_opens_isolated_browser_and_waits_for_human_qr(tmp_path: Path) ->
         assert browser.login_results == [False]
         profile = Path(browser.state.profile_path)
         assert profile.is_relative_to((tmp_path / "data").resolve())
+    finally:
+        observer.close_resources()
+
+
+def test_relaunch_with_new_browser_session_does_not_probe_stale_login_state(
+    tmp_path: Path,
+) -> None:
+    observer, browser, resolver, _evaluator = make_observer(tmp_path)
+    try:
+        first = observer.launch()
+        assert first.browser_id == "browser:pdd-observe"
+        browser.close_browser()
+        browser.state = browser.state.model_copy(
+            update={
+                "browser_id": "browser:pdd-reopened",
+                "status": BrowserSessionStatus.STOPPED,
+                "pid": None,
+            }
+        )
+        resolver.calls = 0
+        browser.navigations.clear()
+
+        reopened = observer.launch()
+
+        assert reopened.browser_id == "browser:pdd-reopened"
+        assert reopened.login_state is PDDLoginState.PDD_LOGIN_PAGE
+        assert resolver.calls == 0
+        assert browser.navigations == [LOGIN_URL]
     finally:
         observer.close_resources()
 

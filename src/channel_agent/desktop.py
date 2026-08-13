@@ -334,15 +334,31 @@ class DesktopAssistantServer:
             self.data_root / "runtime" / "channel-agent-state.json"
         )
         secure_control_ready = False
+        config = None
         try:
-            secure_control_ready = (
-                load_agent_config(self.config_path).device_credential_reference
-                is not None
-            )
+            config = load_agent_config(self.config_path)
+            secure_control_ready = config.device_credential_reference is not None
         except AgentConfigError:
             # Bootstrap stays available for recovery even when configuration is
             # incomplete.  Only the non-sensitive readiness fact is exposed.
             pass
+        real_pdd_message_observation_enabled = bool(
+            config is not None
+            and config.development_profile == "STANDARD"
+            and config.browser_enabled
+            and config.pdd_login_observation_enabled
+            and config.message_observation_enabled
+        )
+        message_source = (
+            "REAL_PDD"
+            if real_pdd_message_observation_enabled
+            else (
+                "OFFLINE_REPLAY"
+                if config is not None
+                and config.development_profile == "OFFLINE_REPLAY"
+                else "DISABLED"
+            )
+        )
         browser_status = state.get("browser_status", "STOPPED")
         pdd_login_state = state.get("pdd_login_state")
         with self._lock:
@@ -365,6 +381,10 @@ class DesktopAssistantServer:
         return {
             "schema_version": DESKTOP_API_VERSION,
             "csrf_token": self._csrf_token,
+            # A newly opened workspace starts after this cursor.  This keeps
+            # historical MESSAGE_ACCEPTED journal entries available for resume
+            # while preventing old entries from being announced as new popups.
+            "assistant_event_cursor": self.event_journal.last_sequence_id(),
             "agent": {
                 "process_status": state.get("process_status", "STARTING"),
                 "runtime_status": state.get("runtime_status", "CONNECTING"),
@@ -383,6 +403,10 @@ class DesktopAssistantServer:
                 "observer_status": state.get("observer_status", "DISABLED"),
                 "observer_restart_available": bool(
                     state.get("message_observation_enabled", False)
+                ),
+                "message_source": message_source,
+                "real_pdd_message_observation_enabled": (
+                    real_pdd_message_observation_enabled
                 ),
             },
             "binding": {
@@ -1130,9 +1154,11 @@ class DesktopAssistantServer:
   window.__channelAgentAssistantEventsStarted = true;
   const recoveryKey = 'channel-agent-local-session-recovery-v1';
   const checkLocalSession = async () => {
+    let bootstrapPayload = null;
     try {
       const response = await fetch('/local-api/v1/bootstrap', { cache: 'no-store' });
       if (response.ok) {
+        bootstrapPayload = await response.json();
         sessionStorage.removeItem(recoveryKey);
       } else if (response.status === 401) {
         const bootstrap = new URLSearchParams(window.location.search).get('bootstrap');
@@ -1147,10 +1173,13 @@ class DesktopAssistantServer:
       // The loopback Runtime may still be restarting. Retry without navigating.
     }
     window.setTimeout(checkLocalSession, 2000);
+    return bootstrapPayload;
   };
-  const connect = () => {
-    checkLocalSession();
-    const source = new EventSource('/local-api/v1/events');
+  const connect = async () => {
+    const bootstrapPayload = await checkLocalSession();
+    const cursor = Number(bootstrapPayload?.assistant_event_cursor ?? 0);
+    const after = Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : 0;
+    const source = new EventSource(`/local-api/v1/events?after=${after}`);
     source.addEventListener('assistant', (message) => {
       let detail;
       try { detail = JSON.parse(message.data); } catch (_) { return; }

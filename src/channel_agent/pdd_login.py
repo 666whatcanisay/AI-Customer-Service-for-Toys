@@ -501,7 +501,12 @@ class PDDLoginObservationAdapter:
             # This avoids creating a redundant login/home tab and preserves the human
             # session.  Observation remains read-only; fallback navigation is used only
             # when no authenticated PDD page can be identified.
-            if previous is not None:
+            # A persisted login observation belongs to one browser session.  When
+            # the operator closes the dedicated Edge window and explicitly opens
+            # it again, open_browser() creates a new browser_id.  Do not probe the
+            # new process using stale state from the closed session; navigate it to
+            # the login page first and let the next read-only refresh classify it.
+            if previous is not None and previous.browser_id == browser.browser_id:
                 existing = self.observe()
                 if existing.login_state in {
                     PDDLoginState.PDD_LOGIN_SUCCESS,

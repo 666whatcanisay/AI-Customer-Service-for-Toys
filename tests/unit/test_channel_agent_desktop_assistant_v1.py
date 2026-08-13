@@ -11,7 +11,9 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 import pytest
 
+from channel_agent.config import ChannelAgentConfig
 from channel_agent.desktop import DesktopAssistantServer
+from channel_agent.observation_stages import ObservationStage
 
 
 class _ProxyCaptureHandler(BaseHTTPRequestHandler):
@@ -242,6 +244,39 @@ def test_assistant_event_client_has_bounded_local_session_reload_recovery() -> N
     assert "attempted !== bootstrap" in script
     assert "window.location.reload()" in script
     assert "window.setTimeout(checkLocalSession, 2000)" in script
+    assert "bootstrapPayload?.assistant_event_cursor" in script
+    assert "new EventSource(`/local-api/v1/events?after=${after}`)" in script
+
+
+def test_bootstrap_reports_real_pdd_message_source_only_from_live_config(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "verified-selector-evidence.json"
+    evidence.write_text("{}", encoding="utf-8")
+    config = ChannelAgentConfig(
+        server_url="http://127.0.0.1:18443",
+        agent_id="agent-real-pdd",
+        device_id="device-real-pdd",
+        runtime_mode="STAGING",
+        development_profile="STANDARD",
+        browser_enabled=True,
+        pdd_login_observation_enabled=True,
+        pdd_login_url="https://mms.pinduoduo.com/login/",
+        pdd_customer_service_url="https://mms.pinduoduo.com/chat-merchant/index.html#",
+        customer_assistant_enabled=True,
+        message_observation_enabled=True,
+        observation_stage=ObservationStage.AI_SUGGESTIONS,
+        pdd_observation_evidence_path=evidence,
+    )
+    config_path = tmp_path / "config" / "agent.json"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
+
+    server = DesktopAssistantServer(data_root=tmp_path, config_path=config_path)
+    bootstrap = server.bootstrap()
+
+    assert bootstrap["browser"]["message_source"] == "REAL_PDD"  # type: ignore[index]
+    assert bootstrap["browser"]["real_pdd_message_observation_enabled"] is True  # type: ignore[index]
 
 
 def test_desktop_server_rejects_send_without_origin_intent_or_handler(tmp_path: Path) -> None:
@@ -373,7 +408,10 @@ def test_pdd_window_launch_requires_explicit_human_intent_and_starts_no_observer
             "pdd_workspace_refresh_available": True,
             "observer_status": "DISABLED",
             "observer_restart_available": False,
+            "message_source": "DISABLED",
+            "real_pdd_message_observation_enabled": False,
         }
+        assert bootstrap["assistant_event_cursor"] == 0
     finally:
         server.stop()
 
