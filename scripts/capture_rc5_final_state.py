@@ -77,7 +77,9 @@ def read_json(path: Path) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def git_snapshot(root: Path) -> dict[str, Any]:
+def git_snapshot(
+    root: Path, implementation_paths: Iterable[str] = ()
+) -> dict[str, Any]:
     def run(*arguments: str) -> str:
         result = subprocess.run(
             ["git", "-C", str(root), *arguments],
@@ -90,11 +92,17 @@ def git_snapshot(root: Path) -> dict[str, Any]:
         return result.stdout.strip()
 
     try:
-        return {
+        snapshot = {
             "head": run("rev-parse", "HEAD"),
             "branch": run("branch", "--show-current"),
             "dirty_paths": run("status", "--short").splitlines(),
         }
+        paths = tuple(implementation_paths)
+        if paths:
+            snapshot["implementation_head"] = run(
+                "log", "-1", "--format=%H", "--", *paths
+            )
+        return snapshot
     except (OSError, subprocess.CalledProcessError) as exc:
         return {"error": type(exc).__name__}
 
@@ -119,6 +127,11 @@ def extract_toml_version(path: Path) -> str | None:
 
 def package_snapshot(package_root: Path, archive: Path | None = None) -> dict[str, Any]:
     manifest = read_json(package_root / "release-manifest.json") or {}
+    build_identity = (
+        manifest.get("build_identity")
+        if isinstance(manifest.get("build_identity"), dict)
+        else {}
+    )
     files = manifest.get("files") if isinstance(manifest.get("files"), list) else []
     declared = {
         item.get("path"): item.get("sha256")
@@ -130,6 +143,7 @@ def package_snapshot(package_root: Path, archive: Path | None = None) -> dict[st
         "version": manifest.get("version"),
         "agent_runtime_version": manifest.get("agent_runtime_version"),
         "gateway_contract_sha256": manifest.get("gateway_contract_sha256"),
+        "build_identity": build_identity,
         "manifest_sha256": sha256_file(package_root / "release-manifest.json"),
         "executable_sha256": sha256_file(package_root / "ChannelAgent.exe"),
         "runtime_sha256": sha256_file(package_root / "app" / "channel-agent.pyz"),
@@ -330,7 +344,7 @@ def build_snapshot(args: argparse.Namespace) -> dict[str, Any]:
     package_root = args.package_root.resolve()
     source_agent = extract_python_constant(ROOT / "src/channel_agent/version.py", "AGENT_VERSION")
     source_engine = extract_python_constant(ROOT / "src/channel_engine/__init__.py", "__version__")
-    return {
+    snapshot = {
         "schema_version": "rc5-final-state.v1",
         "captured_at": datetime.now(UTC).isoformat(),
         "scope": "READ_ONLY_OFFLINE_NO_REAL_PDD",
@@ -339,8 +353,23 @@ def build_snapshot(args: argparse.Namespace) -> dict[str, Any]:
             "engine_version": source_engine,
             "agent_version": source_agent,
             "pyproject_version": extract_toml_version(ROOT / "pyproject.toml"),
-            "engine_git": git_snapshot(ROOT),
-            "ai_cs_git": git_snapshot(ai_cs_root),
+            "engine_git": git_snapshot(
+                ROOT,
+                (
+                    "src/channel_agent",
+                    "packaging/windows-client-v2",
+                    "packaging/windows-client-v1",
+                    "deploy/channel-agent-foundation",
+                    "scripts/build_channel_agent_windows_client.ps1",
+                    "scripts/validate_channel_agent_composition.py",
+                    "scripts/build_channel_agent_brand_assets.ps1",
+                    "scripts/validate_channel_agent_brand_package.ps1",
+                ),
+            ),
+            "ai_cs_git": git_snapshot(
+                ai_cs_root,
+                ("frontend/src", "frontend/package.json", "frontend/package-lock.json"),
+            ),
             "engine_production_tree": production_tree_sha256(
                 ROOT,
                 ("src/channel_agent", "src/channel_engine", "packaging/windows-client-v2", "packaging/windows-client-v1", "deploy/channel-agent-foundation"),
@@ -373,6 +402,39 @@ def build_snapshot(args: argparse.Namespace) -> dict[str, Any]:
             "release_tag": "NOT IN SCOPE",
         },
     }
+    engine_head = snapshot["source"]["engine_git"].get("implementation_head")
+    ai_cs_head = snapshot["source"]["ai_cs_git"].get("implementation_head")
+    package_identity = snapshot["package"].get("build_identity", {})
+    installed_identity = snapshot["installed"].get("build_identity", {})
+
+    def identity_commit(identity: dict[str, Any], component: str) -> Any:
+        value = identity.get(component)
+        return value.get("commit_sha") if isinstance(value, dict) else None
+
+    snapshot["consistency"] = {
+        "source_matches_package": bool(
+            engine_head
+            and ai_cs_head
+            and identity_commit(package_identity, "channel_agent_source") == engine_head
+            and identity_commit(package_identity, "assistant_ui_source") == ai_cs_head
+        ),
+        "package_matches_installed": bool(
+            snapshot["package"].get("manifest_sha256")
+            and snapshot["package"].get("manifest_sha256")
+            == snapshot["installed"].get("manifest_sha256")
+            and snapshot["package"].get("executable_sha256")
+            == snapshot["installed"].get("executable_sha256")
+            and snapshot["package"].get("runtime_sha256")
+            == snapshot["installed"].get("runtime_sha256")
+        ),
+        "installed_identity_matches_source": bool(
+            engine_head
+            and ai_cs_head
+            and identity_commit(installed_identity, "channel_agent_source") == engine_head
+            and identity_commit(installed_identity, "assistant_ui_source") == ai_cs_head
+        ),
+    }
+    return snapshot
 
 
 def parser() -> argparse.ArgumentParser:

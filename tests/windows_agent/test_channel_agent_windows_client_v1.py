@@ -567,6 +567,22 @@ def test_windows_build_prunes_bytecode_without_pipeline_path_binding() -> None:
     assert "Embedded Python runtime was removed while pruning build residue." in build
 
 
+def test_windows_build_manifest_records_reproducible_source_identity() -> None:
+    root = Path(__file__).resolve().parents[2]
+    build = (root / "scripts" / "build_channel_agent_windows_client.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "schema_version = '2.2'" in build
+    assert "build_identity = [ordered]@{" in build
+    assert "log', '-1', '--format=%H', '--'" in build
+    assert "channel_agent_source = $engineSourceIdentity" in build
+    assert "assistant_ui_source = $assistantUiSourceIdentity" in build
+    assert "production_composition_sha256" in build
+    assert "assistant_ui_assets_sha256" in build
+    assert "Official package build requires CLEAN Engine and AI-CS source repositories." in build
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows process validation")
 def test_windows_process_detection_does_not_signal_process() -> None:
     assert _process_exists(os.getpid()) is True

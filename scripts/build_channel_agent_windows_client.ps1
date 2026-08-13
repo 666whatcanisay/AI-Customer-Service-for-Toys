@@ -9,6 +9,44 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+
+function Get-GitBuildIdentity(
+    [string]$Root,
+    [string]$RepositoryName,
+    [string[]]$ImplementationPaths
+) {
+    $commitArguments = @('-C', $Root, 'log', '-1', '--format=%H', '--') + $ImplementationPaths
+    $commit = (& git @commitArguments 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[a-f0-9]{40}$') {
+        throw "Cannot resolve source commit for $RepositoryName."
+    }
+    $tree = (& git -C $Root rev-parse "$commit`^{tree}" 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[a-f0-9]{40}$') {
+        throw "Cannot resolve source tree for $RepositoryName."
+    }
+    $dirtyPaths = @(& git -C $Root status --porcelain --untracked-files=normal 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw "Cannot inspect workspace state for $RepositoryName." }
+    return [ordered]@{
+        repository = $RepositoryName
+        commit_sha = $commit
+        tree_sha = $tree
+        workspace_state = $(if ($dirtyPaths.Count -eq 0) { 'CLEAN' } else { 'DIRTY' })
+    }
+}
+
+function Get-DirectoryContentSha256([string]$Root) {
+    $resolvedRoot = [System.IO.Path]::GetFullPath($Root)
+    $rows = @(Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
+        $relative = $_.FullName.Substring($resolvedRoot.Length + 1).Replace('\', '/')
+        $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$relative|$hash|$($_.Length)"
+    })
+    $payload = [System.Text.Encoding]::UTF8.GetBytes(($rows -join "`n"))
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($payload))).Replace('-', '').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
+
 $allowedOutputRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot 'dist\windows-client-v2'))
 if (-not $OutputRoot) { $OutputRoot = $allowedOutputRoot }
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputRoot)
@@ -223,6 +261,44 @@ if ($DesktopUiDist) {
         }
     }
 }
+
+$engineImplementationPaths = @(
+    'src/channel_agent',
+    'packaging/windows-client-v2',
+    'packaging/windows-client-v1',
+    'deploy/channel-agent-foundation',
+    'scripts/build_channel_agent_windows_client.ps1',
+    'scripts/validate_channel_agent_composition.py',
+    'scripts/build_channel_agent_brand_assets.ps1',
+    'scripts/validate_channel_agent_brand_package.ps1'
+)
+$engineSourceIdentity = Get-GitBuildIdentity `
+    $repoRoot `
+    'AI-CS-Channel-Execution-Engine' `
+    $engineImplementationPaths
+$assistantUiSourceIdentity = $null
+$assistantUiAssetsSha256 = $null
+if ($DesktopUiDist) {
+    $uiRepositoryRoot = (& git -C $resolvedUi rev-parse --show-toplevel 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $uiRepositoryRoot) {
+        throw 'Desktop UI dist must belong to a Git source repository.'
+    }
+    $assistantUiSourceIdentity = Get-GitBuildIdentity `
+        $uiRepositoryRoot `
+        'AI-CS' `
+        @('frontend/src', 'frontend/package.json', 'frontend/package-lock.json')
+    $assistantUiAssetsSha256 = Get-DirectoryContentSha256 $resolvedUi
+}
+if (
+    $BrandingMode -eq 'official' -and
+    (
+        $engineSourceIdentity.workspace_state -ne 'CLEAN' -or
+        -not $assistantUiSourceIdentity -or
+        $assistantUiSourceIdentity.workspace_state -ne 'CLEAN'
+    )
+) {
+    throw 'Official package build requires CLEAN Engine and AI-CS source repositories.'
+}
 Copy-Item -LiteralPath (Join-Path $repoRoot 'deploy\channel-agent-foundation\agent.example.json') -Destination (Join-Path $packageRoot 'config\agent.example.json')
 Copy-Item -LiteralPath (Join-Path $repoRoot 'deploy\channel-agent-foundation\agent.offline-replay.example.json') -Destination (Join-Path $packageRoot 'config\agent.offline-replay.example.json')
 Copy-Item -LiteralPath (Join-Path $repoRoot 'deploy\channel-agent-foundation\upgrade-manifest.example.json') -Destination (Join-Path $packageRoot 'config\upgrade-manifest.example.json')
@@ -282,7 +358,7 @@ $files = Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Sort-Object Fu
     }
 }
 [ordered]@{
-    schema_version = '2.1'
+    schema_version = '2.2'
     product = 'AI-CS Channel Agent Windows Client'
     version = $version
     client_resource_version = $version
@@ -318,6 +394,13 @@ $files = Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Sort-Object Fu
     config_contains_credentials = $false
     agent_control_protocol = '2.1'
     gateway_contract_sha256 = $gatewayContractSha
+    build_identity = [ordered]@{
+        generated_at_utc = [DateTimeOffset]::UtcNow.ToString('o')
+        channel_agent_source = $engineSourceIdentity
+        assistant_ui_source = $assistantUiSourceIdentity
+        production_composition_sha256 = (Get-FileHash -LiteralPath $compositionPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        assistant_ui_assets_sha256 = $assistantUiAssetsSha256
+    }
     capabilities = @('first-launch-wizard','human-confirmed-lan-pairing','device-hmac-auth-v2.1','credential-manager-reference','tray-resident','versioned-brand-assets','desktop-assistant-ui','configuration-center','runtime-doctor','bounded-one-click-repair','atomic-config-rollback','browser-preserving-reload','start','stop','status','heartbeat','autostart','version','upgrade-check','enroll','binding-status','authorized-stores','single-active-store','engine-restart-recovery','encrypted-edge-spool','persist-before-ack','offline-replay-hard-lock','conversation-list-stage','message-capture-stage','host-ingest-stage','assistant-feed-stage','ai-suggestion-stage','signed-assistant-snapshot','offline-status','browser-open','browser-close','browser-status','isolated-browser-profile','pdd-login-open','pdd-login-status','pdd-login-observe-only')
     excluded = $composition.excluded
     files = $files
