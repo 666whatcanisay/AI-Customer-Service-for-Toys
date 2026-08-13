@@ -419,12 +419,47 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void OpenPdd()
     {
-        var code = ChannelAgentLauncher.RunPython(
-            new[] { "pdd-login-open", "--data-root", ChannelAgentLauncher.DataRoot }, true);
-        if (code != 0)
+        var runtime = ReadText(Path.Combine(
+            ChannelAgentLauncher.DataRoot, "runtime", "desktop-assistant.json"));
+        if (!RequestPddWorkspaceOpen(runtime))
         {
             tray.BalloonTipText = "PDD 客服工作台暂时无法打开，请检查 Agent 配置。";
             tray.ShowBalloonTip(3000);
+        }
+    }
+
+    private static bool RequestPddWorkspaceOpen(string runtime)
+    {
+        var launcherUrl = JsonValue(runtime, "launcher_url");
+        var capability = JsonValue(runtime, "launcher_capability");
+        Uri launcherEndpoint;
+        if (String.IsNullOrWhiteSpace(capability)
+            || !Uri.TryCreate(launcherUrl, UriKind.Absolute, out launcherEndpoint)
+            || launcherEndpoint.Scheme != Uri.UriSchemeHttp
+            || (launcherEndpoint.Host != "127.0.0.1" && launcherEndpoint.Host != "localhost")
+            || launcherEndpoint.AbsolutePath != "/launcher-api/v1/open")
+        {
+            return false;
+        }
+        var endpoint = new Uri(launcherEndpoint, "/launcher-api/v1/pdd/open");
+        try
+        {
+            var request = (HttpWebRequest)WebRequest.Create(endpoint);
+            request.Method = "POST";
+            request.Proxy = null;
+            request.Timeout = 2000;
+            request.ReadWriteTimeout = 2000;
+            request.ContentLength = 0;
+            request.Headers["X-Channel-Agent-Launcher"] = capability;
+            request.Headers["X-Channel-Agent-Intent"] = "HUMAN_REQUESTED_PDD_WINDOW";
+            using (var response = (HttpWebResponse)request.GetResponse())
+            {
+                return response.StatusCode == HttpStatusCode.Accepted;
+            }
+        }
+        catch
+        {
+            return false;
         }
     }
 

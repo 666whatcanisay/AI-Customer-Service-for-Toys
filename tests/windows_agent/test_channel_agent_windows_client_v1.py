@@ -492,6 +492,9 @@ def test_windows_launcher_opens_local_assistant_even_when_agent_is_degraded() ->
     assert 'JsonValue(runtime, "launcher_url")' in launcher
     assert 'request.Headers["X-Channel-Agent-Launcher"]' in launcher
     assert 'endpoint.AbsolutePath != "/launcher-api/v1/open"' in launcher
+    assert 'new Uri(launcherEndpoint, "/launcher-api/v1/pdd/open")' in launcher
+    assert 'request.Headers["X-Channel-Agent-Intent"] = "HUMAN_REQUESTED_PDD_WINDOW"' in launcher
+    assert 'new[] { "pdd-login-open"' not in launcher
     assert '"preserve-assistant"' in launcher
     assert '"desktop-bootstrap-handoff-consumed.json"' in launcher
     assert '"preserve-assistant-on-launch.request"' in launcher

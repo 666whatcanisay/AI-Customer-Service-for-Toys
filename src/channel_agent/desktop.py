@@ -174,6 +174,18 @@ class DesktopAssistantServer:
             self._write_runtime_state()
             return workspace_url
 
+    def valid_launcher_capability(self, launcher_capability: str | None) -> bool:
+        """Validate the process-lifetime capability used by the native tray.
+
+        This is intentionally the same capability already used to reopen the
+        assistant.  It does not enable observation or change any read/send
+        switch; it only proves that the caller is the installed local launcher.
+        """
+
+        return launcher_capability is not None and hmac.compare_digest(
+            launcher_capability, self._launcher_capability
+        )
+
     def consume_bootstrap(self, value: str | None) -> bool:
         if value is None:
             return False
@@ -1417,6 +1429,31 @@ class _DesktopHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
+        if path == "/launcher-api/v1/pdd/open":
+            self._discard_request_body()
+            if not self._valid_host():
+                self._json(HTTPStatus.FORBIDDEN, {"error": {"code": "INVALID_HOST"}})
+                return
+            if not self.server.runtime.valid_launcher_capability(
+                self.headers.get("X-Channel-Agent-Launcher")
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "LAUNCHER_CAPABILITY_INVALID"}},
+                )
+                return
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_REQUESTED_PDD_WINDOW"
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            status, response = self.server.runtime.launch_pdd_workspace()
+            self._json(status, response)
+            return
         if path == "/launcher-api/v1/open":
             self._discard_request_body()
             if not self._valid_host():

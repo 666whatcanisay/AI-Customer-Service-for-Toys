@@ -161,6 +161,63 @@ def test_launcher_gets_a_fresh_one_time_session_each_time_the_window_reopens(
         server.stop()
 
 
+def test_native_launcher_opens_pdd_through_existing_manual_handler_only(
+    tmp_path: Path,
+) -> None:
+    launches: list[str] = []
+
+    def launch() -> dict[str, object]:
+        launches.append("PDD")
+        return {
+            "status": "WAITING_LOGIN",
+            "browser_status": "RUNNING",
+            "pdd_login_state": "WAITING_QR_SCAN",
+        }
+
+    server = DesktopAssistantServer(
+        data_root=tmp_path,
+        pdd_workspace_launch_handler=launch,
+    )
+    try:
+        server.start()
+        runtime = json.loads(
+            (tmp_path / "runtime" / "desktop-assistant.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        endpoint = runtime["origin"] + "/launcher-api/v1/pdd/open"
+        request = Request(
+            endpoint,
+            data=b"",
+            method="POST",
+            headers={
+                "X-Channel-Agent-Launcher": runtime["launcher_capability"],
+                "X-Channel-Agent-Intent": "HUMAN_REQUESTED_PDD_WINDOW",
+            },
+        )
+        with urlopen(request, timeout=2) as response:  # noqa: S310
+            result = json.loads(response.read().decode("utf-8"))
+        assert response.status == 202
+        assert launches == ["PDD"]
+        assert result["observer_started"] is False
+        assert result["real_send_enabled"] is False
+
+        for headers in (
+            {
+                "X-Channel-Agent-Launcher": "wrong-capability",
+                "X-Channel-Agent-Intent": "HUMAN_REQUESTED_PDD_WINDOW",
+            },
+            {"X-Channel-Agent-Launcher": runtime["launcher_capability"]},
+        ):
+            rejected = Request(endpoint, data=b"", method="POST", headers=headers)
+            with pytest.raises(HTTPError) as invalid:
+                urlopen(rejected, timeout=2)  # noqa: S310
+            assert invalid.value.code == 403
+        assert launches == ["PDD"]
+    finally:
+        server.stop()
+
+
 def test_exe_restart_reestablishes_cookie_and_csrf_without_reusing_old_runtime(
     tmp_path: Path,
 ) -> None:
