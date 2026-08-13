@@ -103,6 +103,34 @@ describe('HttpChannelAgentMessageAdapter', () => {
     })
   })
 
+  it('keeps an identified product when applicable age is absent', async () => {
+    const reply = {
+      conversationId: 'conversation-b', customerReference: `sha256:${'b'.repeat(64)}`,
+      messageId: 'message-b', decisionId: 'decision-b', answer: 'reply-b', requestId: 'request-b',
+      action: 'CONTROLLED_ANSWER', riskLevel: 'LOW', citations: [], warnings: [], requiredFields: []
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...safeChannelAgentFeed(),
+        schemaVersion: 'channel-agent-workspace-feed.v2',
+        conversations: [{
+          conversationId: 'conversation-b', customerLabel: '客户 B', unreadCount: 1,
+          source: 'CHANNEL_AGENT', messages: [], reply,
+          productContext: {
+            productReference: 'product-b', productName: '商品 B', applicableAge: null
+          }
+        }],
+        replies: { 'conversation-b': reply }
+      })
+    }))
+    const adapter = new HttpChannelAgentMessageAdapter()
+    await adapter.listConversations()
+    await expect(adapter.latestReply('conversation-b')).resolves.toMatchObject({
+      product: { productReference: 'product-b', productName: '商品 B', applicableAge: null }
+    })
+  })
+
   it('persists a read cursor through the local desktop endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
     vi.stubGlobal('fetch', fetchMock)

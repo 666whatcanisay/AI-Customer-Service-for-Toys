@@ -749,9 +749,12 @@ const syncChannelAgentFeed = async (): Promise<void> => {
       && activeDraft.value.state === 'MESSAGE_RECEIVED'
     ) {
       if (liveReply.product) {
+        const applicableAgeLabel = liveReply.product.applicableAge
+          ? `（适用年龄：${liveReply.product.applicableAge}）`
+          : ''
         products.value = [{
           productId: liveReply.product.productReference,
-          displayName: `${liveReply.product.productName}（适用年龄：${liveReply.product.applicableAge}）`
+          displayName: `${liveReply.product.productName}${applicableAgeLabel}`
         }]
         selectedProductId.value = liveReply.product.productReference
         contextWarning.value = '商品事实来自当前真实 PDD 会话与人工确认；店铺映射本轮不作为阻塞条件。'

@@ -71,7 +71,7 @@ export interface ChannelAgentReplySeed {
   product: {
     productReference: string
     productName: string
-    applicableAge: string
+    applicableAge: string | null
   } | null
 }
 
@@ -151,11 +151,11 @@ export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
     const product = reply.productContext ?? conversationProduct ?? this.feed?.productContext
     return structuredClone({
       ...reply,
-      product: product?.productReference && product.productName && product.applicableAge
+      product: product?.productReference && product.productName
         ? {
             productReference: product.productReference,
             productName: product.productName,
-            applicableAge: product.applicableAge
+            applicableAge: product.applicableAge ?? null
           }
         : null
     })
