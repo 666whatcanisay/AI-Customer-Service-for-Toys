@@ -757,7 +757,7 @@ const syncChannelAgentFeed = async (): Promise<void> => {
           displayName: `${liveReply.product.productName}${applicableAgeLabel}`
         }]
         selectedProductId.value = liveReply.product.productReference
-        contextWarning.value = '商品事实来自当前真实 PDD 会话与人工确认；店铺映射本轮不作为阻塞条件。'
+        contextWarning.value = '商品事实来自当前会话上下文；请核对商品与 SKU，缺失时转人工确认。'
       }
       workspace.beginUnderstanding()
       await nextTick()
