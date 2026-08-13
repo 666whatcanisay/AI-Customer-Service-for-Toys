@@ -25,7 +25,20 @@ export interface ChannelConversationSeed {
   policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
   preparationId?: string | null
   traceId?: string | null
+  productContext?: ChannelAgentProductContext | null
   messages: ChannelMessageEnvelope[]
+}
+
+type ChannelAgentProductContext = {
+  productReference?: string | null
+  productName?: string | null
+  skuReference?: string | null
+  skuName?: string | null
+  applicableAge?: string | null
+}
+
+type RawChannelAgentReply = Omit<ChannelAgentReplySeed, 'product'> & {
+  productContext?: ChannelAgentProductContext | null
 }
 
 export interface ChannelAgentReplySeed {
@@ -72,14 +85,10 @@ export interface ChannelMessageAdapter {
 
 type ChannelAgentFeed = {
   schemaVersion: 'channel-agent-workspace-feed.v1' | 'channel-agent-workspace-feed.v2'
-  conversations: Array<ChannelConversationSeed & { reply?: Omit<ChannelAgentReplySeed, 'product'> | null }>
-  reply: Omit<ChannelAgentReplySeed, 'product'> | null
-  replies?: Record<string, Omit<ChannelAgentReplySeed, 'product'>>
-  productContext?: {
-    productReference?: string
-    productName?: string
-    applicableAge?: string
-  }
+  conversations: Array<ChannelConversationSeed & { reply?: RawChannelAgentReply | null }>
+  reply: RawChannelAgentReply | null
+  replies?: Record<string, RawChannelAgentReply>
+  productContext?: ChannelAgentProductContext
   safety: {
     readOnly: true
     autoReply: boolean
@@ -136,7 +145,10 @@ export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
         ?? null
       : this.feed?.reply ?? null
     if (!reply?.answer) return null
-    const product = this.feed?.productContext
+    const conversationProduct = conversationId
+      ? this.feed?.conversations.find((item) => item.conversationId === conversationId)?.productContext
+      : null
+    const product = reply.productContext ?? conversationProduct ?? this.feed?.productContext
     return structuredClone({
       ...reply,
       product: product?.productReference && product.productName && product.applicableAge

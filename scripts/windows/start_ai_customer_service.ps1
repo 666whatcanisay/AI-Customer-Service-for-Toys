@@ -43,6 +43,7 @@ try {
     Start-ManagedServiceWithEnvironment $config 'platform' $config.PlatformPythonPath @('-m','uvicorn','app.main:app','--host',$config.BindAddress,'--port',$config.PlatformPort,'--no-access-log') (Join-Path $config.RepositoryRoot 'platform_backend') 'app.main:app' $config.PlatformPort $platformEnvironment | Out-Null
     Wait-HttpOk (Get-ServiceUrl $config $config.PlatformPort $config.PlatformHealthPath) 60 '平台服务'
     Update-ManagedServiceListenerRecord $config 'platform' | Out-Null
+    Write-Rc5RuntimeActivationManifest $config 'platform' $resolvedConfigPath | Out-Null
 
     $ragEnvironment = Get-LocalRagEnvironment $config
     $startedServices += 'rag'
@@ -52,6 +53,7 @@ try {
     Wait-RagRuntimeReady $config 120 | Out-Null
     $activeCollectionState = Get-RagActiveCollectionStartupState $config
     if (-not $activeCollectionState.Ready) { Write-Warning 'A active collection 未就绪；普通启动不会导入或同步测试知识。' }
+    Write-Rc5RuntimeActivationManifest $config 'rag' $resolvedConfigPath | Out-Null
 
     $startedServices += 'customer-web'
     Start-CustomerWebService $config | Out-Null

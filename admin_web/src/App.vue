@@ -3,11 +3,16 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   getAdminOverview,
-  getAiControlCenterOverview,
   getHealth,
   type HealthResponse
 } from './api/client'
 import { useAdminSession } from './auth/session'
+import {
+  aiControlCenterError,
+  aiControlCenterLoading,
+  aiControlCenterOverview,
+  loadAiControlCenterOverview,
+} from './stores/aiControlCenter'
 
 type ServiceState = 'loading' | 'available' | 'unavailable' | 'not-probed'
 type EnvironmentState = 'loading' | 'internal-production' | 'unknown'
@@ -68,7 +73,16 @@ function initialNavigationMode(): NavigationMode {
 }
 
 const platformState = ref<ServiceState>('loading')
-const aiState = ref<ServiceState>('loading')
+const aiState = computed<ServiceState>(() => {
+  if (aiControlCenterLoading.value && !aiControlCenterOverview.value) return 'loading'
+  const value = aiControlCenterOverview.value
+  if (aiControlCenterError.value || !value) return 'unavailable'
+  return value.service.status === 'RUNNING'
+    && value.service.ready === true
+    && value.service.modelConfigured === true
+    ? 'available'
+    : 'unavailable'
+})
 const customerState = ref<ServiceState>('not-probed')
 const environmentState = ref<EnvironmentState>('loading')
 const health = ref<HealthResponse | null>(null)
@@ -109,7 +123,7 @@ async function refreshStatus(): Promise<void> {
   const [overviewResult, platformResult, aiResult] = await Promise.allSettled([
     getAdminOverview(),
     getHealth(),
-    getAiControlCenterOverview(),
+    loadAiControlCenterOverview(true),
   ])
 
   if (overviewResult.status === 'fulfilled') {
@@ -126,12 +140,8 @@ async function refreshStatus(): Promise<void> {
     platformState.value = 'unavailable'
   }
 
-  aiState.value = aiResult.status === 'fulfilled'
-    && aiResult.value.service.status === 'RUNNING'
-    && aiResult.value.service.ready === true
-    && aiResult.value.service.modelConfigured === true
-    ? 'available'
-    : 'unavailable'
+  // The header and AI status page consume the same shared runtime fact.
+  void aiResult
   checkedAt.value = new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
   }).format(new Date())

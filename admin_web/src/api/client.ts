@@ -26,6 +26,7 @@ export interface UserCreateInput {
 export interface UserUpdateInput {
   display_name?: string
   password?: string
+  status?: 'ACTIVE' | 'DISABLED'
 }
 
 export type StoreContextResolutionStatus =

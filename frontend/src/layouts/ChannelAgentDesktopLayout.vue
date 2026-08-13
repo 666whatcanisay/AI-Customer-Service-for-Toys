@@ -17,6 +17,22 @@
           data-testid="open-pdd-window"
           @click="openPddWindow"
         >{{ openingPdd ? '正在启动…' : '启动 PDD 专属窗口' }}</button>
+        <button
+          v-if="canRefreshPddWorkspace"
+          type="button"
+          class="pdd-launch"
+          :disabled="refreshingPdd"
+          data-testid="refresh-pdd-workspace"
+          @click="refreshPddWorkspace"
+        >{{ refreshingPdd ? '正在识别…' : '我已进入客服工作台，重新识别' }}</button>
+        <button
+          v-if="canRestartPddObserver"
+          type="button"
+          class="pdd-launch"
+          :disabled="restartingObserver"
+          data-testid="restart-pdd-observer"
+          @click="restartPddObserver"
+        >{{ restartingObserver ? '正在恢复…' : '重新开始30分钟观察' }}</button>
         <span :class="activeStore ? 'healthy' : 'attention'" data-testid="active-store-status"><i />{{ storeLabel }}</span>
         <select
           v-if="storeOptions.length > 1"
@@ -63,6 +79,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthSession } from '@/auth/authSession'
 import {
   fetchChannelAgentBootstrap,
+  requestChannelAgentPddObserverRestart,
+  requestChannelAgentPddWorkspaceRefresh,
   requestChannelAgentPddWindowOpen,
   requestChannelAgentSafeStop,
   selectChannelAgentActiveStore,
@@ -75,6 +93,8 @@ const loading = ref(false)
 const error = ref(false)
 const switchingStore = ref(false)
 const openingPdd = ref(false)
+const refreshingPdd = ref(false)
+const restartingObserver = ref(false)
 const selectedStore = ref('')
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -90,6 +110,15 @@ const pddLabel = computed(() => {
 const canOpenPddWindow = computed(() => Boolean(
   bootstrap.value?.browser.pdd_workspace_launch_available
   && ['STOPPED', 'FAILED', 'DEGRADED'].includes(browserStatus.value)
+))
+const canRefreshPddWorkspace = computed(() => Boolean(
+  bootstrap.value?.browser.pdd_workspace_refresh_available
+  && !['STOPPED', 'FAILED'].includes(browserStatus.value)
+))
+const canRestartPddObserver = computed(() => Boolean(
+  bootstrap.value?.browser.observer_restart_available
+  && bootstrap.value?.browser.observer_status === 'SESSION_LIMIT_REACHED'
+  && bootstrap.value?.browser.pdd_login_state === 'CUSTOMER_SERVICE_READY'
 ))
 const authorizedStores = computed(() => bootstrap.value?.binding.authorized_store_ids ?? [])
 const storeOptions = computed(() => authorizedStores.value.map((storeCode) => {
@@ -152,6 +181,41 @@ async function openPddWindow() {
     ElMessage.error('PDD 专属窗口启动失败，请确认 Microsoft Edge 可用后重试。')
   } finally {
     openingPdd.value = false
+  }
+}
+
+async function refreshPddWorkspace() {
+  if (refreshingPdd.value) return
+  refreshingPdd.value = true
+  try {
+    const result = await requestChannelAgentPddWorkspaceRefresh()
+    if (bootstrap.value) {
+      bootstrap.value.browser.status = result.browser_status
+      bootstrap.value.browser.pdd_login_state = result.pdd_login_state
+    }
+    if (result.pdd_login_state === 'CUSTOMER_SERVICE_READY') {
+      ElMessage.success('已识别到拼多多客服工作台。')
+    } else {
+      ElMessage.warning('尚未识别到客服工作台，请确认当前标签页地址后重试。')
+    }
+  } catch {
+    ElMessage.error('客服工作台识别失败；未启动读取或发送。')
+  } finally {
+    refreshingPdd.value = false
+  }
+}
+
+async function restartPddObserver() {
+  if (restartingObserver.value) return
+  restartingObserver.value = true
+  try {
+    await requestChannelAgentPddObserverRestart()
+    ElMessage.success('已申请重新开始一个30分钟只读观察会话。')
+    await refresh()
+  } catch {
+    ElMessage.error('观察会话未恢复，请确认客服工作台与Agent身份状态。')
+  } finally {
+    restartingObserver.value = false
   }
 }
 

@@ -1,8 +1,10 @@
 # AI-CS V1.0.0
 
-AI-CS 是面向玩具业务的内部 AI 客服系统。R020–R022已完成店铺上下文、生产客服Workspace和客服电脑工作流；R024已关闭R023登记的P0/P1生产阻断；R025将协调源码冻结为`ai-cs-production-rc-v1`。当前Gate为`AI_CS_PRODUCTION_RC_READY`：表示clean、可复核、可部署候选已经形成，不表示正式数据库已迁移、LAN TLS已配置或真实PDD/生产Channel Engine已经联通。
+AI-CS 是面向玩具业务的内部 AI 客服系统。当前权威状态为 `RC5_OFFLINE_STABILITY_READY = PASS`；真实 PDD 的 Adapter、读取、AI、人工确认和发送 Gate 均为 `NOT_VERIFIED`，派生字段 `AI_CS_PRODUCTION_READY=false`。
 
-## Production RC V1
+当前数据库源码 Head 与受控 R027 Runtime 均为 `0019_runtime_database_identity_v1`。Active DB 是 `.runtime/r027-ux-acceptance-data-v1/runtime/platform.sqlite3`；实际绝对路径、DB Identity 和 Migration 必须以 Runtime Activation/状态命令的只读结果为准。普通启动策略为 `VALIDATE_ONLY`，不会执行迁移，也不会自动初始化测试知识；迁移和验收知识初始化必须分别使用受控命令。当前 Gate、版本和启动策略的唯一机器事实源位于同级 Channel Engine 仓库的 `docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json`。
+
+## Production RC V1（历史基线，不作为当前事实源）
 
 - Release branch：`release/ai-cs-production-rc-v1`
 - RC reference：`ai-cs-production-rc-v1`（精确SHA从Git tag解析）
@@ -14,7 +16,7 @@ AI-CS 是面向玩具业务的内部 AI 客服系统。R020–R022已完成店�
 - 部署入口：[Production RC V1 Deployment Checklist](docs/control/AI-CS-Production-RC-V1-Deployment-Checklist.md)
 - 冻结证据：[Production Release Candidate Freeze V1](docs/control/AI-CS-Production-Release-Candidate-Freeze-V1.md)
 
-## 正式运行基线
+## 正式运行基线（历史 V1.0.0 记录）
 
 - 唯一项目目录：`C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS`
 - 发布分支：`release/ai-cs-v1.0.0`

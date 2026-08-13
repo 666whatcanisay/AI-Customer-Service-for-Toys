@@ -33,6 +33,7 @@
               <button type="button" class="small secondary" :data-testid="`edit-user-${item.id}`" @click="startProfileEdit(item)">编辑资料</button>
               <button type="button" class="small" :data-testid="`assign-user-${item.id}`" @click="startEdit(item)">修改分配</button>
               <button v-if="item.status === 'ACTIVE'" type="button" class="small danger" @click="disable(item)">停用</button>
+              <button v-else type="button" class="small" :data-testid="`enable-user-${item.id}`" @click="enable(item)">启用</button>
             </td>
           </tr></tbody>
         </table>
@@ -255,6 +256,11 @@ const saveAssignment = async () => {
   finally { saving.value = false }
 }
 const disable = async (item: AuthUser) => { if (!confirm(`确认停用 ${item.display_name}？其会话将立即失效。`)) return; await deactivateUser(item.id); await load() }
+const enable = async (item: AuthUser) => {
+  if (!confirm(`确认重新启用 ${item.display_name}？`)) return
+  await updateUser(item.id, { status: 'ACTIVE' })
+  await load()
+}
 onMounted(load)
 </script>
 

@@ -215,14 +215,14 @@
               </div>
               <button type="button" aria-label="关闭商品与知识依据" data-testid="close-knowledge-evidence" @click="evidenceOpen = false">×</button>
             </header>
-            <div v-if="draft?.citations.length" class="evidence-grid">
-              <article v-for="(citation, index) in draft.citations" :key="citation.chunkId ?? `${citation.file}-${index}`">
+            <div v-if="displayCitations.length" class="evidence-grid">
+              <article v-for="(citation, index) in displayCitations" :key="citation.chunkId ?? `${citation.file}-${index}`">
                 <div><span :class="`source-${sourceKind(citation).code}`">{{ sourceKind(citation).label }}</span><small>#{{ index + 1 }}</small></div>
                 <strong>{{ citation.file }}</strong>
                 <p>{{ citation.summary }}</p>
-                <footer><span>{{ citation.productId ? '已匹配当前商品' : '通用知识' }}</span><span>{{ citation.skuId ? '已匹配当前规格' : '适用全部规格' }}</span></footer>
               </article>
             </div>
+            <p v-if="displayCitations.length" class="evidence-scope">{{ evidenceScopeLabel }}</p>
             <div v-else class="evidence-empty">
               {{ draft?.replySource === 'MANUAL' ? '本次为人工直接回复，未调用 AI，也没有 AI 知识依据。' : '当前还没有知识依据；生成建议后可在这里查看。' }}
             </div>
@@ -286,6 +286,23 @@ const feedbackMode = ref<'REJECT' | 'ISSUE' | null>(null)
 const feedbackType = ref<AiResponseFeedbackType>('FACT_ERROR')
 const feedbackNote = ref('')
 const evidenceOpen = ref(false)
+const displayCitations = computed(() => {
+  const seen = new Set<string>()
+  return (props.draft?.citations ?? []).filter((citation) => {
+    const key = `${citation.file}\u0000${citation.summary}\u0000${citation.productId ?? ''}\u0000${citation.skuId ?? ''}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})
+const evidenceScopeLabel = computed(() => {
+  const citations = displayCitations.value
+  const productScoped = citations.some((citation) => Boolean(citation.productId))
+  const skuScoped = citations.some((citation) => Boolean(citation.skuId))
+  const productLabel = productScoped ? '已匹配当前商品' : '通用知识'
+  const skuLabel = skuScoped ? '已匹配当前规格' : '适用全部规格'
+  return `${productLabel} · ${skuLabel}`
+})
 
 const draftStateLabels: Record<string, string> = {
   MESSAGE_RECEIVED: '已收到客户消息',

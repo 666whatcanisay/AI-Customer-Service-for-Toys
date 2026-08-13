@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 
 import OperationalStatePanel from '../components/OperationalStatePanel.vue'
-import {
-  apiErrorMessage,
-  getAiControlCenterOverview,
-  type AiControlCenterOverview,
-} from '../api/client'
 import { displayPassRate } from '../presentation'
-
-const overview = ref<AiControlCenterOverview | null>(null)
-const loading = ref(true)
-const error = ref('')
+import {
+  aiControlCenterError as error,
+  aiControlCenterLoading as loading,
+  aiControlCenterOverview as overview,
+  loadAiControlCenterOverview,
+} from '../stores/aiControlCenter'
 
 const serviceSummary = computed(() => {
   const value = overview.value
@@ -74,19 +71,10 @@ function formatDate(value: string | null): string {
 }
 
 async function load(): Promise<void> {
-  loading.value = true
-  error.value = ''
-  overview.value = null
-  try {
-    overview.value = await getAiControlCenterOverview()
-  } catch (reason: unknown) {
-    error.value = apiErrorMessage(reason)
-  } finally {
-    loading.value = false
-  }
+  await loadAiControlCenterOverview(true).catch(() => undefined)
 }
 
-onMounted(() => { void load() })
+onMounted(() => { void loadAiControlCenterOverview().catch(() => undefined) })
 </script>
 
 <template>

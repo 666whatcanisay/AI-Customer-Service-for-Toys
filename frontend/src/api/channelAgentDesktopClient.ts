@@ -11,6 +11,9 @@ export type ChannelAgentBootstrap = {
     status: string
     pdd_login_state: string | null
     pdd_workspace_launch_available?: boolean
+    pdd_workspace_refresh_available?: boolean
+    observer_status?: string
+    observer_restart_available?: boolean
   }
   binding: {
     agent_id: string | null
@@ -95,6 +98,34 @@ export function requestChannelAgentPddWindowOpen(): Promise<ChannelAgentPddWindo
   return localJson('/local-api/v1/browser/pdd/open', {
     method: 'POST',
     headers: { 'X-Channel-Agent-Intent': 'HUMAN_REQUESTED_PDD_WINDOW' },
+    body: '{}'
+  })
+}
+
+export type ChannelAgentPddWorkspaceRefresh = {
+  schema_version: 'channel-agent-pdd-workspace-refresh.v1'
+  status: 'OPENING' | 'READY' | 'REFRESHING'
+  browser_status: string
+  pdd_login_state: string | null
+  observer_started: false
+  real_send_enabled: false
+}
+
+export function requestChannelAgentPddWorkspaceRefresh(): Promise<ChannelAgentPddWorkspaceRefresh> {
+  return localJson('/local-api/v1/browser/pdd/refresh', {
+    method: 'POST',
+    headers: { 'X-Channel-Agent-Intent': 'HUMAN_CONFIRMED_PDD_WORKSPACE_READY' },
+    body: '{}'
+  })
+}
+
+export function requestChannelAgentPddObserverRestart(): Promise<{
+  status: 'RESTART_REQUESTED' | 'ALREADY_REQUESTED'
+  real_send_enabled: false
+}> {
+  return localJson('/local-api/v1/observer/pdd/restart', {
+    method: 'POST',
+    headers: { 'X-Channel-Agent-Intent': 'HUMAN_CONFIRMED_PDD_OBSERVER_RESTART' },
     body: '{}'
   })
 }

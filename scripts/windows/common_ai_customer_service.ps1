@@ -1649,6 +1649,122 @@ function Update-ManagedServiceListenerRecord($Config, [string]$Name) {
     return $record
 }
 
+function Write-Rc5RuntimeActivationManifest($Config, [string]$Name, [string]$ConfigSourcePath) {
+    if ($Name -notin @('platform','rag')) { throw "RC5 Runtime Activation 不支持：$Name" }
+    $recordPath = Get-ServiceRecordPath $Config $Name
+    $requiredPaths = @($recordPath, $ConfigSourcePath)
+    if ($Name -eq 'platform') { $requiredPaths += @($Config.PlatformDatabasePath, $Config.PlatformDatabaseBindingPath) }
+    foreach ($required in $requiredPaths) {
+        if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "RC5 Runtime Activation 依赖不存在：$required" }
+    }
+    if ($Name -eq 'rag' -and -not (Test-Path -LiteralPath $Config.RagVectorDbPath -PathType Container)) {
+        throw "RC5 Runtime Activation 的 Vector DB 路径不存在：$($Config.RagVectorDbPath)"
+    }
+    $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($field in @('listener_pid','listener_executable_path','listener_started_at','startedUtc','repository_root','repository_git_sha','repository_source_fingerprint')) {
+        if (-not ($record.PSObject.Properties.Name -contains $field) -or [string]::IsNullOrWhiteSpace([string]$record.$field)) {
+            throw "RC5 Runtime Activation 的 $Name 运行记录缺少 $field。"
+        }
+    }
+    $activationDirectory = Join-Path ([string]$Config.RuntimeDirectory) 'rc5-pilot-governance\activations'
+    New-Item -ItemType Directory -Path $activationDirectory -Force | Out-Null
+    $configSource = [IO.Path]::GetFullPath($ConfigSourcePath)
+    $configSha = (Get-FileHash -LiteralPath $configSource -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($Name -eq 'rag') {
+        $runtimeIdentity = Get-RepositoryRuntimeIdentity ([string]$Config.RepositoryRoot)
+        if (-not $runtimeIdentity.Available) { throw "RC5 RAG Activation 无法解析源码身份：$($runtimeIdentity.Reason)" }
+        $ragStatus = Assert-RagRuntimeReady $Config
+        $knowledge = Get-RagKnowledgeRuntimeStatistics $Config
+        if ($knowledge.State -ne 'AVAILABLE') { throw "RC5 RAG Activation 无法读取 Collection 身份：$($knowledge.Error)" }
+        if ([string]$knowledge.ActiveCollectionName -ne [string]$Config.RagActiveCollectionName) { throw 'RC5 RAG Activation 的 Collection 与配置不一致。' }
+        $vectorPath = [IO.Path]::GetFullPath([string]$Config.RagVectorDbPath)
+        $activationMaterial = "ai-cs-rag|$($record.listener_pid)|$($record.listener_started_at)|$configSha|$($runtimeIdentity.GitSha)|$($runtimeIdentity.SourceFingerprint)|$vectorPath|$($Config.RagActiveCollectionName)"
+        $activationPath = Join-Path $activationDirectory 'ai-cs-rag.json'
+        $manifest = [ordered]@{
+            schema = 'rc5-runtime-activation.v1'
+            activation_id = 'activation:' + (Get-CommandFeatureSha256 $activationMaterial)
+            component = 'AI_CS_RAG'
+            activation_kind = 'RAG'
+            pid = [int]$record.listener_pid
+            executable_path = [IO.Path]::GetFullPath([string]$record.listener_executable_path)
+            manifest_created_at = [DateTime]::UtcNow.ToString('o')
+            service_started_at = [string]$record.startedUtc
+            process_started_at = [string]$record.listener_started_at
+            config_source_path = $configSource
+            config_sha256 = $configSha
+            source_repository_path = [IO.Path]::GetFullPath([string]$runtimeIdentity.RepositoryRoot)
+            source_revision = [string]$runtimeIdentity.GitSha
+            source_fingerprint = [string]$runtimeIdentity.SourceFingerprint
+            rag_identity = [ordered]@{
+                model = [string]$Config.OllamaModel
+                vector_database_path = $vectorPath
+                active_collection_name = [string]$Config.RagActiveCollectionName
+                ready = [bool]$ragStatus.ready
+                model_configured = [bool]$ragStatus.model_configured
+            }
+            ports = @([int]$record.port)
+            runtime_data_paths = [ordered]@{ VECTOR_DATABASE = $vectorPath }
+            safety_flags = [ordered]@{ real_send_enabled = $false }
+            diagnostics = [ordered]@{
+                active_collection_chunk_count = [int]$knowledge.ActiveCollectionChunkCount
+                chunk_count_is_identity = $false
+                model_residency_is_identity = $false
+            }
+        }
+    } else {
+        $binding = Get-Content -LiteralPath $Config.PlatformDatabaseBindingPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($field in @('database_instance_id','environment_id','database_role','canonical_path','expected_revision')) {
+            if (-not ($binding.PSObject.Properties.Name -contains $field) -or [string]::IsNullOrWhiteSpace([string]$binding.$field)) {
+                throw "RC5 Runtime Activation 的数据库绑定缺少 $field。"
+            }
+        }
+        $databasePath = [IO.Path]::GetFullPath([string]$Config.PlatformDatabasePath)
+        $bindingDatabasePath = [IO.Path]::GetFullPath([string]$binding.canonical_path)
+        if (-not [string]::Equals($databasePath, $bindingDatabasePath, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "RC5 Runtime Activation 的数据库路径与绑定不一致。"
+        }
+        $activationPath = Join-Path $activationDirectory 'ai-cs-platform.json'
+        $bindingPath = [IO.Path]::GetFullPath([string]$Config.PlatformDatabaseBindingPath)
+        $bindingSha = (Get-FileHash -LiteralPath $bindingPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $activationMaterial = "ai-cs-platform|$($record.listener_pid)|$($record.listener_started_at)|$configSha|$($binding.database_instance_id)"
+        $activationId = 'activation:' + (Get-CommandFeatureSha256 $activationMaterial)
+        $manifest = [ordered]@{
+            schema = 'rc5-runtime-activation.v1'
+            activation_id = $activationId
+            component = 'AI_CS_PLATFORM'
+            activation_kind = 'DATABASE'
+            pid = [int]$record.listener_pid
+            executable_path = [IO.Path]::GetFullPath([string]$record.listener_executable_path)
+            manifest_created_at = [DateTime]::UtcNow.ToString('o')
+            service_started_at = [string]$record.startedUtc
+            process_started_at = [string]$record.listener_started_at
+            config_source_path = $configSource
+            config_sha256 = $configSha
+            source_repository_path = [IO.Path]::GetFullPath([string]$record.repository_root)
+            source_revision = [string]$record.repository_git_sha
+            source_fingerprint = [string]$record.repository_source_fingerprint
+            canonical_database_path = $databasePath
+            binding_sidecar_path = $bindingPath
+            database_instance_id = [string]$binding.database_instance_id
+            environment_id = [string]$binding.environment_id
+            database_role = [string]$binding.database_role
+            revision = [string]$binding.expected_revision
+            binding_sidecar_sha256 = $bindingSha
+            ports = @([int]$record.port)
+            runtime_data_paths = [ordered]@{ PLATFORM = $databasePath }
+            safety_flags = [ordered]@{ real_send_enabled = $false }
+        }
+    }
+    $temporary = "$activationPath.$([Guid]::NewGuid().ToString('N')).tmp"
+    try {
+        $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $temporary -Encoding UTF8
+        Move-Item -LiteralPath $temporary -Destination $activationPath -Force
+    } finally {
+        Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+    }
+    return $activationPath
+}
+
 function Update-AdminWebServiceRecord($Config, $Process) {
     $recordPath = Get-ServiceRecordPath $Config 'admin-web'
     $record = Update-ManagedServiceListenerRecord $Config 'admin-web'

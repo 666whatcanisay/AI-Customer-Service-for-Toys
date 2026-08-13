@@ -375,8 +375,10 @@ class GatewayServer:
                 if isinstance(source_name, str) and source_name.strip()
                 else "AI-CS knowledge"
             )
-            citations.append(
-                {
+            if title.casefold().startswith("product-knowledge:"):
+                title = "商品知识"
+            excerpt = item.get("excerpt")
+            descriptor = {
                     "reference": chunk_id.strip()[:512],
                     "title": title[:256],
                     "product_id": (
@@ -391,7 +393,9 @@ class GatewayServer:
                     ),
                     "source_kind": "RAG_KNOWLEDGE",
                 }
-            )
+            if isinstance(excerpt, str) and excerpt.strip():
+                descriptor["excerpt"] = excerpt.strip()[:1000]
+            citations.append(descriptor)
         return citations
 
     def close(self) -> None:

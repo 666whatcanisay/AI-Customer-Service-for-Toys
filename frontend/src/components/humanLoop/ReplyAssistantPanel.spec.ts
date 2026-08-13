@@ -39,4 +39,26 @@ describe('ReplyAssistantPanel prepared-state recovery', () => {
     expect(wrapper.find('[data-testid="regenerate-draft"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="edit-draft"]').exists()).toBe(false)
   })
+
+  it('deduplicates readable knowledge evidence and renders scope once', async () => {
+    const citation = {
+      file: '商品知识', page: null, chunkId: 'technical-id', summary: '适合5岁以上使用。',
+      distance: null, knowledgeVersion: null, sourceIds: [], productId: 'product-1', skuId: null
+    }
+    const wrapper = mount(ReplyAssistantPanel, {
+      props: {
+        conversation, draft: { ...draft, citations: [citation, citation] }, stores: [], products: [], skus: [], selectedStoreId: 8,
+        selectedProductId: '', selectedSkuId: '', contextLoading: false, contextError: '',
+        contextStatus: '已就绪', busy: false, actionBusy: false, actionError: '',
+        agentStatus: 'ONLINE', canGenerateReply: true, canSubmitFeedback: true,
+        feedbackBusy: false, feedbackReceiptId: ''
+      },
+      global: { stubs: { Teleport: true } }
+    })
+    await wrapper.get('[data-testid="open-knowledge-evidence"]').trigger('click')
+    const dialog = wrapper.get('[data-testid="knowledge-evidence-dialog"]')
+    expect(dialog.findAll('article')).toHaveLength(1)
+    expect(dialog.text()).toContain('适合5岁以上使用。')
+    expect(dialog.text().match(/已匹配当前商品/g)).toHaveLength(1)
+  })
 })

@@ -1,8 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AiCapabilityCenterView from '../src/views/AiCapabilityCenterView.vue'
 import { getAiControlCenterOverview } from '../src/api/client'
+import {
+  aiControlCenterError,
+  aiControlCenterOverview,
+} from '../src/stores/aiControlCenter'
 
 vi.mock('../src/api/client', () => ({
   getAiControlCenterOverview: vi.fn(),
@@ -22,7 +27,11 @@ const overview = {
 }
 
 describe('AiCapabilityCenterView', () => {
-  beforeEach(() => mockedOverview.mockReset())
+  beforeEach(() => {
+    mockedOverview.mockReset()
+    aiControlCenterOverview.value = null
+    aiControlCenterError.value = ''
+  })
 
   it('renders only the frozen A overview as business summaries and keeps technical data folded', async () => {
     mockedOverview.mockResolvedValue(overview)
@@ -50,10 +59,17 @@ describe('AiCapabilityCenterView', () => {
   })
 
   it('explains loading and failure states and provides recovery paths', async () => {
-    mockedOverview.mockReturnValueOnce(new Promise(() => {}))
+    let resolveLoading!: (value: typeof overview) => void
+    mockedOverview.mockReturnValueOnce(new Promise((resolve) => { resolveLoading = resolve }))
     const loadingWrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await nextTick()
     expect(loadingWrapper.get('[data-testid="ai-loading-state"]').text()).toContain('正在读取 AI 状态')
     expect(loadingWrapper.get('[data-testid="ai-loading-state"]').text()).toContain('下一步：')
+
+    resolveLoading(overview)
+    await flushPromises()
+    loadingWrapper.unmount()
+    aiControlCenterOverview.value = null
 
     mockedOverview.mockRejectedValueOnce(new Error('offline'))
     const errorWrapper = mount(AiCapabilityCenterView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
