@@ -67,6 +67,7 @@ describe('ChannelAgentDesktopLayout', () => {
       browser: {
         status: 'OPENED',
         pdd_login_state: 'CUSTOMER_SERVICE_READY',
+        pdd_workspace_refresh_available: true,
         message_source: 'OFFLINE_REPLAY',
         real_pdd_message_observation_enabled: false
       },
@@ -146,6 +147,9 @@ describe('ChannelAgentDesktopLayout', () => {
     expect(wrapper.text()).toContain('PDD 客服工作台已就绪')
     expect(wrapper.get('[data-testid="message-source-status"]').text()).toContain('消息源 离线回放')
     expect(wrapper.get('[data-testid="message-source-status"]').classes()).toContain('attention')
+    expect(wrapper.get('[data-testid="pdd-workspace-guide"]').text()).toContain(
+      'https://mms.pinduoduo.com/chat-merchant/index.html#'
+    )
     expect(wrapper.text()).toContain('当前店铺 玩具乐园积木店 · PDD 328616090')
     expect(wrapper.get('[data-testid="active-store-status"]').classes()).toContain('healthy')
     expect(wrapper.get('select[aria-label="当前工作店铺"]').element).toBeInstanceOf(HTMLSelectElement)
@@ -154,6 +158,44 @@ describe('ChannelAgentDesktopLayout', () => {
     expect(wrapper.text()).toContain('人工确认模式')
     expect(wrapper.text()).not.toContain('知识管理')
     expect(wrapper.text()).not.toContain('系统管理')
+    wrapper.unmount()
+  })
+
+  it('does not present the offline replay restart as real PDD observation', async () => {
+    desktopMocks.bootstrap.mockResolvedValue({
+      schema_version: '1.0',
+      agent: { process_status: 'RUNNING', runtime_status: 'ONLINE', version: '1.4.0', node_id: 'agent-1' },
+      browser: {
+        status: 'READY',
+        pdd_login_state: 'CUSTOMER_SERVICE_READY',
+        observer_status: 'SESSION_LIMIT_REACHED',
+        observer_restart_available: true,
+        pdd_workspace_refresh_available: true,
+        message_source: 'OFFLINE_REPLAY',
+        real_pdd_message_observation_enabled: false
+      },
+      binding: {
+        authorized_store_ids: ['store-ref:1'],
+        active_store_id: 'store-ref:1',
+        observed_store_id: 'store-ref:1',
+        store_reference: 'store-ref:1'
+      },
+      safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(ChannelAgentDesktopLayout, {
+      global: { plugins: [router, ElementPlus] }
+    })
+    await flushPromises()
+
+    const restart = wrapper.get('[data-testid="restart-pdd-observer"]')
+    expect(restart.text()).toContain('当前为离线回放')
+    expect((restart.element as HTMLButtonElement).disabled).toBe(true)
     wrapper.unmount()
   })
 

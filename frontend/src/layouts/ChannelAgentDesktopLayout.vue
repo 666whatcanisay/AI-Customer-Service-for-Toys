@@ -33,10 +33,10 @@
           v-if="canRestartPddObserver"
           type="button"
           class="pdd-launch"
-          :disabled="restartingObserver"
+          :disabled="restartingObserver || !realMessageObservationEnabled"
           data-testid="restart-pdd-observer"
           @click="restartPddObserver"
-        >{{ restartingObserver ? '正在恢复…' : '重新开始30分钟观察' }}</button>
+        >{{ observerRestartLabel }}</button>
         <span :class="activeStore ? 'healthy' : 'attention'" data-testid="active-store-status"><i />{{ storeLabel }}</span>
         <select
           v-if="storeOptions.length > 1"
@@ -61,6 +61,12 @@
         <button type="button" class="danger" @click="requestStop">安全退出</button>
       </div>
     </header>
+
+    <div v-if="canRefreshPddWorkspace" class="pdd-workspace-guide" data-testid="pdd-workspace-guide">
+      <strong>客服工作台地址</strong>
+      <span>扫码后若停在商家首页，请在当前 PDD 专属 Edge 中新建标签页并输入：</span>
+      <code>{{ PDD_CUSTOMER_SERVICE_URL }}</code>
+    </div>
 
     <div v-if="error" class="agent-warning" role="status">
       本地 Agent 暂时无法连接。AI 建议仍不会自动发送，请从 Windows 托盘检查 Agent 状态。
@@ -100,6 +106,7 @@ const openingPdd = ref(false)
 const refreshingPdd = ref(false)
 const restartingObserver = ref(false)
 const selectedStore = ref('')
+const PDD_CUSTOMER_SERVICE_URL = 'https://mms.pinduoduo.com/chat-merchant/index.html#'
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CONNECTING')
@@ -112,6 +119,12 @@ const messageSourceLabel = computed(() => {
   if (source === 'REAL_PDD') return '真实消息读取 已启用'
   if (source === 'OFFLINE_REPLAY') return '消息源 离线回放'
   return '真实消息读取 未启用'
+})
+const observerRestartLabel = computed(() => {
+  if (restartingObserver.value) return '正在恢复…'
+  return realMessageObservationEnabled.value
+    ? '重新开始30分钟观察'
+    : '当前为离线回放'
 })
 const pddLabel = computed(() => {
   const login = bootstrap.value?.browser.pdd_login_state
@@ -296,6 +309,7 @@ onBeforeUnmount(() => {
 .runtime-summary select{max-width:190px;padding:7px 28px 7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:12px}
 .runtime-summary .pdd-launch{padding:6px 10px;border:1px solid #d6a331;border-radius:8px;background:#fff8e7;color:#8b5c00;font-size:12px;cursor:pointer;white-space:nowrap}.runtime-summary .pdd-launch:disabled{cursor:wait;opacity:.65}
 .operator{display:flex;align-items:center;gap:10px;padding-left:18px;border-left:1px solid #dce8e0}.operator small,.operator strong{display:block}.operator small{color:#788b81;font-size:10px}.operator strong{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.operator button{padding:7px 10px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;cursor:pointer}.operator .danger{border-color:#e2b8b2;color:#a13c30}
+.pdd-workspace-guide{display:flex;align-items:center;gap:8px;padding:6px 20px;border-bottom:1px solid #cfe0d6;background:#f4faf6;color:#48695a;font-size:12px}.pdd-workspace-guide strong{color:#245a43;white-space:nowrap}.pdd-workspace-guide code{padding:3px 7px;border:1px solid #c6d9ce;border-radius:6px;background:#fff;color:#175f43;user-select:all}
 .safety-strip,.agent-warning{padding:8px 20px;border-bottom:1px solid #e6d5a7;background:#fff8e7;color:#77510a;font-size:12px}.safety-strip strong{margin-right:10px;padding:2px 7px;border-radius:999px;background:#e79c1b;color:#fff}.agent-warning{border-color:#efc5c0;background:#fff0ee;color:#943a30}
 .agent-desktop-content{min-width:0;min-height:0;padding:12px;overflow:auto}
 @media(max-width:900px){.agent-desktop-bar{gap:10px;padding:8px 12px}.brand{min-width:0}.runtime-summary span:last-child{display:none}.operator>div{display:none}}
