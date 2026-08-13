@@ -583,6 +583,19 @@ def test_windows_build_manifest_records_reproducible_source_identity() -> None:
     assert "Official package build requires CLEAN Engine and AI-CS source repositories." in build
 
 
+def test_installer_compares_release_candidates_semantically() -> None:
+    root = Path(__file__).resolve().parents[2]
+    installer = (
+        root / "packaging" / "windows-client-v1" / "Install-AI-CS-Channel-Agent.ps1"
+    ).read_text(encoding="utf-8-sig")
+
+    assert "function ConvertTo-ReleaseVersion" in installer
+    assert "(?:rc(?<rc>\\d+))?" in installer
+    assert "[version]$existingManifest.version" not in installer
+    assert "$existingVersion = ConvertTo-ReleaseVersion" in installer
+    assert "$packageVersion = ConvertTo-ReleaseVersion" in installer
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows process validation")
 def test_windows_process_detection_does_not_signal_process() -> None:
     assert _process_exists(os.getpid()) is True

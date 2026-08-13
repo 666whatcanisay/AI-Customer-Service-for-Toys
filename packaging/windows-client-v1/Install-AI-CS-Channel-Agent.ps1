@@ -63,6 +63,22 @@ function Assert-PackageIntegrity([string]$Root, $Manifest) {
     }
 }
 
+function ConvertTo-ReleaseVersion([string]$Value) {
+    $match = [regex]::Match(
+        $Value,
+        '^(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:rc(?<rc>\d+))?$'
+    )
+    if (-not $match.Success) { throw "Invalid release version: $Value" }
+    $stage = $(if ($match.Groups['rc'].Success) { 0 } else { 1 })
+    $rc = $(if ($match.Groups['rc'].Success) { [int]$match.Groups['rc'].Value } else { 0 })
+    return [version]::new(
+        [int]$match.Groups['major'].Value,
+        [int]$match.Groups['minor'].Value,
+        [int]$match.Groups['patch'].Value,
+        (($stage * 10000) + $rc)
+    )
+}
+
 function Get-InstallOwnedProcesses([string]$InstallDirectory) {
     $prefix = [IO.Path]::GetFullPath($InstallDirectory).TrimEnd('\') + '\'
     @(Get-Process ChannelAgent,python,pythonw -ErrorAction SilentlyContinue | Where-Object {
@@ -107,7 +123,9 @@ if ($existingInstall) {
     if ((Test-Path -LiteralPath $existingManifestPath -PathType Leaf) -and -not $Force) {
         $existingManifest = Get-Content -LiteralPath $existingManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
         try {
-            if ([version]$existingManifest.version -gt [version]$packageManifest.version) {
+            $existingVersion = ConvertTo-ReleaseVersion ([string]$existingManifest.version)
+            $packageVersion = ConvertTo-ReleaseVersion ([string]$packageManifest.version)
+            if ($existingVersion -gt $packageVersion) {
                 throw "Installed version $($existingManifest.version) is newer than package version $($packageManifest.version)."
             }
         }
