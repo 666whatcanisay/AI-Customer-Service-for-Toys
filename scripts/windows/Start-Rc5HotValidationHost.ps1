@@ -6,13 +6,29 @@ param(
     [string]$GatewayKeyReference,
     [int]$Port = 18443,
     [string]$DatabasePath,
+    [string]$DatabaseEnvironmentId = 'RC5_CHANNEL_ENGINE_LOCAL',
     [string]$OfflineRuntimeRoot,
     [string]$GatewayBaseUrl = 'http://127.0.0.1:8420',
-    [string]$DeviceCredentialIndex
+    [string]$DeviceCredentialIndex,
+    [string]$AgentSpoolPath
 )
 
 $ErrorActionPreference = 'Stop'
+function Get-Rc5LoopbackListenerPid([int]$ListenerPort) {
+    $matches = @(
+        netstat -ano -p TCP |
+            Select-String "^\s*TCP\s+(127\.0\.0\.1|\[::1\]):$ListenerPort\s+\S+\s+LISTENING\s+(\d+)\s*$" |
+            ForEach-Object { [int]$_.Matches[0].Groups[2].Value } |
+            Sort-Object -Unique
+    )
+    if ($matches.Count -gt 1) { throw "PORT_${ListenerPort}_MULTIPLE_LISTENERS" }
+    if ($matches.Count -eq 1) { return [int]$matches[0] }
+    return $null
+}
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$repoGitSha = [string](& git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -Last 1)
+if ($LASTEXITCODE -ne 0 -or $repoGitSha -notmatch '^[0-9a-fA-F]{40}$') { throw 'RC5_VALIDATION_SOURCE_IDENTITY_UNAVAILABLE' }
+$repoGitSha = $repoGitSha.Trim().ToLowerInvariant()
 $python = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $runtimeRoot = Join-Path $repoRoot '.runtime\channel-agent-lan-host'
 $certificate = Join-Path $runtimeRoot 'tls\channel-agent-host-v2.pem'
@@ -33,8 +49,15 @@ $deviceCredentialIndex = if ($DeviceCredentialIndex) {
 } else {
     Join-Path $runtimeRoot 'device-credential-index.json'
 }
+$agentSpoolPath = if ($AgentSpoolPath) {
+    [System.IO.Path]::GetFullPath($AgentSpoolPath)
+} elseif (-not [string]::IsNullOrWhiteSpace([string]$env:LOCALAPPDATA)) {
+    Join-Path $env:LOCALAPPDATA 'AI-CS\ChannelAgent\runtime\observe-only-spool.sqlite3'
+} else {
+    ''
+}
 
-if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
+if ($null -ne (Get-Rc5LoopbackListenerPid $Port)) {
     throw "PORT_${Port}_ALREADY_IN_USE"
 }
 foreach ($required in @($python, $certificate, $privateKey, $GatewayKeyReference, $deviceCredentialIndex)) {
@@ -47,7 +70,7 @@ New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
 $env:PYTHONPATH = Join-Path $repoRoot 'src'
 $env:CHANNEL_ENGINE_DATABASE_URL = 'sqlite:///' + ($databasePath.Replace('\','/'))
 $env:CHANNEL_ENGINE_DATABASE_BINDING_PATH = "$databasePath.binding.json"
-$env:CHANNEL_ENGINE_DATABASE_ENVIRONMENT_ID = 'RC5_CHANNEL_ENGINE_LOCAL'
+$env:CHANNEL_ENGINE_DATABASE_ENVIRONMENT_ID = $DatabaseEnvironmentId
 $env:CHANNEL_ENGINE_REQUIRE_DATABASE_IDENTITY = 'true'
 $env:CHANNEL_ENGINE_AGENT_CONTROL_V2_ENABLED = 'true'
 $env:CHANNEL_ENGINE_AGENT_HOST_ID = 'ai-cs-desktop-0345200'
@@ -84,25 +107,112 @@ $process = Start-Process -FilePath $python -ArgumentList @(
 
 $ready = $false
 foreach ($attempt in 1..80) {
-    & $python -c "import httpx,sys; r=httpx.get(sys.argv[1],verify=False,timeout=2,trust_env=False); raise SystemExit(0 if r.status_code == 200 and r.json().get('status') == 'healthy' else 1)" "https://127.0.0.1:$Port/health" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $ready = $true
-        break
+    try {
+        $healthText = & curl.exe -ks --max-time 2 "https://127.0.0.1:$Port/health"
+        if ($LASTEXITCODE -ne 0) { throw 'health probe failed' }
+        $health = $healthText | ConvertFrom-Json
+        if ($health.status -eq 'healthy' -and $health.service -eq 'channel-engine-host-control') {
+            $ready = $true
+            break
+        }
+    } catch {
+        Start-Sleep -Milliseconds 250
     }
-    Start-Sleep -Milliseconds 250
 }
 if (-not $ready) {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
     throw "RC5_VALIDATION_HOST_NOT_READY:$(Join-Path $evidenceRoot 'host.stderr.log')"
 }
 
-$owner = Get-NetTCPConnection -State Listen -LocalPort $Port | Select-Object -First 1
+$listenerPid = Get-Rc5LoopbackListenerPid $Port
+if ($null -eq $listenerPid) { throw "RC5_VALIDATION_HOST_LISTENER_MISSING:$Port" }
+try {
+$listenerProcess = Get-Process -Id $listenerPid -ErrorAction Stop
+$bindingPath = "$databasePath.binding.json"
+if (-not (Test-Path -LiteralPath $bindingPath -PathType Leaf)) {
+    throw "RC5_RUNTIME_DATABASE_BINDING_MISSING:$bindingPath"
+}
+$binding = Get-Content -LiteralPath $bindingPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$governanceRoot = Join-Path $evidenceRoot 'rc5-pilot-governance'
+$activationRoot = Join-Path $governanceRoot 'activations'
+New-Item -ItemType Directory -Path $governanceRoot,$activationRoot -Force | Out-Null
+$configSnapshotPath = Join-Path $governanceRoot 'channel-engine-host.config.json'
+$configSnapshot = [ordered]@{
+    schema = 'rc5-runtime-config-snapshot.v1'
+    database_path = $databasePath
+    offline_runtime_root = $offlineRuntimeRoot
+    bind_address = '127.0.0.1'
+    port = $Port
+    observation_stage = $env:CHANNEL_ENGINE_OBSERVATION_STAGE
+    gateway_base_url = $env:CHANNEL_ENGINE_GATEWAY_BASE_URL
+    gateway_environment = $env:CHANNEL_ENGINE_GATEWAY_ENVIRONMENT
+    gateway_key_reference_sha256 = if (Test-Path -LiteralPath $GatewayKeyReference -PathType Leaf) { (Get-FileHash -LiteralPath $GatewayKeyReference -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null }
+    real_send_enabled = $false
+}
+$configTemporary = "$configSnapshotPath.$([Guid]::NewGuid().ToString('N')).tmp"
+try {
+    $configSnapshot | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configTemporary -Encoding UTF8
+    Move-Item -LiteralPath $configTemporary -Destination $configSnapshotPath -Force
+} finally {
+    Remove-Item -LiteralPath $configTemporary -Force -ErrorAction SilentlyContinue
+}
+$configSha = (Get-FileHash -LiteralPath $configSnapshotPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$bindingSha = (Get-FileHash -LiteralPath $bindingPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$activationMaterial = "channel-engine-host|$listenerPid|$($listenerProcess.StartTime.ToUniversalTime().ToString('o'))|$configSha|$($binding.database_instance_id)"
+$sha = [Security.Cryptography.SHA256]::Create()
+try {
+    $activationId = 'activation:' + ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($activationMaterial))).Replace('-','').ToLowerInvariant())
+} finally {
+    $sha.Dispose()
+}
+$activationPath = Join-Path $activationRoot 'channel-engine-host.json'
+$activation = [ordered]@{
+    schema = 'rc5-runtime-activation.v1'
+    activation_id = $activationId
+    component = 'CHANNEL_ENGINE_HOST'
+    pid = [int]$listenerPid
+    executable_path = [IO.Path]::GetFullPath([string]$listenerProcess.Path)
+    manifest_created_at = [DateTime]::UtcNow.ToString('o')
+    service_started_at = $process.StartTime.ToUniversalTime().ToString('o')
+    process_started_at = $listenerProcess.StartTime.ToUniversalTime().ToString('o')
+    config_source_path = [IO.Path]::GetFullPath($configSnapshotPath)
+    config_sha256 = $configSha
+    source_repository_path = $repoRoot
+    source_revision = $repoGitSha
+    canonical_database_path = [IO.Path]::GetFullPath($databasePath)
+    binding_sidecar_path = [IO.Path]::GetFullPath($bindingPath)
+    database_instance_id = [string]$binding.database_instance_id
+    environment_id = [string]$binding.environment_id
+    database_role = [string]$binding.database_role
+    revision = [string]$binding.runtime_storage_version
+    binding_sidecar_sha256 = $bindingSha
+    ports = @([int]$Port)
+    runtime_data_paths = [ordered]@{
+        HOST_CONTROL = [IO.Path]::GetFullPath($databasePath)
+        CONVERSATION_BUFFER = [IO.Path]::GetFullPath((Join-Path $offlineRuntimeRoot 'conversation-buffer.sqlite3'))
+        OFFLINE_CONTROL = [IO.Path]::GetFullPath((Join-Path $offlineRuntimeRoot 'offline-control.sqlite3'))
+        AGENT_SPOOL = $agentSpoolPath
+    }
+    safety_flags = [ordered]@{ real_send_enabled = $false }
+}
+$activationTemporary = "$activationPath.$([Guid]::NewGuid().ToString('N')).tmp"
+try {
+    $activation | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $activationTemporary -Encoding UTF8
+    Move-Item -LiteralPath $activationTemporary -Destination $activationPath -Force
+} finally {
+    Remove-Item -LiteralPath $activationTemporary -Force -ErrorAction SilentlyContinue
+}
 [pscustomobject]@{
-    host_pid = $owner.OwningProcess
+    host_pid = $listenerPid
     launcher_pid = $process.Id
     observation_stage = $env:CHANNEL_ENGINE_OBSERVATION_STAGE
     offline_runtime_root = $env:CHANNEL_ENGINE_OFFLINE_RUNTIME_ROOT
     database_path = $databasePath
     gateway_base_url = $env:CHANNEL_ENGINE_GATEWAY_BASE_URL
+    runtime_activation = $activationPath
     real_send_enabled = $false
 } | ConvertTo-Json -Depth 3 -Compress
+} catch {
+    Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
+    throw
+}

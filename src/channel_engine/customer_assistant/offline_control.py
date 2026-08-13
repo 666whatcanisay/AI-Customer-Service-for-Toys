@@ -215,6 +215,13 @@ class ReplyQualityGate:
             reasons.append("CONTEXT_SCOPE_MISMATCH")
         if package.customer_reference != context.customer_reference:
             reasons.append("CUSTOMER_SCOPE_MISMATCH")
+        current_product = context.page.product.product_reference
+        current_sku = context.page.product.sku_reference
+        for citation in package.citations:
+            if citation.product_id is not None and citation.product_id != current_product:
+                reasons.append("CITATION_PRODUCT_CONTEXT_MISMATCH")
+            if citation.sku_id is not None and citation.sku_id != current_sku:
+                reasons.append("CITATION_SKU_CONTEXT_MISMATCH")
         if set(package.warnings) & self._FAILURE_WARNINGS:
             reasons.append("AI_CAPABILITY_UNAVAILABLE")
         if package.ai_cs_action in {"REFUSE", "TRANSFER_HUMAN", "REQUIRE_LOOKUP"}:

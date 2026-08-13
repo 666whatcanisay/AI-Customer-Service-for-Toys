@@ -370,7 +370,84 @@ def test_pdd_window_launch_requires_explicit_human_intent_and_starts_no_observer
             "status": "READY",
             "pdd_login_state": "CUSTOMER_SERVICE_READY",
             "pdd_workspace_launch_available": True,
+            "pdd_workspace_refresh_available": True,
+            "observer_status": "DISABLED",
+            "observer_restart_available": False,
         }
+    finally:
+        server.stop()
+
+
+def test_pdd_refresh_and_observer_restart_require_local_human_intent(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "runtime" / "channel-agent-state.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps({
+            "message_observation_enabled": True,
+            "pdd_login_state": "CUSTOMER_SERVICE_READY",
+            "identity_status": "ACTIVE",
+            "observer_status": "SESSION_LIMIT_REACHED",
+        }),
+        encoding="utf-8",
+    )
+    refreshes: list[bool] = []
+    server = DesktopAssistantServer(
+        data_root=tmp_path,
+        pdd_workspace_status_handler=lambda: (
+            refreshes.append(True)
+            or {
+                "status": "READY",
+                "browser_status": "READY",
+                "pdd_login_state": "CUSTOMER_SERVICE_READY",
+            }
+        ),
+    )
+    try:
+        server.start()
+        opener, origin, csrf = _authenticated_client(server)
+
+        for path in ("browser/pdd/refresh", "observer/pdd/restart"):
+            blocked = Request(
+                f"{origin}/local-api/v1/{path}", data=b"{}", method="POST",
+                headers={"Origin": origin, "X-Channel-Agent-CSRF": csrf},
+            )
+            with pytest.raises(HTTPError) as forbidden:
+                opener.open(blocked, timeout=2)  # noqa: S310
+            assert forbidden.value.code == 403
+
+        refresh = Request(
+            f"{origin}/local-api/v1/browser/pdd/refresh", data=b"{}", method="POST",
+            headers={
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+                "X-Channel-Agent-Intent": "HUMAN_CONFIRMED_PDD_WORKSPACE_READY",
+            },
+        )
+        with opener.open(refresh, timeout=2) as response:  # noqa: S310
+            payload = json.loads(response.read().decode("utf-8"))
+        assert payload["pdd_login_state"] == "CUSTOMER_SERVICE_READY"
+        assert payload["observer_started"] is False
+        assert payload["real_send_enabled"] is False
+        assert refreshes == [True]
+
+        restart = Request(
+            f"{origin}/local-api/v1/observer/pdd/restart", data=b"{}", method="POST",
+            headers={
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+                "X-Channel-Agent-Intent": "HUMAN_CONFIRMED_PDD_OBSERVER_RESTART",
+            },
+        )
+        with opener.open(restart, timeout=2) as response:  # noqa: S310
+            first = json.loads(response.read().decode("utf-8"))
+        with opener.open(restart, timeout=2) as response:  # noqa: S310
+            second = json.loads(response.read().decode("utf-8"))
+        assert first["status"] == "RESTART_REQUESTED"
+        assert second["status"] == "ALREADY_REQUESTED"
+        assert first["real_send_enabled"] is False
+        assert (tmp_path / "runtime" / "pdd-observer-restart.request").is_file()
     finally:
         server.stop()
 

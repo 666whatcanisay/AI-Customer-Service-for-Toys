@@ -16,7 +16,7 @@ RC5 真实输入使用 `channel-agent-pdd-observation.v2.2`。Host 继续接受 
 | `sequence` | 页面稳定序号；缺失时由稳定 message ID 映射到 Agent 持久化单调序号 | 不使用正文拼接伪造 message ID |
 | `product_id/name`、`sku_id/name`、`attributes` | 当前页面商品卡、SKU/规格可见文本 | `null` 并在 Evidence 中记录 |
 | `visible_history` | 当前活动会话页面实际记录，最近 20 条 | REAL_PDD 不使用 Synthetic Preparation 回退 |
-| `order` | 独立 `REAL_PDD_ORDER_CONTEXT_READY` Gate | 不阻塞 READ/ADAPTER |
+| `order` | 独立 `REAL_PDD_ORDER_CONTEXT_READY` Gate | 不阻塞 ADAPTER/READ |
 
 `provider_kind=REAL_PDD` 只能用于真实页面读取；脱敏 Replay 使用 `RECORDED_REPLAY`，历史来源标记 `SYNTHETIC`，不得冒充真实页面事实。
 
@@ -34,4 +34,3 @@ RC5 真实输入使用 `channel-agent-pdd-observation.v2.2`。Host 继续接受 
 - Spool 加密且默认保留 30 分钟。
 - Observation 先落 Spool，再提交 Host；只有 Host ACK 可推进 Cursor。
 - Observation ID、message ID、Cursor 和内容摘要共同用于冲突与重放保护。
-

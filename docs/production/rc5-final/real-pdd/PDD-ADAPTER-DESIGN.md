@@ -32,11 +32,10 @@ Read Driver 类型上不提供点击、输入或发送方法。正式 Windows Ag
 
 | Gate | 验证范围 |
 |---|---|
-| `REAL_PDD_READ_READY` | 页面事实能稳定只读提取 |
-| `REAL_PDD_ADAPTER_READY` | Snapshot 已进入 Observation、Spool、Host、ACK/Cursor、Replay |
+| `REAL_PDD_ADAPTER_READY` | 专属工作台连接、登录/店铺识别、DOM/Selector 适配和 fail-closed 已验证 |
+| `REAL_PDD_READ_READY` | 真实会话、消息、商品、SKU、订单已端到端进入 Snapshot、Observation、Spool、Host、ACK/Cursor、Replay |
 | `REAL_PDD_AI_READY` | Host Context、AI-CS 与 UI 一致 |
 | `REAL_PDD_CONFIRM_READY` | MANUAL_CONFIRM 生成唯一 Preparation，未发送 |
 | `REAL_PDD_SEND_READY` | 独立 TEST_ONLY 单条发送与真实 Receipt |
 
-后置 Gate 失败不回退已通过的前置 Gate。
-
+固定依赖为 `ADAPTER → READ → AI → CONFIRM → SEND`；前置 Gate 非 PASS 时后置 Gate 不得 PASS。后置 Gate 失败不回退已通过的前置 Gate。

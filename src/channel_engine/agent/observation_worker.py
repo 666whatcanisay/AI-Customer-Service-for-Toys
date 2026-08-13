@@ -281,13 +281,17 @@ class AgentObservationWorker:
             now = self._clock().astimezone(UTC)
             trace_id = self._trace_id(package.store_id, package.conversation_id)
             control_outcome = None
+            context = None
+            stored_reply = getattr(self._assistant, "stored_reply", None)
+            if callable(stored_reply):
+                stored = stored_reply(package.decision_id)
+                if stored is not None:
+                    context, _stored_package = stored
+            if self._offline_control is not None and context is None:
+                raise AgentObservationWorkerError(
+                    "durable reply context is unavailable for assistant projection"
+                )
             if self._offline_control is not None:
-                stored = self._assistant.stored_reply(package.decision_id)
-                if stored is None:
-                    raise AgentObservationWorkerError(
-                        "durable reply context is unavailable for quality gate"
-                    )
-                context, _stored_package = stored
                 self._offline_control.record_trace(
                     trace_id,
                     PipelineStage.CUSTOMER_CONTEXT,
@@ -319,6 +323,7 @@ class AgentObservationWorker:
                 build_assistant_snapshot(
                     package,
                     control_outcome,
+                    context=context,
                     agent_id=scope[0],
                     device_id=scope[1],
                     trace_id=trace_id,

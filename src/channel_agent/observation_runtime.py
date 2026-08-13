@@ -142,16 +142,38 @@ class ObserveOnlyRuntimeComponent:
     def set_page_ready(self, ready: bool) -> None:
         if not self._started:
             return
+        if self._observing and not self.observer.running:
+            # The runner may stop itself at the existing 30-minute safety
+            # boundary. Reflect that fact instead of leaving a stale RUNNING
+            # latch. A session-limit stop still requires an explicit restart.
+            self._observing = False
         if (
             ready
             and self.stage.allows(ObservationStage.CONVERSATION_LIST)
             and not self._observing
+            and self.observer.stop_reason != "PDD_OBSERVER_SESSION_LIMIT_REACHED"
         ):
             self.observer.start()
             self._observing = True
         elif not ready and self._observing:
             self.observer.stop()
             self._observing = False
+
+    def restart_observer(self, *, page_ready: bool) -> bool:
+        """Start a new bounded session only after explicit local intent."""
+
+        if not self._started or not page_ready:
+            raise ObservationRuntimeError("PDD workspace is not ready")
+        if not self.stage.allows(ObservationStage.CONVERSATION_LIST):
+            raise ObservationRuntimeError("PDD observation stage is not enabled")
+        if self.observer.running:
+            self._observing = True
+            return False
+        if self.stage.allows(ObservationStage.HOST_INGEST):
+            self.forwarder.recover_pending()
+        self.observer.start()
+        self._observing = True
+        return True
 
     def stop(self) -> None:
         self.observer.stop()
@@ -165,7 +187,9 @@ class ObserveOnlyRuntimeComponent:
 
     @property
     def observing(self) -> bool:
-        return self._observing and self.observer.running
+        if self._observing and not self.observer.running:
+            self._observing = False
+        return self._observing
 
 
 __all__ = [

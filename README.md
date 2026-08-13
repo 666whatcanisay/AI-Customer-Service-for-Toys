@@ -9,7 +9,13 @@ AI-CS Channel Execution Engine 是 AI-CS 的独立渠道执行层。AI-CS 负责
 - Agent Control：`2.1`
 - Gateway Contract wire：`1.0`
 - Gateway Contract canonical SHA-256：`e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5`
-- RC 状态：`RC5_FINAL_READY`（仅在最终交付清单全部 PASS 后成立）
+- 当前离线 Gate：`RC5_OFFLINE_STABILITY_READY = PASS`
+- 当前真实 PDD Gate：`REAL_PDD_ADAPTER_READY / READ_READY / AI_READY / CONFIRM_READY / SEND_READY = NOT_VERIFIED`
+- 生产派生状态：`AI_CS_PRODUCTION_READY = false`
+
+当前版本、数据库、启动策略与 Gate 的唯一机器事实源是
+[RC5 Offline Stability Version Matrix](docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json)。
+主 Gate 只允许 `PASS / NOT_VERIFIED / BLOCKED / NOT_IN_SCOPE`；布尔值只用于派生状态。
 
 ## RC5 范围
 
@@ -51,7 +57,9 @@ python -m venv .venv
 执行 RC5 后端黑盒验收（不会启动浏览器或调用真实发送）：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\run_rc5_backend_blackbox_suite.py
+$evidenceRoot = Join-Path '.runtime\rc5-backend-blackbox' (Get-Date -Format 'yyyyMMdd-HHmmss')
+.\.venv\Scripts\python.exe scripts\run_rc5_backend_blackbox_suite.py `
+  --evidence-root $evidenceRoot
 ```
 
 生产 Windows 包必须通过 `packaging/windows-client-v2/production-composition.json` 的显式 allowlist 构建；Fake、Sandbox、Pilot、`run_real_*`、真实发送和明文凭据不得进入安装包。

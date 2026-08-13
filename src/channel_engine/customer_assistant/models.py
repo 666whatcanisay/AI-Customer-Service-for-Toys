@@ -284,6 +284,7 @@ class CustomerContext(CustomerAssistantModel):
 class KnowledgeCitation(CustomerAssistantModel):
     reference: str = Field(min_length=1, max_length=512)
     title: str = Field(min_length=1, max_length=256)
+    excerpt: str | None = Field(default=None, max_length=1_000)
     product_id: str | None = Field(default=None, max_length=160)
     sku_id: str | None = Field(default=None, max_length=160)
     source_kind: str | None = Field(default=None, max_length=64)

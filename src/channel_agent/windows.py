@@ -258,6 +258,9 @@ class WindowsAgentHost:
         )
         self.stop_request = self.data_root / "runtime" / "stop.request"
         self.reload_request = self.data_root / "runtime" / "reload.request"
+        self.observer_restart_request = (
+            self.data_root / "runtime" / "pdd-observer-restart.request"
+        )
         self._runtime_factory = runtime_factory
         self._browser_factory = browser_factory or self._build_browser_manager
         self._pdd_login_factory = pdd_login_factory or self._build_pdd_login_adapter
@@ -284,6 +287,7 @@ class WindowsAgentHost:
             )
             return self._run_recovery_ui(stop_event)
         self.stop_request.unlink(missing_ok=True)
+        self.observer_restart_request.unlink(missing_ok=True)
         self.data_root.joinpath("logs").mkdir(parents=True, exist_ok=True)
         runtime = self._runtime_factory(
             config,
@@ -380,6 +384,31 @@ class WindowsAgentHost:
                     )
                     stop_event.set()
                     break
+                if self.observer_restart_request.exists():
+                    identity = snapshot.identity
+                    restart_ready = bool(
+                        observer is not None
+                        and pdd_observation is not None
+                        and pdd_observation.login_state
+                        is PDDLoginState.CUSTOMER_SERVICE_READY
+                        and pdd_observation.page_ready
+                        and identity is not None
+                        and identity.status is AgentIdentityStatus.ACTIVE
+                        and identity.effective_active_store_id is not None
+                    )
+                    try:
+                        if observer is None:
+                            raise WindowsClientError(
+                                "PDD observer runtime is not available"
+                            )
+                        observer.restart_observer(page_ready=restart_ready)
+                        observer_error["code"] = None
+                    except Exception as exc:
+                        record_observer_error(
+                            ("OBSERVER_RESTART_" + type(exc).__name__.upper())[:120]
+                        )
+                    finally:
+                        self.observer_restart_request.unlink(missing_ok=True)
                 snapshot = runtime.snapshot()
                 browser_state = browser.browser_status()
                 if (
@@ -502,6 +531,7 @@ class WindowsAgentHost:
                 TransientBusinessDataPolicy().purge_on_safe_stop(self.data_root)
             self.stop_request.unlink(missing_ok=True)
             self.reload_request.unlink(missing_ok=True)
+            self.observer_restart_request.unlink(missing_ok=True)
 
     def request_stop(self) -> None:
         self.stop_request.parent.mkdir(parents=True, exist_ok=True)
@@ -792,6 +822,12 @@ class WindowsAgentHost:
             return "FAILED"
         if observer is not None and observer.observing:
             return "OBSERVING"
+        if (
+            observer is not None
+            and observer.observer.stop_reason
+            == "PDD_OBSERVER_SESSION_LIMIT_REACHED"
+        ):
+            return "SESSION_LIMIT_REACHED"
         if config.development_profile == "OFFLINE_REPLAY":
             return "WAITING_IDENTITY"
         if (

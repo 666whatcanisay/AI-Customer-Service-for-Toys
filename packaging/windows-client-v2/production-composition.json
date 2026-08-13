@@ -28,6 +28,7 @@
     "src/channel_agent/observation_runtime.py",
     "src/channel_agent/pdd_observer.py",
     "src/channel_agent/pdd_page_port.py",
+    "src/channel_agent/pdd_replay_approval.py",
     "src/channel_agent/pdd_readonly_driver.py",
     "src/channel_agent/windows.py",
     "src/channel_agent/windows_app.py"

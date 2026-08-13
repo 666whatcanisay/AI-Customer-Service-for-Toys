@@ -56,6 +56,9 @@ from channel_agent.security import WindowsDPAPITransientPayloadProtector  # noqa
 from channel_agent.version import AGENT_VERSION  # noqa: E402
 from channel_engine import __version__ as HOST_VERSION  # noqa: E402
 from channel_engine.provider import NormalizedChannelObservation  # noqa: E402
+from channel_engine.storage.runtime_database_identity import (  # noqa: E402
+    bind_runtime_database,
+)
 
 
 def utc_now() -> datetime:
@@ -416,9 +419,52 @@ class ShadowTopology:
     def clone(self) -> dict[str, Any]:
         sqlite_backup(self.args.host_database, self.host_database)
         sqlite_backup(self.args.platform_database, self.platform_database)
+        source_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        host_identity = bind_runtime_database(
+            self.host_database,
+            Path(str(self.host_database) + ".binding.json"),
+            environment_id="RC5_BLACKBOX_SHADOW",
+            source_commit=source_commit,
+            mode="NEW_INSTANCE",
+        )
+        platform_python = (
+            self.args.ai_cs_root / "platform_backend" / ".venv" / "Scripts" / "python.exe"
+        )
+        platform_binding = Path(str(self.platform_database) + ".binding.json")
+        platform_result = subprocess.run(
+            [
+                str(platform_python),
+                "-m",
+                "app.runtime_database_identity",
+                "bind-new",
+                "--database",
+                str(self.platform_database),
+                "--binding",
+                str(platform_binding),
+                "--environment-id",
+                "RC5_BLACKBOX_SHADOW",
+                "--source-commit",
+                source_commit,
+            ],
+            cwd=self.args.ai_cs_root / "platform_backend",
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         return {
             "host_database": str(self.host_database),
             "platform_database": str(self.platform_database),
+            "host_database_instance_id": host_identity.database_instance_id,
+            "platform_database_instance_id": json.loads(
+                platform_result.stdout
+            )["database_instance_id"],
+            "environment_id": "RC5_BLACKBOX_SHADOW",
             "source_databases_unchanged": True,
         }
 
@@ -429,6 +475,7 @@ class ShadowTopology:
             GatewayKeyReference=self.args.gateway_key,
             Port=self.args.shadow_host_port,
             DatabasePath=self.host_database,
+            DatabaseEnvironmentId="RC5_BLACKBOX_SHADOW",
             OfflineRuntimeRoot=self.offline_root,
             GatewayBaseUrl=gateway_url or self.args.ai_url,
         )

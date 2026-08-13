@@ -239,6 +239,9 @@ class AgentAssistantSnapshot(ControlV2Model):
     reply_content: str | None = Field(default=None, max_length=24_000, repr=False)
     risk_level: Literal["LOW", "MEDIUM", "HIGH"]
     citations: tuple[dict[str, Any], ...] = Field(default=(), max_length=32)
+    # Internal UI projection only. This reuses CustomerContext facts and does
+    # not change the Gateway or ExecutionPreparation wire contracts.
+    product_context: dict[str, Any] | None = None
     ai_cs_action: str = Field(default="UNKNOWN", min_length=1, max_length=64)
     warnings: tuple[str, ...] = Field(default=(), max_length=32)
     required_fields: tuple[str, ...] = Field(default=(), max_length=32)

@@ -11,6 +11,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+function Get-Rc5LoopbackListenerPid([int]$ListenerPort) {
+    $matches = @(
+        netstat -ano -p TCP |
+            Select-String "^\s*TCP\s+(127\.0\.0\.1|\[::1\]):$ListenerPort\s+\S+\s+LISTENING\s+(\d+)\s*$" |
+            ForEach-Object { [int]$_.Matches[0].Groups[2].Value } |
+            Sort-Object -Unique
+    )
+    if ($matches.Count -gt 1) { throw "PORT_${ListenerPort}_MULTIPLE_LISTENERS" }
+    if ($matches.Count -eq 1) { return [int]$matches[0] }
+    return $null
+}
 $aiCsRoot = [IO.Path]::GetFullPath($AiCsRoot)
 $databasePath = [IO.Path]::GetFullPath($DatabasePath)
 $evidenceRoot = [IO.Path]::GetFullPath($EvidenceRoot)
@@ -19,7 +30,7 @@ $common = Join-Path $aiCsRoot 'scripts\windows\common_ai_customer_service.ps1'
 $engineRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $engineRuntime = Join-Path $engineRoot '.runtime\channel-agent-lan-host'
 
-if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) {
+if ($null -ne (Get-Rc5LoopbackListenerPid $Port)) {
     throw "PORT_${Port}_ALREADY_IN_USE"
 }
 foreach ($required in @($common, $configPath, $databasePath)) {
@@ -31,6 +42,9 @@ foreach ($required in @($common, $configPath, $databasePath)) {
 . $common
 $config = Get-LocalConfig $configPath
 $config.PlatformDatabaseUrl = 'sqlite:///' + $databasePath.Replace('\', '/')
+$config.PlatformDatabasePath = $databasePath
+$config.PlatformDatabaseBindingPath = "$databasePath.binding.json"
+$config.PlatformDatabaseEnvironmentId = 'RC5_BLACKBOX_SHADOW'
 $config.PlatformPort = $Port
 $config.CorsAllowedOrigins = @("http://127.0.0.1:$Port", "http://localhost:$Port")
 $config.PlatformKnowledgeMaterialStorageDirectory = Join-Path $evidenceRoot 'knowledge-materials'
@@ -46,7 +60,7 @@ $env:CHANNEL_AGENT_CA_CERTIFICATE_FILE = Join-Path $engineRuntime 'tls\channel-a
 $runtimeEnvironment = Get-LocalPlatformEnvironment $config
 
 Invoke-WithProcessEnvironment $runtimeEnvironment {
-    Invoke-PlatformMigration $config
+    Assert-PlatformDatabaseReady $config
 } | Out-Null
 
 $platform = Invoke-WithProcessEnvironment $runtimeEnvironment {
@@ -73,9 +87,10 @@ if (-not $ready) {
     throw "RC5_SHADOW_PLATFORM_NOT_READY:$(Join-Path $evidenceRoot 'platform.stderr.log')"
 }
 
-$owner = Get-NetTCPConnection -State Listen -LocalPort $Port | Select-Object -First 1
+$listenerPid = Get-Rc5LoopbackListenerPid $Port
+if ($null -eq $listenerPid) { throw "RC5_SHADOW_PLATFORM_LISTENER_MISSING:$Port" }
 [pscustomobject]@{
-    platform_pid = $owner.OwningProcess
+    platform_pid = $listenerPid
     launcher_pid = $platform.Id
     database_path = $databasePath
     host_control_url = $env:CHANNEL_AGENT_SERVER_URL

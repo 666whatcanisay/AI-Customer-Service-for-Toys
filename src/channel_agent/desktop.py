@@ -95,6 +95,7 @@ class DesktopAssistantServer:
         self.pdd_workspace_close_handler = pdd_workspace_close_handler
         self._manual_pdd_launch_state: dict[str, Any] | None = None
         self._manual_pdd_launch_requested = False
+        self._manual_pdd_refresh_in_flight = False
         if platform_proxy_mode not in {"DIRECT_API", "SAME_ORIGIN_GATEWAY"}:
             raise DesktopAssistantError("unsupported platform proxy mode")
         self.platform_proxy_mode = platform_proxy_mode
@@ -376,6 +377,13 @@ class DesktopAssistantServer:
                 "pdd_workspace_launch_available": (
                     self.pdd_workspace_launch_handler is not None
                 ),
+                "pdd_workspace_refresh_available": (
+                    self.pdd_workspace_status_handler is not None
+                ),
+                "observer_status": state.get("observer_status", "DISABLED"),
+                "observer_restart_available": bool(
+                    state.get("message_observation_enabled", False)
+                ),
             },
             "binding": {
                 "agent_id": state.get("agent_id"),
@@ -438,6 +446,85 @@ class DesktopAssistantServer:
             self._manual_pdd_launch_state = safe_result
             self._manual_pdd_launch_requested = True
         return HTTPStatus.ACCEPTED, safe_result
+
+    def refresh_pdd_workspace(self) -> tuple[int, dict[str, Any]]:
+        """Re-inspect the already open dedicated PDD page without navigation."""
+
+        if self.pdd_workspace_status_handler is None:
+            return HTTPStatus.SERVICE_UNAVAILABLE, {
+                "error": {"code": "PDD_WORKSPACE_REFRESH_NOT_AVAILABLE"}
+            }
+        with self._lock:
+            if self._manual_pdd_refresh_in_flight:
+                current = self._manual_pdd_launch_state or {}
+                return HTTPStatus.ACCEPTED, {
+                    "schema_version": "channel-agent-pdd-workspace-refresh.v1",
+                    "status": "REFRESHING",
+                    "browser_status": str(current.get("browser_status", "OPENED")),
+                    "pdd_login_state": current.get("pdd_login_state"),
+                    "observer_started": False,
+                    "real_send_enabled": False,
+                }
+            self._manual_pdd_refresh_in_flight = True
+        try:
+            result = self.pdd_workspace_status_handler()
+            safe_result = {
+                "schema_version": "channel-agent-pdd-workspace-refresh.v1",
+                "status": str(result.get("status", "OPENING")),
+                "browser_status": str(result.get("browser_status", "OPENED")),
+                "pdd_login_state": result.get("pdd_login_state"),
+                "observer_started": False,
+                "real_send_enabled": False,
+            }
+            with self._lock:
+                self._manual_pdd_launch_state = safe_result
+                self._manual_pdd_launch_requested = True
+            return HTTPStatus.OK, safe_result
+        except Exception:
+            return HTTPStatus.CONFLICT, {
+                "error": {"code": "PDD_WORKSPACE_REFRESH_FAILED"}
+            }
+        finally:
+            with self._lock:
+                self._manual_pdd_refresh_in_flight = False
+
+    def request_pdd_observer_restart(self) -> tuple[int, dict[str, Any]]:
+        """Queue one explicit restart; never changes read/send configuration."""
+
+        state = self._read_json(
+            self.data_root / "runtime" / "channel-agent-state.json"
+        )
+        if not state.get("message_observation_enabled", False):
+            return HTTPStatus.CONFLICT, {
+                "error": {"code": "PDD_OBSERVER_NOT_ENABLED"}
+            }
+        if state.get("pdd_login_state") != "CUSTOMER_SERVICE_READY":
+            return HTTPStatus.CONFLICT, {
+                "error": {"code": "PDD_WORKSPACE_NOT_READY"}
+            }
+        if state.get("identity_status") != "ACTIVE":
+            return HTTPStatus.CONFLICT, {
+                "error": {"code": "AGENT_IDENTITY_NOT_ACTIVE"}
+            }
+        path = self.data_root / "runtime" / "pdd-observer-restart.request"
+        with self._lock:
+            if path.exists():
+                return HTTPStatus.ACCEPTED, {
+                    "status": "ALREADY_REQUESTED",
+                    "real_send_enabled": False,
+                }
+            atomic_write_bytes(
+                path,
+                (json.dumps({
+                    "schema_version": "channel-agent-pdd-observer-restart-request.v1",
+                    "requested_at": datetime.now(UTC).isoformat(),
+                    "human_intent": True,
+                }, separators=(",", ":")) + "\n").encode("utf-8"),
+            )
+        return HTTPStatus.ACCEPTED, {
+            "status": "RESTART_REQUESTED",
+            "real_send_enabled": False,
+        }
 
     def assistant_feed(self) -> dict[str, Any]:
         TransientBusinessDataPolicy().purge_expired(self.data_root)
@@ -530,22 +617,46 @@ class DesktopAssistantServer:
         customer_label = f"客户 {customer_reference[-12:]}"
         updated_at = str(snapshot["updated_at"])
         citations = []
+        citation_keys: set[tuple[str, str, str, str]] = set()
         for item in snapshot.get("citations", [])[:32]:
             if not isinstance(item, dict):
                 continue
+            title = str(item.get("title") or item.get("reference") or "Knowledge")[:256]
+            summary = str(item.get("excerpt") or title)[:512]
+            product_id = str(item.get("product_id") or "")
+            sku_id = str(item.get("sku_id") or "")
+            key = (title, summary, product_id, sku_id)
+            if key in citation_keys:
+                continue
+            citation_keys.add(key)
             citations.append(
                 {
                     "file": str(item.get("title") or item.get("reference") or "知识来源"),
                     "page": None,
-                    "chunkId": None,
-                    "summary": str(item.get("reference") or "")[:512],
+                    "chunkId": str(item.get("reference") or "")[:512] or None,
+                    "summary": summary,
                     "distance": None,
                     "knowledgeVersion": None,
                     "sourceIds": [],
-                    "productId": item.get("product_id"),
-                    "skuId": item.get("sku_id"),
+                    "productId": product_id or None,
+                    "skuId": sku_id or None,
                 }
             )
+        raw_product = snapshot.get("product_context")
+        product_context = None
+        if isinstance(raw_product, dict):
+            attributes = raw_product.get("attributes")
+            product_context = {
+                "productReference": raw_product.get("product_reference"),
+                "productName": raw_product.get("product_name"),
+                "skuReference": raw_product.get("sku_reference"),
+                "skuName": raw_product.get("sku_name"),
+                "applicableAge": (
+                    attributes.get("applicable_age")
+                    if isinstance(attributes, dict)
+                    else None
+                ),
+            }
         reply_content = snapshot.get("reply_content")
         reply = None
         if isinstance(reply_content, str) and reply_content:
@@ -566,6 +677,7 @@ class DesktopAssistantServer:
                 "policyMode": snapshot.get("policy_mode"),
                 "preparationId": snapshot.get("preparation_id"),
                 "traceId": snapshot.get("trace_id"),
+                "productContext": product_context,
             }
         return {
             "schemaVersion": "channel-agent-workspace-feed.v2",
@@ -586,6 +698,7 @@ class DesktopAssistantServer:
                     "policyMode": snapshot.get("policy_mode"),
                     "preparationId": snapshot.get("preparation_id"),
                     "traceId": snapshot.get("trace_id"),
+                    "productContext": product_context,
                     "messages": [
                         {
                             "messageId": str(snapshot["turn_id"]),
@@ -600,6 +713,7 @@ class DesktopAssistantServer:
                 }
             ],
             "reply": reply,
+            "productContext": product_context,
             "safety": {
                 "readOnly": True,
                 "autoReply": bool(snapshot.get("safety", {}).get("auto_reply")),
@@ -1327,6 +1441,34 @@ class _DesktopHandler(BaseHTTPRequestHandler):
                 )
                 return
             status, response = self.server.runtime.launch_pdd_workspace()
+            self._json(status, response)
+            return
+        if path == "/local-api/v1/browser/pdd/refresh":
+            self._discard_request_body()
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_CONFIRMED_PDD_WORKSPACE_READY"
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            status, response = self.server.runtime.refresh_pdd_workspace()
+            self._json(status, response)
+            return
+        if path == "/local-api/v1/observer/pdd/restart":
+            self._discard_request_body()
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_CONFIRMED_PDD_OBSERVER_RESTART"
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            status, response = self.server.runtime.request_pdd_observer_restart()
             self._json(status, response)
             return
         read_match = re.fullmatch(

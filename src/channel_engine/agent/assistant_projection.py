@@ -31,6 +31,7 @@ def build_assistant_snapshot(
     package: AIReplyPackage,
     outcome: ReplyControlOutcome | None,
     *,
+    context: CustomerContext | None = None,
     agent_id: str,
     device_id: str,
     trace_id: str,
@@ -84,6 +85,9 @@ def build_assistant_snapshot(
             "preparation_count": 1 if prepared else 0,
         },
         citations=tuple(citation.model_dump(mode="json") for citation in package.citations),
+        product_context=(
+            context.page.product.model_dump(mode="json") if context is not None else None
+        ),
         updated_at=now.astimezone(UTC),
         expires_at=now.astimezone(UTC) + timedelta(minutes=30),
     )
@@ -125,6 +129,7 @@ class AssistantProjectionReconciler:
             expected = build_assistant_snapshot(
                 package,
                 outcome,
+                context=context,
                 agent_id=scope[0],
                 device_id=scope[1],
                 trace_id=trace_id,

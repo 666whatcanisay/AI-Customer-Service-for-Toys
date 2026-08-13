@@ -68,9 +68,19 @@ def load_pdd_replay_fixture(path: str | Path) -> PDDReadReplayFixture:
     if len(payload) > 1024 * 1024:
         raise PDDPageReadPortError("PDD replay fixture exceeds one MiB")
     try:
-        return PDDReadReplayFixture.model_validate_json(payload)
+        fixture = PDDReadReplayFixture.model_validate_json(payload)
     except Exception as exc:
         raise PDDPageReadPortError("PDD replay fixture is invalid") from exc
+    if fixture.fixture_id.startswith("real-pdd-sanitized:"):
+        try:
+            from .pdd_replay_approval import validate_real_fixture_from_environment
+
+            validate_real_fixture_from_environment(source)
+        except Exception as exc:
+            raise PDDPageReadPortError(
+                "real-derived PDD replay fixture is not approved"
+            ) from exc
+    return fixture
 
 
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")

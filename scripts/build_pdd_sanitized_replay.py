@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 from channel_agent.pdd_page_port import build_sanitized_pdd_replay_fixture
+from channel_agent.pdd_replay_approval import publish_immutable_fixture
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -34,10 +34,10 @@ def main() -> int:
         target_conversation_id=args.conversation_id,
         allowed_message_ids=tuple(args.message_id),
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = args.output.with_suffix(args.output.suffix + ".tmp")
-    temporary.write_text(fixture.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, args.output)
+    publish_immutable_fixture(
+        args.output,
+        (fixture.model_dump_json(indent=2) + "\n").encode("utf-8"),
+    )
     print(
         json.dumps(
             {
@@ -47,6 +47,9 @@ def main() -> int:
                 "message_count": len(fixture.capture["messages"]),
                 "source": fixture.source,
                 "sanitized": fixture.sanitized,
+                "privacy_processed": True,
+                "manual_review_required": True,
+                "replay_export_allowed": False,
             },
             ensure_ascii=False,
         )

@@ -46,10 +46,13 @@ def _literal_assignment(path: Path, name: str) -> str | None:
     return None
 
 
-def _package_gate() -> tuple[bool, str, str | None]:
-    package_root = ROOT / "dist/windows-client-v2/AI-CS-Channel-Agent"
+def _package_gate(
+    package_root: Path | None = None,
+    archive: Path | None = None,
+) -> tuple[bool, str, str | None]:
+    package_root = package_root or ROOT / "dist/windows-client-v2/AI-CS-Channel-Agent"
     manifest_path = package_root / "release-manifest.json"
-    archive = ROOT / (
+    archive = archive or ROOT / (
         "dist/windows-client-v2/"
         f"AI-CS-Channel-Agent-{EXPECTED_AGENT_VERSION}-windows-x64.zip"
     )
@@ -111,6 +114,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--selector-evidence-json", type=Path)
     parser.add_argument("--require-production-selector-evidence", action="store_true")
+    parser.add_argument("--package-root", type=Path)
+    parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
@@ -202,7 +207,10 @@ def main() -> int:
             "manual approval required; auto reply, real send and activation disabled",
         )
     )
-    package_passed, package_detail, archive_sha = _package_gate()
+    package_passed, package_detail, archive_sha = _package_gate(
+        args.package_root,
+        args.archive,
+    )
     checks.append(_result("WINDOWS_PACKAGE_BOUNDARY", package_passed, package_detail))
     selector_passed, selector_detail, selector_hash = _selector_evidence_gate(
         args.selector_evidence_json

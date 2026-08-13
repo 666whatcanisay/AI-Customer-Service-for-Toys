@@ -56,6 +56,7 @@ class OfflineAICSGateway:
                     {
                         "reference": "synthetic-faq-001",
                         "title": "合成商品 FAQ",
+                        "excerpt": "当前商品有现货知识记录。",
                         "product_id": scope["product_id"],
                         "sku_id": scope["sku_id"],
                         "source_kind": "RAG_KNOWLEDGE",
@@ -140,6 +141,9 @@ def test_black_box_manual_confirm_reaches_execution_prepared_without_real_send(
         assert snapshot.status == "WAITING_APPROVAL"
         assert snapshot.policy_mode == "MANUAL_CONFIRM"
         assert snapshot.quality_status == "PASS"
+        assert snapshot.product_context["product_reference"] == "product-001"
+        assert snapshot.product_context["sku_reference"] == "sku-001"
+        assert snapshot.citations[0]["excerpt"] == "当前商品有现货知识记录。"
         assert snapshot.safety.real_send is False
         assert snapshot.safety.execution_count == 0
         assert snapshot.safety.receipt_count == 0
@@ -288,6 +292,39 @@ def test_black_box_auto_low_risk_switch_and_new_message_invalidation(
         manual = runtime.set_policy("store-001", ReplyPolicyMode.MANUAL_CONFIRM)
         assert manual.mode == "MANUAL_CONFIRM"
         assert manual.revision > policy.revision
+    finally:
+        runtime.close()
+
+
+def test_auto_low_risk_fails_closed_when_citation_scope_is_not_current_product(
+    tmp_path: Path,
+) -> None:
+    class WrongProductGateway(OfflineAICSGateway):
+        def decide(self, request: DecisionRequest) -> DecisionResponse:
+            response = super().decide(request)
+            metadata = dict(response.metadata)
+            citation = dict(metadata["citations"][0])
+            citation["product_id"] = "different-product"
+            metadata["citations"] = [citation]
+            return response.model_copy(update={"metadata": metadata})
+
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "wrong-product", WrongProductGateway(), clock=lambda: NOW
+    )
+    try:
+        runtime.set_policy("store-001", ReplyPolicyMode.AUTO_LOW_RISK)
+        runtime.ingest_provider(
+            SyntheticPDDProvider((observation(message_id="synthetic-message-1"),))
+        )
+        runtime.drain()
+        snapshot = runtime.conversations()[0]
+        outcome = runtime.offline_control.reply_outcome(snapshot.decision_id)
+        assert outcome is not None
+        assert outcome.quality.status == "BLOCKED"
+        assert "CITATION_PRODUCT_CONTEXT_MISMATCH" in outcome.quality.reason_codes
+        assert outcome.preparation is None
+        assert snapshot.status == "MANUAL_INTERVENTION"
+        assert snapshot.safety.real_send is False
     finally:
         runtime.close()
 

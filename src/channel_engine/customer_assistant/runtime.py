@@ -207,10 +207,16 @@ class AICustomerReplyService:
                     product_id = item.get("product_id")
                     sku_id = item.get("sku_id")
                     source_kind = item.get("source_kind")
+                    excerpt = item.get("excerpt")
                     results.append(
                         KnowledgeCitation(
                             reference=reference.strip()[:512],
                             title=title.strip()[:256],
+                            excerpt=(
+                                excerpt.strip()[:1000]
+                                if isinstance(excerpt, str) and excerpt.strip()
+                                else None
+                            ),
                             product_id=(
                                 product_id.strip()[:160]
                                 if isinstance(product_id, str) and product_id.strip()

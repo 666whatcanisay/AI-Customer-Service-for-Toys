@@ -25,6 +25,7 @@ from channel_agent.edge_pdd_observe import (
 )
 from channel_agent.edge_spool import DurableEdgeSpool, EdgeSpoolConflict
 from channel_agent.pdd_observer import PDDObserverRunner
+from channel_agent.observation_runtime import ObserveOnlyRuntimeComponent
 from channel_agent.pdd_page_port import build_sanitized_pdd_replay_fixture
 from channel_agent.providers import ProviderUnavailable, RealPDDProvider
 from channel_engine.agent.observation_pipeline import (
@@ -320,6 +321,48 @@ def test_observer_session_warns_then_stops_before_another_scan() -> None:
     assert runner._session_event(25.0) == "PDD_OBSERVER_SESSION_WARNING"
     assert runner._session_event(26.0) is None
     assert runner._session_event(30.0) == "PDD_OBSERVER_SESSION_LIMIT_REACHED"
+
+
+def test_session_limit_requires_explicit_restart_and_recovers_pending() -> None:
+    class Runner:
+        running = False
+        stop_reason = "PDD_OBSERVER_SESSION_LIMIT_REACHED"
+        starts = 0
+
+        def start(self) -> None:
+            self.running = True
+            self.stop_reason = None
+            self.starts += 1
+
+        def stop(self, timeout: float = 5.0) -> None:
+            del timeout
+            self.running = False
+
+    class Forwarder:
+        recovered = 0
+
+        def recover_pending(self) -> int:
+            self.recovered += 1
+            return self.recovered
+
+    runner = Runner()
+    forwarder = Forwarder()
+    component = ObserveOnlyRuntimeComponent(
+        forwarder=forwarder,
+        observer=runner,
+        assistant_events=SimpleNamespace(start=lambda: None, stop=lambda timeout=5: None),
+    )
+    component._started = True
+    component._observing = True
+
+    component.set_page_ready(True)
+    assert component.observing is False
+    assert runner.starts == 0
+
+    assert component.restart_observer(page_ready=True) is True
+    assert component.observing is True
+    assert runner.starts == 1
+    assert forwarder.recovered == 1
 
 
 def test_missing_page_sequence_uses_durable_message_id_monotonic_mapping(tmp_path) -> None:
