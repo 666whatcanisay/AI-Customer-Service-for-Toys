@@ -9,6 +9,10 @@
       <div class="runtime-summary" aria-label="客户端运行状态">
         <span :class="statusClass(agentStatus)"><i />Agent {{ statusLabel(agentStatus) }}</span>
         <span :class="statusClass(browserStatus)"><i />PDD {{ pddLabel }}</span>
+        <span
+          :class="realMessageObservationEnabled ? 'healthy' : 'attention'"
+          data-testid="message-source-status"
+        ><i />{{ messageSourceLabel }}</span>
         <button
           v-if="canOpenPddWindow"
           type="button"
@@ -100,6 +104,15 @@ let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CONNECTING')
 const browserStatus = computed(() => bootstrap.value?.browser.status ?? 'STOPPED')
+const realMessageObservationEnabled = computed(() => (
+  bootstrap.value?.browser.real_pdd_message_observation_enabled === true
+))
+const messageSourceLabel = computed(() => {
+  const source = bootstrap.value?.browser.message_source
+  if (source === 'REAL_PDD') return '真实消息读取 已启用'
+  if (source === 'OFFLINE_REPLAY') return '消息源 离线回放'
+  return '真实消息读取 未启用'
+})
 const pddLabel = computed(() => {
   const login = bootstrap.value?.browser.pdd_login_state
   if (login === 'CUSTOMER_SERVICE_READY') return '客服工作台已就绪'

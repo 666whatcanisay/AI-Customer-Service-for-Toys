@@ -1,6 +1,7 @@
 export type ChannelAgentBootstrap = {
   schema_version: string
   csrf_token: string
+  assistant_event_cursor?: number
   agent: {
     process_status: string
     runtime_status: string
@@ -14,6 +15,8 @@ export type ChannelAgentBootstrap = {
     pdd_workspace_refresh_available?: boolean
     observer_status?: string
     observer_restart_available?: boolean
+    message_source?: 'REAL_PDD' | 'OFFLINE_REPLAY' | 'DISABLED'
+    real_pdd_message_observation_enabled?: boolean
   }
   binding: {
     agent_id: string | null

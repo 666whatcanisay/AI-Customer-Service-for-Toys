@@ -791,7 +791,19 @@ const syncChannelAgentFeed = async (): Promise<void> => {
   }
 }
 
-const handleChannelAgentAssistantEvent = (): void => {
+type ChannelAgentAssistantEventDetail = {
+  event_type?: string
+  metadata?: { origin?: string }
+}
+
+const handleChannelAgentAssistantEvent = (event: Event): void => {
+  const detail = (event as CustomEvent<ChannelAgentAssistantEventDetail>).detail
+  if (detail?.event_type === 'MESSAGE_ACCEPTED') {
+    const message = ['LIVE_PDD', 'REAL_PDD'].includes(detail.metadata?.origin ?? '')
+      ? '收到一条新的拼多多客户消息，正在刷新会话。'
+      : '收到一条新的客户消息，正在刷新会话。'
+    ElMessage.info(message)
+  }
   void syncChannelAgentFeed()
 }
 

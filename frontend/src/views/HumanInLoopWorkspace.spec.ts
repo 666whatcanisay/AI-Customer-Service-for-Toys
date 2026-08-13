@@ -18,6 +18,11 @@ const apiMocks = vi.hoisted(() => ({
   requestBindingGrant: vi.fn()
 }))
 
+const elementMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  success: vi.fn()
+}))
+
 vi.mock('@/api/storeContextClient', () => ({
   storeContextClient: {
     getContext: apiMocks.getContext,
@@ -45,7 +50,7 @@ vi.mock('@/api/aiResponseFeedbackClient', () => ({
 }))
 
 vi.mock('element-plus', () => ({
-  ElMessage: { info: vi.fn(), success: vi.fn() }
+  ElMessage: { info: elementMocks.info, success: elementMocks.success }
 }))
 
 const store = { storeId: 8, tenantId: 'TENANT-1', platform: 'pinduoduo', storeCode: 'STORE-1', storeName: '演示积木店', isDefault: true }
@@ -320,6 +325,21 @@ describe('HumanInLoopWorkspace', () => {
     await wrapper.get('[data-testid="agent-offline"]').trigger('click')
     expect(wrapper.get('[data-testid="agent-status"]').text()).toContain('离线')
     expect((wrapper.get('[data-testid="generate-draft"]').element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('announces a newly accepted real PDD customer message and refreshes the workspace', async () => {
+    const wrapper = mountWorkspace(); await flushPromises()
+
+    window.dispatchEvent(new CustomEvent('channel-agent:assistant-event', {
+      detail: {
+        event_type: 'MESSAGE_ACCEPTED',
+        metadata: { origin: 'LIVE_PDD' }
+      }
+    }))
+    await flushPromises()
+
+    expect(elementMocks.info).toHaveBeenCalledWith('收到一条新的拼多多客户消息，正在刷新会话。')
+    wrapper.unmount()
   })
 
   it('shows a real Agent offline warning without claiming the page is disconnected', async () => {
