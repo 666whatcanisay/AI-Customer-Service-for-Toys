@@ -307,6 +307,53 @@ def test_windows_profile_discovery_runs_without_a_visible_console(
     )
 
 
+def test_windows_edge_command_bypasses_system_proxy_once_and_keeps_url_last(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "msedge.exe"
+    profile = tmp_path / "profile"
+    url = "https://merchant.example/customer-service"
+
+    command = WindowsBrowserProcessController._command(executable, profile, url)
+
+    assert command[0] == str(executable)
+    assert command[1] == f"--user-data-dir={profile}"
+    assert command.count("--no-proxy-server") == 1
+    assert "--remote-debugging-address=127.0.0.1" in command
+    assert "--remote-debugging-port=0" in command
+    assert command[-1] == url
+
+
+def test_windows_start_and_navigate_share_proxy_bypass_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "msedge.exe"
+    executable.write_bytes(b"edge")
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    controller = WindowsBrowserProcessController()
+    commands: list[list[str]] = []
+
+    monkeypatch.setattr(controller, "_require_windows", lambda _executable: None)
+
+    class FakeProcess:
+        pid = 40152
+
+    def fake_popen(command: list[str], **_kwargs: object) -> FakeProcess:
+        commands.append(command)
+        return FakeProcess()
+
+    monkeypatch.setattr(browser_module.subprocess, "Popen", fake_popen)
+
+    assert controller.start(executable, profile, "https://merchant.example/login") == 40152
+    controller.navigate(executable, profile, "https://merchant.example/chat")
+
+    assert len(commands) == 2
+    assert all(command.count("--no-proxy-server") == 1 for command in commands)
+    assert commands[0][-1] == "https://merchant.example/login"
+    assert commands[1][-1] == "https://merchant.example/chat"
+
+
 def test_windows_profile_discovery_uses_devtools_listener_when_cim_is_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

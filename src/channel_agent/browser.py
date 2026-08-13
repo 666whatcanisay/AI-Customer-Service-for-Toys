@@ -500,6 +500,7 @@ if ($null -ne $main) { [Console]::Out.Write([string]$main.ProcessId) }
             "--no-default-browser-check",
             "--disable-background-mode",
             "--disable-sync",
+            "--no-proxy-server",
             "--remote-debugging-address=127.0.0.1",
             "--remote-debugging-port=0",
             url,
