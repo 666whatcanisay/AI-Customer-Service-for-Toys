@@ -1,78 +1,90 @@
-# RC5 Final Readiness Report
+# RC5 最终收口报告
 
 生成时间：2026-08-13（Asia/Shanghai）
 
-## 一页结论
+## 最终结论
 
-| Gate | 状态 | 结论 |
+| 项目 | 状态 | 结论 |
 |---|---|---|
-| `RC5_OFFLINE_STABILITY_READY` | PASS | 离线业务链、AI、策略、安全门、恢复、部署及自动化 UI 均通过 |
-| `MORNING_PDD_SCAN_READY` | PASS | 专属 PDD 启动入口的配置、路由、参数和调用链已离线/Mock 验证；今晚未启动 PDD |
-| `CURRENT_GREEN_UI_HUMAN_ACCEPTANCE` | NOT_VERIFIED | 必须明早在唯一绿色助手窗口人工点击验收 |
-| `RC5_FINAL_READY` | BLOCKED | 仅被上述人工 UI Gate 阻塞 |
-| `REAL_PDD_ADAPTER_READY` | NOT_VERIFIED | 明早真实 PDD Gate |
-| `REAL_PDD_READ_READY` | NOT_VERIFIED | 依赖 Adapter PASS，需真实页面证据 |
-| `REAL_PDD_AI_READY` | NOT_VERIFIED | 需真实消息进入 AI 链 |
-| `REAL_PDD_CONFIRM_READY` | NOT_VERIFIED | 需真实会话人工确认证据 |
-| `REAL_PDD_SEND_READY` | NOT_VERIFIED | 独立、最后执行 |
-| `AI_CS_PRODUCTION_READY` | BLOCKED | 所有真实 PDD Gate 通过前不得宣告生产完成 |
+| `RC5_OFFLINE_STABILITY_READY` | PASS | 离线消息、AI、质量门、人工确认、低风险策略、执行准备、安全门及部署能力已完成 |
+| `CURRENT_GREEN_UI_HUMAN_ACCEPTANCE` | PASS | 已保存人工确认后的 Decision、Approval、唯一 ExecutionPrepared 与零真实副作用证据 |
+| `RC5_FINAL_READY` | PASS | RC5 离线产品收口完成 |
+| `REAL_PDD_PAGE_STRUCTURE_DISCOVERY` | PASS | 已确认官方客服工作台、会话项、消息根、角色标记、商品卡、订单面板和回复框的页面形态 |
+| `REAL_PDD_ADAPTER_READY` | NOT_VERIFIED | 尚未冻结无歧义活动会话选择、真实 ID 映射、正式 Observation 与 ACK 链 |
+| `REAL_PDD_READ_READY` | NOT_VERIFIED | 尚未完成真实会话/消息/商品/SKU 的端到端读取证据 |
+| `REAL_PDD_AI_READY` | NOT_VERIFIED | 尚未以真实消息进入 CustomerContext、AI-CS 和绿色助手 |
+| `REAL_PDD_CONFIRM_READY` | NOT_VERIFIED | 尚未以真实会话完成 MANUAL_CONFIRM 证据 |
+| `REAL_PDD_SEND_READY` | NOT_VERIFIED | 真实发送仍关闭；不得由当前结果推导 |
+| `AI_CS_PRODUCTION_READY` | BLOCKED | 必须等真实 PDD Gate 完成 |
 
-## 本轮问题与修复
+## 本轮 P0 修复
 
-| Issue | 原因 | 最小修复 | 验证 |
+| P0 | 根因 | 修复 | 结果 |
 |---|---|---|---|
-| 商品依据显示内部 ID/重复作用域 | 可读 citation 信息在投影丢失且 UI 重复渲染 | 复用现有 citation，内部增加可选 excerpt；UI 去重并以“商品知识”展示 | Backend/Frontend/Engine PASS |
-| 无商品上下文仍可做具体商品自动答复 | Decision 未校验 citation 与当前商品/SKU 作用域 | 仅对明确依赖商品事实的 mismatch 阻断 AUTO_LOW_RISK | Engine unit/e2e PASS |
-| 停用用户无法重新启用 | 管理界面未连接已有 updateUser 状态能力 | 复用既有 API 增加“启用”动作 | Admin 92 PASS |
-| 顶部 AI 状态与状态页不一致 | 两处独立取数与缓存 | 复用同一 Admin store/cache | Admin 92 PASS |
-| 进入 PDD 工作台后不能重新识别 | UI 未连接现有只读 inspect/observer 能力 | 增加 loopback、本地鉴权、CSRF/人工意图、single-flight 的薄连接 | Engine/Frontend PASS；真实点击留明早 |
-| 30 分钟停止后不能再次开始 | Observer 到期状态没有回到可显式 START 的生命周期 | 保留既有 30 分钟安全限制，修复 `TIMEOUT/STOPPED → START` | Unit/e2e PASS |
-| 当前 Host 健康但 Worker 不消费 | 历史 SQLite lock 后 Worker 停滞 | 停止新 Observation、三库一致性备份、原路径重启、投影恢复 | 当前链前8项 PASS；黑盒35/35 PASS |
-| 黑盒 Shadow 启动失效 | 数据库身份治理后测试克隆未生成新 ID；脚本仍调用已删除迁移函数；CIM 受页面文件压力影响 | Clone 生成独立 DB identity；普通启动 validate-only；精确 loopback+health fail-closed 识别 | 黑盒35/35、Engine 797 PASS |
-| Pilot Governance 可能 fail-open | 原判定只覆盖 Host/Platform 与 Host DB，Buffer、Offline、Spool、源码冻结和 A/RAG 身份未成为必需条件 | 分离 Runtime/Source/Storage/Send/Gate 状态，所有必需依赖 fail-closed；旧派生字段仅兼容解析并忽略 | Governance 18项、Engine Full Gate PASS |
-| A/RAG 运行身份缺失 | Platform 有 Activation，但 8420 进程、模型配置、Vector Collection 与冻结源码未纳入身份核验 | 受控启动生成 `AI_CS_RAG` Activation；强校验 PID/启动时间/端口/源码/配置/模型/Vector 路径/Collection/Ready | PowerShell Activation 测试与 Full Gate PASS |
+| 源码、候选包、安装实例无法证明是同一版本 | 旧包 Manifest 没有 Engine/UI 源码身份，最终状态脚本只能比较文件 Hash | Windows Agent Manifest 升至 `2.2`，记录实现提交、Tree、Composition SHA、UI Assets SHA；最终状态脚本增加三段一致性判断 | `source_matches_package=true`、`package_matches_installed=true`、`installed_identity_matches_source=true` |
+| RC 版本覆盖安装失败 | 安装器把 `2.0.0rc5` 直接转换为 `System.Version` | 增加受控 RC 版本解析和比较；正式版仍高于相同基础版本 RC | 安装成功，当前安装包与候选包 Hash 完全一致 |
+| 最终 BOM 仍指向旧候选包 | 旧 BOM 指向旧 SHA，且明确记录 `matches_current_candidate=false` | 重建候选包、覆盖安装、重新生成 BOM/版本矩阵 | 当前 BOM 指向实现提交 `71fc4eb` / `4d3be2a` 与已安装资产 |
 
-## 架构与安全结论
+## 当前唯一版本事实
 
-- 核心路径保持：Provider → Agent → Host → Buffer → CustomerContext → AI-CS → Quality Gate → Reply Strategy → ExecutionPrepared。
-- 未修改 Gateway Wire 1.0、ExecutionPreparation 公共协议、ACK/Cursor、Identity 或 Binding 设计。
-- 两个本地 POST 动作只允许 loopback assistant session，复用 CSRF/人工意图，single-flight/幂等，失败关闭；不得改变 real read/send 开关。
-- `RealExecutionAttempt=0`、`RealSend=0`、`RealReceipt=0`。离线 `ExecutionPrepared` 按测试正常增长。
-- Controlled Send 仍被生产 composition 排除；`AUTO_LOW_RISK → 真实发送` 今晚未启用。
-
-## 数据库与恢复
-
-| 数据库 | 实际状态 |
+| 对象 | 当前值 |
 |---|---|
-| Platform | `0019_runtime_database_identity_v1`，49 tables，integrity `ok`，Instance `1a915867-4418-44e7-b9b7-4bb098c9b1d9` |
-| Host Control | storage `1.0`，45 tables，integrity `ok`，Instance `eacc942b-a1db-4807-810b-9db3e5e3d395` |
-| 普通启动 | validate-only；不建库、不自动 migration、不导入测试知识 |
-| 一致性备份 | `.runtime/rc5-overnight-closure/host-worker-recovery-backup/manifest.json` |
+| Engine Implementation Freeze SHA | `71fc4eb9eb754001e4264736200f64f8340371f3` |
+| AI-CS Implementation Freeze SHA | `4d3be2ac3958697d42271439a41557dea784246d` |
+| Agent EXE SHA-256 | `a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d` |
+| Agent PYZ SHA-256 | `4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93` |
+| Package Manifest SHA-256 | `819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7` |
+| ZIP SHA-256 | `9e67800add464d72a2bf3624ad6ec3c86b17fc58706b2b32fc59d7bec602f826` |
+| Platform Migration Head | `0019_runtime_database_identity_v1` |
+| Gateway Wire / Canonical SHA | `1.0` / `e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5` |
 
-备份前已停止 Observation 入口与 Host，三库使用 SQLite backup API 并逐一执行 integrity check；Agent binding/config SHA 恢复前后完全一致。
+Evidence/Docs Commit 与 Implementation Freeze SHA 分开记录。本文档提交不会改变已安装运行资产的实现身份，也不要求重新构建或重启。
 
-## 最终测试
+## 验证结果
 
-| 测试 | 结果 |
+| 验证 | 结果 |
 |---|---|
-| Channel Engine / Agent | 797 passed，1 个显式真实 Edge smoke NOT IN SCOPE |
-| AI-CS Backend | 153 passed，3 个显式真实本地 E2E NOT IN SCOPE |
-| Platform | 181 passed |
-| Contracts | 16 passed |
-| 绿色助手 | 216 passed + typecheck PASS |
-| Admin | 92 passed + typecheck PASS |
-| 后端黑盒 | 35/35 PASS |
-| Windows 隔离部署 | 13/13 PASS |
-| Production Architecture | software RC PASS；真实 Selector BLOCKED |
+| P0 打包/安装定向回归 | 23/23 PASS |
+| PDD Adapter 离线定向回归 | 39 项先前 PASS；最终当前选择集 37/37 PASS |
+| 后端黑盒 | 35/35 PASS（复用上一阶段 Full Gate） |
+| Engine / Agent | 797 PASS，1 个真实 Edge smoke NOT IN SCOPE（复用） |
+| AI-CS Backend | 153 PASS，3 个真实本地 E2E NOT IN SCOPE（复用） |
+| Platform / Contracts | 181 PASS / 16 PASS（复用） |
+| 绿色助手 / Admin | 216 PASS / 92 PASS + typecheck（复用） |
+| Windows 隔离部署 | 13/13 PASS（复用；本轮实际覆盖安装另行成功） |
+| Production Architecture | software RC PASS；真实 Selector Gate 按预期 BLOCKED |
 
-本轮阶段 Full Gate 证据位于 `.runtime/rc5-governance-freeze/full-gate/`，后端黑盒证据位于 `.runtime/rc5-governance-freeze/backend-blackbox-run/`，Windows 隔离部署报告位于 `.runtime/w/windows-deployment-report.json`，Production Architecture 报告位于 `.runtime/rc5-governance-freeze/production-architecture.json`。当前绿色窗口的人工点击不能由自动化测试替代，因此没有伪写 PASS。
+本轮只改变打包身份记录、状态采集与安装器版本比较，按 Change Gate 制度没有重复运行全部 1400+ 测试。
 
-## 冻结与范围
+## 运行保护与安全
 
-冻结：Provider 抽象、ACK/Cursor、Agent Identity、Device Binding、Gateway、Execution 安全门、MANUAL_CONFIRM、AUTO_LOW_RISK 离线策略、Receipt 隔离。上述能力修改会触发相关全量、黑盒35项、Contracts/消费者与 Architecture Gate 重验。
+- Agent Identity、Device Binding revision、Store 授权、正式 PDD Profile 身份和配置 Hash 安装前后保持不变。
+- 未导出 Cookie、Token 或 PDD Session 内容。
+- 当前 `real_send_enabled=false`，正式 PDD 浏览器未由本轮启动。
+- 当前浏览器状态 `STOPPED`；Observer 为 `WAITING_IDENTITY`，没有处于扫描状态。
+- 本轮未调用 Observer restart，也未生成真实 Observation 或执行页面写操作。
+- Controlled Send 仍不进入生产组合；`AUTO_LOW_RISK → 真实发送` 仍未启用。
 
-本轮不阻塞项：代码签名、企业证书、Windows Service、正式 Release Tag。人工编辑后的 Preparation Gate、真实 PDD、通知增强均不在今晚范围；通知不阻塞核心 Pilot。
+## 真实 PDD 已确认与未确认
 
-## 明早唯一人工收口
+已确认：官方客服工作台路径、可见会话列表、消息容器、CUSTOMER/OPERATOR 结构标记、稳定 message-id 形态、商品卡、订单面板及回复框存在。
 
-代码与文档冻结后，先在不启动 PDD Edge 的前提下经受管入口恢复 Host、Platform、A/RAG，生成三份 Runtime Activation 并执行最终 fail-closed Preflight。随后按 `real-pdd/MORNING-PDD-PILOT-RUNBOOK.md`：先确认唯一绿色助手窗口，完成 Synthetic/Replay → 显示 → 人工确认 → Approval → ExecutionPrepared → RealSend=0；通过后将 `RC5_FINAL_READY` 升为 PASS，再由用户手工启动专属 PDD Edge、扫码并进入 Adapter Gate。`may_enter_read_only_pilot=true` 只代表技术预检通过，不能替代该人工授权。
+仍需真实 PDD 才能确认：
+
+1. 唯一活动会话选择器与稳定 conversation/customer 映射。
+2. unread/last activity 归一化及 BOT/SYSTEM 真实证据。
+3. 当前 Turn 的 product/SKU ID 映射。
+4. 正式 Production Selector Evidence。
+5. REAL_PDD Observation → Durable Spool → Host ACK/Cursor。
+6. 首个脱敏 Replay 与等价离线回归。
+7. 真实消息进入 AI、人工确认以及最后的受控真实发送。
+
+## 冻结能力
+
+Provider 抽象、ACK/Cursor、Agent Identity、Device Binding、Gateway Wire、Execution 安全门、MANUAL_CONFIRM、AUTO_LOW_RISK 离线策略、Synthetic/Real Receipt 隔离均已冻结。无明确 P0/P1 原因不得重构；修改会触发对应消费者、黑盒和 Architecture Gate 重验。
+
+## 非 P0 记录
+
+所有非 P0 项统一记录在 [RC5-Post-Pilot-Issues.md](RC5-Post-Pilot-Issues.md)。当前不拆分三套 PDD Snapshot、不拆 `desktop.py`、不更换 SQLite、不建设远程审计系统。
+
+下一步只进入 `REAL_PDD_ADAPTER_READY → REAL_PDD_READ_READY` 的真实 Pilot，不继续增加治理或外围功能。

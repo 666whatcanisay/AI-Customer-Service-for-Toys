@@ -1,15 +1,14 @@
 {
-  "schema": "rc5-offline-stability-version-matrix.v3",
-  "generated_at": "2026-08-13T10:14:17+08:00",
-  "scope": "OFFLINE_NO_REAL_PDD",
+  "schema": "rc5-offline-stability-version-matrix.v4",
+  "generated_at": "2026-08-13T19:35:00+08:00",
+  "scope": "OFFLINE_RC5_PLUS_REAL_PDD_PAGE_DISCOVERY",
   "source": {
     "identity_semantics": "FROZEN_IMPLEMENTATION_COMMITS_PLUS_EVIDENCE_COMMIT_RESOLVED_FROM_GIT",
-    "engine_base_implementation_commit": "476a02e8a87bb972a7e94d743e3b4567327bcd00",
-    "engine_implementation_commit": "bc6aee32babdcb142ad13faaab9ed56ad305f455",
-    "engine_implementation_tree": "e88ba514030c8f396f884b08f2f2529534b83bcf",
+    "engine_implementation_commit": "71fc4eb9eb754001e4264736200f64f8340371f3",
+    "engine_implementation_tree": "d07d30b929532385a59976beb25361c58344f94d",
     "engine_evidence_commit_resolution": "git log -1 -- docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json",
-    "ai_cs_implementation_commit": "84154f56b2d165a8983b678460a24fb94cc29103",
-    "ai_cs_implementation_tree": "1db7c71a1de04900a8732070761f893b66acf05d",
+    "ai_cs_implementation_commit": "4d3be2ac3958697d42271439a41557dea784246d",
+    "ai_cs_implementation_tree": "7fa80f2ac4bc7953bc137c844a083892caead1e9",
     "engine_version": "0.2.0rc3",
     "agent_version": "2.0.0rc5",
     "ai_cs_contracts": "0.14.0",
@@ -17,32 +16,30 @@
     "channel_engine_storage_version": "1.0"
   },
   "candidate_package": {
-    "path": "dist/windows-client-v2/rc5-governance-freeze/AI-CS-Channel-Agent-2.0.0rc5-windows-x64.zip",
-    "archive_sha256": "40adfd1647a595343427e4d4aa1a4ab7421224e44c5d285bbc9fd3db7b5c9528",
-    "manifest_sha256": "a4a79d216bff763d84a314c7f62e6a256993fc5902aea57307e1d7fe5ddbf308",
-    "executable_sha256": "25c0d9219fed0f9b0b348d5227973a84412ad9e174c355011b2ac2adb3fc2542",
-    "pyz_sha256": "771c0b6dadfe1672d667510244b005d45c6ac8798b308b32a6c474ae6bd1122f",
+    "path": "dist/windows-client-v2/rc5-p0-closeout/AI-CS-Channel-Agent-2.0.0rc5-windows-x64.zip",
+    "archive_sha256": "9e67800add464d72a2bf3624ad6ec3c86b17fc58706b2b32fc59d7bec602f826",
+    "manifest_sha256": "819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7",
+    "executable_sha256": "a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d",
+    "pyz_sha256": "4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93",
     "file_count": 1161,
-    "isolated_deployment": "13/13 PASS",
     "production_composition": "PASS",
     "forbidden_entries": 0
   },
   "installed_runtime": {
     "version": "2.0.0rc5",
-    "matches_current_candidate": false,
-    "installed_executable_sha256": "7d0bbdcc04c5cff4131081b17be06f2d5b1d0d3188d5512a3b184b78dd090b49",
-    "installed_pyz_sha256": "77a8ecb400bfbbf75b68df01fdbdfed5b25007bfc061214148ff576e7a44d8e9",
-    "installed_manifest_sha256": "171a0666c9aac3d56e4c58adc884cc51f2341108aff075fef838ec980ccd202f",
-    "upgrade_status": "DEFERRED_TO_CONTROLLED_UI_ACCEPTANCE",
-    "identity_status": "ACTIVE",
+    "matches_current_candidate": true,
+    "installed_executable_sha256": "a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d",
+    "installed_pyz_sha256": "4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93",
+    "installed_manifest_sha256": "819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7",
+    "identity_status": "REGISTERED",
     "binding_revision": 2,
     "profile_replaced": false,
-    "pdd_session_exported": false,
     "real_send_enabled": false,
-    "pdd_browser_started_by_full_gate": false
+    "pdd_browser_running": false,
+    "pdd_observer_runtime_status": "WAITING_IDENTITY_NOT_SCANNING"
   },
   "verification": {
-    "stage_full_gate": "PASS",
+    "stage_full_gate": "PASS_REUSED_FOR_UNCHANGED_CORE",
     "engine": "797 PASS, 1 NOT_IN_SCOPE",
     "ai_cs_backend": "153 PASS, 3 NOT_IN_SCOPE",
     "platform": "181 PASS",
@@ -51,9 +48,10 @@
     "admin_ui": "92 PASS + typecheck PASS",
     "backend_blackbox": "35/35 PASS",
     "windows_deployment": "13/13 PASS",
+    "p0_package_change_gate": "23/23 PASS",
+    "pdd_adapter_offline_change_gate": "39 PASS earlier; 37/37 PASS final selected recheck",
     "production_architecture_software_rc": "PASS",
-    "pilot_governance_change_gate": "23/23 PASS",
-    "production_selector_evidence": "BLOCKED_EXPECTED_REAL_PDD_NOT_VERIFIED",
+    "production_selector_evidence": "BLOCKED_EXPECTED_REAL_PDD_ADAPTER_NOT_VERIFIED",
     "real_execution_attempts": 0,
     "real_sends": 0,
     "real_receipts": 0
@@ -85,9 +83,8 @@
     "REAL_PDD_AUTO_SEND_READY": "NOT_IN_SCOPE"
   },
   "derived": {
-    "semantics": "DEPRECATED_INPUTS_IGNORED; USE PILOT GOVERNANCE OUTPUT",
-    "ai_cs_production_ready": null,
+    "ai_cs_production_ready": false,
     "may_enter_read_only_pilot": null,
-    "real_send_enabled": null
+    "real_send_enabled": false
   }
 }
