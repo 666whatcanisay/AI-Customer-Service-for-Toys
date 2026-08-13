@@ -307,6 +307,94 @@ def test_windows_profile_discovery_runs_without_a_visible_console(
     )
 
 
+def test_windows_profile_discovery_uses_devtools_listener_when_cim_is_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "msedge.exe"
+    executable.write_bytes(b"edge")
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "DevToolsActivePort").write_text(
+        "57744\n/devtools/browser/synthetic-id\n",
+        encoding="utf-8",
+    )
+    controller = WindowsBrowserProcessController()
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(controller, "_require_windows", lambda _executable: None)
+    monkeypatch.setattr(
+        browser_module,
+        "_windows_process_image",
+        lambda pid: str(executable.resolve()) if pid == 40152 else None,
+    )
+    monkeypatch.setattr(
+        controller,
+        "_devtools_endpoint_matches",
+        lambda port, path: port == 57744 and path == "/devtools/browser/synthetic-id",
+    )
+
+    def fake_run(command: list[str], **_kwargs: object) -> object:
+        calls.append(command)
+        assert command[0] == "netstat.exe"
+        return type(
+            "Completed",
+            (),
+            {
+                "stdout": (
+                    "  TCP    127.0.0.1:57744    0.0.0.0:0    "
+                    "LISTENING    40152\n"
+                ),
+                "returncode": 0,
+            },
+        )()
+
+    monkeypatch.setattr(browser_module.subprocess, "run", fake_run)
+
+    assert controller.find_running(executable, profile) == 40152
+    assert len(calls) == 1
+
+
+def test_windows_profile_discovery_rejects_stale_devtools_listener(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "msedge.exe"
+    executable.write_bytes(b"edge")
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "DevToolsActivePort").write_text(
+        "57744\n/devtools/browser/stale-id\n",
+        encoding="utf-8",
+    )
+    controller = WindowsBrowserProcessController()
+    calls = 0
+
+    monkeypatch.setattr(controller, "_require_windows", lambda _executable: None)
+    monkeypatch.setattr(browser_module, "_windows_process_image", lambda _pid: None)
+    monkeypatch.setattr(controller, "_devtools_endpoint_matches", lambda _port, _path: True)
+
+    def fake_run(command: list[str], **_kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        if command[0] == "netstat.exe":
+            return type(
+                "Completed",
+                (),
+                {
+                    "stdout": (
+                        "  TCP    127.0.0.1:57744    0.0.0.0:0    "
+                        "LISTENING    40152\n"
+                    ),
+                    "returncode": 0,
+                },
+            )()
+        return type("Completed", (), {"stdout": "", "returncode": 1})()
+
+    monkeypatch.setattr(browser_module.subprocess, "run", fake_run)
+
+    assert controller.find_running(executable, profile) is None
+    assert calls == 2
+
+
 def test_browser_status_reattaches_to_existing_agent_profile_process(
     tmp_path: Path,
 ) -> None:

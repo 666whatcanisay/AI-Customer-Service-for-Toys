@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -299,6 +300,13 @@ class WindowsBrowserProcessController:
         """
 
         self._require_windows(executable)
+        # Edge writes this file inside the exact isolated profile after binding
+        # its loopback DevTools listener.  Prefer that narrow ownership signal
+        # over a system-wide CIM scan: Win32_Process can fail under Windows
+        # memory pressure even while the dedicated Edge window is healthy.
+        devtools_pid = self._find_running_from_devtools(executable, profile_path)
+        if devtools_pid is not None:
+            return devtools_pid
         environment = os.environ.copy()
         environment["AI_CS_EDGE_EXECUTABLE"] = str(executable.resolve())
         environment["AI_CS_EDGE_PROFILE"] = str(profile_path.resolve())
@@ -352,6 +360,95 @@ if ($null -ne $main) { [Console]::Out.Write([string]$main.ProcessId) }
         except (TypeError, ValueError):
             return None
         return pid if completed.returncode == 0 and self.is_running(pid, executable) else None
+
+    def _find_running_from_devtools(
+        self,
+        executable: Path,
+        profile_path: Path,
+    ) -> int | None:
+        port_file = profile_path.resolve() / "DevToolsActivePort"
+        try:
+            raw = port_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            return None
+        if len(raw) > 4096:
+            return None
+        lines = raw.splitlines()
+        if len(lines) < 2 or not lines[1].startswith("/devtools/browser/"):
+            return None
+        try:
+            port = int(lines[0])
+        except ValueError:
+            return None
+        if not 1 <= port <= 65535:
+            return None
+        if not self._devtools_endpoint_matches(port, lines[1]):
+            return None
+        try:
+            completed = subprocess.run(
+                ["netstat.exe", "-ano", "-p", "tcp"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=5.0,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if completed.returncode != 0:
+            return None
+        listener = re.compile(
+            rf"^\s*TCP\s+127\.0\.0\.1:{port}\s+\S+\s+LISTENING\s+(\d+)\s*$",
+            flags=re.IGNORECASE | re.MULTILINE,
+        ).search(completed.stdout)
+        if listener is None:
+            return None
+        try:
+            pid = int(listener.group(1))
+        except ValueError:
+            return None
+        return pid if self.is_running(pid, executable) else None
+
+    @staticmethod
+    def _devtools_endpoint_matches(port: int, expected_path: str) -> bool:
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1.0)
+        try:
+            connection.request("GET", "/json/version")
+            response = connection.getresponse()
+            if response.status != 200:
+                return False
+            body = response.read(16385)
+            if len(body) > 16384:
+                return False
+            payload = json.loads(body.decode("utf-8"))
+        except (
+            OSError,
+            UnicodeError,
+            ValueError,
+            json.JSONDecodeError,
+            http.client.HTTPException,
+        ):
+            return False
+        finally:
+            connection.close()
+        websocket_url = payload.get("webSocketDebuggerUrl")
+        if not isinstance(websocket_url, str):
+            return False
+        parsed = urlsplit(websocket_url)
+        return (
+            parsed.scheme == "ws"
+            and parsed.hostname in {"127.0.0.1", "localhost"}
+            and parsed.port == port
+            and parsed.path == expected_path
+            and not parsed.username
+            and not parsed.password
+            and not parsed.query
+            and not parsed.fragment
+        )
 
     def stop(self, pid: int, executable: Path, timeout_seconds: float) -> bool:
         if not self.is_running(pid, executable):
