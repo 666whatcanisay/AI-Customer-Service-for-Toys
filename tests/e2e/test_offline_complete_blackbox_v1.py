@@ -23,8 +23,22 @@ from channel_engine.gateway import (
 from channel_engine.models import DecisionAction
 from channel_engine.offline_runtime import OfflineCompleteRuntime
 from channel_engine.provider import NormalizedChannelObservation
+from channel_engine.recorded_replay_acceptance import (
+    ProductScopeIsolationStatus,
+    RecordedReplayDecision,
+    evaluate_recorded_replay,
+    load_recorded_replay_acceptance,
+)
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
+RECORDED_NOW = datetime(2026, 8, 14, 16, 0, tzinfo=UTC)
+RECORDED_FIXTURE = (
+    Path(__file__).parents[2]
+    / "simulators"
+    / "recorded-replay"
+    / "fixtures"
+    / "pdd-recorded-replay-20260814.v1.json"
+)
 
 
 class OfflineAICSGateway:
@@ -65,6 +79,49 @@ class OfflineAICSGateway:
                 "verified_product_name": product.get("product_name"),
             },
             decided_at=NOW,
+        )
+
+
+class ReferenceBlindRecordedReplayGateway:
+    """Deterministic AI boundary that never receives evaluation references."""
+
+    version = "recorded-replay-reference-blind.v1"
+
+    def __init__(self) -> None:
+        self.requests: list[DecisionRequest] = []
+
+    def decide(self, request: DecisionRequest) -> DecisionResponse:
+        self.requests.append(request)
+        scope = request.context["ai_cs_scope"]
+        product = request.context["product"]
+        return DecisionResponse(
+            contract_version="1.0",
+            request_id=request.request_id,
+            idempotency_key=request.idempotency_key,
+            correlation_id=request.correlation_id,
+            decision_id=f"decision-{request.message_id[-32:]}",
+            action=DecisionAction.SUGGEST_REPLY,
+            proposed_content="当前商品资料不足，请人工核对具体参数后再回复买家。",
+            requires_approval=True,
+            risk_level=GatewayRiskLevel.LOW,
+            gateway_version=self.version,
+            metadata={
+                "ai_cs_action": "DIRECT_ANSWER",
+                "warnings": ["RECORDED_REPLAY_BASELINE"],
+                "required_fields": [],
+                "citations": [
+                    {
+                        "reference": "recorded-replay-scope-only",
+                        "title": "录制样本商品作用域",
+                        "excerpt": "仅验证消息链与商品隔离，不提供历史人工答案。",
+                        "product_id": scope["product_id"],
+                        "sku_id": scope["sku_id"],
+                        "source_kind": "SCOPE_EVIDENCE",
+                    }
+                ],
+                "verified_product_name": product.get("product_name"),
+            },
+            decided_at=RECORDED_NOW,
         )
 
 
@@ -511,6 +568,97 @@ def test_signed_workspace_service_controls_policy_and_manual_preparation(
             "offline-agent", "offline-device", after_sequence_id=0, limit=100
         )
         assert any(item.event_type == "EXECUTION_PREPARED" for item in events)
+    finally:
+        runtime.close()
+
+
+def test_recorded_pdd_replay_persists_16_formal_messages_without_answer_leak(
+    tmp_path: Path,
+) -> None:
+    fixture = load_recorded_replay_acceptance(RECORDED_FIXTURE)
+    gateway = ReferenceBlindRecordedReplayGateway()
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "recorded-pdd-20260814",
+        gateway,
+        clock=lambda: RECORDED_NOW,
+    )
+    try:
+        assert runtime.ingest_provider(RecordedReplayProvider(RECORDED_FIXTURE)) == 16
+        drained = runtime.drain(limit=100)
+        assert drained.observations_ingested == 16
+        assert drained.replies_generated == 16
+
+        snapshots = runtime.conversations()
+        assert len(snapshots) == 16
+        assert len(gateway.requests) == 16
+        assert {item.customer_message for item in gateway.requests} == {
+            item.content for item in fixture.observations
+        }
+        assert all(
+            item.context["visible_conversation_history"] == []
+            for item in gateway.requests
+        )
+
+        ai_visible_payload = json.dumps(
+            [item.model_dump(mode="json") for item in gateway.requests],
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        assert all(
+            reference.operator_answer not in ai_visible_payload
+            for reference in fixture.evaluation_references
+        )
+
+        decisions = tuple(
+            RecordedReplayDecision(
+                external_message_id=snapshot.customer_message_id or "",
+                reply_content=snapshot.reply_content,
+                action=snapshot.ai_cs_action,
+                risk_level=snapshot.risk_level,
+                quality_status=snapshot.quality_status,
+                store_id=snapshot.store_id,
+                product_ref=(snapshot.product_context or {}).get("product_reference"),
+                sku_ref=(snapshot.product_context or {}).get("sku_reference"),
+            )
+            for snapshot in snapshots
+        )
+        baseline = evaluate_recorded_replay(fixture, decisions)
+        assert baseline.total_cases == 16
+        assert baseline.accepted_cases < 13
+        assert baseline.accuracy_gate_passed is False
+        assert (
+            baseline.product_scope_isolation
+            is ProductScopeIsolationStatus.PASS
+        )
+        assert baseline.simulated_auto_send_ready is False
+
+        assert {
+            (item.store_id, (item.product_context or {}).get("product_reference"))
+            for item in snapshots
+        } == {
+            (fixture.observations[0].store_id, product_id)
+            for product_id in (
+                "970504176629",
+                "972030445746",
+                "982904528556",
+                "984350540183",
+            )
+        }
+        assert all(item.status == "WAITING_APPROVAL" for item in snapshots)
+        assert all(item.safety.receipt_count == 0 for item in snapshots)
+        assert all(item.safety.send_count == 0 for item in snapshots)
+
+        selected = snapshots[0]
+        prepared = runtime.prepare_manually(
+            selected.decision_id,
+            authorized_by="operator:offline-recorded-acceptance",
+            store_id=selected.store_id,
+            conversation_id=selected.conversation_id,
+            customer_reference=selected.customer_reference,
+        )
+        assert prepared.state == "READY"
+        assert runtime.conversations()[0].safety.real_send is False
+        assert runtime.offline_control.real_success_count() == 0
     finally:
         runtime.close()
 

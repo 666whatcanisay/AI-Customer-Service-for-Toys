@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -30,8 +30,7 @@ from channel_engine.pdd_adapter import (
 )
 from channel_engine.storage.orm import ApprovalRow, ExecutionRow, ReceiptRow
 
-
-NOW = datetime(2026, 8, 5, 13, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 5, 13, 0, tzinfo=UTC)
 
 
 class MutableClock:
@@ -123,6 +122,10 @@ def test_human_approval_lease_fake_execution_receipt_and_trace_close_the_loop(
     assert receipt.details["approval_id"] == enqueued.approval_id
     assert receipt.details["authorization_id"] == result.trace.authorization_id
     assert receipt.details["human_approved"] is True
+    assert receipt.details["transport_kind"] == "SYNTHETIC_PDD"
+    assert receipt.details["evidence_transport_kind"] == "SIMULATED_PDD"
+    assert receipt.details["simulation_only"] is True
+    assert receipt.details["external_side_effect"] is False
     assert receipt.details["lease_validated"] is True
     assert receipt.details["authorization_validated"] is True
     assert receipt.details["customer_message_sent"] is False
@@ -136,15 +139,17 @@ def test_human_approval_lease_fake_execution_receipt_and_trace_close_the_loop(
 
     with pytest.raises(ValidationError, match="frozen"):
         receipt.outcome = ReceiptOutcome.UNKNOWN  # type: ignore[misc]
-    with pytest.raises(ValueError, match="immutable"):
-        with foundation["uow_factory"]() as uow:
-            uow.require_repository().append_receipt(
-                Receipt(
-                    execution_id=enqueued.execution_id,
-                    outcome=ReceiptOutcome.FAILED,
-                    details={"reason": "attempted overwrite"},
-                )
+    with (
+        pytest.raises(ValueError, match="immutable"),
+        foundation["uow_factory"]() as uow,
+    ):
+        uow.require_repository().append_receipt(
+            Receipt(
+                execution_id=enqueued.execution_id,
+                outcome=ReceiptOutcome.FAILED,
+                details={"reason": "attempted overwrite"},
             )
+        )
 
 
 def test_missing_approval_is_rejected_before_execution_or_receipt(foundation) -> None:

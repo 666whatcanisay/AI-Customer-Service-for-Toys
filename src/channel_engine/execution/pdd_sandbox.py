@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # Execution-owned sandbox; kept outside the receive-only PDD prototype package.
-
 import hashlib
 import json
 from collections.abc import Callable
@@ -10,20 +9,13 @@ from enum import StrEnum
 from threading import Lock, RLock
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from channel_engine.channel import (
     AuthorizedOutboundMessage,
     ExecutionBoundaryDenied,
     LedgerExecutionAuthorizationService,
 )
-from .coordinator import ExecutionCoordinator, ExecutionEnqueued
-from .fake_executor import (
-    ClaimedExecutionContext,
-    ExecutionCommand,
-    ExecutionResult,
-)
-from .worker import ExecutionWorker
 from channel_engine.models import (
     ApprovalState,
     DecisionState,
@@ -34,6 +26,13 @@ from channel_engine.models.entities import utc_now
 from channel_engine.policy import ApprovalPolicy
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
+from .coordinator import ExecutionCoordinator, ExecutionEnqueued
+from .fake_executor import (
+    ClaimedExecutionContext,
+    ExecutionCommand,
+    ExecutionResult,
+)
+from .worker import ExecutionWorker
 
 PDD_HUMAN_APPROVAL_EXECUTION_SANDBOX_VERSION = "1.0"
 
@@ -198,6 +197,13 @@ class FakePDDExecutor:
             error_code=error_code,
             details={
                 "mode": "PDD_HUMAN_APPROVAL_EXECUTION_SANDBOX",
+                # Keep the frozen/shared receipt vocabulary while preserving
+                # the stronger internal fact that this is the offline PDD
+                # simulation used by release acceptance.
+                "transport_kind": "SYNTHETIC_PDD",
+                "evidence_transport_kind": "SIMULATED_PDD",
+                "simulation_only": True,
+                "external_side_effect": False,
                 "decision_id": authorization.decision_id,
                 "approval_id": authorization.approval_id,
                 "authorization_id": authorization.authorization_id,
@@ -224,6 +230,10 @@ class FakePDDExecutor:
             error_code=error_code,
             details={
                 "mode": "PDD_HUMAN_APPROVAL_EXECUTION_SANDBOX",
+                "transport_kind": "SYNTHETIC_PDD",
+                "evidence_transport_kind": "SIMULATED_PDD",
+                "simulation_only": True,
+                "external_side_effect": False,
                 "human_approved": False,
                 "lease_validated": False,
                 "authorization_validated": False,

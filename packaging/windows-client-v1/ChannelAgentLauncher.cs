@@ -355,6 +355,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             FileName = edge,
             Arguments = "--app=" + ChannelAgentLauncher.Quote(url)
                 + " --user-data-dir=" + ChannelAgentLauncher.Quote(profile)
+                + " --window-size=1180,820 --window-position=32,32"
                 + " --no-first-run --no-default-browser-check",
             UseShellExecute = false,
         });
