@@ -25,6 +25,7 @@ from channel_engine.customer_assistant import (
 )
 from channel_engine.customer_assistant.buffer import SQLiteConversationBuffer
 from channel_engine.gateway import AICSGateway
+from channel_engine.reply_turn import build_reply_turn_envelope
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
 
@@ -395,6 +396,19 @@ class AgentObservationDecisionProjector:
                     or payload.product.get("sku_reference")
                 ),
             },
+            "ai_cs_reply_turn": build_reply_turn_envelope(
+                turn_id="agent-observation-turn:"
+                + hashlib.sha256(
+                    "\0".join(
+                        (
+                            payload.store_id,
+                            payload.conversation_id,
+                            payload.external_message_id,
+                        )
+                    ).encode("utf-8")
+                ).hexdigest(),
+                messages=((payload.external_message_id, payload.content),),
+            ),
         }
         service = ConversationService(
             self._uow_factory,

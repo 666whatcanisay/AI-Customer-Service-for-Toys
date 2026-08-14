@@ -44,11 +44,20 @@ def main() -> None:
                 )
             return {
                 "answer": "[REAL AI-CS CONTROLLED] Human approval is required.",
-                "action": "CONTROLLED_ANSWER",
+                "action": "DIRECT_ANSWER",
                 "risk_level": "LOW",
-                "warnings": [],
+                "warnings": ["SUGGESTION_ONLY", "AUTO_SEND_DISABLED"],
                 "required_fields": [],
-                "sources": [{"source": "controlled-synthetic-fixture"}],
+                "sources": [
+                    {
+                        "source": "controlled-synthetic-fixture",
+                        "chunk_id": "controlled-synthetic-fixture:chunk-1",
+                        "product_id": context.product_id,
+                        "sku_id": context.sku_id,
+                        "knowledge_version": "a" * 64,
+                        "source_ids": ["controlled-synthetic-material"],
+                    }
+                ],
                 "request_id": "ai-cs-controlled-provider-request",
             }
 

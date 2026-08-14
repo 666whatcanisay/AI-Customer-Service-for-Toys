@@ -210,6 +210,14 @@ def test_three_short_messages_are_combined_into_one_customer_context(foundation,
     durable_context, _durable_package = stored
     assert durable_context.current_turn_message_ids == ("m-001", "m-002", "m-003")
     assert "current_turn_message_ids" not in gateway.requests[0].context
+    reply_turn = gateway.requests[0].context["ai_cs_reply_turn"]
+    assert reply_turn["turn_id"] == durable_context.turn_id
+    assert [item["message_id"] for item in reply_turn["messages"]] == [
+        "m-001",
+        "m-002",
+        "m-003",
+    ]
+    assert reply_turn["messages"][1]["range_start"] == len(messages[0].content) + 1
 
     snapshot = build_assistant_snapshot(
         package,

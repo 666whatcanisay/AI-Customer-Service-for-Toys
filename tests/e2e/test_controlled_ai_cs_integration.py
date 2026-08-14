@@ -47,6 +47,7 @@ from channel_engine.models import (
 from channel_engine.models.entities import utc_now
 from channel_engine.outbox import FakeEventPublisher, OutboxPublisher
 from channel_engine.policy import ApprovalPolicy
+from channel_engine.reply_turn import build_reply_turn_envelope
 from channel_engine.storage.orm import EventRow
 
 
@@ -170,7 +171,14 @@ def _client_bundle(
 
 
 def _request(suffix: str, *, include_scope: bool = True) -> DecisionRequest:
-    context: dict[str, object] = {"channel_name": "fake-pdd"}
+    customer_message = "Please draft a controlled response."
+    context: dict[str, object] = {
+        "channel_name": "fake-pdd",
+        "ai_cs_reply_turn": build_reply_turn_envelope(
+            turn_id=f"controlled-turn-{suffix}",
+            messages=((f"controlled-message-{suffix}", customer_message),),
+        ),
+    }
     if include_scope:
         context.update(CONTROLLED_SCOPE.as_gateway_context())
     return DecisionRequest(
@@ -180,7 +188,7 @@ def _request(suffix: str, *, include_scope: bool = True) -> DecisionRequest:
         correlation_id=f"controlled-message-{suffix}",
         conversation_id=f"controlled-conversation-{suffix}",
         message_id=f"controlled-message-{suffix}",
-        customer_message="Please draft a controlled response.",
+        customer_message=customer_message,
         context=context,
         requested_at=utc_now(),
     )
@@ -194,6 +202,16 @@ def _message(suffix: str, body: str = "Please draft a controlled response."):
         body=body,
         created_at=utc_now(),
     )
+
+
+def _decision_context(inbound) -> dict[str, object]:
+    return {
+        **CONTROLLED_SCOPE.as_gateway_context(),
+        "ai_cs_reply_turn": build_reply_turn_envelope(
+            turn_id=f"controlled-turn-{inbound.external_message_id}",
+            messages=((inbound.external_message_id, inbound.content),),
+        ),
+    }
 
 
 @pytest.fixture(scope="module")
@@ -301,9 +319,7 @@ def test_real_decision_approval_fake_execution_receipt_and_event_evidence(
     service = ConversationService(
         foundation["uow_factory"],
         bundle.gateway,
-        decision_context_provider=lambda _inbound: (
-            CONTROLLED_SCOPE.as_gateway_context()
-        ),
+        decision_context_provider=_decision_context,
     )
     try:
         intake = service.receive(inbound)
@@ -324,7 +340,7 @@ def test_real_decision_approval_fake_execution_receipt_and_event_evidence(
     assert wire_response["decision_id"] == intake.decision_id
     assert wire_response["proposed_content"] == intake.proposed_content
     assert wire_response["metadata"]["risk_level"] == "LOW"
-    assert wire_response["metadata"]["ai_cs_action"] == "CONTROLLED_ANSWER"
+    assert wire_response["metadata"]["ai_cs_action"] == "DIRECT_ANSWER"
     assert wire_response["action"] == "SUGGEST_REPLY"
     assert wire_response["requires_approval"] is True
     assert intake.message_state is MessageState.COMPLETED
@@ -435,9 +451,7 @@ def test_real_ai_cs_timeout_rolls_back_and_never_executes(
     service = ConversationService(
         foundation["uow_factory"],
         bundle.gateway,
-        decision_context_provider=lambda _inbound: (
-            CONTROLLED_SCOPE.as_gateway_context()
-        ),
+        decision_context_provider=_decision_context,
     )
     try:
         with pytest.raises(AICSGatewayTimeout) as raised:
@@ -534,9 +548,7 @@ def test_unknown_execution_from_real_decision_is_not_retried(
         intake = ConversationService(
             foundation["uow_factory"],
             bundle.gateway,
-            decision_context_provider=lambda _inbound: (
-                CONTROLLED_SCOPE.as_gateway_context()
-            ),
+            decision_context_provider=_decision_context,
         ).receive(inbound)
     finally:
         bundle.close()

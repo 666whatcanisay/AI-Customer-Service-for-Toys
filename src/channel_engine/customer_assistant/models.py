@@ -17,6 +17,7 @@ from pydantic import (
 
 from channel_engine.catalog_scope import canonical_catalog_platform
 from channel_engine.gateway import GatewayRiskLevel
+from channel_engine.reply_turn import build_reply_turn_envelope
 
 CUSTOMER_ASSISTANT_VERSION = "1.0"
 
@@ -209,9 +210,9 @@ class CustomerContext(CustomerAssistantModel):
         default=(), max_length=100
     )
     # Internal turn identity used by the local assistant projection and the
-    # controlled-send safety gate.  It is deliberately not emitted by
-    # ``gateway_context`` and defaults to empty for previously persisted RC5
-    # contexts.
+    # controlled-send safety gate.  The raw tuple is not emitted by
+    # ``gateway_context``; only the hash/range reply-turn envelope is emitted.
+    # It defaults to empty for previously persisted RC5 contexts.
     current_turn_message_ids: tuple[str, ...] = Field(default=(), max_length=32)
     current_question: str = Field(min_length=1, max_length=8_000, repr=False)
     knowledge_scopes: tuple[str, ...] = Field(default=(), max_length=32)
@@ -248,7 +249,7 @@ class CustomerContext(CustomerAssistantModel):
         product_reference = (
             self.page.product.product_reference or "PDD-CURRENT-PAGE-UNKNOWN"
         )
-        return {
+        context: dict[str, object] = {
             "customer_context_version": CUSTOMER_ASSISTANT_VERSION,
             "store_id": self.store_id,
             "store_name": self.page.store_name,
@@ -284,6 +285,28 @@ class CustomerContext(CustomerAssistantModel):
                 "sku_id": self.page.product.sku_reference,
             },
         }
+        messages_by_id = {
+            item.external_message_id: item for item in self.conversation_history
+        }
+        current_messages = tuple(
+            (
+                message_id,
+                messages_by_id[message_id].content,
+            )
+            for message_id in self.current_turn_message_ids
+            if message_id in messages_by_id
+        )
+        if (
+            len(current_messages) == len(self.current_turn_message_ids)
+            and current_messages
+            and "\n".join(content for _message_id, content in current_messages)
+            == self.current_question
+        ):
+            context["ai_cs_reply_turn"] = build_reply_turn_envelope(
+                turn_id=self.turn_id,
+                messages=current_messages,
+            )
+        return context
 
 
 class KnowledgeCitation(CustomerAssistantModel):
