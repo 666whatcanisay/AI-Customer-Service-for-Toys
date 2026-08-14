@@ -868,7 +868,7 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 980px;
   height: calc(100vh - 154px);
-  min-height: 650px;
+  min-height: 600px;
   overflow: hidden;
   border: 1px solid var(--workspace-border);
   border-radius: 15px;
@@ -877,6 +877,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1280px) {
-  .human-loop-workspace-grid { grid-template-columns: 230px minmax(540px, 1fr) 220px; }
+  .desktop-workspace-shell { min-width: 940px; padding: 8px; }
+  .human-loop-workspace-grid {
+    grid-template-columns: 220px minmax(500px, 1fr) 210px;
+    min-width: 940px;
+  }
 }
 </style>
