@@ -13,3 +13,5 @@ def test_full_gate_rebuilds_every_shipped_web_surface() -> None:
     assert "'assistant-agent-ui-build'" in gate
     assert "@('run','build:agent')" in gate
     assert "'admin-ui-build'" in gate
+    assert "$ErrorActionPreference = 'Continue'" in gate
+    assert "$exitCode = $LASTEXITCODE" in gate

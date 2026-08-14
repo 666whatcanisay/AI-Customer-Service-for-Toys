@@ -27,8 +27,17 @@ function Invoke-Gate(
     $log = Join-Path $evidence ($Name + '.log')
     Push-Location -LiteralPath $WorkingDirectory
     try {
-        & $Executable @Arguments 2>&1 | Tee-Object -FilePath $log
-        $exitCode = $LASTEXITCODE
+        # Native tools such as Vite legitimately emit non-fatal warnings to
+        # stderr.  Preserve those lines in the evidence log, but use the
+        # native exit code as the Gate fact instead of PowerShell's stream type.
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & $Executable @Arguments 2>&1 | Tee-Object -FilePath $log
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
     } finally {
         Pop-Location
     }
