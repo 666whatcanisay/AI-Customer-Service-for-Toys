@@ -231,6 +231,10 @@ class AgentAssistantSnapshot(ControlV2Model):
     revision: int = Field(ge=1)
     status: Literal["WAITING_APPROVAL", "MANUAL_INTERVENTION", "EXECUTION_PREPARED"]
     turn_id: str = Field(min_length=1, max_length=160)
+    # The verified PDD/customer message that the Decision actually answers.
+    # Optional keeps already persisted RC5 snapshots readable; controlled real
+    # send remains fail-closed when this value is unavailable.
+    customer_message_id: str | None = Field(default=None, min_length=1, max_length=255)
     decision_id: str = Field(min_length=1, max_length=160)
     request_id: str = Field(min_length=1, max_length=255)
     customer_reference: str = Field(min_length=1, max_length=255)

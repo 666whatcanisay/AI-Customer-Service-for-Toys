@@ -13,10 +13,14 @@ from pydantic import ValidationError
 
 from channel_agent.assistant_bridge import (
     ApprovedReplyBridgeError,
+    ApprovedReplyIntent,
     ApprovedReplyRequest,
     ApprovedReplyService,
 )
-from channel_agent.controlled_send_grant import ControlledSendGrantStore
+from channel_agent.controlled_send_grant import (
+    ControlledPilotSendWindowStore,
+    ControlledSendGrantStore,
+)
 from channel_agent.browser import ChannelAgentBrowserManager
 from channel_agent.config import load_agent_config
 from channel_agent.logger import SafeAgentLogger
@@ -124,6 +128,9 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
             controlled_send_grant_store=ControlledSendGrantStore(
                 assistant_root / "controlled-send-grants.sqlite3"
             ),
+            controlled_pilot_window_store=ControlledPilotSendWindowStore(
+                assistant_root / "controlled-pilot-send-window.sqlite3"
+            ),
             controlled_send_enabled=enabled,
         ),
         engine,
@@ -169,9 +176,11 @@ class _Handler(BaseHTTPRequestHandler):
         if self.headers.get("Origin") != self.server.allowed_origin:
             self._json(HTTPStatus.FORBIDDEN, {"error_code": "ORIGIN_DENIED"})
             return
-        if self.headers.get("X-Channel-Agent-Intent") != "HUMAN_CONFIRMED_SEND":
+        raw_intent = self.headers.get("X-Channel-Agent-Intent")
+        if raw_intent not in {"HUMAN_CONFIRMED_SEND", "AUTO_POLICY_PILOT_SEND"}:
             self._json(HTTPStatus.FORBIDDEN, {"error_code": "SEND_INTENT_MISSING"})
             return
+        intent: ApprovedReplyIntent = raw_intent
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
@@ -181,7 +190,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         try:
             request = ApprovedReplyRequest.model_validate_json(self.rfile.read(length))
-            response = self.server.service.approve_and_send(request)
+            response = self.server.service.approve_and_send(request, intent=intent)
         except (UnicodeError, json.JSONDecodeError, ValidationError):
             self._json(HTTPStatus.BAD_REQUEST, {"error_code": "REQUEST_INVALID"})
             return

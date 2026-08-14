@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from channel_agent.binding import atomic_write_bytes
 from channel_agent.browser import ChannelAgentBrowserManager
+from channel_agent.client import ChannelEngineClient
 from channel_agent.config import load_agent_config
 from channel_agent.logger import SafeAgentLogger
 from channel_agent.pdd_login import EdgePDDTargetResolver
@@ -17,10 +19,10 @@ from channel_agent.pdd_workspace import (
     ExistingPDDWorkspaceObserver,
     FixedReadOnlyPDDWorkspaceEvaluator,
     LivePDDContextProvider,
-    PDDWorkspaceError,
     PDDWorkspaceSelectorContract,
     SQLitePDDWorkspaceCheckpoint,
 )
+from channel_agent.windows import WindowsStateStore
 from channel_engine.browser.cdp_readonly import WebSocketCDPEvaluator
 from channel_engine.customer_assistant import (
     AICustomerReplyService,
@@ -34,8 +36,8 @@ from channel_engine.gateway import (
     AICSGatewayRequestFailed,
     GatewayAdapterConfig,
     GatewayEnvironment,
-    GatewayRetryPolicy,
     GatewayHealthStatus,
+    GatewayRetryPolicy,
     ProductionGatewayClient,
 )
 from channel_engine.storage import (
@@ -49,7 +51,17 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Attach the existing real PDD workspace to the read-only AI-CS assistant."
     )
-    parser.add_argument("command", choices=("baseline", "once", "run", "status"))
+    parser.add_argument(
+        "command",
+        choices=(
+            "baseline",
+            "once",
+            "run",
+            "status",
+            "formal-status",
+            "formal-restart",
+        ),
+    )
     parser.add_argument(
         "--data-root",
         default=".runtime/pdd-login-observation-v1",
@@ -80,10 +92,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _atomic_text(path: Path, value: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(value, encoding="utf-8")
-    os.replace(temporary, path)
+    atomic_write_bytes(path, value.encode("utf-8"))
 
 
 def _atomic_json(path: Path, value: dict[str, object]) -> None:
@@ -104,6 +113,131 @@ def _append_runtime_event(path: Path, event_type: str, **metadata: object) -> No
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+
+def _validate_formal_runtime_config(config) -> None:
+    """Fail closed unless the installed Agent owns the complete read-only chain."""
+
+    if (
+        not config.browser_enabled
+        or not config.pdd_login_observation_enabled
+        or not config.customer_assistant_enabled
+        or not config.message_observation_enabled
+        or config.observer_mode != "OBSERVE_ONLY"
+        or not config.manual_approval_required
+        or config.auto_reply_enabled
+        or config.real_send_enabled
+        or config.real_platform_activation_allowed
+    ):
+        raise RuntimeError("formal Windows Agent observation safety is not enabled")
+
+
+def _formal_scope_reference(store_id: str, conversation_id: str) -> str:
+    payload = f"{store_id}\0{conversation_id}".encode()
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _formal_status(data_root: Path, config_path: Path) -> dict[str, object]:
+    """Read the installed Agent and signed Host projection without touching PDD."""
+
+    config = load_agent_config(config_path)
+    _validate_formal_runtime_config(config)
+    state = WindowsStateStore(
+        data_root / "runtime" / "channel-agent-state.json"
+    ).load()
+    if state.agent_id not in {None, config.agent_id}:
+        raise RuntimeError("formal Windows Agent state belongs to another agent")
+    if state.device_id not in {None, config.device_id}:
+        raise RuntimeError("formal Windows Agent state belongs to another device")
+
+    client = ChannelEngineClient(config)
+    try:
+        response = client.fetch_assistant_conversations(limit=100)
+    finally:
+        client.close()
+    conversations = [
+        {
+            "scope_reference": _formal_scope_reference(
+                item.store_id, item.conversation_id
+            ),
+            "revision": item.revision,
+            "status": item.status,
+            "processing_stage": item.processing_stage,
+            "quality_status": item.quality_status,
+            "policy_mode": item.policy_mode,
+        }
+        for item in response.conversations
+    ]
+    return {
+        "schema_version": "real-pdd-formal-runtime-status.v1",
+        "runtime_owner": "WINDOWS_AGENT",
+        "projection_source": "SIGNED_HOST",
+        "agent_id": config.agent_id,
+        "device_id": config.device_id,
+        "identity_status": state.identity_status.value,
+        "pdd_login_state": (
+            state.pdd_login_state.value if state.pdd_login_state else None
+        ),
+        "observer_status": state.observer_status,
+        "message_observation_enabled": state.message_observation_enabled,
+        "assistant_conversation_count": len(conversations),
+        "assistant_conversations": conversations,
+        "real_send_enabled": False,
+        "legacy_runtime_started": False,
+    }
+
+
+def _queue_formal_observer_restart(
+    data_root: Path, config_path: Path
+) -> dict[str, object]:
+    """Queue the existing human-intent request consumed by WindowsAgentHost."""
+
+    config = load_agent_config(config_path)
+    _validate_formal_runtime_config(config)
+    state = WindowsStateStore(
+        data_root / "runtime" / "channel-agent-state.json"
+    ).load()
+    if state.agent_id != config.agent_id or state.device_id != config.device_id:
+        raise RuntimeError("formal Windows Agent runtime identity is unavailable")
+    if not state.message_observation_enabled:
+        raise RuntimeError("formal Windows Agent message observation is not enabled")
+    if state.pdd_login_state is None or state.pdd_login_state.value != "CUSTOMER_SERVICE_READY":
+        raise RuntimeError("formal PDD customer service workspace is not ready")
+    if state.identity_status.value != "ACTIVE":
+        raise RuntimeError("formal Windows Agent identity is not active")
+
+    request_path = data_root / "runtime" / "pdd-observer-restart.request"
+    if request_path.exists():
+        try:
+            existing = json.loads(request_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError, TypeError) as exc:
+            raise RuntimeError("existing observer restart request is invalid") from exc
+        if (
+            not isinstance(existing, dict)
+            or existing.get("schema_version")
+            != "channel-agent-pdd-observer-restart-request.v1"
+            or existing.get("human_intent") is not True
+        ):
+            raise RuntimeError("existing observer restart request is invalid")
+        status = "ALREADY_REQUESTED"
+    else:
+        _atomic_json(
+            request_path,
+            {
+                "schema_version": "channel-agent-pdd-observer-restart-request.v1",
+                "requested_at": datetime.now(UTC).isoformat(),
+                "human_intent": True,
+            },
+        )
+        status = "RESTART_REQUESTED"
+    return {
+        "schema_version": "real-pdd-formal-observer-restart.v1",
+        "status": status,
+        "runtime_owner": "WINDOWS_AGENT",
+        "human_intent": True,
+        "real_send_enabled": False,
+        "legacy_runtime_started": False,
+    }
 
 
 def _existing_feed_reply(path: Path) -> dict[str, object] | None:
@@ -531,6 +665,25 @@ def main(argv: list[str] | None = None) -> int:
         if args.config
         else data_root / "config" / "agent.json"
     )
+    if args.command in {"formal-status", "formal-restart"}:
+        try:
+            value = (
+                _formal_status(data_root, config_path)
+                if args.command == "formal-status"
+                else _queue_formal_observer_restart(data_root, config_path)
+            )
+            print(json.dumps(value, ensure_ascii=False, indent=2))
+            return 0
+        except Exception as exc:
+            error_code = getattr(exc, "error_code", type(exc).__name__.upper())
+            print(
+                json.dumps(
+                    {"status": "FAILED", "error_code": str(error_code)},
+                    ensure_ascii=False,
+                ),
+                file=sys.stderr,
+            )
+            return 4
     assistant_root = data_root / "runtime" / "real-pdd-assistant"
     status_path = assistant_root / "status.json"
     checkpoint = SQLitePDDWorkspaceCheckpoint(

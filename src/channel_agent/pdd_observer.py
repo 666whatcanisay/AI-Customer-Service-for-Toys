@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from threading import Event, Thread
-import time
-from typing import Callable, Protocol
+from typing import Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -18,6 +19,11 @@ from .edge_pdd_observe import (
 )
 from .edge_spool import DurableEdgeSpool, EdgeObservation
 from .observation_stages import ObservationStage
+from .pdd_conversation_capture import (
+    DurablePDDConversationCaptureStore,
+    PDDConversationCaptureState,
+    PDDReplyAttentionState,
+)
 
 
 class PDDObserverError(RuntimeError):
@@ -30,6 +36,15 @@ class PDDObserverFatalError(PDDObserverError):
 
 class PDDConversationNotActive(PDDObserverError):
     """The conversation is listed but is not the currently visible page."""
+
+
+class PDDConversationNavigationError(PDDObserverError):
+    """A narrowly-scoped conversation navigation was rejected fail-closed."""
+
+    def __init__(self, message: str, *, error_code: str, manual_review: bool) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.manual_review = manual_review
 
 
 class ObservationOrigin(StrEnum):
@@ -50,6 +65,14 @@ class PDDConversationSummary(BaseModel):
     unread_count: int | None = Field(default=None, ge=0, le=9999)
     last_activity_at: AwareDatetime
     latest_sequence: int | None = Field(default=None, ge=1)
+    latest_message_id: str | None = Field(default=None, min_length=1, max_length=255)
+    page_position: int | None = Field(default=None, ge=0, le=10_000)
+    attention_state: PDDReplyAttentionState = PDDReplyAttentionState.NONE
+    attention_verified: bool = False
+    attention_seconds: int | None = Field(default=None, ge=0, le=604_800)
+    attention_evidence_hash: str | None = Field(
+        default=None, pattern=r"^sha256:[a-f0-9]{64}$"
+    )
 
 
 class PDDReadOnlyConversationDriver(Protocol):
@@ -62,6 +85,16 @@ class PDDReadOnlyConversationDriver(Protocol):
     ) -> PDDWorkspaceSnapshot: ...
 
     def selector_evidence(self, capability: str) -> PDDSelectorRuntimeEvidence: ...
+
+    @property
+    def navigation_enabled(self) -> bool: ...
+
+    def navigate_to_conversation(
+        self,
+        summary: PDDConversationSummary,
+        *,
+        allow_attention_missing: bool = False,
+    ) -> None: ...
 
 
 class ObservationForwarder(Protocol):
@@ -101,6 +134,7 @@ class PDDMessageObserver:
         spool: DurableEdgeSpool,
         forward: ObservationForwarder,
         diagnostic: ObserverDiagnosticSink | None = None,
+        capture_store: DurablePDDConversationCaptureStore | None = None,
         stage: ObservationStage = ObservationStage.AI_SUGGESTIONS,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
@@ -109,6 +143,7 @@ class PDDMessageObserver:
         self._spool = spool
         self._forward = forward
         self._diagnostic = diagnostic or (lambda _code, _summary, _details: None)
+        self._capture_store = capture_store
         self._stage = stage
         self._clock = clock
 
@@ -122,9 +157,17 @@ class PDDMessageObserver:
                 "OBSERVE selector evidence is unavailable"
             ) from exc
 
+        # scan_once is single-flight. Any NAVIGATING record present before a
+        # new scan is therefore an interrupted claim, not concurrent work.
+        # Recover on every scan so a transient page/mapper/forward failure
+        # does not require an Agent process restart before the task can retry.
+        if self._capture_store is not None:
+            self._capture_store.recover_interrupted()
+
         summaries = self._driver.scan_conversations()
         seen: set[tuple[str, str, str]] = set()
         captured = forwarded = baselines = manual = 0
+        summaries_by_identity: dict[tuple[str, str, str], PDDConversationSummary] = {}
         for summary in summaries:
             identity = (
                 summary.store_id,
@@ -134,11 +177,58 @@ class PDDMessageObserver:
             if identity in seen:
                 raise PDDObserverError("conversation list contains an unstable duplicate identity")
             seen.add(identity)
+            summaries_by_identity[identity] = summary
+            if self._capture_store is not None:
+                cursor = self._spool.conversation_cursor(*identity)
+                self._capture_store.reconcile_ack(
+                    summary.store_id,
+                    summary.platform_store_id,
+                    summary.conversation_id,
+                    None if cursor is None else cursor[1],
+                )
+                self._capture_store.observe_attention(
+                    store_id=summary.store_id,
+                    platform_store_id=summary.platform_store_id,
+                    conversation_id=summary.conversation_id,
+                    attention_state=summary.attention_state,
+                    attention_verified=summary.attention_verified,
+                    attention_seconds=summary.attention_seconds,
+                    attention_evidence_hash=summary.attention_evidence_hash,
+                    page_position=summary.page_position,
+                    latest_sequence=summary.latest_sequence,
+                    latest_message_id=summary.latest_message_id,
+                )
+
+        scheduled: tuple[tuple[str, str, str], ...] = ()
+        if self._capture_store is not None and getattr(
+            self._driver, "navigation_enabled", False
+        ):
+            scheduled = tuple(
+                (item.store_id, item.platform_store_id or "", item.conversation_id)
+                for item in self._capture_store.pending(limit=20)
+                if (item.store_id, item.platform_store_id or "", item.conversation_id)
+                in summaries_by_identity
+            )
+        scheduled_set = set(scheduled)
+        ordered = [summaries_by_identity[item] for item in scheduled]
+        ordered.extend(
+            summary
+            for identity, summary in summaries_by_identity.items()
+            if identity not in scheduled_set
+        )
+
+        for summary in ordered:
+            identity = (
+                summary.store_id,
+                summary.platform_store_id or "",
+                summary.conversation_id,
+            )
             if not self._stage.allows(ObservationStage.MESSAGE_CAPTURE):
                 continue
             cursor = self._spool.conversation_cursor(*identity)
+            is_scheduled = identity in scheduled_set
 
-            if cursor is None and summary.unread_count is None:
+            if cursor is None and summary.unread_count is None and not is_scheduled:
                 manual += 1
                 self._diagnostic(
                     "STARTUP_UNREAD_STATE_UNKNOWN",
@@ -147,22 +237,106 @@ class PDDMessageObserver:
                 )
                 continue
             if cursor is not None and summary.latest_sequence is not None:
-                if summary.latest_sequence <= cursor[1] and not summary.unread_count:
+                if (
+                    summary.latest_sequence <= cursor[1]
+                    and not summary.unread_count
+                    and not is_scheduled
+                ):
+                    continue
+            if is_scheduled and self._capture_store is not None:
+                if not self._capture_store.claim(
+                    summary.store_id,
+                    summary.platform_store_id,
+                    summary.conversation_id,
+                ):
                     continue
 
             try:
                 snapshot = self._driver.capture_conversation(summary)
             except PDDConversationNotActive:
-                manual += 1
-                self._diagnostic(
-                    "CONVERSATION_REQUIRES_HUMAN_SELECTION",
-                    summary,
-                    {
-                        "action": "HUMAN_SELECT_CONVERSATION",
-                        "write_operations": 0,
-                    },
-                )
-                continue
+                if is_scheduled and getattr(self._driver, "navigation_enabled", False):
+                    try:
+                        record = (
+                            self._capture_store.get(
+                                summary.store_id,
+                                summary.platform_store_id,
+                                summary.conversation_id,
+                            )
+                            if self._capture_store is not None
+                            else None
+                        )
+                        self._driver.navigate_to_conversation(
+                            summary,
+                            allow_attention_missing=(
+                                record is not None
+                                and record.last_error_code
+                                == "RECOVERED_AFTER_NAVIGATION_INTERRUPTION"
+                            ),
+                        )
+                        snapshot = self._driver.capture_conversation(summary)
+                    except PDDConversationNotActive:
+                        if self._capture_store is not None:
+                            self._capture_store.mark_failure(
+                                store_id=summary.store_id,
+                                platform_store_id=summary.platform_store_id,
+                                conversation_id=summary.conversation_id,
+                                error_code="PDD_NAVIGATION_TARGET_NOT_STABLE",
+                                manual_review=False,
+                            )
+                        self._diagnostic(
+                            "PDD_NAVIGATION_TARGET_NOT_STABLE",
+                            summary,
+                            {
+                                "action": "RETRY_VERIFIED_CONVERSATION_NAVIGATION",
+                                "write_operations": 0,
+                            },
+                        )
+                        continue
+                    except PDDConversationNavigationError as exc:
+                        if self._capture_store is not None:
+                            self._capture_store.mark_failure(
+                                store_id=summary.store_id,
+                                platform_store_id=summary.platform_store_id,
+                                conversation_id=summary.conversation_id,
+                                error_code=exc.error_code,
+                                manual_review=exc.manual_review,
+                            )
+                        if exc.manual_review:
+                            manual += 1
+                        self._diagnostic(
+                            exc.error_code,
+                            summary,
+                            {
+                                "action": (
+                                    "HUMAN_REVIEW_CONVERSATION_NAVIGATION"
+                                    if exc.manual_review
+                                    else "PAUSE_AND_RETRY_CONVERSATION_NAVIGATION"
+                                ),
+                                "write_operations": 0,
+                            },
+                        )
+                        continue
+                    except PDDObserverError:
+                        if self._capture_store is not None:
+                            self._capture_store.mark_failure(
+                                store_id=summary.store_id,
+                                platform_store_id=summary.platform_store_id,
+                                conversation_id=summary.conversation_id,
+                                error_code="PDD_CAPTURE_RETRY_REQUIRED",
+                                manual_review=False,
+                            )
+                        raise
+                else:
+                    manual += 1
+                    self._diagnostic(
+                        "CONVERSATION_REQUIRES_HUMAN_SELECTION",
+                        summary,
+                        {
+                            "action": "HUMAN_SELECT_CONVERSATION",
+                            "write_operations": 0,
+                        },
+                    )
+                    continue
             captured += 1
             self._validate_capture(summary, snapshot, evidence)
             snapshot = self._resolve_message_sequences(snapshot)
@@ -170,7 +344,7 @@ class PDDMessageObserver:
                 (message.sequence for message in snapshot.messages), default=0
             )
 
-            if cursor is None and summary.unread_count == 0:
+            if cursor is None and summary.unread_count == 0 and not is_scheduled:
                 if latest_sequence:
                     self._spool.establish_high_water(
                         store_id=summary.store_id,
@@ -206,10 +380,55 @@ class PDDMessageObserver:
                         "write_operations": 0,
                     },
                 )
+            if is_scheduled and not any(
+                item.sender == "CUSTOMER" for item in snapshot.messages
+            ):
+                if self._capture_store is not None:
+                    self._capture_store.mark_failure(
+                        store_id=summary.store_id,
+                        platform_store_id=summary.platform_store_id,
+                        conversation_id=summary.conversation_id,
+                        error_code="PDD_CAPTURE_NO_CUSTOMER_MESSAGE",
+                        manual_review=True,
+                    )
+                manual += 1
+                self._diagnostic(
+                    "PDD_CAPTURE_NO_CUSTOMER_MESSAGE",
+                    summary,
+                    {
+                        "action": "REVIEW_CONVERSATION_AND_SELECTOR_EVIDENCE",
+                        "write_operations": 0,
+                    },
+                )
+                continue
             if not pending:
                 # Once this conversation has entered the durable flow, only a
                 # Host ACK may advance its cursor. Re-reading a handled operator
                 # tail is safer than inventing an acknowledgement locally.
+                if is_scheduled and self._capture_store is not None:
+                    latest_customer = max(
+                        (
+                            item
+                            for item in snapshot.messages
+                            if item.sender == "CUSTOMER"
+                        ),
+                        key=lambda item: item.sequence,
+                        default=None,
+                    )
+                    if latest_customer is not None:
+                        self._capture_store.mark_captured(
+                            store_id=summary.store_id,
+                            platform_store_id=summary.platform_store_id,
+                            conversation_id=summary.conversation_id,
+                            # Keep the privacy-safe conversation-list row
+                            # watermark. The captured message sequence remains
+                            # the durable customer-message high-water mark.
+                            latest_message_id=summary.latest_message_id,
+                            latest_sequence=latest_customer.sequence,
+                            host_acked_sequence=(
+                                None if cursor is None else cursor[1]
+                            ),
+                        )
                 continue
 
             observations = self._mapper.map_customer_messages(
@@ -224,6 +443,83 @@ class PDDMessageObserver:
             for observation in observations:
                 self._forward(observation)
                 forwarded += 1
+
+            if is_scheduled and self._capture_store is not None:
+                latest_customer = max(
+                    (item for item in snapshot.messages if item.sender == "CUSTOMER"),
+                    key=lambda item: item.sequence,
+                    default=None,
+                )
+                if latest_customer is not None:
+                    cursor_after = self._spool.conversation_cursor(*identity)
+                    record = self._capture_store.mark_captured(
+                        store_id=summary.store_id,
+                        platform_store_id=summary.platform_store_id,
+                        conversation_id=summary.conversation_id,
+                        latest_message_id=summary.latest_message_id,
+                        latest_sequence=latest_customer.sequence,
+                        host_acked_sequence=(
+                            None if cursor_after is None else cursor_after[1]
+                        ),
+                    )
+                    if record.state is PDDConversationCaptureState.COMPLETED:
+                        # ACK has completed. Recheck the same active conversation
+                        # once so a second customer message arriving during the
+                        # first capture cannot hide behind a consumed red marker.
+                        try:
+                            extra = self._driver.capture_conversation(summary)
+                        except PDDConversationNotActive:
+                            continue
+                        self._validate_capture(summary, extra, evidence)
+                        extra = self._resolve_message_sequences(extra)
+                        cursor_after = self._spool.conversation_cursor(*identity)
+                        after = 0 if cursor_after is None else cursor_after[1]
+                        extra_pending, extra_unknown = _unhandled_customer_messages(
+                            extra.messages,
+                            after_sequence=after,
+                        )
+                        if extra_unknown:
+                            manual += 1
+                            self._diagnostic(
+                                "MESSAGE_ROLE_UNKNOWN",
+                                summary,
+                                {
+                                    "message_count": len(extra_unknown),
+                                    "action": "REVIEW_SELECTOR_EVIDENCE",
+                                    "write_operations": 0,
+                                },
+                            )
+                        if extra_pending:
+                            extra_observations = self._mapper.map_customer_messages(
+                                extra,
+                                after_sequence=after,
+                                origin=ObservationOrigin.LIVE_PDD.value,
+                                selected_message_ids=frozenset(
+                                    item.external_message_id for item in extra_pending
+                                ),
+                                now=now,
+                            )
+                            for observation in extra_observations:
+                                self._forward(observation)
+                                forwarded += 1
+                            latest_extra = max(
+                                extra_pending, key=lambda item: item.sequence
+                            )
+                            cursor_final = self._spool.conversation_cursor(*identity)
+                            self._capture_store.mark_captured(
+                                store_id=summary.store_id,
+                                platform_store_id=summary.platform_store_id,
+                                conversation_id=summary.conversation_id,
+                                # The list row was not rescanned during this
+                                # same-conversation ACK recheck. Preserve its
+                                # last observed row watermark; a later row
+                                # change will intentionally reopen the task.
+                                latest_message_id=summary.latest_message_id,
+                                latest_sequence=latest_extra.sequence,
+                                host_acked_sequence=(
+                                    None if cursor_final is None else cursor_final[1]
+                                ),
+                            )
 
         return PDDObserverScanResult(
             conversations_seen=len(summaries),
@@ -403,12 +699,12 @@ class PDDObserverRunner:
 
 __all__ = [
     "ObservationOrigin",
-    "PDDConversationSummary",
     "PDDConversationNotActive",
+    "PDDConversationSummary",
     "PDDMessageObserver",
     "PDDObserverError",
     "PDDObserverFatalError",
-    "PDDObserverScanResult",
     "PDDObserverRunner",
+    "PDDObserverScanResult",
     "PDDReadOnlyConversationDriver",
 ]

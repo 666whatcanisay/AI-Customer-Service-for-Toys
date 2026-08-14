@@ -58,6 +58,11 @@ def build_assistant_snapshot(
         revision=1,
         status=status,
         turn_id=package.turn_id,
+        customer_message_id=(
+            context.current_turn_message_ids[-1]
+            if context is not None and context.current_turn_message_ids
+            else None
+        ),
         decision_id=package.decision_id,
         request_id=package.request_id,
         customer_reference=package.customer_reference,

@@ -208,6 +208,11 @@ class CustomerContext(CustomerAssistantModel):
     visible_conversation_history: tuple[ConversationHistoryEntry, ...] = Field(
         default=(), max_length=100
     )
+    # Internal turn identity used by the local assistant projection and the
+    # controlled-send safety gate.  It is deliberately not emitted by
+    # ``gateway_context`` and defaults to empty for previously persisted RC5
+    # contexts.
+    current_turn_message_ids: tuple[str, ...] = Field(default=(), max_length=32)
     current_question: str = Field(min_length=1, max_length=8_000, repr=False)
     knowledge_scopes: tuple[str, ...] = Field(default=(), max_length=32)
     assembled_at: AwareDatetime

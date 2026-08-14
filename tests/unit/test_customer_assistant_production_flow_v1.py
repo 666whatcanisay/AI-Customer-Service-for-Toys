@@ -22,6 +22,7 @@ from channel_engine.customer_assistant import (
     TransactionContext,
     render_customer_assistant,
 )
+from channel_engine.agent.assistant_projection import build_assistant_snapshot
 from channel_engine.execution import ExecutionCoordinator, ExecutionWorker, FakeExecutionAdapter
 from channel_engine.gateway import (
     CONTRACT_VERSION,
@@ -34,6 +35,7 @@ from channel_engine.pdd_adapter import PDDCapturedMessage, PDDPrivacyFilter
 from channel_engine.policy import ApprovalPolicy
 from channel_engine.storage.orm import ApprovalRow, ExecutionRow, ReceiptRow
 from channel_agent.config import AgentConfigError, ChannelAgentConfig, load_agent_config
+from channel_agent.desktop import DesktopAssistantServer
 
 
 NOW = datetime(2026, 8, 7, 9, 0, tzinfo=timezone.utc)
@@ -202,6 +204,26 @@ def test_three_short_messages_are_combined_into_one_customer_context(foundation,
     assert package.state == "WAITING_APPROVAL"
     assert package.citations[0].reference == "kb://products/blocks"
     assert buffer.pending_count() == 0
+
+    stored = runtime.stored_reply(package.decision_id)
+    assert stored is not None
+    durable_context, _durable_package = stored
+    assert durable_context.current_turn_message_ids == ("m-001", "m-002", "m-003")
+    assert "current_turn_message_ids" not in gateway.requests[0].context
+
+    snapshot = build_assistant_snapshot(
+        package,
+        None,
+        context=durable_context,
+        agent_id="agent-001",
+        device_id="device-001",
+        trace_id="trace:" + "1" * 64,
+        now=NOW + timedelta(seconds=10),
+    )
+    assert snapshot.customer_message_id == "m-003"
+    feed = DesktopAssistantServer._snapshot_feed(snapshot.model_dump(mode="json"))
+    assert feed["reply"]["messageId"] == "m-003"
+    assert feed["conversations"][0]["messages"][0]["messageId"] == "m-003"
 
 
 @pytest.mark.parametrize(

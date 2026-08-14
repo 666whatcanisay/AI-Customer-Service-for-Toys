@@ -10,7 +10,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from channel_agent.control_v2 import ServiceRequestSigner, ServiceRequestVerifier
+from channel_agent.desktop import DesktopAssistantServer
 from channel_agent.providers import RecordedReplayProvider, SyntheticPDDProvider
+from channel_engine.agent.control_v2 import create_channel_agent_service_v2_router
+from channel_engine.agent.node_api import ChannelAgentNodeRegistry
+from channel_engine.customer_assistant import ReplyPolicyMode
 from channel_engine.gateway import (
     DecisionRequest,
     DecisionResponse,
@@ -18,11 +22,7 @@ from channel_engine.gateway import (
 )
 from channel_engine.models import DecisionAction
 from channel_engine.offline_runtime import OfflineCompleteRuntime
-from channel_engine.agent.control_v2 import create_channel_agent_service_v2_router
-from channel_engine.agent.node_api import ChannelAgentNodeRegistry
 from channel_engine.provider import NormalizedChannelObservation
-from channel_engine.customer_assistant import ReplyPolicyMode
-
 
 NOW = datetime(2026, 8, 11, 12, 0, tzinfo=UTC)
 
@@ -78,7 +78,9 @@ def _signed_service_request(
     payload: dict[str, object] | None = None,
     intent: str | None = None,
 ):
-    body = b"" if payload is None else json.dumps(payload, separators=(",", ":")).encode()
+    body = (
+        b"" if payload is None else json.dumps(payload, separators=(",", ":")).encode()
+    )
     headers = signer.headers(
         method,
         path,
@@ -287,7 +289,10 @@ def test_black_box_auto_low_risk_switch_and_new_message_invalidation(
         second = observation(message_id="synthetic-message-2")
         runtime.ingest_provider(SyntheticPDDProvider((second,)))
         runtime.drain()
-        assert runtime.offline_control.preparation(snapshot.decision_id).state == "INVALIDATED"
+        assert (
+            runtime.offline_control.preparation(snapshot.decision_id).state
+            == "INVALIDATED"
+        )
 
         manual = runtime.set_policy("store-001", ReplyPolicyMode.MANUAL_CONFIRM)
         assert manual.mode == "MANUAL_CONFIRM"
@@ -333,7 +338,9 @@ def test_black_box_manual_multiturn_projects_only_authorized_reply_history(
     tmp_path: Path,
 ) -> None:
     gateway = OfflineAICSGateway()
-    runtime = OfflineCompleteRuntime(tmp_path / "multiturn-human", gateway, clock=lambda: NOW)
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "multiturn-human", gateway, clock=lambda: NOW
+    )
     first = observation(message_id="synthetic-message-1")
     second = observation(message_id="synthetic-message-2")
     try:
@@ -389,8 +396,7 @@ def test_black_box_unconfirmed_draft_never_enters_next_turn_history(
         history = gateway.requests[1].context["visible_conversation_history"]
         assert [item["sender"] for item in history] == ["customer"]
         assert all(
-            not item["message_id"].startswith("authorized-reply:")
-            for item in history
+            not item["message_id"].startswith("authorized-reply:") for item in history
         )
     finally:
         runtime.close()
@@ -400,7 +406,9 @@ def test_black_box_auto_policy_reply_is_preserved_as_operator_history(
     tmp_path: Path,
 ) -> None:
     gateway = OfflineAICSGateway()
-    runtime = OfflineCompleteRuntime(tmp_path / "multiturn-auto", gateway, clock=lambda: NOW)
+    runtime = OfflineCompleteRuntime(
+        tmp_path / "multiturn-auto", gateway, clock=lambda: NOW
+    )
     first = observation(message_id="synthetic-message-1")
     second = observation(message_id="synthetic-message-2")
     try:
@@ -431,9 +439,9 @@ def test_signed_workspace_service_controls_policy_and_manual_preparation(
     secret = b"offline-service-control-secret-32-bytes-minimum"
     signer = ServiceRequestSigner("ai-cs", "service-key-1", secret)
     verifier = ServiceRequestVerifier(
-        lambda service, key: secret
-        if (service, key) == ("ai-cs", "service-key-1")
-        else b"",
+        lambda service, key: (
+            secret if (service, key) == ("ai-cs", "service-key-1") else b""
+        ),
         clock=lambda: NOW.timestamp(),
     )
     value = observation(message_id="synthetic-message-1")
@@ -560,10 +568,36 @@ def test_black_box_two_stores_and_four_conversations_never_cross_scope(
         assert result.replies_generated == 4
         snapshots = runtime.conversations()
         assert len(snapshots) == 4
-        assert len(
-            {(item.store_id, item.conversation_id) for item in snapshots}
-        ) == 4
+        assert len({(item.store_id, item.conversation_id) for item in snapshots}) == 4
         assert all(item.status == "WAITING_APPROVAL" for item in snapshots)
         assert all(item.safety.execution_count == 0 for item in snapshots)
+
+        feed = DesktopAssistantServer._snapshots_feed(
+            tuple(item.model_dump(mode="json") for item in snapshots)
+        )
+        conversations = feed["conversations"]
+        assert len(conversations) == 4
+        assert {item["conversationId"] for item in conversations} == {
+            f"conversation-{index:03d}" for index in range(1, 5)
+        }
+        assert len(feed["replies"]) == 4
+        assert {
+            item["productContext"]["productReference"] for item in conversations
+        } == {f"product-{index:03d}" for index in range(1, 5)}
+        assert all(len(item["messages"]) == 1 for item in conversations)
+        assert all(
+            item["reply"]["conversationId"] == item["conversationId"]
+            for item in conversations
+        )
+        assert feed["safety"] == {
+            "readOnly": True,
+            "autoReply": False,
+            "realSend": False,
+            "browserWriteOperations": 0,
+            "executionCount": 0,
+            "receiptCount": 0,
+            "sendCount": 0,
+            "executionPrepared": False,
+        }
     finally:
         runtime.close()

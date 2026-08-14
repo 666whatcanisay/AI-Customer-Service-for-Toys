@@ -649,6 +649,9 @@ class DesktopAssistantServer:
     def _snapshot_feed(snapshot: dict[str, Any]) -> dict[str, Any]:
         conversation_id = str(snapshot["conversation_id"])
         decision_id = str(snapshot["decision_id"])
+        customer_message_id = str(
+            snapshot.get("customer_message_id") or snapshot["turn_id"]
+        )
         customer_reference = str(snapshot["customer_reference"])
         customer_label = f"客户 {customer_reference[-12:]}"
         updated_at = str(snapshot["updated_at"])
@@ -699,7 +702,7 @@ class DesktopAssistantServer:
             reply = {
                 "conversationId": conversation_id,
                 "customerReference": customer_reference,
-                "messageId": str(snapshot["turn_id"]),
+                "messageId": customer_message_id,
                 "decisionId": decision_id,
                 "answer": reply_content,
                 "requestId": snapshot.get("request_id"),
@@ -737,7 +740,7 @@ class DesktopAssistantServer:
                     "productContext": product_context,
                     "messages": [
                         {
-                            "messageId": str(snapshot["turn_id"]),
+                            "messageId": customer_message_id,
                             "conversationId": conversation_id,
                             "customerLabel": customer_label,
                             "content": snapshot["current_question"],

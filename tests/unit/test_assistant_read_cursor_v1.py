@@ -8,7 +8,9 @@ from channel_agent.control_v2 import AgentAssistantSnapshot
 from channel_agent.desktop import DesktopAssistantServer
 
 
-def _snapshot(*, revision: int = 3) -> AgentAssistantSnapshot:
+def _snapshot(
+    *, revision: int = 3, customer_message_id: str | None = None
+) -> AgentAssistantSnapshot:
     now = datetime.now(UTC)
     return AgentAssistantSnapshot(
         agent_id="agent-1",
@@ -18,6 +20,7 @@ def _snapshot(*, revision: int = 3) -> AgentAssistantSnapshot:
         revision=revision,
         status="WAITING_APPROVAL",
         turn_id="turn-1",
+        customer_message_id=customer_message_id,
         decision_id="decision-1",
         request_id="request-1",
         customer_reference="customer-1",
@@ -60,3 +63,25 @@ def test_desktop_multi_conversation_feed_uses_read_cursor(tmp_path: Path) -> Non
     read = runtime.assistant_feed()["conversations"][0]
     assert read["unreadCount"] == 0
     assert read["readRevision"] == 3
+
+
+def test_desktop_feed_uses_verified_customer_message_id_and_keeps_old_snapshot_compatible(
+    tmp_path: Path,
+) -> None:
+    del tmp_path
+    verified = DesktopAssistantServer._snapshot_feed(
+        _snapshot(customer_message_id="pdd-customer-message-001").model_dump(
+            mode="json"
+        )
+    )
+    assert verified["reply"]["messageId"] == "pdd-customer-message-001"
+    assert (
+        verified["conversations"][0]["messages"][0]["messageId"]
+        == "pdd-customer-message-001"
+    )
+
+    legacy_payload = _snapshot().model_dump(mode="json", exclude={"customer_message_id"})
+    restored = AgentAssistantSnapshot.model_validate(legacy_payload)
+    assert restored.customer_message_id is None
+    legacy = DesktopAssistantServer._snapshot_feed(restored.model_dump(mode="json"))
+    assert legacy["reply"]["messageId"] == "turn-1"

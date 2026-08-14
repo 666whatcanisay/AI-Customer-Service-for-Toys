@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import RLock
@@ -18,17 +19,23 @@ from .edge_pdd_observe import (
     PDDWorkspaceProduct,
     PDDWorkspaceSnapshot,
 )
+from .pdd_conversation_capture import PDDReplyAttentionState
+from .pdd_conversation_navigation import (
+    WebSocketPDDConversationNavigationPort,
+)
 from .pdd_login import EdgePDDTargetResolver, PDDCDPPageTarget
-from .pdd_page_port import PDDPageReadPort, PDDReadReplayFixture
 from .pdd_observer import (
     PDDConversationNotActive,
     PDDConversationSummary,
     PDDObserverError,
     PDDObserverFatalError,
 )
-
+from .pdd_page_port import PDDPageReadPort, PDDReadReplayFixture
 
 _MAX_CDP_BYTES = 1_048_576
+_PDD_CONVERSATION_ID_PREFIX = re.compile(r"^(\d{8,20})(?:\D|$)")
+_PDD_MESSAGE_ID = re.compile(r"^middlePanel_list_(\d{13})$")
+_UNSUPPORTED_NON_TEXT_MESSAGE = "[UNSUPPORTED_NON_TEXT_MESSAGE]"
 _REQUIRED_SELECTORS = {
     "conversation_item",
     "conversation_id",
@@ -43,6 +50,12 @@ _REQUIRED_SELECTORS = {
     "message_content",
     "message_timestamp",
     "message_sequence",
+}
+_NAVIGATION_SELECTORS = {
+    "conversation_attention",
+    "conversation_select_target",
+    "reply_input",
+    "message_container",
 }
 
 
@@ -67,7 +80,10 @@ class PDDFingerprintProbe(_StrictModel):
 
 
 class PDDObserverEvidence(_StrictModel):
-    schema_version: Literal["channel-agent-pdd-observer-evidence.v2.1"]
+    schema_version: Literal[
+        "channel-agent-pdd-observer-evidence.v2.1",
+        "channel-agent-pdd-observer-evidence.v2.2",
+    ]
     state: Literal["VERIFIED"]
     environment: Literal["PRODUCTION", "STAGING"]
     platform: Literal["PDD"]
@@ -85,11 +101,12 @@ class PDDObserverEvidence(_StrictModel):
     evidence_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
 
     @model_validator(mode="after")
-    def validate_contract(self) -> "PDDObserverEvidence":
+    def validate_contract(self) -> PDDObserverEvidence:
         if not _REQUIRED_SELECTORS.issubset(self.selectors):
             raise ValueError("verified PDD observer evidence is incomplete")
         unknown = set(self.selectors).difference(
             _REQUIRED_SELECTORS
+            | _NAVIGATION_SELECTORS
             | {
                 "store_name",
                 "product_id",
@@ -101,10 +118,42 @@ class PDDObserverEvidence(_StrictModel):
                 "order_status",
                 "logistics_status",
                 "aftersales_status",
+                "latest_message_preview",
             }
         )
         if unknown:
             raise ValueError("verified PDD observer evidence contains unknown selectors")
+        if (
+            self.schema_version == "channel-agent-pdd-observer-evidence.v2.2"
+            and not _NAVIGATION_SELECTORS.issubset(self.selectors)
+        ):
+            raise ValueError("verified PDD conversation navigation evidence is incomplete")
+        if self.schema_version == "channel-agent-pdd-observer-evidence.v2.2":
+            attention = self.selectors["conversation_attention"]
+            if attention.required or attention.maximum_matches != 1:
+                raise ValueError(
+                    "verified PDD reply-attention selector must be optional and unique per row"
+                )
+            for selector_name in (
+                "conversation_select_target",
+                "reply_input",
+                "message_container",
+            ):
+                binding = self.selectors[selector_name]
+                if not binding.required or binding.maximum_matches != 1:
+                    raise ValueError(
+                        "verified PDD conversation navigation selectors must be required and unique"
+                    )
+            conversation_identity = self.selectors["conversation_id"]
+            active_identity = self.selectors["active_conversation_id"]
+            if (
+                active_identity.maximum_matches != 1
+                or active_identity.attribute != conversation_identity.attribute
+            ):
+                raise ValueError(
+                    "verified PDD active conversation identity must be unique and use "
+                    "the same attribute as the conversation row"
+                )
         if self.expires_at <= self.verified_at:
             raise ValueError("verified PDD observer evidence expiry is invalid")
         canonical = self.model_dump(mode="json", exclude={"evidence_hash"})
@@ -125,6 +174,13 @@ class PDDObserverEvidence(_StrictModel):
             capability="OBSERVE",
             verified_at=self.verified_at,
             expires_at=self.expires_at,
+        )
+
+    @property
+    def navigation_enabled(self) -> bool:
+        return (
+            self.schema_version == "channel-agent-pdd-observer-evidence.v2.2"
+            and _NAVIGATION_SELECTORS.issubset(self.selectors)
         )
 
 
@@ -316,11 +372,11 @@ class LivePDDPageReadPort:
 
 
 class EvidenceBackedPDDReadOnlyDriver:
-    """Production PDD reader with no navigation, click, input or send capability.
+    """Production PDD reader with an optional, evidence-gated navigation port.
 
-    The driver can capture only the conversation already visible in PDD.  It will
-    not click a conversation row because that would mutate platform read state.
-    Other unread conversations remain queued for human selection.
+    Legacy v2.1 evidence can capture only the already-active conversation.  A
+    verified v2.2 evidence set may select one reply-attention conversation, but
+    the driver still has no composer, reply or send capability.
     """
 
     observe_only = True
@@ -338,6 +394,7 @@ class EvidenceBackedPDDReadOnlyDriver:
         resolver: EdgePDDTargetResolver | None = None,
         evaluator: ReadOnlyCDPEvaluator | None = None,
         page_port: PDDPageReadPort | None = None,
+        navigation_port: WebSocketPDDConversationNavigationPort | None = None,
         clock: Any = lambda: datetime.now(UTC),
     ) -> None:
         self._store_id = store_id
@@ -346,13 +403,27 @@ class EvidenceBackedPDDReadOnlyDriver:
         if page_port is None:
             if profile_path is None:
                 raise PDDReadOnlyDriverError("live PDD reader requires an Edge profile")
+            resolver = resolver or EdgePDDTargetResolver()
+            evaluator = evaluator or ReadOnlyCDPEvaluator()
             page_port = LivePDDPageReadPort(
                 profile_path=profile_path,
                 applicable_path=evidence.applicable_path,
                 resolver=resolver,
                 evaluator=evaluator,
             )
+            if evidence.navigation_enabled and navigation_port is None:
+                navigation_port = WebSocketPDDConversationNavigationPort(
+                    profile_path=profile_path,
+                    applicable_path=evidence.applicable_path,
+                    selectors={
+                        key: value.model_dump(mode="json")
+                        for key, value in evidence.selectors.items()
+                    },
+                    resolver=resolver,
+                    evaluator=evaluator,
+                )
         self._page_port = page_port
+        self._navigation_port = navigation_port
         self._clock = clock
 
     @property
@@ -362,6 +433,24 @@ class EvidenceBackedPDDReadOnlyDriver:
     @property
     def pdd_network_requests(self) -> int:
         return self._page_port.pdd_network_requests
+
+    @property
+    def navigation_enabled(self) -> bool:
+        return self._evidence.navigation_enabled and self._navigation_port is not None
+
+    def navigate_to_conversation(
+        self,
+        summary: PDDConversationSummary,
+        *,
+        allow_attention_missing: bool = False,
+    ) -> None:
+        if not self.navigation_enabled or self._navigation_port is None:
+            raise PDDConversationNotActive(
+                "verified PDD conversation navigation evidence is unavailable"
+            )
+        self._navigation_port.navigate(
+            summary, allow_attention_missing=allow_attention_missing
+        )
 
     def selector_evidence(self, capability: str) -> PDDSelectorRuntimeEvidence:
         if capability != "OBSERVE":
@@ -377,20 +466,55 @@ class EvidenceBackedPDDReadOnlyDriver:
         if len(rows) > 200:
             raise PDDReadOnlyDriverError("PDD conversation list exceeded the safety limit")
         results: list[PDDConversationSummary] = []
-        for item in rows:
+        for page_position, item in enumerate(rows):
             if not isinstance(item, dict):
                 raise PDDReadOnlyDriverError("PDD conversation row is invalid")
-            raw_customer = _required_text(item, "customer_reference", 512)
+            raw_conversation = _required_text(item, "conversation_id", 255)
+            conversation_id = _pdd_conversation_id(raw_conversation)
+            raw_customer = _optional_text(item.get("customer_reference"), 512)
+            customer_basis = (
+                conversation_id
+                if raw_customer is None
+                else _pdd_customer_reference_basis(raw_customer, conversation_id)
+            )
+            attention_text = _optional_text(item.get("attention"), 512)
+            attention_state, attention_seconds = _reply_attention(attention_text)
+            latest_raw = _optional_text(
+                item.get("latest_message_id") or item.get("latest_sequence"), 255
+            )
             results.append(
                 PDDConversationSummary(
                     store_id=self._store_id,
                     platform_store_id=self._platform_store_id,
-                    conversation_id=_required_text(item, "conversation_id", 255),
+                    conversation_id=conversation_id,
                     customer_reference="sha256:"
-                    + hashlib.sha256(raw_customer.encode("utf-8")).hexdigest(),
+                    + hashlib.sha256(customer_basis.encode("utf-8")).hexdigest(),
                     unread_count=_optional_int(item.get("unread_count"), minimum=0),
-                    last_activity_at=_aware_datetime(item.get("last_activity")),
-                    latest_sequence=_optional_int(item.get("latest_sequence"), minimum=1),
+                    last_activity_at=_pdd_message_datetime(item.get("last_activity")),
+                    latest_sequence=_pdd_message_sequence(item.get("latest_sequence")),
+                    latest_message_id=latest_raw,
+                    page_position=page_position,
+                    attention_state=attention_state,
+                    attention_verified=(
+                        self._evidence.navigation_enabled and attention_text is not None
+                    ),
+                    attention_seconds=attention_seconds,
+                    attention_evidence_hash=(
+                        "sha256:"
+                        + hashlib.sha256(
+                            (
+                                self._evidence.evidence_hash
+                                + "\n"
+                                + _pdd_conversation_id(
+                                    raw_conversation
+                                )
+                                + "\n"
+                                + attention_state.value
+                            ).encode("utf-8")
+                        ).hexdigest()
+                        if attention_text is not None
+                        else None
+                    ),
                 )
             )
         return tuple(results)
@@ -400,7 +524,9 @@ class EvidenceBackedPDDReadOnlyDriver:
         if not isinstance(raw, dict):
             raise PDDReadOnlyDriverError("PDD conversation capture result is invalid")
         self._assert_fingerprint(raw.get("fingerprint"))
-        active = _required_text(raw, "active_conversation_id", 255)
+        active = _pdd_conversation_id(
+            _required_text(raw, "active_conversation_id", 255)
+        )
         if active != summary.conversation_id:
             raise PDDConversationNotActive(
                 "PDD conversation requires human selection before read-only capture"
@@ -413,17 +539,44 @@ class EvidenceBackedPDDReadOnlyDriver:
             if not isinstance(item, dict):
                 raise PDDReadOnlyDriverError("PDD message row is invalid")
             role_key = _required_text(item, "role", 128)
-            role = self._evidence.role_map.get(role_key, "UNKNOWN")
+            role = self._evidence.role_map.get(role_key)
+            if role is None:
+                role = next(
+                    (
+                        mapped
+                        for token in role_key.split()
+                        if (mapped := self._evidence.role_map.get(token)) is not None
+                    ),
+                    "UNKNOWN",
+                )
+            content = _optional_text(item.get("content"), 8_000)
+            if content is None:
+                # The real workspace reuses the text wrapper for image, sticker
+                # and card rows. Preserve source ordering, but make the row
+                # manual-review-only so no fabricated content can reach AI.
+                role = "UNKNOWN"
+                content = _UNSUPPORTED_NON_TEXT_MESSAGE
             messages.append(
                 PDDWorkspaceMessage(
                     external_message_id=_required_text(item, "message_id", 255),
                     sender=role,
-                    content=_required_text(item, "content", 8_000),
-                    timestamp=_aware_datetime(item.get("timestamp")),
-                    sequence=_optional_int(item.get("sequence"), minimum=1) or 0,
+                    content=content,
+                    timestamp=_pdd_message_datetime(item.get("timestamp")),
+                    sequence=_pdd_message_sequence(item.get("sequence")) or 0,
                 )
             )
-        raw_customer = _required_text(raw, "customer_reference", 512)
+        raw_customer = _optional_text(raw.get("customer_reference"), 512)
+        # The production PDD workspace does not consistently expose a separate
+        # customer reference.  The scan path already uses the normalized row
+        # conversation id as its privacy-safe fallback; capture must use the
+        # same basis after the active-row equality check succeeds.
+        customer_basis = (
+            summary.conversation_id
+            if raw_customer is None
+            else _pdd_customer_reference_basis(
+                raw_customer, summary.conversation_id
+            )
+        )
         product = raw.get("product") if isinstance(raw.get("product"), dict) else {}
         order = raw.get("order") if isinstance(raw.get("order"), dict) else {}
         return PDDWorkspaceSnapshot(
@@ -432,7 +585,7 @@ class EvidenceBackedPDDReadOnlyDriver:
             store_name=_optional_text(raw.get("store_name"), 160),
             conversation_id=summary.conversation_id,
             customer_reference="sha256:"
-            + hashlib.sha256(raw_customer.encode("utf-8")).hexdigest(),
+            + hashlib.sha256(customer_basis.encode("utf-8")).hexdigest(),
             page_fingerprint=self._evidence.page_fingerprint,
             selector_evidence_hash=self._evidence.evidence_hash,
             page_state="CUSTOMER_SERVICE_RUNNING",
@@ -489,13 +642,16 @@ class EvidenceBackedPDDReadOnlyDriver:
 def _read_expression(config_json: str, *, capture: bool) -> str:
     # Selectors are JSON values, never concatenated into executable JavaScript.
     action = "capture" if capture else "scan"
-    return f"""
+    return rf"""
 (() => {{
   const cfg = {config_json};
   const one = (root, name) => {{
     const b = cfg.selectors[name];
     if (!b) return null;
-    const nodes = Array.from((root || document).querySelectorAll(b.selector));
+    const scope = root || document;
+    const nodes = [];
+    if (scope !== document && typeof scope.matches === 'function' && scope.matches(b.selector)) nodes.push(scope);
+    nodes.push(...Array.from(scope.querySelectorAll(b.selector)));
     if (nodes.length > b.maximum_matches || (b.required && nodes.length === 0)) throw new Error('selector boundary');
     const node = nodes[0];
     if (!node) return null;
@@ -518,14 +674,37 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     return h.map(v=>(v>>>0).toString(16).padStart(8,'0')).join('');
   }};
   const fingerprint = 'sha256:' + sha256(stable);
+  const activity = (value) => {{
+    const text = String(value || '').trim();
+    const clock = text.match(/^(\d{{1,2}}):(\d{{2}})$/);
+    if (!clock) return text || null;
+    const local = new Date();
+    local.setHours(Number(clock[1]), Number(clock[2]), 0, 0);
+    return local.toISOString();
+  }};
+  const sequenceLike = (value) => /^(?:middlePanel_list_\d{{13}}|\d+)$/.test(String(value || '').trim());
   if ('{action}' === 'scan') {{
     const item = cfg.selectors.conversation_item;
     const rows = Array.from(document.querySelectorAll(item.selector));
     if (rows.length > item.maximum_matches) throw new Error('conversation boundary');
-    return {{fingerprint, conversations: rows.map((row) => ({{
-      conversation_id: one(row,'conversation_id'), customer_reference: one(row,'customer_reference'),
-      unread_count: one(row,'unread_count'), last_activity: one(row,'last_activity'), latest_sequence: one(row,'latest_sequence')
-    }}))}};
+    return {{fingerprint, conversations: rows.map((row) => {{
+      const conversationId = one(row,'conversation_id');
+      const lastActivity = one(row,'last_activity');
+      const rawSequence = one(row,'latest_sequence');
+      const preview = one(row,'latest_message_preview');
+      const latestMessageId = sequenceLike(rawSequence)
+        ? rawSequence
+        : (preview ? 'sha256:' + sha256([conversationId, lastActivity, preview].join('\n')) : null);
+      return {{
+        conversation_id: conversationId,
+        customer_reference: one(row,'customer_reference'),
+        unread_count: one(row,'unread_count'),
+        last_activity: activity(lastActivity),
+        latest_sequence: sequenceLike(rawSequence) ? rawSequence : null,
+        latest_message_id: latestMessageId,
+        attention: one(row,'conversation_attention')
+      }};
+    }})}};
   }}
   const item = cfg.selectors.message_item;
   const rows = Array.from(document.querySelectorAll(item.selector));
@@ -570,6 +749,64 @@ def _optional_int(value: object, *, minimum: int) -> int | None:
     if parsed < minimum:
         raise PDDReadOnlyDriverError("PDD read numeric field is outside its boundary")
     return parsed
+
+
+def _pdd_conversation_id(value: str) -> str:
+    """Return the stable PDD conversation id without a volatile DOM suffix."""
+
+    match = _PDD_CONVERSATION_ID_PREFIX.match(value)
+    return match.group(1) if match else value
+
+
+def _pdd_customer_reference_basis(value: str, conversation_id: str) -> str:
+    """Normalize an optional customer reference against the row conversation id.
+
+    Non-PDD replay identifiers remain unchanged.  This keeps scan and capture
+    identity checks strict without persisting a public customer name.
+    """
+
+    normalized = _pdd_conversation_id(value)
+    return conversation_id if normalized == conversation_id else value
+
+
+def _pdd_message_sequence(value: object) -> int | None:
+    if isinstance(value, str):
+        match = _PDD_MESSAGE_ID.fullmatch(value.strip())
+        if match:
+            return int(match.group(1))
+    return _optional_int(value, minimum=1)
+
+
+def _pdd_message_datetime(value: object) -> datetime:
+    if isinstance(value, str):
+        match = _PDD_MESSAGE_ID.fullmatch(value.strip())
+        if match:
+            try:
+                return datetime.fromtimestamp(int(match.group(1)) / 1_000, tz=UTC)
+            except (OverflowError, OSError, ValueError) as exc:
+                raise PDDReadOnlyDriverError(
+                    "PDD message id timestamp is outside its boundary"
+                ) from exc
+    return _aware_datetime(value)
+
+
+def _reply_attention(
+    value: str | None,
+) -> tuple[PDDReplyAttentionState, int | None]:
+    if value is None:
+        return PDDReplyAttentionState.NONE, None
+    normalized = " ".join(value.split())
+    countdown = re.search(r"(\d{1,6})\s*秒后超时", normalized)
+    if countdown:
+        return PDDReplyAttentionState.COUNTDOWN, min(int(countdown.group(1)), 604_800)
+    overdue = re.search(r"(?:(\d{1,6})\s*(秒|分钟|小时))?.*(?:未回|未回复|已超时|超时)", normalized)
+    if overdue:
+        amount = int(overdue.group(1)) if overdue.group(1) else None
+        unit = overdue.group(2)
+        if amount is not None:
+            amount *= {"秒": 1, "分钟": 60, "小时": 3600}.get(unit or "秒", 1)
+        return PDDReplyAttentionState.OVERDUE, min(amount, 604_800) if amount else None
+    return PDDReplyAttentionState.UNKNOWN, None
 
 
 def _aware_datetime(value: object) -> datetime:

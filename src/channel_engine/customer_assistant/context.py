@@ -147,6 +147,9 @@ class CustomerContextCollector:
             transaction=transaction,
             conversation_history=merged,
             visible_conversation_history=visible_history,
+            current_turn_message_ids=tuple(
+                item.external_message_id for item in turn.messages
+            ),
             current_question=turn.combined_question,
             knowledge_scopes=self._knowledge.scopes_for(
                 store_id=turn.store_id,

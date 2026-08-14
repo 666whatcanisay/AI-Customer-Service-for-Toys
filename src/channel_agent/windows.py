@@ -49,6 +49,7 @@ from .pdd_login import (
     PDDLoginObservationAdapter,
     PDDLoginState,
 )
+from .pdd_conversation_capture import DurablePDDConversationCaptureStore
 from .pdd_observer import PDDMessageObserver, PDDObserverRunner
 from .pdd_page_port import ReplayPDDPageReadPort, load_pdd_replay_fixture
 from .pdd_readonly_driver import (
@@ -892,9 +893,15 @@ class WindowsAgentHost:
                     hashlib.sha256,
                 ).digest()
             )
+        spool_path = data_root / "runtime" / "observe-only-spool.sqlite3"
         spool = DurableEdgeSpool(
-            data_root / "runtime" / "observe-only-spool.sqlite3",
+            spool_path,
             WindowsDPAPITransientPayloadProtector(),
+        )
+        capture_store = (
+            DurablePDDConversationCaptureStore(spool_path)
+            if evidence.navigation_enabled
+            else None
         )
         client = None
         if config.observation_stage.allows(ObservationStage.HOST_INGEST):
@@ -918,6 +925,7 @@ class WindowsAgentHost:
             spool=spool,
             forward=forwarder,
             diagnostic=lambda code, _summary, _details: error_sink(code),
+            capture_store=capture_store,
             stage=config.observation_stage,
         )
         runner = PDDObserverRunner(
