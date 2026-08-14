@@ -74,6 +74,11 @@ Invoke-Gate 'assistant-ui' (Join-Path $aiCs 'frontend') 'npm.cmd' @('test')
 Invoke-Gate 'assistant-ui-typecheck' (Join-Path $aiCs 'frontend') 'npm.cmd' @('run','typecheck')
 Invoke-Gate 'admin-ui' (Join-Path $aiCs 'admin_web') 'npm.cmd' @('test')
 Invoke-Gate 'admin-ui-typecheck' (Join-Path $aiCs 'admin_web') 'npm.cmd' @('run','typecheck')
+if ($Mode -eq 'Full') {
+    Invoke-Gate 'assistant-ui-build' (Join-Path $aiCs 'frontend') 'npm.cmd' @('run','build')
+    Invoke-Gate 'assistant-agent-ui-build' (Join-Path $aiCs 'frontend') 'npm.cmd' @('run','build:agent')
+    Invoke-Gate 'admin-ui-build' (Join-Path $aiCs 'admin_web') 'npm.cmd' @('run','build')
+}
 
 $report = [ordered]@{
     schema = 'rc5-offline-stability-verification.v1'

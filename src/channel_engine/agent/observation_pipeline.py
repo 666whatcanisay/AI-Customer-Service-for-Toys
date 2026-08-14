@@ -10,6 +10,7 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from channel_agent.control_v2 import AgentObservationSubmission
+from channel_engine.catalog_scope import canonical_catalog_platform
 from channel_engine.channel import NormalizedMessage
 from channel_engine.conversation import ConversationService, IntakeResult
 from channel_engine.customer_assistant import (
@@ -382,7 +383,7 @@ class AgentObservationDecisionProjector:
             ),
             "ai_cs_scope": {
                 "tenant_id": payload.catalog_tenant_id,
-                "platform": payload.catalog_platform,
+                "platform": canonical_catalog_platform(payload.catalog_platform),
                 "store_code": payload.store_id,
                 "product_id": (
                     payload.product.get("product_id")

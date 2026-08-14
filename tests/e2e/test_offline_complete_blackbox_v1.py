@@ -598,6 +598,10 @@ def test_recorded_pdd_replay_persists_16_formal_messages_without_answer_leak(
             item.context["visible_conversation_history"] == []
             for item in gateway.requests
         )
+        assert all(
+            item.context["ai_cs_scope"]["platform"] == "pinduoduo"
+            for item in gateway.requests
+        )
 
         ai_visible_payload = json.dumps(
             [item.model_dump(mode="json") for item in gateway.requests],

@@ -15,8 +15,8 @@ from pydantic import (
     model_validator,
 )
 
+from channel_engine.catalog_scope import canonical_catalog_platform
 from channel_engine.gateway import GatewayRiskLevel
-
 
 CUSTOMER_ASSISTANT_VERSION = "1.0"
 
@@ -278,7 +278,7 @@ class CustomerContext(CustomerAssistantModel):
             "privacy_filtered": True,
             "ai_cs_scope": {
                 "tenant_id": self.page.catalog_tenant_id,
-                "platform": self.page.catalog_platform,
+                "platform": canonical_catalog_platform(self.page.catalog_platform),
                 "store_code": self.store_id,
                 "product_id": product_reference,
                 "sku_id": self.page.product.sku_reference,
