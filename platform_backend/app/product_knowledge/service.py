@@ -787,7 +787,13 @@ class ProductKnowledgeService:
                 structured_faq or ("approved" if "faq" in hints else None),
                 partial=not structured_faq and "faq" in hints,
             ),
-            _topic("parts_count", "零件数量", "B", [data.get("particle_count") for data in sku_raw if data.get("particle_count")]),
+            _topic(
+                "parts_count",
+                "零件数量",
+                "B",
+                raw.get("particle_count")
+                or [data.get("particle_count") for data in sku_raw if data.get("particle_count")],
+            ),
             _topic("size", "尺寸", "B", raw.get("assembled_size") or [data.get("assembled_size") for data in sku_raw if data.get("assembled_size")]),
             _topic("difficulty_time", "拼装难度与时间", "B", _first(raw, "assembly_difficulty", "estimated_time")),
             _topic("play", "玩法", "B", raw.get("play_method")),

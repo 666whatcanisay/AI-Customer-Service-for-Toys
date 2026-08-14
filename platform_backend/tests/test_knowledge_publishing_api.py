@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -5,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.knowledge_publishing.ai_client import AiKnowledgePublicationClient
+from app.knowledge_publishing.canonical import build_canonical_product_knowledge
 from app.knowledge_publishing.models import ProductKnowledgePublication
 from app.errors import AppError
 from app.knowledge_publishing.schemas import ProductKnowledgePublishCommand
@@ -113,6 +115,44 @@ def test_publish_accepts_formalized_initial_import_source(
 
     assert response.status_code == 200
     assert captured["data_source"] == "INITIAL_IMPORT"
+
+
+def test_canonical_product_knowledge_keeps_product_level_pdd_facts(
+    session: Session,
+) -> None:
+    product = _approved_product(
+        session,
+        product_id="982904528556",
+        data_source="PILOT",
+    )
+    product.raw_data_json = json.dumps(
+        {
+            "platform_product_id": "982904528556",
+            "particle_count": "约500颗",
+            "assembled_size": "成品约20×5×5厘米",
+            "package_type": "彩盒包装",
+            "product_scale": "比例约1:20",
+            "image_material_status": "详情页图片为产品实物拍摄展示",
+            "ship_origin": "广东汕头",
+        },
+        ensure_ascii=False,
+    )
+    session.commit()
+
+    canonical = build_canonical_product_knowledge(session, product)
+    document = json.loads(canonical.document)
+
+    assert document["product"] == {
+        "age_max": None,
+        "age_min": None,
+        "assembled_size": "成品约20×5×5厘米",
+        "image_material_status": "详情页图片为产品实物拍摄展示",
+        "package_type": "彩盒包装",
+        "particle_count": "约500颗",
+        "product_scale": "比例约1:20",
+        "safety_summary": None,
+        "ship_origin": "广东汕头",
+    }
 
 
 def test_publish_rejects_unapproved_and_records_sync_failure(

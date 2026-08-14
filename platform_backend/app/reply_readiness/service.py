@@ -371,7 +371,11 @@ class ReplyReadinessService:
         sku_values = values(sku.raw_data_json) if sku is not None else {}
         attributes: dict[str, str] = {}
         candidates = {
-            "particle_count": sku_values.get("particle_count"),
+            "particle_count": (
+                sku_values.get("particle_count")
+                if sku is not None
+                else product_values.get("particle_count")
+            ),
             "finished_size": (
                 sku_values.get("assembled_size")
                 if sku is not None

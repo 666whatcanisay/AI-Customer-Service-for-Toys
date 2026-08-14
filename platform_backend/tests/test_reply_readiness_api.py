@@ -465,6 +465,16 @@ def test_published_debug_passes_publication_facts_and_rejects_wrong_sku(
     client: TestClient, session: Session
 ) -> None:
     _seed(session)
+    product = session.get(CatalogProduct, "PRODUCT-READINESS")
+    assert product is not None
+    product.raw_data_json = json.dumps(
+        {
+            "particle_count": "约500颗",
+            "assembled_size": "约20×5×5厘米",
+            "ship_origin": "广东汕头",
+        },
+        ensure_ascii=False,
+    )
     session.add(
         ProductKnowledgePublication(
             product_id="PRODUCT-READINESS",
@@ -510,6 +520,11 @@ def test_published_debug_passes_publication_facts_and_rejects_wrong_sku(
         "current_fingerprint": "a" * 64,
         "indexed_fingerprint": "a" * 64,
         "active_collection": "published-v1",
+    }
+    assert evaluator.payloads[0]["verified_product"]["attributes"] == {
+        "particle_count": "约500颗",
+        "finished_size": "约20×5×5厘米",
+        "ship_origin": "广东汕头",
     }
     assert invalid.status_code == 422, invalid.text
     assert invalid.json()["error"]["code"] == "REPLY_DEBUG_SCOPE_INVALID"
