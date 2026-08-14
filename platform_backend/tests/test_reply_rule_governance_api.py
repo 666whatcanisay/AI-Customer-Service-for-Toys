@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.knowledge_publishing.ai_client import (
@@ -19,6 +20,7 @@ from app.knowledge_publishing.ai_client import (
 from app.knowledge_materials.models import KnowledgeMaterial
 from app.reply_rules.models import (
     ReplyRule,
+    ReplyRuleEvent,
     ReplyRuleSnapshotPublication,
     ReplyRuleSnapshotPublicationReceipt,
 )
@@ -308,6 +310,15 @@ def test_fixed_reply_rule_review_version_and_minimized_audit(
     assert revision.json()["status"] == "DRAFT"
     assert revision.json()["content_fingerprint"] != created["content_fingerprint"]
 
+    # SQLite and fast test clocks can assign the same timestamp to multiple
+    # append-only events.  The API must still expose lifecycle order rather
+    # than UUID order so the audit is reproducible.
+    session.execute(
+        update(ReplyRuleEvent)
+        .where(ReplyRuleEvent.rule_id == rule_id)
+        .values(occurred_at=datetime(2026, 8, 15, tzinfo=timezone.utc))
+    )
+    session.commit()
     events = client.get(f"/api/v1/admin/reply-rules/{rule_id}/events")
     assert events.status_code == 200
     assert [item["event_type"] for item in events.json()["items"]] == [

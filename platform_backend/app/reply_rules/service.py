@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -41,6 +41,17 @@ _APPROVED_SOURCE_STATES = {
 }
 _SOURCE_EVIDENCE_ADAPTER = TypeAdapter(tuple[ReplyRuleSourceMaterialEvidence, ...])
 _SHA256_CONTENT_HASH = re.compile(r"^sha256:([a-f0-9]{64})$")
+_EVENT_LIFECYCLE_ORDER = {
+    ReplyRuleEventType.CREATED.value: 10,
+    ReplyRuleEventType.REVISION_CREATED.value: 10,
+    ReplyRuleEventType.DRAFT_UPDATED.value: 20,
+    ReplyRuleEventType.REVIEW_SUBMITTED.value: 30,
+    ReplyRuleEventType.APPROVED.value: 40,
+    ReplyRuleEventType.REJECTED.value: 40,
+    ReplyRuleEventType.PUBLISHED.value: 50,
+    ReplyRuleEventType.WITHDRAWN.value: 60,
+    ReplyRuleEventType.EXPIRED.value: 60,
+}
 
 
 def _canonical_sha256(value: object) -> str:
@@ -250,6 +261,11 @@ class ReplyRuleService:
             .order_by(
                 ReplyRuleEvent.occurred_at,
                 ReplyRuleEvent.rule_version,
+                case(
+                    _EVENT_LIFECYCLE_ORDER,
+                    value=ReplyRuleEvent.event_type,
+                    else_=999,
+                ),
                 ReplyRuleEvent.event_id,
             )
         ).all()
