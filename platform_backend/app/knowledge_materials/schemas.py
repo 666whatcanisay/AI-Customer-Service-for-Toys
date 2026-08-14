@@ -115,6 +115,28 @@ class KnowledgeMaterialDetail(KnowledgeMaterialSummary):
     """Admin-only readable excerpt; never the original upload binary."""
 
     analysis_text_preview: str
+    editable_record: dict[str, str] | None = None
+
+
+class KnowledgeMaterialRevisionListResponse(BaseModel):
+    material_id: str
+    items: list[KnowledgeMaterialSummary]
+    total: int
+
+
+class KnowledgeMaterialFieldChange(BaseModel):
+    field: str
+    before: str | None = None
+    after: str | None = None
+
+
+class KnowledgeMaterialDiffResponse(BaseModel):
+    material_id: str
+    from_revision: int = Field(ge=1)
+    to_revision: int = Field(ge=1)
+    from_content_hash: str
+    to_content_hash: str
+    changes: list[KnowledgeMaterialFieldChange]
 
 
 class KnowledgeMaterialListResponse(BaseModel):

@@ -1,0 +1,43 @@
+{
+  "schema_version": "pdd-reply-readiness-input.v1",
+  "run_id": "DBG-SYNTHETIC-CONTRACT-001",
+  "test_data_mode": true,
+  "production_usable": false,
+  "allow_auto_send": false,
+  "execution_mode": "PUBLISHED_ROUTER_DEBUG",
+  "scope": {
+    "tenant_id": "TENANT-SYNTHETIC",
+    "platform": "pdd",
+    "store_code": "STORE-SYNTHETIC",
+    "product_id": "PRODUCT-SYNTHETIC"
+  },
+  "question_set": {
+    "schema_version": "pdd-reply-readiness-question-set.v1",
+    "baseline_version": "pdd-published-router-debug.v1",
+    "fingerprint": "26e47aafc5d2e1abafb353996ac5a6ebf17c62956f462ca6648b0d81b1cbb505",
+    "questions": [
+      {
+        "schema_version": "pdd-reply-readiness-question.v1",
+        "question_id": "DEBUG-SYNTHETIC-001",
+        "category": "DEBUG",
+        "canonical_question": "你好",
+        "aliases": [],
+        "policy_risk_floor": "LOW",
+        "expected_action": "DIRECT_ANSWER",
+        "required_fact_keys": [],
+        "requires_realtime_lookup": false,
+        "prohibited_claims": [],
+        "mandatory": true
+      }
+    ]
+  },
+  "router_build_fingerprint": "d4066125af447bab3ec309a69ba200a16cecfc22425bcaac0359e9c6afbde662",
+  "publication_state": {
+    "status": "NOT_GENERATED"
+  },
+  "verified_product": {
+    "product_reference": "PRODUCT-SYNTHETIC",
+    "product_name": "合成积木",
+    "attributes": {}
+  }
+}

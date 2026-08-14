@@ -3,7 +3,10 @@ import os
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
+
+from app.runtime_database_identity import EXPECTED_REVISION
 
 
 def _config(database_path: Path) -> Config:
@@ -42,9 +45,11 @@ def test_0013_to_head_to_0013_and_back_to_head_is_reversible(tmp_path: Path) -> 
     assert "uq_user_store_bindings_single_default" in binding_indexes
     assert "store_platform_bindings" in inspector.get_table_names()
     assert "runtime_database_identity" in inspector.get_table_names()
+    assert "reply_readiness_question_set_extensions" in inspector.get_table_names()
+    assert "reply_readiness_runs" in inspector.get_table_names()
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0019_runtime_database_identity_v1"
+            "0023_reply_readiness_v1"
         )
     engine.dispose()
 
@@ -70,3 +75,11 @@ def test_0013_to_head_to_0013_and_back_to_head_is_reversible(tmp_path: Path) -> 
         )
     engine.dispose()
     command.upgrade(config, "head")
+
+
+def test_runtime_identity_revision_matches_the_only_alembic_head(tmp_path: Path) -> None:
+    config = _config(tmp_path / "head-check.sqlite3")
+    heads = ScriptDirectory.from_config(config).get_heads()
+
+    assert heads == ["0023_reply_readiness_v1"]
+    assert EXPECTED_REVISION == heads[0]

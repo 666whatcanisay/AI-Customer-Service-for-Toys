@@ -1,0 +1,25 @@
+{
+  "schema_version": "pdd-reply-readiness-result.v1",
+  "run_id": "RRN-SYNTHETIC-CONTRACT-001",
+  "status": "COMPLETED",
+  "question_set_fingerprint": "a8cb883deabc4d1d97edab8fb20085edfad6b7961c202381e382c0b79f081f2a",
+  "items": [
+    {
+      "schema_version": "pdd-reply-readiness-item-result.v1",
+      "question_id": "PDD-FINISHED-SIZE",
+      "effective_risk": "LOW",
+      "action": "DIRECT_ANSWER",
+      "origin": "RAG",
+      "answer_preview": "亲，这款商品拼好后的成品尺寸是40cm。",
+      "answer_sha256": "d267e639945d4700009f41f37fe1367fbf7e9c95bb2b3eea4efc5053a2933511",
+      "missing_fact_keys": [],
+      "blocker_codes": [],
+      "prohibited_claim_hits": [],
+      "citation_ids": [
+        "rr:RRN-SYNTHETIC-CONTRACT-001:PDD-FINISHED-SIZE"
+      ],
+      "evidence_bundle_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "result_sha256": "5ed8313c9cd742caeb10cef01f1a8ac4178f500ca956f3408d42eabbda949213"
+}

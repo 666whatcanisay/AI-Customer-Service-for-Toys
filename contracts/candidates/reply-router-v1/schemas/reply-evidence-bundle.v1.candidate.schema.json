@@ -1,0 +1,716 @@
+{
+  "$defs": {
+    "EvidenceSourceType": {
+      "enum": [
+        "FIXED_RULE",
+        "RAG_KNOWLEDGE"
+      ],
+      "title": "EvidenceSourceType",
+      "type": "string"
+    },
+    "EvidenceSourceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "source_type": {
+          "$ref": "#/$defs/EvidenceSourceType"
+        },
+        "scope": {
+          "$ref": "#/$defs/ReplyScopeV1"
+        },
+        "rule_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Id"
+        },
+        "rule_version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Version"
+        },
+        "rule_content_fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Content Fingerprint"
+        },
+        "rule_snapshot_revision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Snapshot Revision"
+        },
+        "rule_snapshot_fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Snapshot Fingerprint"
+        },
+        "rule_source_materials": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ReplyRuleSourceMaterialV1"
+          },
+          "maxItems": 32,
+          "title": "Rule Source Materials",
+          "type": "array"
+        },
+        "knowledge_reference": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Knowledge Reference"
+        },
+        "knowledge_publication_fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Knowledge Publication Fingerprint"
+        }
+      },
+      "required": [
+        "source_id",
+        "source_type",
+        "scope"
+      ],
+      "title": "EvidenceSourceV1",
+      "type": "object"
+    },
+    "ProposedContentRangeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "range_start": {
+          "maximum": 8000,
+          "minimum": 0,
+          "title": "Range Start",
+          "type": "integer"
+        },
+        "range_end": {
+          "exclusiveMinimum": 0,
+          "maximum": 8000,
+          "title": "Range End",
+          "type": "integer"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "range_start",
+        "range_end",
+        "content_sha256"
+      ],
+      "title": "ProposedContentRangeV1",
+      "type": "object"
+    },
+    "ReplyAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ReplyAction",
+      "type": "string"
+    },
+    "ReplyFactV1": {
+      "additionalProperties": false,
+      "properties": {
+        "fact_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Fact Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "content_range": {
+          "$ref": "#/$defs/ProposedContentRangeV1"
+        },
+        "source_ids": {
+          "items": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fact_id",
+        "segment_id",
+        "content_range",
+        "source_ids"
+      ],
+      "title": "ReplyFactV1",
+      "type": "object"
+    },
+    "ReplyOrigin": {
+      "enum": [
+        "FIXED_RULE",
+        "RAG",
+        "COMPOSITE"
+      ],
+      "title": "ReplyOrigin",
+      "type": "string"
+    },
+    "ReplyRiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "ReplyRiskLevel",
+      "type": "string"
+    },
+    "ReplyRuleSourceMaterialV1": {
+      "additionalProperties": false,
+      "description": "Content-free evidence for the exact governed source revision.",
+      "properties": {
+        "material_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Material Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "governance_status": {
+          "const": "REVIEWED_VALID",
+          "title": "Governance Status",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/ReplyScopeV1"
+        },
+        "reviewed_by": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Reviewed By",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "material_id",
+        "revision",
+        "content_sha256",
+        "governance_status",
+        "scope",
+        "reviewed_by",
+        "reviewed_at"
+      ],
+      "title": "ReplyRuleSourceMaterialV1",
+      "type": "object"
+    },
+    "ReplyScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "$ref": "#/$defs/RuleScopeKind"
+        },
+        "tenant_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "platform": {
+          "maxLength": 40,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Platform",
+          "type": "string"
+        },
+        "store_code": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Code"
+        },
+        "product_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Id"
+        },
+        "sku_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku Id"
+        }
+      },
+      "required": [
+        "scope_kind",
+        "tenant_id",
+        "platform"
+      ],
+      "title": "ReplyScopeV1",
+      "type": "object"
+    },
+    "ReplySegmentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "ordinal": {
+          "maximum": 8,
+          "minimum": 1,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "sub_question_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Sub Question Id",
+          "type": "string"
+        },
+        "content_range": {
+          "$ref": "#/$defs/ProposedContentRangeV1"
+        },
+        "action": {
+          "$ref": "#/$defs/ReplyAction"
+        },
+        "risk_level": {
+          "$ref": "#/$defs/ReplyRiskLevel"
+        },
+        "source_ids": {
+          "items": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "segment_id",
+        "ordinal",
+        "sub_question_id",
+        "content_range",
+        "action",
+        "risk_level",
+        "source_ids"
+      ],
+      "title": "ReplySegmentV1",
+      "type": "object"
+    },
+    "RuleScopeKind": {
+      "enum": [
+        "TENANT",
+        "STORE",
+        "PRODUCT",
+        "SKU"
+      ],
+      "title": "RuleScopeKind",
+      "type": "string"
+    },
+    "SourceTextRangeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "aggregate_start": {
+          "maximum": 8000,
+          "minimum": 0,
+          "title": "Aggregate Start",
+          "type": "integer"
+        },
+        "aggregate_end": {
+          "exclusiveMinimum": 0,
+          "maximum": 8000,
+          "title": "Aggregate End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "message_id",
+        "aggregate_start",
+        "aggregate_end"
+      ],
+      "title": "SourceTextRangeV1",
+      "type": "object"
+    },
+    "SplitStatus": {
+      "enum": [
+        "SINGLE",
+        "SPLIT_CONFIRMED",
+        "AMBIGUOUS"
+      ],
+      "title": "SplitStatus",
+      "type": "string"
+    },
+    "SubQuestionPlanV1": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "sub-question-plan.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "turn_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Turn Id",
+          "type": "string"
+        },
+        "aggregate_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Aggregate Content Sha256",
+          "type": "string"
+        },
+        "split_status": {
+          "$ref": "#/$defs/SplitStatus"
+        },
+        "sub_questions": {
+          "items": {
+            "$ref": "#/$defs/SubQuestionV1"
+          },
+          "maxItems": 8,
+          "title": "Sub Questions",
+          "type": "array"
+        },
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Blocker Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "turn_id",
+        "aggregate_content_sha256",
+        "split_status",
+        "sub_questions"
+      ],
+      "title": "SubQuestionPlanV1",
+      "type": "object"
+    },
+    "SubQuestionRoute": {
+      "enum": [
+        "FIXED_RULE",
+        "RAG",
+        "MANUAL"
+      ],
+      "title": "SubQuestionRoute",
+      "type": "string"
+    },
+    "SubQuestionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "sub_question_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Sub Question Id",
+          "type": "string"
+        },
+        "ordinal": {
+          "maximum": 8,
+          "minimum": 1,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "source_ranges": {
+          "items": {
+            "$ref": "#/$defs/SourceTextRangeV1"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Source Ranges",
+          "type": "array"
+        },
+        "source_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Content Sha256",
+          "type": "string"
+        },
+        "intent": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Intent",
+          "type": "string"
+        },
+        "route": {
+          "$ref": "#/$defs/SubQuestionRoute"
+        },
+        "depends_on": {
+          "default": [],
+          "items": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Blocker Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sub_question_id",
+        "ordinal",
+        "source_ranges",
+        "source_content_sha256",
+        "intent",
+        "route"
+      ],
+      "title": "SubQuestionV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "reply-evidence-bundle.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "reply_origin": {
+      "$ref": "#/$defs/ReplyOrigin"
+    },
+    "scope": {
+      "$ref": "#/$defs/ReplyScopeV1"
+    },
+    "sub_question_plan": {
+      "$ref": "#/$defs/SubQuestionPlanV1"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/ReplySegmentV1"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Segments",
+      "type": "array"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/EvidenceSourceV1"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "title": "Sources",
+      "type": "array"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/ReplyFactV1"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "title": "Facts",
+      "type": "array"
+    },
+    "warnings": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Warnings",
+      "type": "array"
+    },
+    "missing_fields": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Missing Fields",
+      "type": "array"
+    },
+    "blocker_codes": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Blocker Codes",
+      "type": "array"
+    },
+    "bundle_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Bundle Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "reply_origin",
+    "scope",
+    "sub_question_plan",
+    "segments",
+    "sources",
+    "facts",
+    "bundle_sha256"
+  ],
+  "title": "ReplyEvidenceBundleV1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:candidate:reply-evidence-bundle.v1.candidate",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE"
+}

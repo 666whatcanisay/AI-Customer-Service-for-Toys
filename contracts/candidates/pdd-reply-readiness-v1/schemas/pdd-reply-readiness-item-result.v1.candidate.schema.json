@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "ExpectedAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ExpectedAction",
+      "type": "string"
+    },
+    "RiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "pdd-reply-readiness-item-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "question_id": {
+      "title": "Question Id",
+      "type": "string"
+    },
+    "effective_risk": {
+      "$ref": "#/$defs/RiskLevel"
+    },
+    "action": {
+      "$ref": "#/$defs/ExpectedAction"
+    },
+    "origin": {
+      "title": "Origin",
+      "type": "string"
+    },
+    "answer_preview": {
+      "maxLength": 2000,
+      "title": "Answer Preview",
+      "type": "string"
+    },
+    "answer_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Answer Sha256",
+      "type": "string"
+    },
+    "missing_fact_keys": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Missing Fact Keys",
+      "type": "array"
+    },
+    "blocker_codes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Blocker Codes",
+      "type": "array"
+    },
+    "prohibited_claim_hits": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Prohibited Claim Hits",
+      "type": "array"
+    },
+    "citation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Citation Ids",
+      "type": "array"
+    },
+    "evidence_bundle_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Bundle Sha256"
+    }
+  },
+  "required": [
+    "schema_version",
+    "question_id",
+    "effective_risk",
+    "action",
+    "origin",
+    "answer_preview",
+    "answer_sha256"
+  ],
+  "title": "PddReplyReadinessItemResultV1",
+  "type": "object",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE",
+  "x-ai-cs-contract-type": "PddReplyReadinessItemResultV1"
+}

@@ -1,0 +1,389 @@
+{
+  "$defs": {
+    "ExpectedAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ExpectedAction",
+      "type": "string"
+    },
+    "PddReplyReadinessItemResultV1": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "pdd-reply-readiness-item-result.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "effective_risk": {
+          "$ref": "#/$defs/RiskLevel"
+        },
+        "action": {
+          "$ref": "#/$defs/ExpectedAction"
+        },
+        "origin": {
+          "title": "Origin",
+          "type": "string"
+        },
+        "answer_preview": {
+          "maxLength": 2000,
+          "title": "Answer Preview",
+          "type": "string"
+        },
+        "answer_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Answer Sha256",
+          "type": "string"
+        },
+        "missing_fact_keys": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Missing Fact Keys",
+          "type": "array"
+        },
+        "blocker_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "prohibited_claim_hits": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Prohibited Claim Hits",
+          "type": "array"
+        },
+        "citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Citation Ids",
+          "type": "array"
+        },
+        "evidence_bundle_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Bundle Sha256"
+        }
+      },
+      "required": [
+        "schema_version",
+        "question_id",
+        "effective_risk",
+        "action",
+        "origin",
+        "answer_preview",
+        "answer_sha256"
+      ],
+      "title": "PddReplyReadinessItemResultV1",
+      "type": "object"
+    },
+    "ReplyReadinessDependencyUsageV1": {
+      "additionalProperties": false,
+      "properties": {
+        "router": {
+          "title": "Router",
+          "type": "boolean"
+        },
+        "reply_rule": {
+          "title": "Reply Rule",
+          "type": "boolean"
+        },
+        "rag_collection": {
+          "title": "Rag Collection",
+          "type": "boolean"
+        },
+        "knowledge": {
+          "title": "Knowledge",
+          "type": "boolean"
+        },
+        "model": {
+          "title": "Model",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "router",
+        "reply_rule",
+        "rag_collection",
+        "knowledge",
+        "model"
+      ],
+      "title": "ReplyReadinessDependencyUsageV1",
+      "type": "object"
+    },
+    "ReplyReadinessDiagnosticChangeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "dependency": {
+          "enum": [
+            "router",
+            "reply_rule",
+            "rag_collection",
+            "knowledge",
+            "model"
+          ],
+          "title": "Dependency",
+          "type": "string"
+        },
+        "before": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before"
+        },
+        "after": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After"
+        }
+      },
+      "required": [
+        "dependency"
+      ],
+      "title": "ReplyReadinessDiagnosticChangeV1",
+      "type": "object"
+    },
+    "RiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "pdd-reply-readiness-published-debug-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "simulation_mode": {
+      "const": "PUBLISHED_ROUTER_DEBUG",
+      "title": "Simulation Mode",
+      "type": "string"
+    },
+    "run_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETED",
+        "FAILED"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "question_set_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Question Set Fingerprint",
+      "type": "string"
+    },
+    "item": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PddReplyReadinessItemResultV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "failure_code": {
+      "anyOf": [
+        {
+          "maxLength": 96,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failure Code"
+    },
+    "quality_gate_status": {
+      "enum": [
+        "PASS",
+        "MANUAL"
+      ],
+      "title": "Quality Gate Status",
+      "type": "string"
+    },
+    "rule_references": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Rule References",
+      "type": "array"
+    },
+    "router_build_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Router Build Fingerprint",
+      "type": "string"
+    },
+    "reply_rule_snapshot_fingerprint": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reply Rule Snapshot Fingerprint"
+    },
+    "rag_collection_identity": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rag Collection Identity"
+    },
+    "knowledge_publication_fingerprint": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Knowledge Publication Fingerprint"
+    },
+    "knowledge_publication_status": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Knowledge Publication Status",
+      "type": "string"
+    },
+    "model_config_identity": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Model Config Identity",
+      "type": "string"
+    },
+    "evaluated_at": {
+      "format": "date-time",
+      "title": "Evaluated At",
+      "type": "string"
+    },
+    "dependency_usage": {
+      "$ref": "#/$defs/ReplyReadinessDependencyUsageV1"
+    },
+    "diagnostic_changes": {
+      "items": {
+        "$ref": "#/$defs/ReplyReadinessDiagnosticChangeV1"
+      },
+      "maxItems": 5,
+      "title": "Diagnostic Changes",
+      "type": "array"
+    },
+    "drifted_dependencies": {
+      "items": {
+        "enum": [
+          "router",
+          "reply_rule",
+          "rag_collection",
+          "knowledge",
+          "model"
+        ],
+        "type": "string"
+      },
+      "maxItems": 5,
+      "title": "Drifted Dependencies",
+      "type": "array"
+    },
+    "production_usable": {
+      "const": false,
+      "title": "Production Usable",
+      "type": "boolean"
+    },
+    "allow_auto_send": {
+      "const": false,
+      "title": "Allow Auto Send",
+      "type": "boolean"
+    },
+    "result_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Result Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "simulation_mode",
+    "run_id",
+    "status",
+    "question_set_fingerprint",
+    "quality_gate_status",
+    "router_build_fingerprint",
+    "knowledge_publication_status",
+    "model_config_identity",
+    "evaluated_at",
+    "dependency_usage",
+    "production_usable",
+    "allow_auto_send",
+    "result_sha256"
+  ],
+  "title": "PddReplyReadinessPublishedDebugResultV1",
+  "type": "object",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE",
+  "x-ai-cs-contract-type": "PddReplyReadinessPublishedDebugResultV1"
+}

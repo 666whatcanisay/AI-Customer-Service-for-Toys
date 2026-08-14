@@ -1,0 +1,21 @@
+{
+  "schema_version": "ai-cs-reply-turn.v1",
+  "turn_id": "assistant-turn:synthetic-001",
+  "aggregate_content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "index_unit": "UNICODE_CODE_POINT",
+  "aggregation_separator": "\n",
+  "messages": [
+    {
+      "message_id": "PDD-MSG-SYNTHETIC-001",
+      "content_sha256": "a8e00f3b815141e8f30cf9092740f179e174feff653aa7035c724911aff5b610",
+      "range_start": 0,
+      "range_end": 10
+    },
+    {
+      "message_id": "PDD-MSG-SYNTHETIC-002",
+      "content_sha256": "ac4eaafa37e2c7bcfa3b33ce3ecefb5b03e444cf408cf55092737130b68b26e0",
+      "range_start": 11,
+      "range_end": 16
+    }
+  ]
+}

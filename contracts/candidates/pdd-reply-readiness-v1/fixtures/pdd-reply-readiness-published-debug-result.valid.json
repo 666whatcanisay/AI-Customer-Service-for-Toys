@@ -1,0 +1,47 @@
+{
+  "schema_version": "pdd-reply-readiness-published-debug-result.v1",
+  "simulation_mode": "PUBLISHED_ROUTER_DEBUG",
+  "run_id": "DBG-SYNTHETIC-CONTRACT-001",
+  "status": "COMPLETED",
+  "question_set_fingerprint": "26e47aafc5d2e1abafb353996ac5a6ebf17c62956f462ca6648b0d81b1cbb505",
+  "item": {
+    "schema_version": "pdd-reply-readiness-item-result.v1",
+    "question_id": "DEBUG-SYNTHETIC-001",
+    "effective_risk": "LOW",
+    "action": "DIRECT_ANSWER",
+    "origin": "FIXED_RULE",
+    "answer_preview": "您好，请问有什么可以帮您？",
+    "answer_sha256": "ea5d710083d2725232595086889bbe3382e52959865b164daeba978add4470c8",
+    "missing_fact_keys": [],
+    "blocker_codes": [],
+    "prohibited_claim_hits": [],
+    "citation_ids": [
+      "reply-rule:RULE-GREETING:v1"
+    ],
+    "evidence_bundle_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "failure_code": null,
+  "quality_gate_status": "PASS",
+  "rule_references": [
+    "RULE-GREETING:v1"
+  ],
+  "router_build_fingerprint": "d4066125af447bab3ec309a69ba200a16cecfc22425bcaac0359e9c6afbde662",
+  "reply_rule_snapshot_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "rag_collection_identity": null,
+  "knowledge_publication_fingerprint": null,
+  "knowledge_publication_status": "UNAVAILABLE",
+  "model_config_identity": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "evaluated_at": "2026-08-14T08:00:00Z",
+  "dependency_usage": {
+    "router": true,
+    "reply_rule": true,
+    "rag_collection": false,
+    "knowledge": false,
+    "model": false
+  },
+  "diagnostic_changes": [],
+  "drifted_dependencies": [],
+  "production_usable": false,
+  "allow_auto_send": false,
+  "result_sha256": "e3c1dfe08a488f8452ce90af3290768acb6dc3a35be729ae4e8eced4d12f5f42"
+}

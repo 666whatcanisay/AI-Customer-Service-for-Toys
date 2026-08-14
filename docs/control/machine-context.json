@@ -3,10 +3,28 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "1.0.0",
-  "status": "customer_pc_deployment_ready_local_controlled",
-  "current_task": "R030 AI-CS Customer PC Deployment Preparation V1",
-  "current_stage": "Local controlled customer-PC deployment completed: clean Client installed, ux_kefu manually enrolled, Agent ACTIVE/ONLINE, heartbeat projected through C and Workspace online status confirmed by the user.",
-  "current_gate": "PASS / AI_CS_CUSTOMER_PC_DEPLOYMENT_READY / LOCAL_CONTROLLED_DEPLOYMENT / PDD_NOT_CONNECTED",
+  "status": "ai_cs_minimal_arch_fix_ready_source_only",
+  "current_task": "AI-CS Minimal Architecture Fix and Source Freeze V1",
+  "current_stage": "A/C/Admin source blockers are repaired: source DB head identity is 0023, dependency-aware rule snapshot validation is coherent, debug requests are epoch-isolated and process-limited, and TEST sources are visible. Formal Runtime remains untouched at 0019.",
+  "current_gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY / FORMAL_RUNTIME_UNCHANGED",
+  "minimal_arch_fix_v1": {
+    "date": "2026-08-14",
+    "gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY",
+    "database": "source unique head 0023_reply_readiness_v1; formal Runtime remains 0019 and was not accessed",
+    "tests": "A 239 passed/3 skipped; C 213; Admin 38 files/109 plus typecheck/build; synthetic C-to-A real HTTP PASS",
+    "contracts": "0.14.0 coordinated; Gateway Wire 1.0 raw/canonical SHA unchanged",
+    "safety": "Engine/PDD/send unchanged; production_usable=false and allow_auto_send=false",
+    "report": "docs/control/AI-CS-Minimal-Architecture-Fix-V1-Report.md"
+  },
+  "published_reply_debug_workbench_v1": {
+    "date": "2026-08-14",
+    "gate": "PASS / AI_CS_PUBLISHED_REPLY_DEBUG_WORKBENCH_READY / SOURCE_ONLY",
+    "scope": "A/C/Admin source implementation only; current formal Runtime and PDD windows untouched",
+    "tests": "A task 99, C task 31, Admin 38 files/107 tests plus typecheck/build, candidate drift PASS",
+    "contracts": "0.14.0 coordinated; Gateway Wire 1.0 raw/canonical SHA unchanged",
+    "safety": "production_usable=false, allow_auto_send=false; no ledger, conversation, approval, execution or sender side effect",
+    "report": "docs/control/AI-CS-Production-Readonly-Reply-Debug-Workbench-V1-Report.md"
+  },
   "customer_pc_deployment_v1": {
     "date": "2026-08-07",
     "requirement": "R030",

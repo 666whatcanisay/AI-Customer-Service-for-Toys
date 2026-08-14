@@ -15,7 +15,7 @@ import App from './App.vue'
 const createTestRouter = () => createRouter({
   history: createMemoryHistory(),
   routes: [
-    '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-review', '/knowledge-gaps', '/import-center', '/store-management', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/ai-issues', '/suggestions',
+    '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-review', '/knowledge-gaps', '/reply-readiness', '/import-center', '/store-management', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/ai-issues', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
     '/ai-capabilities', '/ai-optimization-pool', '/knowledge-materials', '/knowledge-quality-pool',
     '/system-status', '/imports', '/test-data-packages'
@@ -80,10 +80,12 @@ describe('App product shell', () => {
     await wrapper.get('[data-testid="navigation-mode-advanced"]').trigger('click')
 
     expect(wrapper.findAll('[data-testid="simple-navigation-item"]')).toHaveLength(6)
-    expect(wrapper.findAll('[data-testid="advanced-navigation-group"]')).toHaveLength(3)
-    expect(wrapper.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(10)
+    expect(wrapper.findAll('[data-testid="advanced-navigation-group"]')).toHaveLength(4)
+    expect(wrapper.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(11)
     expect(wrapper.get('[data-testid="advanced-navigation-label"]').text()).toBe('高级功能')
     expect(wrapper.text()).toContain('知识治理')
+    expect(wrapper.text()).toContain('PDD 回答治理')
+    expect(wrapper.text()).toContain('商品风险调整池')
     expect(wrapper.text()).toContain('运营复盘')
     expect(wrapper.text()).toContain('系统诊断')
     expect(wrapper.text()).toContain('手工补充知识')
@@ -103,6 +105,6 @@ describe('App product shell', () => {
     const restored = mount(App, { global: { plugins: [router] } })
     await flushPromises()
     expect(restored.get('[data-testid="navigation-mode-advanced"]').attributes('aria-pressed')).toBe('true')
-    expect(restored.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(10)
+    expect(restored.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(11)
   })
 })

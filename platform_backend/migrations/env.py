@@ -29,6 +29,8 @@ from app.iam import models as iam_models  # noqa: F401
 from app.workspace import models as workspace_models  # noqa: F401
 from app.desktop_agent import models as desktop_agent_models  # noqa: F401
 from app.store_platform_bindings import models as store_platform_binding_models  # noqa: F401
+from app.reply_rules import models as reply_rule_models  # noqa: F401
+from app.reply_readiness import models as reply_readiness_models  # noqa: F401
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

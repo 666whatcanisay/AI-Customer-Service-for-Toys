@@ -4,12 +4,114 @@
   "project_name": "AI-CS Target A runtime and RAG service",
   "line": "A + OPS runtime",
   "version": "AI-CS V1.0.0",
-  "status": "ux_acceptance_data_ready",
-  "current_task": "R027 AI-CS UX Acceptance Data Readiness V1",
-  "current_gate": "AI_CS_UX_ACCEPTANCE_DATA_READY / UX_REACCEPTANCE_PENDING",
-  "current_stage": "An isolated acceptance Runtime contains a reviewed and incrementally published product knowledge set: PDD-SM-P0002, 6 SKUs, 7 FAQs and 14/14 publication evidence. The active isolated collection has 70 vectors; formal RAG and database fingerprints remain unchanged.",
-  "next_recommended_task": "Re-run the four-role Edge UX gate with the R027 isolated data. Fix the authenticated chat startup smoke separately without weakening internal-service authentication.",
-  "checked_at": "2026-08-07",
+  "status": "ai_cs_minimal_arch_fix_ready_source_only",
+  "current_task": "AI-CS Minimal Architecture Fix and Source Freeze V1",
+  "current_gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY; formal Runtime and send state unchanged",
+  "current_stage": "A now validates C's expected rule snapshot according to actual dependency use; fixed/composite mismatches fail closed while unused rule changes on pure RAG remain diagnostic.",
+  "next_recommended_task": "Deploy A and C only from the same approved candidate in a separately authorized maintenance window. Do not enable sending or access PDD as part of this source Gate.",
+  "checked_at": "2026-08-14",
+  "minimal_arch_fix_v1": {
+    "gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY",
+    "tests": "A 239 passed/3 skipped; focused published-debug dependency tests 9 passed; synthetic C-to-A real HTTP PASS",
+    "compatibility": "Contract 0.14.0 coordinated and Gateway Wire/SHA unchanged",
+    "report": "docs/control/AI-CS-Minimal-Architecture-Fix-V1-Report.md"
+  },
+  "published_reply_debug_workbench_v1": {
+    "gate": "PASS / AI_CS_PUBLISHED_REPLY_DEBUG_WORKBENCH_READY / SOURCE_ONLY",
+    "implementation": "Existing Readiness Evaluate endpoint with PUBLISHED_ROUTER_DEBUG, current ReplyRouter and published read-only RAG runtime; no second A Router/debug endpoint",
+    "dependency_drift": "FIXED_RULE=Router+ReplyRule; RAG=Router+Collection+Knowledge+Model; COMPOSITE=all actual participants; unused changes diagnostic only",
+    "versions": "Actual Router source-build fingerprint, ReplyRule snapshot, Collection, publication fingerprint/status, model/prompt identity and evaluated_at",
+    "tests": "A task scope 99 passed; candidate export drift check passed",
+    "contracts": "Formal 0.14.0 coordinated and Gateway Wire 1.0/raw+canonical SHA frozen; candidate-only additive schemas/fixtures",
+    "boundary": "No service start, production RAG/DB/vector access, publish, conversation/ledger write, approval, execution or sender",
+    "report": "docs/control/AI-CS-Production-Readonly-Reply-Debug-Workbench-V1-Report.md"
+  },
+  "pdd_reply_readiness_card8": {
+    "gate": "PASS / AI_CS_PDD_REPLY_READINESS_KNOWLEDGE_LOOP_READY / SOURCE_ONLY",
+    "implementation": "Candidate multi-source input, product/exact-SKU governed aggregation, FAQ and safety question links, conflict-preserving fact merge, actual per-question citations and knowledge-editor rerun deep links",
+    "compatibility": "knowledge_sources[] is additive; legacy knowledge_snapshot remains valid but cannot coexist. Formal contract remains 0.14.0/coordinated and Gateway Wire 1.0/raw SHA remains frozen",
+    "tests": "A task/router 43 passed including a real 36/36 C-baseline evaluation; C task/migration 11 passed; Admin 37 files/104 tests plus typecheck and production build; candidate drift check passed",
+    "migration": "No new migration or KnowledgeMaterial column; C source head remains 0023_reply_readiness_v1 and controlled Runtime remains 0019_runtime_database_identity_v1",
+    "boundary": "Synthetic/replay only, production_usable=false, allow_auto_send=false; no production RAG, formal Runtime, vector, PDD Profile, Engine, CE, sender or real-send access",
+    "report": "docs/control/AI-CS-PDD-Reply-Readiness-Knowledge-Loop-Card8-Report-V1.md"
+  },
+  "pdd_reply_readiness_card7": {
+    "gate": "PASS / AI_CS_PDD_REPLY_READINESS_CARD7_READY / SOURCE_ONLY",
+    "implementation": "36-category versioned baseline, additive STORE/PRODUCT question projection, immutable knowledge revision history/diff, frozen run ledger, real ReplyRouter sandbox evaluation and Admin /reply-readiness governance view",
+    "reuse": "Existing KnowledgeMaterial revisions and analysis_text templates, catalog scope, ReplyRule publication snapshot, ReplyRouter, Quality Gate, evidence, IAM and internal-service authentication; no second knowledge/review/publication/IAM framework",
+    "migration": "C source head 0023_reply_readiness_v1 adds only two task-specific tables; knowledge_materials columns are unchanged and no formal database was migrated",
+    "contracts": "PddReplyReadiness candidate schemas and synthetic fixtures remain UNCOORDINATED_CANDIDATE; formal contract stays 0.14.0/coordinated and Gateway Wire 1.0/raw SHA stays frozen",
+    "entry_context": "DEFERRED_CROSS_REPO; proactive greeting, product-card and order-card entry are not implemented, tested or required by Card 7",
+    "tests": "A task-scoped aggregate 92 passed; Python compile check and candidate export drift check passed",
+    "boundary": "Synthetic/replay only, production_usable=false, allow_auto_send=false; no formal Runtime, vector, PDD Profile, Engine, CE, sender or real-send access",
+    "report": "docs/control/AI-CS-PDD-Reply-Readiness-Card7-Report-V1.md"
+  },
+  "fixed_rule_source_evidence_hardening_v1": {
+    "gate": "PASS / AI_CS_FIXED_RULE_SOURCE_EVIDENCE_READY / SOURCE_ONLY",
+    "implementation": "C seals exact KnowledgeMaterial id/revision/content SHA/scope/reviewer identity at approval and revalidates it at publication; A binds that material evidence plus rule semantic identity and complete snapshot revision/fingerprint into fixed-answer evidence",
+    "fail_closed": "Missing, stale, withdrawn, hash-changed or unreviewed material and any source scope narrower than the rule scope are excluded; current PRODUCT/SKU materials cannot support STORE/TENANT rules",
+    "migration": "C source head 0022_reply_rule_source_evidence_v1; controlled Runtime remains 0019_runtime_database_identity_v1 and was not migrated",
+    "tests": "A targeted 76 and full 213 passed/3 skipped; C targeted 14 and full 194 passed; candidate/verifier 24; formal contracts 16; candidate drift check passed",
+    "candidate_manifest_sha256": "2fbbd9d9fa1f3bded3c8ac09f6b58400cd93eda7ca5e21404c3938a543f77d4b",
+    "boundary": "Source-only hardening; no Engine/PDD/Runtime write, shared-version freeze, real send or readiness promotion",
+    "report": "docs/control/AI-CS-Fixed-Rule-Source-Evidence-Hardening-V1.md"
+  },
+  "reply_autoreply_card6": {
+    "task_gate": "FAIL / AI_CS_AUTOREPLY_READY_NOT_ACHIEVED",
+    "component_gate": "PASS / AI_CS_AUTOREPLY_COMPONENT_READY / SOURCE_ONLY",
+    "coordination": "CROSS_REPO_HANDOFF_REQUIRED; contracts/version.json remains 0.14.0 coordinated and Gateway wire 1.0 remains frozen",
+    "passed": "Cards 2-5 AI-CS-owned rule governance, complete snapshot publication, fixed/RAG/composite Router, local Quality Gate, deterministic evidence and Gateway fail-closed validation",
+    "failed": "Engine does not produce ReplyTurnEnvelopeV1, consume ReplyEvidenceBundleV1 into a strict local V2 package, implement AutoPolicyAuthorizationV2 or connect that authorization to Sender and Receipt",
+    "engine_read_only_evidence": "Engine HEAD aea8c88c1f7db3d94b8352d2b27b66958d408203 was clean; V1 open maps preserve candidate turn/evidence, but production source has no ai_cs_reply_turn, reply_evidence_bundle or AutoPolicyAuthorizationV2 and ExecutionPreparation fixes real_send_enabled=false",
+    "tests": "A full 213 passed/3 real opt-in E2E skipped; C full 194 passed; formal contracts 16 passed; reply Router/publication/evidence core targeted 76 passed; Card 6 verifier/candidate targeted 24 passed; candidate export --check passed",
+    "gateway": "AI-CS and Engine schema raw bytes equal; raw SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80; canonical SHA-256 e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5",
+    "readiness_verifier": "backend/scripts/verify_engine_autoreply_v2_readiness.py independently checks Engine identity, frozen Gateway and candidate manifest, then validates the Engine-owned strict 14-check adapter artifact; current result FAIL / ENGINE_ACCEPTANCE_ADAPTER_MISSING",
+    "candidate_manifest_sha256": "2fbbd9d9fa1f3bded3c8ac09f6b58400cd93eda7ca5e21404c3938a543f77d4b",
+    "boundary": "No Engine/PDD/Runtime write, no real send, no shared-version freeze and no Pilot or Production readiness claim",
+    "remedial_handoff": "docs/control/interfaces/AI-CS-Reply-Router-V1-Cross-Repo-Handoff.md#9-engine-autoreply-v2-remedial-task",
+    "report": "docs/control/AI-CS-Autoreply-Card6-Functional-Acceptance-Report-V1.md"
+  },
+  "reply_quality_evidence_card5": {
+    "gate": "PASS / AI_CS_REPLY_QUALITY_EVIDENCE_CARD5_READY / SOURCE_ONLY",
+    "coordination": "UNCOORDINATED_CANDIDATE; contracts/version.json remains 0.14.0 coordinated and Gateway wire 1.0 remains frozen",
+    "implementation": "Unified post-composition Quality Gate; current rule snapshot re-read and approved-template re-render; low-risk RAG and reviewed medium-risk fixed-template policy; deterministic reply_evidence_bundle.v1 with segment, fact, source, scope and publication lineage",
+    "fail_closed": "Missing, tampered, unknown-version, oversized, structurally invalid, incomplete or cross-request-scope evidence; stale/withdrawn rule; prohibited claim; dangerous intent; unsupported medium/high risk; missing RAG publication SHA/lineage all become manual NO_ACTION",
+    "tests": "Card 5 Router/candidate/Gateway targeted 70 passed; A full suite 208 passed and 3 real opt-in E2E skipped; current offline RAG/API/Gateway combination 86 passed; candidate export --check passed",
+    "fingerprints": "Gateway raw SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80; RAG vector SHA-256 0c6ca2e39618dd81ad764e7063ec787cc441316415a3d857de86d4b47fb41417; knowledge placeholder SHA-256 c215ab851a5d78ab82840ba0e2108b0755c4abb5efe05c4810fac4e36361e456; all unchanged",
+    "boundary": "Evidence proves generation-time quality only and never grants execution authority. No Engine/PDD, execution-time state check, policy authorization, rate limit, Kill Switch, sender, Receipt, Runtime or formal shared-contract change; Gateway requires_approval remains true",
+    "report": "docs/control/AI-CS-Reply-Quality-Evidence-Card5-Report-V1.md"
+  },
+  "reply_router_card4": {
+    "gate": "PASS / AI_CS_REPLY_ROUTER_CARD4_READY / SOURCE_ONLY",
+    "coordination": "UNCOORDINATED_CANDIDATE; contracts/version.json remains 0.14.0 coordinated",
+    "implementation": "Strict turn validation, conservative exact-range split planning, original-fragment fixed-rule matching, existing scoped RAG fallback, source-scope revalidation and ordered composite suggestions on the enabled Gateway path",
+    "fail_closed": "Missing/tampered turn, ambiguous split, unresolved reference, product/SKU mismatch, tied rules, missing template context, RAG exception/high-risk/warning/no-source/cross-scope result all become manual NO_ACTION",
+    "tests": "Router/Gateway targeted 39 passed; A full suite 192 passed and 3 real opt-in E2E skipped; deterministic offline RAG/Gateway baseline 81 passed before and after; candidate export --check passed",
+    "fingerprints": "Gateway raw SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80; RAG vector SHA-256 0c6ca2e39618dd81ad764e7063ec787cc441316415a3d857de86d4b47fb41417; knowledge placeholder SHA-256 c215ab851a5d78ab82840ba0e2108b0755c4abb5efe05c4810fac4e36361e456; all unchanged",
+    "boundary": "No RAG internals, Prompt, model, knowledge, vector, Engine, PDD, Quality Gate, policy authorization, sender, Receipt, Runtime or formal shared-contract change; Gateway requires_approval remains true",
+    "report": "docs/control/AI-CS-Reply-Router-Card4-Report-V1.md"
+  },
+  "reply_rule_publication_card3": {
+    "gate": "PASS / AI_CS_REPLY_RULE_PUBLICATION_CARD3_READY / SOURCE_ONLY",
+    "coordination": "UNCOORDINATED_CANDIDATE; contracts/version.json remains 0.14.0 coordinated",
+    "implementation": "Internal-service and loopback protected A endpoint; strict ReplyRulePublicationV1 validation; atomic per-scope JSON projection under the existing ignored vector-db root; revision, size, publication identity and semantic idempotency checks",
+    "cross_line": "Every populated and empty C publication payload was validated in an isolated process by A ReplyRulePublicationV1",
+    "tests": "A targeted Card 3/candidate/Gateway gate 27 passed; A full suite 173 passed and 3 real opt-in E2E skipped; C targeted 11 and full 191 passed",
+    "gateway": "Wire 1.0, raw SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80 and canonical JSON SHA-256 e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5 unchanged",
+    "boundary": "No RAG collection, Prompt, model, Router, authorization, Engine, PDD, sender, Runtime or formal shared-contract change",
+    "report": "docs/control/AI-CS-Reply-Rule-Snapshot-Publication-Card3-Report-V1.md"
+  },
+  "reply_router_card1_candidate": {
+    "gate": "PASS / AI_CS_REPLY_ROUTER_CARD1_CANDIDATE_READY",
+    "coordination": "UNCOORDINATED_CANDIDATE; contracts/version.json remains 0.14.0 coordinated",
+    "source_baseline": "4d3be2ac3958697d42271439a41557dea784246d",
+    "gateway": "Wire 1.0 unchanged; raw SHA-256 fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80; canonical JSON SHA-256 e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5; AI-CS and Engine schemas matched read-only",
+    "implementation": "Local strict candidates for reply turn, rule/publication, sub-question plan and evidence bundle; deterministic schemas/fixtures; missing or invalid turn fails closed to MANUAL_REQUIRED",
+    "tests": "Card 1 targeted Contract/Gateway gate 22 passed; candidate export --check passed; existing Engine DecisionResponse parser accepted and preserved the synthetic evidence bundle read-only",
+    "boundary": "No Engine/B/C/Admin, formal Gateway runtime, database, migration, RAG, Prompt, model, knowledge or Runtime change",
+    "handoff": "docs/control/interfaces/AI-CS-Reply-Router-V1-Cross-Repo-Handoff.md",
+    "report": "docs/rag/AI-CS-Reply-Router-Card1-Candidate-Report-V1.md"
+  },
   "ux_acceptance_data_readiness_v1": {
     "requirement": "R027",
     "gate": "PASS / AI_CS_UX_ACCEPTANCE_DATA_READY",
@@ -251,11 +353,12 @@
     }
   },
   "tests": {
-    "backend": "105 passed, 3 opt-in real E2E skipped",
+    "backend": "213 passed, 3 opt-in real E2E skipped; fixed-rule source evidence targeted 76 passed; current offline RAG/API/Gateway combination remains covered",
+    "card6": "C full 194 passed; formal shared contracts 16 passed; Router/candidate/Gateway/rule-publication core targeted 76 passed; verifier/candidate targeted 24 passed; candidate export --check passed",
     "windows_ops": "6 selected script suites passed: runtime entry alignment, runtime fix 2, LAN mode, target pilot ready, Admin T05 and OPS scripts",
     "runtime": "Formal no-config stop/start/status passed and restored standard/LAN mode; explicit ConfigPath start and Chinese start/status batch shortcuts passed; all four services are RUNNING with verified repository identity."
   },
-  "contracts": ["contracts/version.json 0.4.0 additive AI publication/visibility; 0.3.0 catalog schemas retained"],
+  "contracts": ["contracts/version.json 0.14.0 coordinated; Gateway wire 1.0 frozen; Reply Router candidates remain uncoordinated under contracts/candidates"],
   "recovery": {
     "repository": "AI-CS-pilot-baseline-recovery-v1",
     "commit": "cbc77ed883cb99e2eff76ccb8eb3193bbddaba38",
@@ -282,12 +385,28 @@
     "Partial-start managed cleanup",
     "Target pilot standard-entry correction",
     "Real standard runtime acceptance",
-    "R019 IAM-safe startup and four-service production account acceptance with RAG preservation"
+    "R019 IAM-safe startup and four-service production account acceptance with RAG preservation",
+    "AI-CS Reply Router Card 1 candidate contracts",
+    "AI-CS Reply Rule Governance Card 2",
+    "AI-CS Reply Rule Snapshot Publication Card 3",
+    "AI-CS Reply Router Card 4 source capability",
+    "AI-CS Reply Quality/Evidence Card 5 source capability",
+    "AI-CS Autoreply Card 6 acceptance audit (global Gate failed; AI-CS component passed)",
+    "AI-CS Card 6 executable cross-repository readiness verifier",
+    "Fixed Rule Source Evidence Hardening V1"
   ],
-  "blockers": [],
+  "blockers": [
+    "ENGINE_AUTOREPLY_V2_INTEGRATION_REQUIRED",
+    "ENGINE_ACCEPTANCE_ADAPTER_MISSING"
+  ],
   "known_risks": [
     "documents remains empty by design; operators must use active collection status.",
     "An empty active collection permits degraded service startup but does not satisfy AI smoke or Pilot acceptance.",
-    "R007 second-computer network access and R003 full business activation acceptance remain separate tasks."
+    "R007 second-computer network access and R003 full business activation acceptance remain separate tasks.",
+    "Engine does not yet produce ReplyTurnEnvelopeV1 for the Router; missing or invalid input therefore fails closed to manual NO_ACTION.",
+    "Engine execution-time state validation, evidence-bound AUTO_POLICY authorization, rate limits, Kill Switch, sender and Receipt integration remain absent; Card 5 evidence must not be treated as send authority.",
+    "The current Engine has no scripts/verify_ai_cs_autoreply_v2.py acceptance adapter, so the AI-CS Card 6 verifier fails closed with ENGINE_ACCEPTANCE_ADAPTER_MISSING.",
+    "C source migration head is 0022 while controlled Runtime remains 0019; deployment and historical rule re-review require separate authorization.",
+    "The historical real 28-question RAG report remains 19/28 and was not rewritten by Cards 4-6; Router and Quality Gate regression do not change that separate knowledge-quality status."
   ]
 }

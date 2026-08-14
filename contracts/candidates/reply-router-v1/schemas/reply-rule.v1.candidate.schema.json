@@ -1,0 +1,363 @@
+{
+  "$defs": {
+    "ReplyAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ReplyAction",
+      "type": "string"
+    },
+    "ReplyRiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "ReplyRiskLevel",
+      "type": "string"
+    },
+    "ReplyRuleReviewV1": {
+      "additionalProperties": false,
+      "properties": {
+        "reviewed_by": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Reviewed By",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "review_note": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Review Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewed_by",
+        "reviewed_at",
+        "review_note"
+      ],
+      "title": "ReplyRuleReviewV1",
+      "type": "object"
+    },
+    "ReplyRuleSourceMaterialV1": {
+      "additionalProperties": false,
+      "description": "Content-free evidence for the exact governed source revision.",
+      "properties": {
+        "material_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Material Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "governance_status": {
+          "const": "REVIEWED_VALID",
+          "title": "Governance Status",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/ReplyScopeV1"
+        },
+        "reviewed_by": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Reviewed By",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "material_id",
+        "revision",
+        "content_sha256",
+        "governance_status",
+        "scope",
+        "reviewed_by",
+        "reviewed_at"
+      ],
+      "title": "ReplyRuleSourceMaterialV1",
+      "type": "object"
+    },
+    "ReplyRuleStatus": {
+      "enum": [
+        "DRAFT",
+        "IN_REVIEW",
+        "REJECTED",
+        "APPROVED",
+        "PUBLISHED",
+        "WITHDRAWN",
+        "EXPIRED"
+      ],
+      "title": "ReplyRuleStatus",
+      "type": "string"
+    },
+    "ReplyScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "$ref": "#/$defs/RuleScopeKind"
+        },
+        "tenant_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "platform": {
+          "maxLength": 40,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Platform",
+          "type": "string"
+        },
+        "store_code": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Code"
+        },
+        "product_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Id"
+        },
+        "sku_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku Id"
+        }
+      },
+      "required": [
+        "scope_kind",
+        "tenant_id",
+        "platform"
+      ],
+      "title": "ReplyScopeV1",
+      "type": "object"
+    },
+    "RuleScopeKind": {
+      "enum": [
+        "TENANT",
+        "STORE",
+        "PRODUCT",
+        "SKU"
+      ],
+      "title": "RuleScopeKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "reply-rule.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "rule_id": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "title": "Rule Id",
+      "type": "string"
+    },
+    "rule_version": {
+      "minimum": 1,
+      "title": "Rule Version",
+      "type": "integer"
+    },
+    "scope": {
+      "$ref": "#/$defs/ReplyScopeV1"
+    },
+    "canonical_question": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Canonical Question",
+      "type": "string"
+    },
+    "aliases": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Aliases",
+      "type": "array"
+    },
+    "fixed_reply": {
+      "maxLength": 8000,
+      "minLength": 1,
+      "title": "Fixed Reply",
+      "type": "string"
+    },
+    "variable_names": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 5,
+      "title": "Variable Names",
+      "type": "array"
+    },
+    "action": {
+      "$ref": "#/$defs/ReplyAction"
+    },
+    "risk_level": {
+      "$ref": "#/$defs/ReplyRiskLevel"
+    },
+    "required_context_fields": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Required Context Fields",
+      "type": "array"
+    },
+    "prohibited_claims": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Prohibited Claims",
+      "type": "array"
+    },
+    "allow_auto_candidate": {
+      "title": "Allow Auto Candidate",
+      "type": "boolean"
+    },
+    "source_materials": {
+      "items": {
+        "$ref": "#/$defs/ReplyRuleSourceMaterialV1"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "title": "Source Materials",
+      "type": "array"
+    },
+    "effective_from": {
+      "format": "date-time",
+      "title": "Effective From",
+      "type": "string"
+    },
+    "effective_to": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effective To"
+    },
+    "status": {
+      "$ref": "#/$defs/ReplyRuleStatus"
+    },
+    "review": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReplyRuleReviewV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "content_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Content Fingerprint",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "rule_id",
+    "rule_version",
+    "scope",
+    "canonical_question",
+    "aliases",
+    "fixed_reply",
+    "action",
+    "risk_level",
+    "allow_auto_candidate",
+    "source_materials",
+    "effective_from",
+    "status",
+    "content_fingerprint"
+  ],
+  "title": "ReplyRuleV1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:candidate:reply-rule.v1.candidate",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE"
+}

@@ -34,7 +34,12 @@ class AiKnowledgePublicationClient:
         try:
             with self.opener.open(request, timeout=self.timeout_seconds) as response:
                 decoded = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            UnicodeError,
+            json.JSONDecodeError,
+        ) as exc:
             raise AiKnowledgePublicationUnavailable(
                 "A商品知识发布服务不可用"
             ) from exc
@@ -47,3 +52,6 @@ class AiKnowledgePublicationClient:
 
     def visibility(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/api/admin/ai/knowledge-publications/visibility", payload)
+
+    def publish_reply_rules(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/api/admin/ai/reply-rule-publications", payload)

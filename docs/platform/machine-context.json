@@ -4,10 +4,94 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "R031 RC5 Pilot pre-governance and current-facts freeze",
-  "current_stage": "RC5 offline stability is PASS at Platform migration 0019; real PDD Adapter, Read, AI, Confirm and Send remain NOT_VERIFIED and real sending remains disabled.",
-  "current_gate": "PASS / RC5_OFFLINE_STABILITY_READY; REAL_PDD_* = NOT_VERIFIED",
-  "status": "rc5_offline_stability_ready_real_pdd_not_verified",
+  "current_task": "AI-CS Minimal Architecture Fix and Source Freeze V1",
+  "current_stage": "C source identity targets unique head 0023, controlled migration resolves head dynamically, debug calls are process-limited and Admin rejects late cross-scope responses. Formal Runtime remains 0019 and untouched.",
+  "current_gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY; formal Runtime 0019 unchanged; REAL_PDD_* remains NOT_VERIFIED",
+  "status": "ai_cs_minimal_arch_fix_ready_source_only",
+  "minimal_arch_fix_v1": {
+    "gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY",
+    "database": "source head 0023_reply_readiness_v1; isolated 0019-to-0023 identity/binding test passed; no formal migration",
+    "rate_limit": "single process, one inflight and ten attempts/minute per user plus Store",
+    "tests": "C 213; Admin 38 files/109 plus typecheck/build; synthetic C-to-A real HTTP PASS",
+    "report": "docs/control/AI-CS-Minimal-Architecture-Fix-V1-Report.md"
+  },
+  "published_reply_debug_workbench_v1": {
+    "gate": "PASS / AI_CS_PUBLISHED_REPLY_DEBUG_WORKBENCH_READY / SOURCE_ONLY",
+    "endpoint": "POST /api/v1/admin/reply-readiness/debug -> existing A ReplyReadinessAiClient.evaluate",
+    "scope": "Existing IAM/catalog Store/Product/SKU validation through a non-persisting explicit Scope resolver",
+    "side_effects": "No ReplyReadinessRun, context resolution, transaction, feedback, observation, approval, execution or send; Session.add/commit spy count zero",
+    "ui": "36-question and one-message tabs; business result plus collapsible dependency/version evidence; module-level Vue reactive state cleared on logout",
+    "tests": "C task scope 31 passed; Admin full 38 files/107 tests, typecheck and production build passed",
+    "migration": "None; source head remains 0023 and controlled Runtime remains 0019 untouched",
+    "report": "docs/control/AI-CS-Production-Readonly-Reply-Debug-Workbench-V1-Report.md"
+  },
+  "pdd_reply_readiness_card8": {
+    "gate": "PASS / AI_CS_PDD_REPLY_READINESS_KNOWLEDGE_LOOP_READY / SOURCE_ONLY",
+    "aggregation": "Latest effective APPROVED_FOR_ANALYSIS/ANALYZING/ANALYZED revision per material_id at PRODUCT plus exact SKU scope; one explicit RECOGNIZED/REVIEWING overlay replaces the same identity",
+    "freeze": "All sources are immutable inside existing reply_readiness_runs.input_json; row material_id/revision denotes only the draft overlay and knowledge_source_count is read-only",
+    "ui": "Automatic aggregation notice, optional draft overlay, per-question knowledge-editor deep link, related question IDs for FAQ/safety, four added product facts and return with the new revision selected",
+    "migration": "No new table, background task or KnowledgeMaterial column; source head remains 0023_reply_readiness_v1",
+    "tests": "C task/migration 11 passed; Admin 37 files/104 tests, typecheck and production build passed; A real 36-question cross-line source evaluation passed",
+    "runtime": "Controlled Runtime remains 0019 and no formal database, vector, DataRoot, port, Agent or PDD Profile was accessed",
+    "report": "docs/control/AI-CS-PDD-Reply-Readiness-Knowledge-Loop-Card8-Report-V1.md"
+  },
+  "pdd_reply_readiness_card7": {
+    "gate": "PASS / AI_CS_PDD_REPLY_READINESS_CARD7_READY / SOURCE_ONLY",
+    "implementation": "36-category global baseline, additive STORE/PRODUCT extensions, immutable material history/detail/diff, frozen PRODUCT/SKU run ledger, idempotent A result receipt and Admin /reply-readiness",
+    "reuse": "Existing catalog scope and store access, KnowledgeMaterial immutable rows/templates, ReplyRule snapshot, knowledge.manage IAM, internal service auth and no-proxy A client",
+    "migration": "0023_reply_readiness_v1 adds only reply_readiness_question_set_extensions and reply_readiness_runs; knowledge_materials schema is byte-for-byte column-equivalent across isolated round trip",
+    "contracts": "Candidate-only A/C schemas and synthetic fixtures; formal contract remains 0.14.0/coordinated and Gateway Wire remains 1.0",
+    "entry_context": "DEFERRED_CROSS_REPO and not a Card 7 completion condition",
+    "tests": "C task-scoped aggregate 21 passed; Admin 37 files/93 tests and typecheck passed; isolated migration round trip and single source head 0023 passed",
+    "ui_optimization": "Exact scope filters and late-response rejection; stable idempotency recovery; Chinese operational risk view; four-template rehydration; immutable identity lock; dirty guard and safety warnings",
+    "ui_tests": "C scoped 12 passed; Admin targeted 11, full 37 files/102 tests, typecheck and production build passed",
+    "runtime": "Controlled RC5 Runtime remains 0019; no formal database, vector, DataRoot, port, Agent or PDD Profile access",
+    "report": "docs/control/AI-CS-PDD-Reply-Readiness-Card7-Report-V1.md"
+  },
+  "fixed_rule_source_evidence_hardening_v1": {
+    "gate": "PASS / AI_CS_FIXED_RULE_SOURCE_EVIDENCE_READY / SOURCE_ONLY",
+    "implementation": "Approval seals exact KnowledgeMaterial id/revision/content SHA/scope/reviewer identity; publication revalidates exact equality and sends the evidence in each complete-snapshot rule",
+    "scope_policy": "Only same or broader source scopes may support a rule; SKU cannot support PRODUCT and PRODUCT/SKU cannot support STORE/TENANT",
+    "migration": "0022_reply_rule_source_evidence_v1 source-only; controlled Runtime remains 0019_runtime_database_identity_v1",
+    "compatibility": "Existing approved rows receive empty evidence and therefore fail closed until a new revision is reviewed; no data backfill bypasses governance",
+    "tests": "C targeted 14 and full 194 passed; 0021->0022->0021->0022 isolated migration round trip passed",
+    "boundary": "No Runtime migration, Engine/PDD change, shared-version freeze or real send",
+    "report": "docs/control/AI-CS-Fixed-Rule-Source-Evidence-Hardening-V1.md"
+  },
+  "reply_autoreply_card6": {
+    "task_gate": "FAIL / AI_CS_AUTOREPLY_READY_NOT_ACHIEVED",
+    "component_gate": "PASS / AI_CS_AUTOREPLY_COMPONENT_READY / SOURCE_ONLY",
+    "c_result": "Card 2/3 governance and publication plus source-evidence hardening remain PASS; C full suite 194 passed in the final aggregate run",
+    "engine_gap": "No ReplyTurnEnvelopeV1 producer, reply_evidence_bundle consumer, AutoPolicyAuthorizationV2 or evidence-bound Sender/Receipt integration",
+    "readiness_verifier": "AI-CS now provides a strict uncoordinated Engine acceptance artifact and read-only wrapper; current Engine result is FAIL / ENGINE_ACCEPTANCE_ADAPTER_MISSING",
+    "runtime": "C source head is 0022; controlled RC5 Runtime remains 0019 and was not migrated or restarted",
+    "coordination": "Shared contract remains 0.14.0; candidates remain uncoordinated until Engine implementation",
+    "report": "docs/control/AI-CS-Autoreply-Card6-Functional-Acceptance-Report-V1.md"
+  },
+  "reply_rule_publication_card3": {
+    "gate": "PASS / AI_CS_REPLY_RULE_PUBLICATION_CARD3_READY / SOURCE_ONLY",
+    "coordination": "CROSS_REPO_UNCOORDINATED_CANDIDATE; contracts/version.json remains 0.14.0 coordinated",
+    "reuse": "Existing knowledge.manage, reviewed KnowledgeMaterial checks, server Principal, internal service identity, publication lease, idempotency and receipt patterns; no second IAM, review framework, database or Admin app",
+    "publication": "Complete effective tenant/platform snapshot; A validates strict candidate fingerprints/revision/idempotency and atomically replaces only after all checks pass",
+    "failure": "Transport or receipt mismatch records SYNC_FAILED and preserves the prior C revision/fingerprints/rule states/receipt while A continues using its last valid snapshot",
+    "withdrawal": "Withdrawal publishes the complete snapshot without the target and changes lifecycle state only after an exact A receipt; an empty next revision is valid",
+    "source_head": "0021_reply_rule_snapshot_publication_v1",
+    "controlled_runtime": "0019_runtime_database_identity_v1; not migrated or restarted in Card 3",
+    "tests": "Card 2/3 and migration targeted 11 passed; C full suite 191 passed; every populated/empty C payload parsed by A ReplyRulePublicationV1 in an isolated process",
+    "boundary": "No Router, auto authorization, Engine, PDD, sender, RAG, Prompt, model, Gateway Wire or formal shared contract change",
+    "report": "docs/control/AI-CS-Reply-Rule-Snapshot-Publication-Card3-Report-V1.md"
+  },
+  "reply_rule_governance_card2": {
+    "gate": "PASS / AI_CS_REPLY_RULE_GOVERNANCE_CARD2_READY / SOURCE_ONLY",
+    "coordination": "CROSS_REPO_UNCOORDINATED; contracts/version.json remains 0.14.0 coordinated",
+    "reuse": "Existing knowledge.manage IAM, reviewed KnowledgeMaterial states, catalog scope, SQLAlchemy/Alembic and server-derived Principal; no second review, permission, publication framework or database",
+    "lifecycle": "DRAFT -> IN_REVIEW -> APPROVED or REJECTED; reviewed versions are immutable and only a new version may be created",
+    "source_head": "0020_reply_rule_governance_v1",
+    "controlled_runtime": "0019_runtime_database_identity_v1; not migrated or restarted in Card 2",
+    "tests": "Card 2 targeted 7 passed; C full suite 188 passed; Alembic single head and isolated 0019->0020->0019->head round trip passed",
+    "boundary": "No C-to-A publication, Engine, A Router, B/Admin UI, Gateway Wire, shared contract version, RAG, Prompt, model, PDD or send change",
+    "report": "docs/platform/33_AI-CS_Reply_Rule_Governance_Card2_Report_V1.md"
+  },
   "current_authoritative_state": {
     "gate_enum": ["PASS", "NOT_VERIFIED", "BLOCKED", "NOT_IN_SCOPE"],
     "rc5_offline_stability_ready": "PASS",
@@ -16,9 +100,11 @@
     "real_pdd_ai_ready": "NOT_VERIFIED",
     "real_pdd_confirm_ready": "NOT_VERIFIED",
     "real_pdd_send_ready": "NOT_VERIFIED",
+    "ai_cs_autoreply_ready": false,
     "ai_cs_production_ready": false,
     "real_send_enabled": false,
-    "platform_migration_head": "0019_runtime_database_identity_v1",
+    "platform_migration_head": "0023_reply_readiness_v1",
+    "controlled_runtime_migration": "0019_runtime_database_identity_v1",
     "ordinary_startup": "VALIDATE_ONLY",
     "test_knowledge_startup": "EXPLICIT_BOOTSTRAP_ONLY"
   },
@@ -321,7 +407,9 @@
     "Formal Runtime is deployed at 0010; R003 full manual PILOT activation and rollback acceptance remains separate from release smoke.",
     "The acceptance Runtime is local and ephemeral; its database, logs, knowledge copies and PID record are Git-ignored and must not be treated as production assets.",
     "The isolated acceptance database now contains 19 approved test products and must never be copied into the formal database.",
-    "This browser dataset produced ADD and KEEP only because no workbook product identity matched the isolated snapshot; UPDATE and NO_CHANGE were not observed in this retry."
+    "This browser dataset produced ADD and KEEP only because no workbook product identity matched the isolated snapshot; UPDATE and NO_CHANGE were not observed in this retry.",
+    "C source migration head is 0022 while controlled Runtime remains 0019; deployment and historical approved-rule re-review require separate authorization.",
+    "AI_CS_AUTOREPLY_READY remains false until Engine produces the turn envelope, consumes evidence and binds AutoPolicyAuthorizationV2 to Sender and Receipt."
   ],
   "out_of_scope": [
     "The other five workbook import implementations",
@@ -329,7 +417,10 @@
     "A, B, RAG, Prompt or contracts changes",
     "Automatic knowledge publication, customer activation, messaging, refunds, orders or ERP writes"
   ],
-  "blockers": [],
+  "blockers": [
+    "ENGINE_AUTOREPLY_V2_INTEGRATION_REQUIRED",
+    "ENGINE_ACCEPTANCE_ADAPTER_MISSING"
+  ],
   "git": {
     "branch": "codex/rc5-offline-stability",
     "base": "03550b58572abebad9dd64cd1370157d98522be3",
@@ -374,6 +465,6 @@
     "database_revision": "0009_product_knowledge_import_v1",
     "formal_runtime_unchanged": true
   },
-  "next_recommended_task": "Stop peripheral governance after the RC5 Pilot preflight patch; proceed directly to REAL_PDD_ADAPTER_READY and then REAL_PDD_READ_READY with real sending disabled.",
-  "last_updated": "2026-08-12"
+  "next_recommended_task": "Run any Card 8 operator experience check only in a separate Synthetic/Replay runtime. C remains source-ready at 0023 and must not migrate the controlled 0019 Runtime, touch PDD, or freeze the shared version as part of that check.",
+  "last_updated": "2026-08-14"
 }

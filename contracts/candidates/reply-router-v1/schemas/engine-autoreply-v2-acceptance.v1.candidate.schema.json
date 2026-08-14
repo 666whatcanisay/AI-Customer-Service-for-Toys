@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "EngineAutoreplyAcceptanceStatus": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "title": "EngineAutoreplyAcceptanceStatus",
+      "type": "string"
+    },
+    "EngineAutoreplyCheckV1": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/EngineAutoreplyAcceptanceStatus"
+        },
+        "evidence_codes": {
+          "items": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Evidence Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "evidence_codes"
+      ],
+      "title": "EngineAutoreplyCheckV1",
+      "type": "object"
+    },
+    "EngineAutoreplySideEffectsV1": {
+      "additionalProperties": false,
+      "properties": {
+        "engine_source_modified": {
+          "title": "Engine Source Modified",
+          "type": "boolean"
+        },
+        "runtime_started": {
+          "title": "Runtime Started",
+          "type": "boolean"
+        },
+        "pdd_connected": {
+          "title": "Pdd Connected",
+          "type": "boolean"
+        },
+        "real_send_attempted": {
+          "title": "Real Send Attempted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "engine_source_modified",
+        "runtime_started",
+        "pdd_connected",
+        "real_send_attempted"
+      ],
+      "title": "EngineAutoreplySideEffectsV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Engine-owned test artifact consumed only by the Card 6 verifier.",
+  "properties": {
+    "schema_version": {
+      "const": "engine-autoreply-v2-acceptance.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "engine_commit": {
+      "pattern": "^[a-f0-9]{40,64}$",
+      "title": "Engine Commit",
+      "type": "string"
+    },
+    "candidate_manifest_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Candidate Manifest Sha256",
+      "type": "string"
+    },
+    "gateway_wire": {
+      "const": "1.0",
+      "title": "Gateway Wire",
+      "type": "string"
+    },
+    "gateway_raw_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Gateway Raw Sha256",
+      "type": "string"
+    },
+    "gateway_canonical_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Gateway Canonical Sha256",
+      "type": "string"
+    },
+    "contract_status": {
+      "const": "UNCOORDINATED_CANDIDATE",
+      "title": "Contract Status",
+      "type": "string"
+    },
+    "checks": {
+      "additionalProperties": {
+        "$ref": "#/$defs/EngineAutoreplyCheckV1"
+      },
+      "title": "Checks",
+      "type": "object"
+    },
+    "side_effects": {
+      "$ref": "#/$defs/EngineAutoreplySideEffectsV1"
+    },
+    "contains_secret_material": {
+      "title": "Contains Secret Material",
+      "type": "boolean"
+    },
+    "contains_customer_data": {
+      "title": "Contains Customer Data",
+      "type": "boolean"
+    },
+    "final_status": {
+      "$ref": "#/$defs/EngineAutoreplyAcceptanceStatus"
+    }
+  },
+  "required": [
+    "schema_version",
+    "engine_commit",
+    "candidate_manifest_sha256",
+    "gateway_wire",
+    "gateway_raw_sha256",
+    "gateway_canonical_sha256",
+    "contract_status",
+    "checks",
+    "side_effects",
+    "contains_secret_material",
+    "contains_customer_data",
+    "final_status"
+  ],
+  "title": "EngineAutoreplyV2AcceptanceV1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:candidate:engine-autoreply-v2-acceptance.v1.candidate",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE"
+}

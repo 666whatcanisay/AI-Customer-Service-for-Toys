@@ -325,32 +325,91 @@ class StoreContextService:
                 "Product/SKU confirmation must finish before AI generation.",
                 status_code=409,
             )
-        ensure_store_access(principal, row.store_id)
         store = self.session.get(TestStore, row.store_id)
-        product = self.session.get(TestProduct, row.product_id)
+        if store is None:
+            raise AppError("RESOLUTION_NOT_READY", "Resolved catalog context is no longer available.", status_code=409)
+        return self._validated_chat_context(
+            principal,
+            store_code=store.store_code,
+            product_id=row.product_id,
+            sku_id=row.sku_id,
+            error_code="RESOLUTION_NOT_READY",
+        )
+
+    def chat_context_for_explicit_scope(
+        self,
+        principal: Principal,
+        *,
+        store_code: str,
+        product_id: str,
+        sku_id: str | None,
+    ) -> ChatContext:
+        """Resolve an operator-selected scope without persisting a resolution row."""
+        return self._validated_chat_context(
+            principal,
+            store_code=store_code,
+            product_id=product_id,
+            sku_id=sku_id,
+            error_code="REPLY_DEBUG_SCOPE_INVALID",
+        )
+
+    def _validated_chat_context(
+        self,
+        principal: Principal,
+        *,
+        store_code: str,
+        product_id: str,
+        sku_id: str | None,
+        error_code: str,
+    ) -> ChatContext:
+        product = self.session.get(TestProduct, product_id)
+        invalid_status = 409 if error_code == "RESOLUTION_NOT_READY" else 422
+        if product is None:
+            raise AppError(
+                error_code,
+                "Selected Product does not belong to the Store.",
+                status_code=invalid_status,
+            )
+        store = self.session.scalar(
+            select(TestStore).where(
+                TestStore.store_code == store_code,
+                TestStore.package_id == product.package_id,
+            )
+        )
         if (
-            store is None or product is None or product.package_id != store.package_id
+            store is None
+            or product is None
+            or product.package_id != store.package_id
             or product.store_code != store.store_code
         ):
-            raise AppError("RESOLUTION_NOT_READY", "Resolved catalog context is no longer available.", status_code=409)
-        if row.sku_id is not None:
-            sku = self.session.get(TestSku, row.sku_id)
+            raise AppError(
+                error_code,
+                "Selected Product does not belong to the Store.",
+                status_code=invalid_status,
+            )
+        ensure_store_access(principal, store.id)
+        if sku_id is not None:
+            sku = self.session.get(TestSku, sku_id)
             if sku is None or sku.product_id != product.product_id or sku.package_id != product.package_id:
-                raise AppError("RESOLUTION_NOT_READY", "Resolved SKU is no longer available.", status_code=409)
+                raise AppError(
+                    error_code,
+                    "Selected SKU does not belong to the Product.",
+                    status_code=invalid_status,
+                )
         available_products = {
             item.product_id for item in self.catalog.list_products(store.store_code).items
         }
         if product.product_id not in available_products:
-            raise AppError("RESOLUTION_NOT_READY", "Resolved Product is no longer customer-service available.", status_code=409)
-        if row.sku_id is not None:
+            raise AppError(error_code, "Selected Product is not customer-service available.", status_code=409)
+        if sku_id is not None:
             available_skus = {
                 item.sku_id for item in self.catalog.list_skus(product.product_id).items
             }
-            if row.sku_id not in available_skus:
-                raise AppError("RESOLUTION_NOT_READY", "Resolved SKU is no longer customer-service available.", status_code=409)
+            if sku_id not in available_skus:
+                raise AppError(error_code, "Selected SKU is not customer-service available.", status_code=409)
         return ChatContext(
             tenant_id=store.tenant_id, platform=store.platform,
-            store_code=store.store_code, product_id=product.product_id, sku_id=row.sku_id,
+            store_code=store.store_code, product_id=product.product_id, sku_id=sku_id,
         )
 
     def list_audits(

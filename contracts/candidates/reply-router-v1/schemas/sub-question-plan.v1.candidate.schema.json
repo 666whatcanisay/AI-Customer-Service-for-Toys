@@ -1,0 +1,184 @@
+{
+  "$defs": {
+    "SourceTextRangeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "aggregate_start": {
+          "maximum": 8000,
+          "minimum": 0,
+          "title": "Aggregate Start",
+          "type": "integer"
+        },
+        "aggregate_end": {
+          "exclusiveMinimum": 0,
+          "maximum": 8000,
+          "title": "Aggregate End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "message_id",
+        "aggregate_start",
+        "aggregate_end"
+      ],
+      "title": "SourceTextRangeV1",
+      "type": "object"
+    },
+    "SplitStatus": {
+      "enum": [
+        "SINGLE",
+        "SPLIT_CONFIRMED",
+        "AMBIGUOUS"
+      ],
+      "title": "SplitStatus",
+      "type": "string"
+    },
+    "SubQuestionRoute": {
+      "enum": [
+        "FIXED_RULE",
+        "RAG",
+        "MANUAL"
+      ],
+      "title": "SubQuestionRoute",
+      "type": "string"
+    },
+    "SubQuestionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "sub_question_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Sub Question Id",
+          "type": "string"
+        },
+        "ordinal": {
+          "maximum": 8,
+          "minimum": 1,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "source_ranges": {
+          "items": {
+            "$ref": "#/$defs/SourceTextRangeV1"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Source Ranges",
+          "type": "array"
+        },
+        "source_content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Source Content Sha256",
+          "type": "string"
+        },
+        "intent": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Intent",
+          "type": "string"
+        },
+        "route": {
+          "$ref": "#/$defs/SubQuestionRoute"
+        },
+        "depends_on": {
+          "default": [],
+          "items": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n]+$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Blocker Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sub_question_id",
+        "ordinal",
+        "source_ranges",
+        "source_content_sha256",
+        "intent",
+        "route"
+      ],
+      "title": "SubQuestionV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "sub-question-plan.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "turn_id": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "title": "Turn Id",
+      "type": "string"
+    },
+    "aggregate_content_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Aggregate Content Sha256",
+      "type": "string"
+    },
+    "split_status": {
+      "$ref": "#/$defs/SplitStatus"
+    },
+    "sub_questions": {
+      "items": {
+        "$ref": "#/$defs/SubQuestionV1"
+      },
+      "maxItems": 8,
+      "title": "Sub Questions",
+      "type": "array"
+    },
+    "blocker_codes": {
+      "default": [],
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n]+$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Blocker Codes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "turn_id",
+    "aggregate_content_sha256",
+    "split_status",
+    "sub_questions"
+  ],
+  "title": "SubQuestionPlanV1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:candidate:sub-question-plan.v1.candidate",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE"
+}

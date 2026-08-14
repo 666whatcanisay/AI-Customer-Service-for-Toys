@@ -16,7 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router
 from app.config.settings import Settings, get_settings
-from app.gateway.contract import GatewayErrorCode, GatewayProblem
+from app.gateway.contract import DecisionRequest, GatewayErrorCode, GatewayProblem
 from app.gateway.routes import (
     gateway_http_problem,
     gateway_problem_response,
@@ -25,6 +25,8 @@ from app.gateway.routes import (
 )
 from app.gateway.service import GatewayRuntimeConfig, GatewayServer
 from app.models.chat import FrozenChatContext
+from app.reply_router.publication_store import ReplyRuleSnapshotStore
+from app.reply_router.router import ReplyRouter
 from app.service.ai_capability import INITIALIZATION_FAILED_CODE
 from app.service.rag_service import RAGService
 
@@ -65,6 +67,10 @@ def create_app(
         application.state.loading_message = "正在加载本地知识库..."
         application.state.gateway_server = None
         application.state.gateway_initialization_error = None
+        application.state.reply_rule_snapshot_store = ReplyRuleSnapshotStore(
+            active_settings.vector_db_path / "reply_rule_snapshots"
+        )
+        application.state.reply_router = None
 
         if active_settings.gateway_enabled:
             try:
@@ -79,6 +85,26 @@ def create_app(
                         )
                     return application.state.rag_service.query(
                         question, context=context
+                    )
+
+                application.state.reply_router = ReplyRouter(
+                    application.state.reply_rule_snapshot_store,
+                    gateway_decision_provider,
+                )
+
+                def gateway_request_decision_provider(
+                    request: DecisionRequest, context: FrozenChatContext
+                ) -> dict:
+                    if not getattr(application.state, "ready", False):
+                        raise GatewayProblem(
+                            status_code=503,
+                            code=GatewayErrorCode.SERVICE_UNAVAILABLE,
+                            message="AI decision capability is unavailable.",
+                        )
+                    return application.state.reply_router.decide(
+                        request.customer_message,
+                        request.context,
+                        context,
                     )
 
                 def gateway_readiness() -> tuple[bool, bool]:
@@ -103,6 +129,7 @@ def create_app(
                     ),
                     decision_provider=gateway_decision_provider,
                     readiness_provider=gateway_readiness,
+                    request_decision_provider=gateway_request_decision_provider,
                 )
             except Exception as exc:
                 application.state.gateway_initialization_error = (

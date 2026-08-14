@@ -36,6 +36,12 @@ const simpleNavigationItems: NavigationItem[] = [
 
 const advancedNavigationGroups: NavigationGroup[] = [
   {
+    label: 'PDD 回答治理',
+    items: [
+      { label: '商品风险调整池', to: '/reply-readiness' },
+    ],
+  },
+  {
     label: '知识治理',
     items: [
       { label: '手工补充知识', to: '/knowledge-editor' },

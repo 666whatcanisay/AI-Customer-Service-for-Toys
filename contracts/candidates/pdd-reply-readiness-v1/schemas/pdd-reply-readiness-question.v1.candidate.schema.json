@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "ExpectedAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ExpectedAction",
+      "type": "string"
+    },
+    "RiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "pdd-reply-readiness-question.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "question_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9][A-Z0-9-]+$",
+      "title": "Question Id",
+      "type": "string"
+    },
+    "category": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Category",
+      "type": "string"
+    },
+    "canonical_question": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Canonical Question",
+      "type": "string"
+    },
+    "aliases": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64,
+      "title": "Aliases",
+      "type": "array"
+    },
+    "policy_risk_floor": {
+      "$ref": "#/$defs/RiskLevel"
+    },
+    "expected_action": {
+      "$ref": "#/$defs/ExpectedAction"
+    },
+    "required_fact_keys": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Required Fact Keys",
+      "type": "array"
+    },
+    "requires_realtime_lookup": {
+      "title": "Requires Realtime Lookup",
+      "type": "boolean"
+    },
+    "prohibited_claims": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Prohibited Claims",
+      "type": "array"
+    },
+    "mandatory": {
+      "title": "Mandatory",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "question_id",
+    "category",
+    "canonical_question",
+    "policy_risk_floor",
+    "expected_action",
+    "requires_realtime_lookup",
+    "mandatory"
+  ],
+  "title": "PddReplyReadinessQuestionV1",
+  "type": "object",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE",
+  "x-ai-cs-contract-type": "PddReplyReadinessQuestionV1"
+}

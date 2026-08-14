@@ -1,0 +1,548 @@
+{
+  "$defs": {
+    "ExpectedAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ExpectedAction",
+      "type": "string"
+    },
+    "PddQuestionSetProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "pdd-reply-readiness-question-set.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "baseline_version": {
+          "title": "Baseline Version",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "questions": {
+          "items": {
+            "$ref": "#/$defs/PddReplyReadinessQuestionV1"
+          },
+          "maxItems": 200,
+          "minItems": 1,
+          "title": "Questions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "baseline_version",
+        "fingerprint",
+        "questions"
+      ],
+      "title": "PddQuestionSetProjection",
+      "type": "object"
+    },
+    "PddReplyReadinessQuestionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "pdd-reply-readiness-question.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "question_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Z0-9][A-Z0-9-]+$",
+          "title": "Question Id",
+          "type": "string"
+        },
+        "category": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        },
+        "canonical_question": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Canonical Question",
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Aliases",
+          "type": "array"
+        },
+        "policy_risk_floor": {
+          "$ref": "#/$defs/RiskLevel"
+        },
+        "expected_action": {
+          "$ref": "#/$defs/ExpectedAction"
+        },
+        "required_fact_keys": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Required Fact Keys",
+          "type": "array"
+        },
+        "requires_realtime_lookup": {
+          "title": "Requires Realtime Lookup",
+          "type": "boolean"
+        },
+        "prohibited_claims": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Prohibited Claims",
+          "type": "array"
+        },
+        "mandatory": {
+          "title": "Mandatory",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "question_id",
+        "category",
+        "canonical_question",
+        "policy_risk_floor",
+        "expected_action",
+        "requires_realtime_lookup",
+        "mandatory"
+      ],
+      "title": "PddReplyReadinessQuestionV1",
+      "type": "object"
+    },
+    "ReplyReadinessExecutionMode": {
+      "enum": [
+        "READINESS_SANDBOX",
+        "PUBLISHED_ROUTER_DEBUG"
+      ],
+      "title": "ReplyReadinessExecutionMode",
+      "type": "string"
+    },
+    "ReplyReadinessKnowledgeSnapshotV1": {
+      "additionalProperties": false,
+      "properties": {
+        "material_id": {
+          "title": "Material Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "content_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "material_status": {
+          "title": "Material Status",
+          "type": "string"
+        },
+        "template_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Type"
+        },
+        "store_code": {
+          "anyOf": [
+            {
+              "maxLength": 96,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Code"
+        },
+        "product_id": {
+          "anyOf": [
+            {
+              "maxLength": 96,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Id"
+        },
+        "sku_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku Id"
+        },
+        "analysis_text": {
+          "maxLength": 64000,
+          "minLength": 1,
+          "title": "Analysis Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "material_id",
+        "revision",
+        "content_hash",
+        "material_status",
+        "analysis_text"
+      ],
+      "title": "ReplyReadinessKnowledgeSnapshotV1",
+      "type": "object"
+    },
+    "ReplyReadinessPublicationStateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "current_fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Fingerprint"
+        },
+        "indexed_fingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Indexed Fingerprint"
+        },
+        "active_collection": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Active Collection"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ReplyReadinessPublicationStateV1",
+      "type": "object"
+    },
+    "ReplyReadinessScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "platform": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Platform",
+          "type": "string"
+        },
+        "store_code": {
+          "maxLength": 96,
+          "minLength": 1,
+          "title": "Store Code",
+          "type": "string"
+        },
+        "product_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "title": "Product Id",
+          "type": "string"
+        },
+        "sku_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku Id"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "platform",
+        "store_code",
+        "product_id"
+      ],
+      "title": "ReplyReadinessScopeV1",
+      "type": "object"
+    },
+    "RiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    },
+    "VerifiedProductContext": {
+      "additionalProperties": false,
+      "properties": {
+        "product_reference": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Reference"
+        },
+        "product_name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Name"
+        },
+        "sku_reference": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku Reference"
+        },
+        "sku_name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku Name"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Attributes",
+          "type": "object"
+        }
+      },
+      "title": "VerifiedProductContext",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "pdd-reply-readiness-input.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "test_data_mode": {
+      "const": true,
+      "title": "Test Data Mode",
+      "type": "boolean"
+    },
+    "production_usable": {
+      "const": false,
+      "title": "Production Usable",
+      "type": "boolean"
+    },
+    "allow_auto_send": {
+      "const": false,
+      "title": "Allow Auto Send",
+      "type": "boolean"
+    },
+    "execution_mode": {
+      "$ref": "#/$defs/ReplyReadinessExecutionMode",
+      "default": "READINESS_SANDBOX"
+    },
+    "scope": {
+      "$ref": "#/$defs/ReplyReadinessScopeV1"
+    },
+    "question_set": {
+      "$ref": "#/$defs/PddQuestionSetProjection"
+    },
+    "knowledge_snapshot": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReplyReadinessKnowledgeSnapshotV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "knowledge_sources": {
+      "items": {
+        "$ref": "#/$defs/ReplyReadinessKnowledgeSnapshotV1"
+      },
+      "maxItems": 64,
+      "title": "Knowledge Sources",
+      "type": "array"
+    },
+    "reply_rule_snapshot_revision": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reply Rule Snapshot Revision"
+    },
+    "reply_rule_snapshot_fingerprint": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reply Rule Snapshot Fingerprint"
+    },
+    "router_build_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Router Build Fingerprint",
+      "type": "string"
+    },
+    "sandbox_vector_identity": {
+      "anyOf": [
+        {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^in-memory-replay:",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sandbox Vector Identity"
+    },
+    "publication_state": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReplyReadinessPublicationStateV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "verified_product": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerifiedProductContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "test_data_mode",
+    "production_usable",
+    "allow_auto_send",
+    "scope",
+    "question_set",
+    "router_build_fingerprint"
+  ],
+  "title": "PddReplyReadinessInputV1",
+  "type": "object",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE",
+  "x-ai-cs-contract-type": "PddReplyReadinessInputV1"
+}

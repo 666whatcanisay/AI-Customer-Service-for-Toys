@@ -8,6 +8,7 @@ action.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile
@@ -30,9 +31,12 @@ from app.knowledge_materials.schemas import (
     CustomerKnowledgeStatusResponse,
     CustomerKnowledgeStatusValue,
     KnowledgeMaterialDetail,
+    KnowledgeMaterialDiffResponse,
+    KnowledgeMaterialFieldChange,
     KnowledgeMaterialListResponse,
     KnowledgeMaterialReceipt,
     KnowledgeMaterialReview,
+    KnowledgeMaterialRevisionListResponse,
     KnowledgeMaterialReviewDecision,
     KnowledgeMaterialStatus,
     KnowledgeMaterialSummary,
@@ -150,10 +154,52 @@ def _same_upload_scope(item: KnowledgeMaterial, values: dict[str, str | None]) -
         item.material_id == values["material_id"] if values["material_id"] else True
     ) and all(
         getattr(item, key) == values[key]
-        for key in ("store_code", "product_id", "sku_id", "material_type", "display_name", "submitted_by")
+        for key in ("store_code", "product_id", "sku_id", "material_type", "display_name")
     )
     return base_matches and (item.recognition_summary or {}).get("template_type") == values.get(
         "template_type"
+    )
+
+
+def _editable_record(item: KnowledgeMaterial) -> dict[str, str] | None:
+    summary = item.recognition_summary or {}
+    if not summary.get("template_type") or summary.get("record_count") != 1:
+        return None
+    try:
+        payload = json.loads(item.analysis_text)
+    except (TypeError, ValueError):
+        return None
+    records = payload.get("数据记录") if isinstance(payload, dict) else None
+    if not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict):
+        return None
+    return {
+        str(key): str(value)
+        for key, value in records[0].items()
+        if isinstance(key, str) and value is not None
+    }
+
+
+def _revision_or_404(session: Session, material_id: str, revision: int) -> KnowledgeMaterial:
+    item = session.scalar(
+        select(KnowledgeMaterial).where(
+            KnowledgeMaterial.material_id == material_id,
+            KnowledgeMaterial.revision == revision,
+        )
+    )
+    if item is None:
+        raise AppError(
+            "KNOWLEDGE_MATERIAL_REVISION_NOT_FOUND",
+            "未找到对应的资料修订版本。",
+            status_code=404,
+        )
+    return item
+
+
+def _detail(item: KnowledgeMaterial) -> KnowledgeMaterialDetail:
+    return KnowledgeMaterialDetail(
+        **_summary(item).model_dump(),
+        analysis_text_preview=item.analysis_text[:_PREVIEW_LIMIT],
+        editable_record=_editable_record(item),
     )
 
 
@@ -311,7 +357,7 @@ async def upload_knowledge_material(
         )
     if previous is not None and not _same_upload_scope(previous, values):
         raise AppError(
-            "KNOWLEDGE_MATERIAL_VALIDATION_FAILED", "修正资料必须保持相同的业务范围、类型和提交人。", status_code=422
+            "KNOWLEDGE_MATERIAL_VALIDATION_FAILED", "修正资料必须保持相同的业务范围、类型和资料身份。", status_code=422
         )
     next_material_id = previous.material_id if previous is not None else new_material_id()
     next_revision = previous.revision + 1 if previous is not None else 1
@@ -366,6 +412,7 @@ async def upload_knowledge_material(
 def list_knowledge_materials(
     store_code: str | None = Query(default=None, max_length=96),
     product_id: str | None = Query(default=None, max_length=128),
+    sku_id: str | None = Query(default=None, max_length=128),
     material_status: KnowledgeMaterialStatus | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
@@ -376,6 +423,10 @@ def list_knowledge_materials(
         statement = statement.where(KnowledgeMaterial.store_code == store_code)
     if product_id:
         statement = statement.where(KnowledgeMaterial.product_id == product_id)
+    if sku_id:
+        statement = statement.where(
+            (KnowledgeMaterial.sku_id == sku_id) | (KnowledgeMaterial.sku_id.is_(None))
+        )
     if material_status:
         statement = statement.where(KnowledgeMaterial.material_status == material_status)
     total = session.scalar(select(func.count()).select_from(statement.subquery())) or 0
@@ -389,11 +440,69 @@ def list_knowledge_materials(
 
 @admin_router.get("/{material_id}", response_model=KnowledgeMaterialDetail)
 def get_knowledge_material(material_id: str, session: Session = Depends(get_db)) -> KnowledgeMaterialDetail:
-    item = _material_or_404(session, material_id)
-    summary = _summary(item)
-    return KnowledgeMaterialDetail(
-        **summary.model_dump(),
-        analysis_text_preview=item.analysis_text[:_PREVIEW_LIMIT],
+    return _detail(_material_or_404(session, material_id))
+
+
+@admin_router.get(
+    "/{material_id}/revisions", response_model=KnowledgeMaterialRevisionListResponse
+)
+def list_knowledge_material_revisions(
+    material_id: str, session: Session = Depends(get_db)
+) -> KnowledgeMaterialRevisionListResponse:
+    items = list(
+        session.scalars(
+            select(KnowledgeMaterial)
+            .where(KnowledgeMaterial.material_id == material_id)
+            .order_by(KnowledgeMaterial.revision.desc())
+        ).all()
+    )
+    if not items:
+        raise AppError(
+            "KNOWLEDGE_MATERIAL_VALIDATION_FAILED", "未找到对应的商品资料。", status_code=404
+        )
+    return KnowledgeMaterialRevisionListResponse(
+        material_id=material_id,
+        items=[_summary(item) for item in items],
+        total=len(items),
+    )
+
+
+@admin_router.get(
+    "/{material_id}/revisions/{revision}", response_model=KnowledgeMaterialDetail
+)
+def get_knowledge_material_revision(
+    material_id: str, revision: int, session: Session = Depends(get_db)
+) -> KnowledgeMaterialDetail:
+    return _detail(_revision_or_404(session, material_id, revision))
+
+
+@admin_router.get("/{material_id}/diff", response_model=KnowledgeMaterialDiffResponse)
+def diff_knowledge_material_revisions(
+    material_id: str,
+    from_revision: int = Query(ge=1),
+    to_revision: int = Query(ge=1),
+    session: Session = Depends(get_db),
+) -> KnowledgeMaterialDiffResponse:
+    before = _revision_or_404(session, material_id, from_revision)
+    after = _revision_or_404(session, material_id, to_revision)
+    before_fields = _editable_record(before) or {}
+    after_fields = _editable_record(after) or {}
+    changes = [
+        KnowledgeMaterialFieldChange(
+            field=field,
+            before=before_fields.get(field),
+            after=after_fields.get(field),
+        )
+        for field in sorted(set(before_fields) | set(after_fields))
+        if before_fields.get(field) != after_fields.get(field)
+    ]
+    return KnowledgeMaterialDiffResponse(
+        material_id=material_id,
+        from_revision=from_revision,
+        to_revision=to_revision,
+        from_content_hash=before.content_hash,
+        to_content_hash=after.content_hash,
+        changes=changes,
     )
 
 

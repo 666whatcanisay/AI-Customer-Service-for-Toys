@@ -1,0 +1,71 @@
+{
+  "schema_version": "reply-rule-publication.v1",
+  "publication_id": "reply-rule-publication-synthetic-001",
+  "idempotency_key": "reply-rule-publication-synthetic-001",
+  "tenant_id": "TENANT-SYNTHETIC",
+  "platform": "pdd",
+  "snapshot_revision": 1,
+  "rules": [
+    {
+      "schema_version": "reply-rule.v1",
+      "rule_id": "RULE-PRODUCT-MATERIAL-001",
+      "rule_version": 1,
+      "scope": {
+        "scope_kind": "PRODUCT",
+        "tenant_id": "TENANT-SYNTHETIC",
+        "platform": "pdd",
+        "store_code": "STORE-SYNTHETIC",
+        "product_id": "PRODUCT-SYNTHETIC",
+        "sku_id": null
+      },
+      "canonical_question": "这个积木是什么材质？",
+      "aliases": [
+        "什么材质",
+        "积木材质"
+      ],
+      "fixed_reply": "材质为ABS塑料。",
+      "variable_names": [
+        "material"
+      ],
+      "action": "DIRECT_ANSWER",
+      "risk_level": "LOW",
+      "required_context_fields": [
+        "product_id"
+      ],
+      "prohibited_claims": [
+        "绝对安全"
+      ],
+      "allow_auto_candidate": true,
+      "source_materials": [
+        {
+          "material_id": "KMT-SYNTHETIC-PRODUCT-001",
+          "revision": 1,
+          "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "governance_status": "REVIEWED_VALID",
+          "scope": {
+            "scope_kind": "PRODUCT",
+            "tenant_id": "TENANT-SYNTHETIC",
+            "platform": "pdd",
+            "store_code": "STORE-SYNTHETIC",
+            "product_id": "PRODUCT-SYNTHETIC",
+            "sku_id": null
+          },
+          "reviewed_by": "operator-synthetic",
+          "reviewed_at": "2026-08-13T00:00:00Z"
+        }
+      ],
+      "effective_from": "2026-08-13T00:00:00Z",
+      "effective_to": null,
+      "status": "PUBLISHED",
+      "review": {
+        "reviewed_by": "operator-synthetic",
+        "reviewed_at": "2026-08-13T00:00:00Z",
+        "review_note": "synthetic fixture approval"
+      },
+      "content_fingerprint": "83096bb8ecee12956ed3f3b978e840174c1dfae482998f495133e23a00685e35"
+    }
+  ],
+  "snapshot_fingerprint": "18bfaccf247de020c439e47888c131b96f5d80d402e2c7e4df4d5a4e2278a555",
+  "produced_by": "operator-synthetic",
+  "produced_at": "2026-08-13T00:01:00Z"
+}

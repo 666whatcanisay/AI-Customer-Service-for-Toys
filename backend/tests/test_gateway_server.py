@@ -26,6 +26,11 @@ from app.gateway.service import GatewayRuntimeConfig, GatewayServer
 from app.gateway.lan_proxy import GatewayLanProxyConfig, create_gateway_lan_proxy_app
 from app.gateway.store import DecisionClaimState, GatewayStateStore
 from app.main import create_app
+from app.reply_router.contracts import (
+    ReplyEvidenceBundleV1,
+    canonical_sha256,
+    text_sha256,
+)
 
 
 CLIENT_ID = "channel-engine"
@@ -198,6 +203,75 @@ def test_gateway_decision_returns_contract_response_and_required_approval(
     assert payload["requires_approval"] is True
     assert payload["proposed_content"]
     assert payload["metadata"]["source_count"] == 1
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "MISSING",
+        "TAMPERED",
+        "UNKNOWN_VERSION",
+        "STRUCTURE_INVALID",
+        "CROSS_SCOPE",
+    ],
+)
+def test_gateway_invalid_quality_evidence_fails_closed_to_no_action(
+    gateway_harness, variant: str
+) -> None:
+    client, install, _ = gateway_harness
+    result = {
+        **_result(),
+        "quality_gate_status": "PASS",
+    }
+    if variant in {"TAMPERED", "UNKNOWN_VERSION", "CROSS_SCOPE"}:
+        fixture = (
+            Path(__file__).resolve().parents[2]
+            / "contracts"
+            / "candidates"
+            / "reply-router-v1"
+            / "fixtures"
+            / "reply-evidence-bundle.valid.json"
+        )
+        evidence = json.loads(fixture.read_text(encoding="utf-8"))
+        if variant == "TAMPERED":
+            evidence["warnings"] = ["TAMPERED"]
+        elif variant == "UNKNOWN_VERSION":
+            evidence["schema_version"] = "reply-evidence-bundle.v999"
+        else:
+            evidence["scope"]["tenant_id"] = "TENANT-OTHER"
+            for source in evidence["sources"]:
+                source["scope"]["tenant_id"] = "TENANT-OTHER"
+            evidence["bundle_sha256"] = canonical_sha256(
+                {
+                    key: value
+                    for key, value in evidence.items()
+                    if key != "bundle_sha256"
+                }
+            )
+            response_fixture = fixture.with_name(
+                "gateway-decision-response.with-reply-evidence.json"
+            )
+            result["answer"] = json.loads(
+                response_fixture.read_text(encoding="utf-8")
+            )["proposed_content"]
+        result["reply_evidence_bundle"] = evidence
+    elif variant == "STRUCTURE_INVALID":
+        result["reply_evidence_bundle"] = {
+            "schema_version": "reply-evidence-bundle.v1"
+        }
+    install(
+        lambda question, context: result
+    )
+    response = _post_decision(client, _request_payload())
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "NO_ACTION"
+    assert payload["proposed_content"] is None
+    assert payload["risk_level"] == "HIGH"
+    assert payload["metadata"]["ai_cs_action"] == "TRANSFER_HUMAN"
+    assert payload["metadata"]["warnings"] == ["REPLY_EVIDENCE_INVALID"]
+    assert "reply_evidence_bundle" not in payload["metadata"]
 
 
 def test_gateway_validates_bounded_host_context_and_projects_citations(
@@ -670,12 +744,28 @@ def test_enabled_runtime_builds_gateway_without_changing_legacy_routes(
     class StubRag:
         model_configured = True
 
+        def __init__(self) -> None:
+            self.calls = []
+
         def warm_up(self) -> None:
             return None
 
         def query(self, question, context=None):
-            del question, context
-            return _result()
+            self.calls.append((question, context))
+            return {
+                **_result(),
+                "sources": [
+                    {
+                        "source_name": "synthetic-product-faq.md",
+                        "chunk_id": "chunk-product-001",
+                        "distance": 0.1,
+                        "product_id": "PRODUCT-SYNTHETIC",
+                        "sku_id": None,
+                        "knowledge_version": "a" * 64,
+                        "source_ids": ["SOURCE-SYNTHETIC-001"],
+                    }
+                ],
+            }
 
         def close(self) -> None:
             return None
@@ -700,16 +790,52 @@ def test_enabled_runtime_builds_gateway_without_changing_legacy_routes(
         gateway_state_path=tmp_path / "gateway-state.sqlite3",
         internal_service_secret_file=internal_secret_path,
     )
-    app = create_app(settings=settings, rag_factory=lambda active: StubRag())
+    stub_rag = StubRag()
+    app = create_app(settings=settings, rag_factory=lambda active: stub_rag)
 
     with TestClient(app, headers={"X-AI-CS-Service-Token": internal_token}) as client:
-        payload = _request_payload()
+        missing_turn = _post_decision(client, _request_payload())
+        payload = _request_payload(
+            request_id="gateway-request-002",
+            idempotency_key="decision-message-002",
+            correlation_id="correlation-002",
+        )
+        message = payload["customer_message"]
+        payload["context"]["ai_cs_reply_turn"] = {
+            "schema_version": "ai-cs-reply-turn.v1",
+            "turn_id": "assistant-turn:synthetic-002",
+            "aggregate_content_sha256": text_sha256(message),
+            "index_unit": "UNICODE_CODE_POINT",
+            "aggregation_separator": "\n",
+            "messages": [
+                {
+                    "message_id": "PDD-MSG-SYNTHETIC-002",
+                    "content_sha256": text_sha256(message),
+                    "range_start": 0,
+                    "range_end": len(message),
+                }
+            ],
+        }
         decision = _post_decision(client, payload)
         runtime = client.get("/api/admin/server-runtime")
         legacy = client.post("/api/chat", json={"message": "合成测试问题"})
 
+    assert missing_turn.status_code == 200
+    assert missing_turn.json()["action"] == "NO_ACTION"
+    assert "REPLY_ROUTER_MANUAL_REQUIRED" in missing_turn.json()["metadata"]["warnings"]
     assert decision.status_code == 200
+    assert decision.json()["action"] == "SUGGEST_REPLY"
     assert decision.json()["requires_approval"] is True
+    evidence = ReplyEvidenceBundleV1.model_validate_json(
+        json.dumps(
+            decision.json()["metadata"]["reply_evidence_bundle"],
+            ensure_ascii=False,
+        )
+    )
+    evidence.validate_proposed_content(decision.json()["proposed_content"])
+    assert len(stub_rag.calls) == 2
+    assert stub_rag.calls[0][1].recent_conversation[-1].content == message
+    assert stub_rag.calls[1][1] is None
     assert legacy.status_code == 200
     assert legacy.json()["success"] is True
     assert runtime.status_code == 200

@@ -33,6 +33,10 @@ from app.models.chat import (
     VerifiedProductContext,
     VerifiedTransactionContext,
 )
+from app.reply_router.contracts import (
+    ReplyEvidenceBundleV1,
+    RuleScopeKind,
+)
 from app.service.rag_service import (
     LLM_REQUEST_FAILED_MESSAGE,
     MODEL_NOT_CONFIGURED_MESSAGE,
@@ -41,6 +45,9 @@ from app.service.rag_service import (
 
 
 DecisionProvider = Callable[[str, FrozenChatContext], dict[str, Any]]
+RequestDecisionProvider = Callable[
+    [DecisionRequest, FrozenChatContext], dict[str, Any]
+]
 ReadinessProvider = Callable[[], tuple[bool, bool]]
 
 
@@ -69,9 +76,11 @@ class GatewayServer:
         *,
         decision_provider: DecisionProvider,
         readiness_provider: ReadinessProvider,
+        request_decision_provider: RequestDecisionProvider | None = None,
     ) -> None:
         self.config = config
         self._decision_provider = decision_provider
+        self._request_decision_provider = request_decision_provider
         self._readiness_provider = readiness_provider
         self.state_store = GatewayStateStore(
             config.state_path,
@@ -168,8 +177,12 @@ class GatewayServer:
 
         try:
             scope = self._scope_from(request)
-            result = self._decision_provider(request.customer_message, scope)
-            response = self._map_response(request, result)
+            result = (
+                self._request_decision_provider(request, scope)
+                if self._request_decision_provider is not None
+                else self._decision_provider(request.customer_message, scope)
+            )
+            response = self._map_response(request, result, scope)
             response_json = response.model_dump_json()
             self.state_store.complete_decision(
                 client_id=identity.client_id,
@@ -267,6 +280,7 @@ class GatewayServer:
     def _map_response(
         request: DecisionRequest,
         result: dict[str, Any],
+        scope: FrozenChatContext,
     ) -> DecisionResponse:
         warnings = result.get("warnings")
         if not isinstance(warnings, list) or not all(
@@ -318,14 +332,51 @@ class GatewayServer:
                 )
             proposed_content = answer.strip()
 
+        evidence_bundle: ReplyEvidenceBundleV1 | None = None
+        raw_evidence = result.get("reply_evidence_bundle")
+        raw_quality_status = result.get("quality_gate_status")
+        evidence_declared = raw_evidence is not None or raw_quality_status is not None
+        evidence_invalid = False
+        if evidence_declared:
+            try:
+                if (
+                    raw_quality_status != "PASS"
+                    or not isinstance(raw_evidence, dict)
+                    or proposed_content is None
+                ):
+                    raise ValueError("quality evidence declaration is incomplete")
+                evidence_bundle = ReplyEvidenceBundleV1.model_validate_json(
+                    json.dumps(
+                        raw_evidence,
+                        ensure_ascii=False,
+                        allow_nan=False,
+                    )
+                )
+                evidence_bundle.validate_proposed_content(proposed_content)
+                if not GatewayServer._evidence_matches_scope(
+                    evidence_bundle, scope
+                ):
+                    raise ValueError("quality evidence scope does not match request")
+            except (TypeError, ValueError, ValidationError):
+                evidence_invalid = True
+                evidence_bundle = None
+                ai_action = "TRANSFER_HUMAN"
+                action = GatewayDecisionAction.NO_ACTION
+                proposed_content = None
+                warnings = ["REPLY_EVIDENCE_INVALID"]
+
         required_fields = result.get("required_fields")
         if not isinstance(required_fields, list) or not all(
             isinstance(item, str) for item in required_fields
         ):
             required_fields = []
+        if evidence_invalid:
+            required_fields = []
         sources = result.get("sources")
+        if evidence_invalid:
+            sources = []
         source_count = len(sources) if isinstance(sources, list) else 0
-        raw_risk_level = result.get("risk_level")
+        raw_risk_level = "HIGH" if evidence_invalid else result.get("risk_level")
         risk_level = (
             GatewayRiskLevel(raw_risk_level)
             if raw_risk_level in {item.value for item in GatewayRiskLevel}
@@ -342,6 +393,8 @@ class GatewayServer:
         ai_request_id = result.get("request_id")
         if isinstance(ai_request_id, str) and ai_request_id:
             metadata["ai_request_id"] = ai_request_id[:128]
+        if evidence_bundle is not None:
+            metadata["reply_evidence_bundle"] = evidence_bundle.model_dump(mode="json")
 
         return DecisionResponse(
             contract_version=CONTRACT_VERSION,
@@ -356,6 +409,29 @@ class GatewayServer:
             gateway_version=GATEWAY_VERSION,
             metadata=metadata,
             decided_at=utc_now(),
+        )
+
+    @staticmethod
+    def _evidence_matches_scope(
+        bundle: ReplyEvidenceBundleV1,
+        scope: FrozenChatContext,
+    ) -> bool:
+        evidence_scope = bundle.scope
+        if (
+            evidence_scope.tenant_id != scope.tenant_id
+            or evidence_scope.platform != scope.platform
+            or evidence_scope.store_code != scope.store_code
+        ):
+            return False
+        if scope.product_id.startswith("__STORE_LEVEL_"):
+            return evidence_scope.scope_kind is RuleScopeKind.STORE
+        if evidence_scope.product_id != scope.product_id:
+            return False
+        if scope.sku_id is None:
+            return evidence_scope.scope_kind is RuleScopeKind.PRODUCT
+        return (
+            evidence_scope.scope_kind is RuleScopeKind.SKU
+            and evidence_scope.sku_id == scope.sku_id
         )
 
     @staticmethod
@@ -391,7 +467,11 @@ class GatewayServer:
                         if item.get("sku_id") is not None
                         else None
                     ),
-                    "source_kind": "RAG_KNOWLEDGE",
+                    "source_kind": (
+                        "FIXED_RULE"
+                        if chunk_id.strip().startswith("reply-rule:")
+                        else "RAG_KNOWLEDGE"
+                    ),
                 }
             if isinstance(excerpt, str) and excerpt.strip():
                 descriptor["excerpt"] = excerpt.strip()[:1000]

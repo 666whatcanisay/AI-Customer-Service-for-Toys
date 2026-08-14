@@ -1,8 +1,10 @@
 # AI-CS V1.0.0
 
-AI-CS 是面向玩具业务的内部 AI 客服系统。当前权威状态为 `RC5_OFFLINE_STABILITY_READY = PASS`；真实 PDD 的 Adapter、读取、AI、人工确认和发送 Gate 均为 `NOT_VERIFIED`，派生字段 `AI_CS_PRODUCTION_READY=false`。
+Latest source gate: `PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY`. The repository database head is `0023_reply_readiness_v1`; the controlled formal Runtime remains `0019_runtime_database_identity_v1` and was not accessed or migrated. A and C must be deployed from the same approved candidate commit. Engine, PDD, auto authorization, Sender and real-send state are outside this gate and remain unchanged. See [AI-CS Minimal Architecture Fix V1](docs/control/AI-CS-Minimal-Architecture-Fix-V1-Report.md).
 
-当前数据库源码 Head 与受控 R027 Runtime 均为 `0019_runtime_database_identity_v1`。Active DB 是 `.runtime/r027-ux-acceptance-data-v1/runtime/platform.sqlite3`；实际绝对路径、DB Identity 和 Migration 必须以 Runtime Activation/状态命令的只读结果为准。普通启动策略为 `VALIDATE_ONLY`，不会执行迁移，也不会自动初始化测试知识；迁移和验收知识初始化必须分别使用受控命令。当前 Gate、版本和启动策略的唯一机器事实源位于同级 Channel Engine 仓库的 `docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json`。
+AI-CS 是面向玩具业务的内部 AI 客服系统。当前权威状态为 `RC5_OFFLINE_STABILITY_READY = PASS`；真实 PDD 的 Adapter、读取、AI、人工确认和发送 Gate 均为 `NOT_VERIFIED`，派生字段 `AI_CS_PRODUCTION_READY=false`。商品风险池 Card 8 的“36题评测 → 补资料 → 新修订 → 复跑”知识闭环已达到`AI_CS_PDD_REPLY_READINESS_KNOWLEDGE_LOOP_READY / SOURCE_ONLY`；完整`AI_CS_AUTOREPLY_READY`仍为FAIL，因为Engine尚未生产Turn Envelope、消费证据包或实现证据绑定的自动策略授权。
+
+当前工作树的C数据库源码Head为`0023_reply_readiness_v1`，受控R027 Runtime仍为`0019_runtime_database_identity_v1`且未迁移。Card 8不增加数据库结构：C自动聚合最新已审核商品/精确SKU资料并允许一份草稿覆盖，A用真实Router执行完整36题，Admin从逐题缺口跳转既有知识编辑器并携带新修订返回复跑；结果始终不授予发送权。Card 6只读确认Engine现有V1模型会保留开放metadata，却不会消费新证据，也没有`AutoPolicyAuthorizationV2`；最小补救任务见[Card 6验收报告](docs/control/AI-CS-Autoreply-Card6-Functional-Acceptance-Report-V1.md)。Active DB 是 `.runtime/r027-ux-acceptance-data-v1/runtime/platform.sqlite3`；实际绝对路径、DB Identity 和 Migration 必须以 Runtime Activation/状态命令的只读结果为准。普通启动策略为 `VALIDATE_ONLY`，不会执行迁移，也不会自动初始化测试知识；迁移和验收知识初始化必须分别使用受控命令。当前RC5 Gate、已部署版本和启动策略的机器事实源仍位于同级 Channel Engine 仓库的 `docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json`。
 
 ## Production RC V1（历史基线，不作为当前事实源）
 

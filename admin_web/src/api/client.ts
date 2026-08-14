@@ -644,6 +644,162 @@ export interface KnowledgeMaterial {
 
 export interface KnowledgeMaterialDetail extends KnowledgeMaterial {
   analysis_text_preview: string
+  editable_record: Record<string, string> | null
+}
+
+export interface KnowledgeMaterialRevisionList {
+  material_id: string
+  items: KnowledgeMaterial[]
+  total: number
+}
+
+export interface KnowledgeMaterialFieldChange {
+  field: string
+  before: string | null
+  after: string | null
+}
+
+export interface KnowledgeMaterialDiff {
+  material_id: string
+  from_revision: number
+  to_revision: number
+  from_content_hash: string
+  to_content_hash: string
+  changes: KnowledgeMaterialFieldChange[]
+}
+
+export type ReplyReadinessRisk = 'LOW' | 'MEDIUM' | 'HIGH'
+export type ReplyReadinessAction =
+  | 'DIRECT_ANSWER'
+  | 'CONTROLLED_ANSWER'
+  | 'ASK_CLARIFY'
+  | 'REQUIRE_LOOKUP'
+  | 'TRANSFER_HUMAN'
+  | 'REFUSE'
+
+export interface ReplyReadinessQuestion {
+  schema_version: 'pdd-reply-readiness-question.v1'
+  question_id: string
+  category: string
+  canonical_question: string
+  aliases: string[]
+  policy_risk_floor: ReplyReadinessRisk
+  expected_action: ReplyReadinessAction
+  required_fact_keys: string[]
+  requires_realtime_lookup: boolean
+  prohibited_claims: string[]
+  mandatory: boolean
+}
+
+export interface ReplyReadinessQuestionSet {
+  schema_version: 'pdd-reply-readiness-question-set.v1'
+  baseline_version: string
+  fingerprint: string
+  questions: ReplyReadinessQuestion[]
+}
+
+export interface ReplyReadinessItemResult {
+  schema_version: 'pdd-reply-readiness-item-result.v1'
+  question_id: string
+  effective_risk: ReplyReadinessRisk
+  action: ReplyReadinessAction
+  origin: string
+  answer_preview: string
+  answer_sha256: string
+  missing_fact_keys: string[]
+  blocker_codes: string[]
+  prohibited_claim_hits: string[]
+  citation_ids: string[]
+  evidence_bundle_sha256: string | null
+}
+
+export interface ReplyReadinessResult {
+  schema_version: 'pdd-reply-readiness-result.v1'
+  run_id: string
+  status: 'COMPLETED'
+  question_set_fingerprint: string
+  items: ReplyReadinessItemResult[]
+  result_sha256: string
+}
+
+export type ReplyReadinessDependency =
+  | 'router'
+  | 'reply_rule'
+  | 'rag_collection'
+  | 'knowledge'
+  | 'model'
+
+export interface ReplyReadinessPublishedDebugResult {
+  schema_version: 'pdd-reply-readiness-published-debug-result.v1'
+  simulation_mode: 'PUBLISHED_ROUTER_DEBUG'
+  run_id: string
+  status: 'COMPLETED' | 'FAILED'
+  question_set_fingerprint: string
+  item: ReplyReadinessItemResult | null
+  failure_code: string | null
+  quality_gate_status: 'PASS' | 'MANUAL'
+  rule_references: string[]
+  router_build_fingerprint: string
+  reply_rule_snapshot_fingerprint: string | null
+  rag_collection_identity: string | null
+  knowledge_publication_fingerprint: string | null
+  knowledge_publication_status: string
+  model_config_identity: string
+  evaluated_at: string
+  dependency_usage: Record<ReplyReadinessDependency, boolean>
+  diagnostic_changes: Array<{
+    dependency: ReplyReadinessDependency
+    before: string | null
+    after: string | null
+  }>
+  drifted_dependencies: ReplyReadinessDependency[]
+  production_usable: false
+  allow_auto_send: false
+  result_sha256: string
+}
+
+export interface ReplyReadinessRun {
+  run_id: string
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  tenant_id: string
+  platform: string
+  store_code: string
+  product_id: string
+  sku_id: string | null
+  question_set_fingerprint: string
+  question_count: number
+  material_id: string | null
+  material_revision: number | null
+  material_content_hash: string | null
+  knowledge_source_count: number
+  reply_rule_snapshot_revision: number
+  reply_rule_snapshot_fingerprint: string
+  result: ReplyReadinessResult | null
+  failure_code: string | null
+  requested_by: string
+  requested_at: string
+  completed_at: string | null
+}
+
+export interface ReplyReadinessRunList {
+  items: ReplyReadinessRun[]
+  total: number
+}
+
+export interface ReplyReadinessRunComparison {
+  baseline_run_id: string
+  candidate_run_id: string
+  changed_items: Array<{
+    question_id: string
+    before_risk: ReplyReadinessRisk | null
+    after_risk: ReplyReadinessRisk
+    answer_changed: boolean
+    missing_fact_keys_before: string[]
+    missing_fact_keys_after: string[]
+    blocker_codes_before: string[]
+    blocker_codes_after: string[]
+    evidence_changed: boolean
+  }>
 }
 
 export interface KnowledgeMaterialReceipt {
@@ -1399,7 +1555,7 @@ export async function verifyKnowledgeOptimizationTask(
 }
 
 export async function listKnowledgeMaterials(
-  params?: { store_code?: string; product_id?: string; material_status?: KnowledgeMaterialStatus | ''; page?: number; size?: number },
+  params?: { store_code?: string; product_id?: string; sku_id?: string; material_status?: KnowledgeMaterialStatus | ''; page?: number; size?: number },
 ): Promise<KnowledgeMaterialList> {
   const response = await apiClient.get<KnowledgeMaterialList>('/api/v1/admin/knowledge-materials', {
     params: omitBlankQueryParams(params),
@@ -1410,6 +1566,114 @@ export async function listKnowledgeMaterials(
 export async function getKnowledgeMaterial(materialId: string): Promise<KnowledgeMaterialDetail> {
   const response = await apiClient.get<KnowledgeMaterialDetail>(
     `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}`,
+  )
+  return response.data
+}
+
+export async function listKnowledgeMaterialRevisions(
+  materialId: string,
+): Promise<KnowledgeMaterialRevisionList> {
+  const response = await apiClient.get<KnowledgeMaterialRevisionList>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}/revisions`,
+  )
+  return response.data
+}
+
+export async function getKnowledgeMaterialRevision(
+  materialId: string,
+  revision: number,
+): Promise<KnowledgeMaterialDetail> {
+  const response = await apiClient.get<KnowledgeMaterialDetail>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}/revisions/${revision}`,
+  )
+  return response.data
+}
+
+export async function getKnowledgeMaterialDiff(
+  materialId: string,
+  fromRevision: number,
+  toRevision: number,
+): Promise<KnowledgeMaterialDiff> {
+  const response = await apiClient.get<KnowledgeMaterialDiff>(
+    `/api/v1/admin/knowledge-materials/${encodeURIComponent(materialId)}/diff`,
+    { params: { from_revision: fromRevision, to_revision: toRevision } },
+  )
+  return response.data
+}
+
+export async function getReplyReadinessQuestionSet(params: {
+  store_code: string
+  product_id: string
+  sku_id?: string
+}): Promise<ReplyReadinessQuestionSet> {
+  const response = await apiClient.get<ReplyReadinessQuestionSet>(
+    '/api/v1/admin/reply-readiness/question-set',
+    { params: omitBlankQueryParams(params) },
+  )
+  return response.data
+}
+
+export async function debugPublishedReply(payload: {
+  store_code: string
+  product_id: string
+  sku_id?: string
+  customer_message: string
+}): Promise<ReplyReadinessPublishedDebugResult> {
+  const response = await apiClient.post<ReplyReadinessPublishedDebugResult>(
+    '/api/v1/admin/reply-readiness/debug',
+    payload,
+  )
+  return response.data
+}
+
+export async function listReplyReadinessRuns(params: {
+  store_code: string
+  product_id: string
+  scope_kind?: 'PRODUCT' | 'SKU'
+  sku_id?: string
+}): Promise<ReplyReadinessRunList> {
+  const response = await apiClient.get<ReplyReadinessRunList>(
+    '/api/v1/admin/reply-readiness/runs',
+    { params },
+  )
+  return response.data
+}
+
+export async function getReplyReadinessRun(runId: string): Promise<ReplyReadinessRun> {
+  const response = await apiClient.get<ReplyReadinessRun>(
+    `/api/v1/admin/reply-readiness/runs/${encodeURIComponent(runId)}`,
+  )
+  return response.data
+}
+
+export async function createReplyReadinessRun(
+  payload: {
+    store_code: string
+    product_id: string
+    sku_id?: string
+    material_id?: string
+    material_revision?: number
+  },
+  idempotencyKey?: string,
+): Promise<ReplyReadinessRun> {
+  const key = idempotencyKey || (typeof crypto?.randomUUID === 'function'
+    ? `reply-readiness-${crypto.randomUUID()}`
+    : `reply-readiness-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+  const response = await apiClient.post<ReplyReadinessRun>(
+    '/api/v1/admin/reply-readiness/runs',
+    payload,
+    { headers: { 'Idempotency-Key': key } },
+  )
+  return response.data
+}
+
+export async function compareReplyReadinessRuns(
+  runId: string,
+  baselineRunId: string,
+): Promise<ReplyReadinessRunComparison> {
+  const response = await apiClient.get<ReplyReadinessRunComparison>(
+    `/api/v1/admin/reply-readiness/runs/${encodeURIComponent(runId)}/compare`,
+    { params: { baseline_run_id: baselineRunId } },
   )
   return response.data
 }
@@ -1850,10 +2114,15 @@ export function apiErrorMessage(error: unknown): string {
   if (isOfflineError(error)) return '无法连接运营平台。请确认本机服务已启动后再重试。'
   if (error instanceof AxiosError) {
     const status = error.response?.status
+    const code = (error.response?.data as { error?: { code?: string } } | undefined)?.error?.code
+    if (status === 429 && code === 'REPLY_DEBUG_RATE_LIMITED') {
+      return '单条回答调试过于频繁，请稍后再试。'
+    }
     if (status === 400 || status === 422) return '筛选条件或提交内容不符合要求。请检查页面中的必填项和格式。'
     if (status === 401 || status === 403) return '当前账号没有访问此项数据的权限。请联系管理员确认。'
     if (status === 404) return '没有找到所需记录。请刷新页面并确认筛选条件。'
     if (status === 409) return '这条记录的状态已发生变化。请刷新后再核对和操作。'
+    if (status === 429) return '操作过于频繁，请稍后再试。'
     if (status !== undefined && status >= 500) return '运营平台暂时无法处理请求。请稍后重试；若持续出现，请查看服务状态。'
   }
   return '暂时无法完成此操作。请稍后重试；若持续出现，请查看服务状态。'

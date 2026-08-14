@@ -1,0 +1,104 @@
+{
+  "schema_version": "engine-autoreply-v2-acceptance.v1",
+  "engine_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "candidate_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "gateway_wire": "1.0",
+  "gateway_raw_sha256": "fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80",
+  "gateway_canonical_sha256": "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5",
+  "contract_status": "UNCOORDINATED_CANDIDATE",
+  "checks": {
+    "reply_turn_producer": {
+      "status": "PASS",
+      "evidence_codes": [
+        "REPLY_TURN_PRODUCER_PASS"
+      ]
+    },
+    "reply_turn_negative_vectors": {
+      "status": "PASS",
+      "evidence_codes": [
+        "REPLY_TURN_NEGATIVE_VECTORS_PASS"
+      ]
+    },
+    "reply_evidence_consumer": {
+      "status": "PASS",
+      "evidence_codes": [
+        "REPLY_EVIDENCE_CONSUMER_PASS"
+      ]
+    },
+    "reply_evidence_negative_vectors": {
+      "status": "PASS",
+      "evidence_codes": [
+        "REPLY_EVIDENCE_NEGATIVE_VECTORS_PASS"
+      ]
+    },
+    "ai_reply_package_v2": {
+      "status": "PASS",
+      "evidence_codes": [
+        "AI_REPLY_PACKAGE_V2_PASS"
+      ]
+    },
+    "auto_policy_authorization_v2": {
+      "status": "PASS",
+      "evidence_codes": [
+        "AUTO_POLICY_AUTHORIZATION_V2_PASS"
+      ]
+    },
+    "human_auto_ledger_separation": {
+      "status": "PASS",
+      "evidence_codes": [
+        "HUMAN_AUTO_LEDGER_SEPARATION_PASS"
+      ]
+    },
+    "execution_time_state_revalidation": {
+      "status": "PASS",
+      "evidence_codes": [
+        "EXECUTION_TIME_STATE_REVALIDATION_PASS"
+      ]
+    },
+    "versioned_rate_policy": {
+      "status": "PASS",
+      "evidence_codes": [
+        "VERSIONED_RATE_POLICY_PASS"
+      ]
+    },
+    "kill_switch": {
+      "status": "PASS",
+      "evidence_codes": [
+        "KILL_SWITCH_PASS"
+      ]
+    },
+    "sender_binding": {
+      "status": "PASS",
+      "evidence_codes": [
+        "SENDER_BINDING_PASS"
+      ]
+    },
+    "receipt_binding": {
+      "status": "PASS",
+      "evidence_codes": [
+        "RECEIPT_BINDING_PASS"
+      ]
+    },
+    "unknown_no_retry": {
+      "status": "PASS",
+      "evidence_codes": [
+        "UNKNOWN_NO_RETRY_PASS"
+      ]
+    },
+    "cross_repo_replay": {
+      "status": "PASS",
+      "evidence_codes": [
+        "CROSS_REPO_REPLAY_PASS"
+      ]
+    }
+  },
+  "side_effects": {
+    "engine_source_modified": false,
+    "runtime_started": false,
+    "pdd_connected": false,
+    "real_send_attempted": false
+  },
+  "contains_secret_material": false,
+  "contains_customer_data": false,
+  "final_status": "PASS"
+}

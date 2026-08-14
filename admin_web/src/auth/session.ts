@@ -1,6 +1,8 @@
 import axios from 'axios'
 import { computed, readonly, ref } from 'vue'
 
+import { resetReplyReadinessDebugState } from '../stores/replyReadinessDebug'
+
 export type RoleName = 'ADMIN' | 'OPERATOR' | 'CUSTOMER_SERVICE'
 export interface AuthStoreBinding { id: number; store_id: number; store_code: string; store_name: string; platform: string; is_default: boolean }
 export interface AuthUser {
@@ -27,7 +29,7 @@ export function authorizationHeader(): Record<string, string> {
   return token.value ? { Authorization: `Bearer ${token.value}` } : {}
 }
 export function clearAdminSession(): void {
-  token.value = ''; user.value = null; initialized.value = true; persist('')
+  token.value = ''; user.value = null; initialized.value = true; persist(''); resetReplyReadinessDebugState()
 }
 
 async function restore(): Promise<boolean> {
@@ -67,5 +69,5 @@ export function useAdminSession() {
 
 export const adminSessionTestControl = {
   setUser(value: AuthUser | null, accessToken = 'test-token') { user.value = value; token.value = value ? accessToken : ''; initialized.value = true },
-  reset() { token.value = ''; user.value = null; initialized.value = false; persist('') }
+  reset() { token.value = ''; user.value = null; initialized.value = false; persist(''); resetReplyReadinessDebugState() }
 }

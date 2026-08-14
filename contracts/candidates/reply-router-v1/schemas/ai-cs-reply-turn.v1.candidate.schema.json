@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "ReplyTurnMessageV1": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "range_start": {
+          "maximum": 8000,
+          "minimum": 0,
+          "title": "Range Start",
+          "type": "integer"
+        },
+        "range_end": {
+          "exclusiveMinimum": 0,
+          "maximum": 8000,
+          "title": "Range End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "message_id",
+        "content_sha256",
+        "range_start",
+        "range_end"
+      ],
+      "title": "ReplyTurnMessageV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "ai-cs-reply-turn.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "turn_id": {
+      "maxLength": 255,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "title": "Turn Id",
+      "type": "string"
+    },
+    "aggregate_content_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Aggregate Content Sha256",
+      "type": "string"
+    },
+    "index_unit": {
+      "const": "UNICODE_CODE_POINT",
+      "title": "Index Unit",
+      "type": "string"
+    },
+    "aggregation_separator": {
+      "const": "\n",
+      "title": "Aggregation Separator",
+      "type": "string"
+    },
+    "messages": {
+      "items": {
+        "$ref": "#/$defs/ReplyTurnMessageV1"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "title": "Messages",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "turn_id",
+    "aggregate_content_sha256",
+    "index_unit",
+    "aggregation_separator",
+    "messages"
+  ],
+  "title": "ReplyTurnEnvelopeV1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:candidate:ai-cs-reply-turn.v1.candidate",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE"
+}

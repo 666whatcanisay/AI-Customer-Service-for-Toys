@@ -55,13 +55,19 @@ _TEMPLATE_DEFINITIONS: dict[KnowledgeTemplateType, dict[str, object]] = {
         "name": "商品知识采集模板",
         "fields": [
             "店铺名称", "商品名称", "商品简介", "核心卖点", "适用年龄", "材质信息", "安全提醒",
-            "包装内容", "使用说明", "玩法介绍", "客户常问问题", "推荐回答方向", "资料来源",
+            "颗粒数量", "成品尺寸", "商品比例", "商品重量", "包装内容", "兼容性", "安装方式",
+            "随附物品", "发货地", "版本差异", "图片资料状态", "视频资料状态", "使用说明",
+            "玩法介绍", "客户常问问题", "推荐回答方向", "禁止承诺", "实时查询要求",
+            "人工处理条件", "资料来源",
             "来源日期", "是否人工确认", "备注",
         ],
         "required": ["店铺名称", "商品名称", "资料来源", "是否人工确认"],
         "knowledge_fields": [
-            "商品简介", "核心卖点", "适用年龄", "材质信息", "安全提醒", "包装内容",
-            "使用说明", "玩法介绍", "客户常问问题",
+            "商品简介", "核心卖点", "适用年龄", "材质信息", "安全提醒", "颗粒数量",
+            "成品尺寸", "商品比例", "商品重量", "包装内容", "兼容性", "安装方式",
+            "随附物品", "发货地", "版本差异", "图片资料状态", "视频资料状态",
+            "使用说明", "玩法介绍", "客户常问问题", "禁止承诺", "实时查询要求",
+            "人工处理条件",
         ],
     },
     KnowledgeTemplateType.SKU_DIFFERENCE: {
@@ -260,6 +266,7 @@ def _extract_template_records(
 ) -> list[dict[str, str]]:
     definition = _TEMPLATE_DEFINITIONS[template_type]
     fields = list(definition["fields"])
+    required_fields = set(definition["required"])
     if suffix == ".json":
         value: Any = json.loads(content.decode("utf-8-sig"))
         if isinstance(value, dict) and isinstance(value.get("数据记录"), list):
@@ -283,7 +290,7 @@ def _extract_template_records(
             header_values: list[str] = []
             for index, row in enumerate(rows[:30]):
                 values = [_cell_text(value) for value in row]
-                if set(fields).issubset(set(values)):
+                if required_fields.issubset(set(values)):
                     header_index = index
                     header_values = values
                     break
@@ -292,12 +299,21 @@ def _extract_template_records(
             lowered = {value.lower() for value in header_values if value}
             if lowered & _FORBIDDEN_TEMPLATE_HEADERS:
                 raise ValueError("technical headers are not allowed")
-            column_by_field = {field: header_values.index(field) for field in fields}
+            column_by_field = {
+                field: header_values.index(field)
+                for field in fields
+                if field in header_values
+            }
             records = []
             for row in rows[header_index + 1:]:
                 record = {
-                    field: _cell_text(row[column]) if column < len(row) else ""
-                    for field, column in column_by_field.items()
+                    field: (
+                        _cell_text(row[column_by_field[field]])
+                        if field in column_by_field
+                        and column_by_field[field] < len(row)
+                        else ""
+                    )
+                    for field in fields
                 }
                 if any(_has_value(value) for value in record.values()):
                     records.append(record)

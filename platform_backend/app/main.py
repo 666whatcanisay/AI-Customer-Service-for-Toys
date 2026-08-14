@@ -49,6 +49,12 @@ from app.customer_catalog.routes import (
     customer_router as customer_catalog_customer_router,
 )
 from app.knowledge_publishing.routes import router as knowledge_publishing_router
+from app.reply_rules.routes import router as reply_rules_router
+from app.reply_readiness.routes import (
+    admin_router as reply_readiness_admin_router,
+    internal_router as reply_readiness_internal_router,
+)
+from app.reply_readiness.rate_limit import ReplyDebugRateLimiter
 from app.errors import (
     AppError,
     app_exception_handler,
@@ -111,6 +117,7 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.state.settings = settings
+    application.state.reply_debug_rate_limiter = ReplyDebugRateLimiter()
     application.middleware("http")(request_id_middleware)
     application.add_middleware(
         CORSMiddleware,
@@ -163,6 +170,12 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
     application.include_router(customer_knowledge_status_router, dependencies=workspace_dependencies)
     application.include_router(product_knowledge_router, dependencies=operations_dependencies)
     application.include_router(knowledge_publishing_router, dependencies=operations_dependencies)
+    application.include_router(reply_rules_router, dependencies=operations_dependencies)
+    application.include_router(reply_readiness_admin_router, dependencies=operations_dependencies)
+    application.include_router(
+        reply_readiness_internal_router,
+        dependencies=[Depends(require_internal_service_identity)],
+    )
     application.include_router(product_knowledge_import_router, dependencies=operations_dependencies)
     application.include_router(operation_management_router, dependencies=operations_dependencies)
     application.include_router(customer_catalog_customer_router, dependencies=workspace_dependencies)

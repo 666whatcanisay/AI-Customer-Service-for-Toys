@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from ipaddress import ip_address
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.config.settings import update_env_values
 from app.models.chat import (
@@ -22,6 +24,25 @@ from app.models.knowledge_publication import (
     ProductKnowledgePublishRequest,
     ProductKnowledgeVisibilityBatchRequest,
     ProductKnowledgeVisibilityBatchResponse,
+)
+from app.reply_router.contracts import (
+    ReplyRulePublicationReceiptV1,
+    ReplyRulePublicationV1,
+)
+from app.reply_router.publication_store import (
+    ReplyRuleSnapshotConflict,
+    ReplyRuleSnapshotStore,
+    ReplyRuleSnapshotUnavailable,
+)
+from app.reply_readiness.contracts import (
+    PddReplyReadinessInputV1,
+    PddReplyReadinessPublishedDebugResultV1,
+    PddReplyReadinessResultV1,
+    ReplyReadinessExecutionMode,
+)
+from app.reply_readiness.evaluator import (
+    PublishedReplyReadinessRuntime,
+    ReplyReadinessEvaluator,
 )
 from app.service.experience_evaluation import (
     ExperienceEvaluationError,
@@ -111,6 +132,27 @@ def get_knowledge_quality_service(request: Request) -> KnowledgeQualityService:
         return injected
     return KnowledgeQualityService(
         request.app.state.settings, request.headers.get("Authorization")
+    )
+
+
+def get_reply_rule_snapshot_store(request: Request) -> ReplyRuleSnapshotStore:
+    store = getattr(request.app.state, "reply_rule_snapshot_store", None)
+    if not isinstance(store, ReplyRuleSnapshotStore):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="REPLY_RULE_SNAPSHOT_STORE_UNAVAILABLE",
+        )
+    return store
+
+
+def get_reply_readiness_evaluator(request: Request) -> ReplyReadinessEvaluator:
+    injected = getattr(request.app.state, "reply_readiness_evaluator", None)
+    if injected is not None:
+        return injected
+    rag = getattr(request.app.state, "rag_service", None)
+    return ReplyReadinessEvaluator(
+        get_reply_rule_snapshot_store(request),
+        PublishedReplyReadinessRuntime(rag) if rag is not None else None,
     )
 
 
@@ -412,6 +454,62 @@ def get_product_knowledge_visibility(
         active_collection=rag.settings.active_collection_name,
         items=items,
     )
+
+
+@router.post(
+    "/admin/ai/reply-rule-publications",
+    tags=["reply-rule-publishing"],
+    response_model=ReplyRulePublicationReceiptV1,
+    dependencies=[Depends(require_internal_service_identity)],
+)
+def publish_reply_rule_snapshot(
+    request: Request, publication_payload: dict[str, Any]
+) -> ReplyRulePublicationReceiptV1:
+    require_loopback_client(request)
+    try:
+        publication = ReplyRulePublicationV1.model_validate_json(
+            json.dumps(publication_payload, ensure_ascii=False, allow_nan=False)
+        )
+        return get_reply_rule_snapshot_store(request).publish(publication)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422, detail="REPLY_RULE_PUBLICATION_INVALID"
+        ) from exc
+    except ReplyRuleSnapshotConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ReplyRuleSnapshotUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post(
+    "/admin/ai/reply-readiness/evaluate",
+    tags=["reply-readiness"],
+    response_model=(
+        PddReplyReadinessResultV1 | PddReplyReadinessPublishedDebugResultV1
+    ),
+    dependencies=[Depends(require_internal_service_identity)],
+)
+def evaluate_reply_readiness(
+    request: Request, payload: dict[str, Any]
+) -> PddReplyReadinessResultV1 | PddReplyReadinessPublishedDebugResultV1:
+    """Evaluate replay inputs or the current published Router without side effects."""
+    require_loopback_client(request)
+    try:
+        validated = PddReplyReadinessInputV1.model_validate_json(
+            json.dumps(payload, ensure_ascii=False, allow_nan=False)
+        )
+        if (
+            validated.execution_mode
+            is ReplyReadinessExecutionMode.PUBLISHED_ROUTER_DEBUG
+            and getattr(request.app.state, "rag_service", None) is None
+            and getattr(request.app.state, "reply_readiness_evaluator", None) is None
+        ):
+            raise HTTPException(
+                status_code=503, detail="PUBLISHED_ROUTER_DEBUG_RUNTIME_UNAVAILABLE"
+            )
+        return get_reply_readiness_evaluator(request).evaluate(validated)
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise HTTPException(status_code=422, detail="REPLY_READINESS_INPUT_INVALID") from exc
 
 
 @router.get(

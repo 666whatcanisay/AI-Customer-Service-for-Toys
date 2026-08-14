@@ -19,7 +19,7 @@ from typing import Any, Literal
 from uuid import UUID, uuid4
 
 
-EXPECTED_REVISION = "0019_runtime_database_identity_v1"
+EXPECTED_REVISION = "0023_reply_readiness_v1"
 DATABASE_ROLE = "PLATFORM"
 BINDING_SCHEMA = "ai-cs.runtime-database-binding.v1"
 IDENTITY_REVISION = 1

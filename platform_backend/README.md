@@ -2,6 +2,10 @@
 
 C-line FastAPI service. It owns the production IAM V1 user, role, opaque session and Store-binding records, in addition to the existing product, knowledge and operations capabilities. It does not own RAG/model behavior, PDD integration or browser automation.
 
+The current source migration head is `0023_reply_readiness_v1`; the controlled RC5 Runtime remains at `0019_runtime_database_identity_v1` until a separately authorized backup and migration. Fixed reply rule governance and snapshot publication reuse the existing `knowledge.manage` permission, reviewed knowledge materials, internal service identity, lease, idempotency and receipt patterns. The isolated reply-readiness pool automatically freezes the latest reviewed product and exact-SKU knowledge plus one optional draft overlay in its existing run input. Card 8 adds no table or `KnowledgeMaterial` column. Complete candidate snapshots are evaluated by A, but C does not implement automatic sending.
+
+Runtime identity validation targets the unique Alembic head (`0023_reply_readiness_v1`). The controlled migration wrapper resolves that head dynamically and must never be used against a formal database without the separate backup/migration authorization. The reply-debug endpoint uses a process-local limiter of one in-flight request and ten attempts per minute per user plus Store; this is suitable only for the current single-process LOCAL topology.
+
 ## Local setup
 
 ```powershell
@@ -42,6 +46,8 @@ $ChannelAgentTimeoutSeconds = 5
 Non-loopback plain HTTP is rejected; remote use requires HTTPS. The referenced file must resolve inside the controlled Runtime directory and is read on demand, while its content is never copied into Git config, reports or browser responses. When integration is disabled, unreachable, unauthorized or contract-incompatible, C returns a non-2xx Error Envelope with a distinct error code.
 
 `GET /health` returns service status and a request ID. Product/SKU import endpoints are under `/api/v1`; the fixed template is served by `GET /api/v1/import-templates/product-sku`.
+
+Governed fixed reply rule drafts, reviews, immutable revisions, minimized events, complete-snapshot publication, receipts and receipt-gated withdrawal are under `/api/v1/admin/reply-rules`. Only `DRAFT` versions can be edited; approval requires current reviewed source materials in the same business scope. Publication and withdrawal require an `Idempotency-Key`; failed A synchronization preserves the previous valid snapshot and rule states.
 
 `POST /api/v1/import-batches/product-sku/preflight` analyzes the same multipart `.xlsx` input entirely in memory. It reuses import file-safety, parser, normalizer, validator, duplicate, and conflict rules, but has no database dependency and creates no batch or staged row. The existing formal upload endpoint remains unchanged.
 

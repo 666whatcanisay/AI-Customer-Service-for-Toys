@@ -37,6 +37,18 @@ Copy-Item -LiteralPath $backupPath -Destination $clonePath
 $cloneUrl = 'sqlite:///' + ($clonePath.Replace('\','/'))
 Push-Location -LiteralPath $platformRoot
 try {
+    $headOutput = @(& $config.PlatformPythonPath -m alembic heads)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the Platform Alembic head.' }
+    $headRevisions = @(
+        $headOutput | ForEach-Object {
+            if ([string]$_ -match '^([^\s]+)\s+\(head\)$') { $Matches[1] }
+        }
+    )
+    if ($headRevisions.Count -ne 1) {
+        throw "Platform migrations must have exactly one head; found $($headRevisions.Count)."
+    }
+    $targetRevision = [string]$headRevisions[0]
+
     $envBefore = [Environment]::GetEnvironmentVariable('DATABASE_URL', 'Process')
     try {
         [Environment]::SetEnvironmentVariable('DATABASE_URL', $cloneUrl, 'Process')
@@ -52,7 +64,7 @@ try {
         [Environment]::SetEnvironmentVariable('DATABASE_URL', $envBefore, 'Process')
     }
 
-    if (-not $SkipConfirmation -and -not $PSCmdlet.ShouldProcess($databasePath, 'backup, migrate to 0019 and bind runtime identity')) {
+    if (-not $SkipConfirmation -and -not $PSCmdlet.ShouldProcess($databasePath, "backup, migrate to $targetRevision and bind runtime identity")) {
         Write-Host "Migration cancelled. Backup and preflight remain at: $backupDirectory"
         return
     }
@@ -92,7 +104,7 @@ $backupHash = (Get-FileHash -LiteralPath $backupPath -Algorithm SHA256).Hash.ToL
     database_path = $databasePath
     binding_path = $bindingPath
     source_commit = $sourceCommit
-    target_revision = '0019_runtime_database_identity_v1'
+    target_revision = $targetRevision
     identity_mode = $IdentityMode
     backup_epoch = if ($IdentityMode -eq 'RESTORE') { $BackupEpoch } else { $null }
     backup_path = $backupPath

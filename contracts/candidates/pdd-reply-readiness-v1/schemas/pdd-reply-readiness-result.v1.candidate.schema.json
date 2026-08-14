@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "ExpectedAction": {
+      "enum": [
+        "DIRECT_ANSWER",
+        "CONTROLLED_ANSWER",
+        "ASK_CLARIFY",
+        "REQUIRE_LOOKUP",
+        "TRANSFER_HUMAN",
+        "REFUSE"
+      ],
+      "title": "ExpectedAction",
+      "type": "string"
+    },
+    "PddReplyReadinessItemResultV1": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "pdd-reply-readiness-item-result.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "effective_risk": {
+          "$ref": "#/$defs/RiskLevel"
+        },
+        "action": {
+          "$ref": "#/$defs/ExpectedAction"
+        },
+        "origin": {
+          "title": "Origin",
+          "type": "string"
+        },
+        "answer_preview": {
+          "maxLength": 2000,
+          "title": "Answer Preview",
+          "type": "string"
+        },
+        "answer_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Answer Sha256",
+          "type": "string"
+        },
+        "missing_fact_keys": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Missing Fact Keys",
+          "type": "array"
+        },
+        "blocker_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "prohibited_claim_hits": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Prohibited Claim Hits",
+          "type": "array"
+        },
+        "citation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Citation Ids",
+          "type": "array"
+        },
+        "evidence_bundle_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Bundle Sha256"
+        }
+      },
+      "required": [
+        "schema_version",
+        "question_id",
+        "effective_risk",
+        "action",
+        "origin",
+        "answer_preview",
+        "answer_sha256"
+      ],
+      "title": "PddReplyReadinessItemResultV1",
+      "type": "object"
+    },
+    "RiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "pdd-reply-readiness-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "status": {
+      "const": "COMPLETED",
+      "title": "Status",
+      "type": "string"
+    },
+    "question_set_fingerprint": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Question Set Fingerprint",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/PddReplyReadinessItemResultV1"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "title": "Items",
+      "type": "array"
+    },
+    "result_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Result Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "question_set_fingerprint",
+    "items",
+    "result_sha256"
+  ],
+  "title": "PddReplyReadinessResultV1",
+  "type": "object",
+  "x-ai-cs-contract-status": "UNCOORDINATED_CANDIDATE",
+  "x-ai-cs-contract-type": "PddReplyReadinessResultV1"
+}

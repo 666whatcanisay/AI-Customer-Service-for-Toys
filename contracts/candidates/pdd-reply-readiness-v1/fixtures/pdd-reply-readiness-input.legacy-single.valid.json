@@ -1,0 +1,54 @@
+{
+  "schema_version": "pdd-reply-readiness-input.v1",
+  "run_id": "RRN-SYNTHETIC-CONTRACT-001",
+  "test_data_mode": true,
+  "production_usable": false,
+  "allow_auto_send": false,
+  "execution_mode": "READINESS_SANDBOX",
+  "scope": {
+    "tenant_id": "TENANT-SYNTHETIC",
+    "platform": "pdd",
+    "store_code": "STORE-SYNTHETIC",
+    "product_id": "PRODUCT-SYNTHETIC",
+    "sku_id": "SKU-SYNTHETIC"
+  },
+  "question_set": {
+    "schema_version": "pdd-reply-readiness-question-set.v1",
+    "baseline_version": "pdd-common-questions.v1",
+    "fingerprint": "a8cb883deabc4d1d97edab8fb20085edfad6b7961c202381e382c0b79f081f2a",
+    "questions": [
+      {
+        "schema_version": "pdd-reply-readiness-question.v1",
+        "question_id": "PDD-FINISHED-SIZE",
+        "category": "PRODUCT_FACT",
+        "canonical_question": "拼好后多大",
+        "aliases": [
+          "成品尺寸是多少"
+        ],
+        "policy_risk_floor": "LOW",
+        "expected_action": "DIRECT_ANSWER",
+        "required_fact_keys": [
+          "finished_size"
+        ],
+        "requires_realtime_lookup": false,
+        "prohibited_claims": [],
+        "mandatory": true
+      }
+    ]
+  },
+  "knowledge_snapshot": {
+    "material_id": "KMT-SYNTHETIC-001",
+    "revision": 2,
+    "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "material_status": "RECOGNIZED",
+    "template_type": "PRODUCT_KNOWLEDGE",
+    "store_code": "STORE-SYNTHETIC",
+    "product_id": "PRODUCT-SYNTHETIC",
+    "sku_id": "SKU-SYNTHETIC",
+    "analysis_text": "{\"数据记录\":[{\"成品尺寸\":\"40cm\"}]}"
+  },
+  "reply_rule_snapshot_revision": 1,
+  "reply_rule_snapshot_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "router_build_fingerprint": "d4066125af447bab3ec309a69ba200a16cecfc22425bcaac0359e9c6afbde662",
+  "sandbox_vector_identity": "in-memory-replay:RRN-SYNTHETIC-CONTRACT-001"
+}

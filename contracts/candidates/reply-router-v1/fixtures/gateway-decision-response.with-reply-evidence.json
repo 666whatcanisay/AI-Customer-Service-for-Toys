@@ -1,0 +1,194 @@
+{
+  "contract_version": "1.0",
+  "request_id": "request-synthetic-001",
+  "idempotency_key": "idempotency-synthetic-001",
+  "correlation_id": "correlation-synthetic-001",
+  "decision_id": "decision-synthetic-001",
+  "action": "SUGGEST_REPLY",
+  "proposed_content": "材质为ABS塑料。适合6岁以上儿童。",
+  "requires_approval": true,
+  "risk_level": "LOW",
+  "gateway_version": "ai-cs-gateway.v1",
+  "metadata": {
+    "ai_cs_action": "DIRECT_ANSWER",
+    "risk_level": "LOW",
+    "warnings": [],
+    "required_fields": [],
+    "source_count": 2,
+    "reply_evidence_bundle": {
+      "schema_version": "reply-evidence-bundle.v1",
+      "reply_origin": "COMPOSITE",
+      "scope": {
+        "scope_kind": "PRODUCT",
+        "tenant_id": "TENANT-SYNTHETIC",
+        "platform": "pdd",
+        "store_code": "STORE-SYNTHETIC",
+        "product_id": "PRODUCT-SYNTHETIC",
+        "sku_id": null
+      },
+      "sub_question_plan": {
+        "schema_version": "sub-question-plan.v1",
+        "turn_id": "assistant-turn:synthetic-001",
+        "aggregate_content_sha256": "f7ce7f5154d8056d3e8f53528b15cb8261e2d575fb692d402b9ab9d4548337b8",
+        "split_status": "SPLIT_CONFIRMED",
+        "sub_questions": [
+          {
+            "sub_question_id": "SUBQUESTION-001",
+            "ordinal": 1,
+            "source_ranges": [
+              {
+                "message_id": "PDD-MSG-SYNTHETIC-001",
+                "aggregate_start": 0,
+                "aggregate_end": 10
+              }
+            ],
+            "source_content_sha256": "a8e00f3b815141e8f30cf9092740f179e174feff653aa7035c724911aff5b610",
+            "intent": "PRODUCT_MATERIAL",
+            "route": "FIXED_RULE",
+            "depends_on": [],
+            "blocker_codes": []
+          },
+          {
+            "sub_question_id": "SUBQUESTION-002",
+            "ordinal": 2,
+            "source_ranges": [
+              {
+                "message_id": "PDD-MSG-SYNTHETIC-002",
+                "aggregate_start": 11,
+                "aggregate_end": 16
+              }
+            ],
+            "source_content_sha256": "ac4eaafa37e2c7bcfa3b33ce3ecefb5b03e444cf408cf55092737130b68b26e0",
+            "intent": "PRODUCT_AGE",
+            "route": "RAG",
+            "depends_on": [],
+            "blocker_codes": []
+          }
+        ],
+        "blocker_codes": []
+      },
+      "segments": [
+        {
+          "segment_id": "SEGMENT-001",
+          "ordinal": 1,
+          "sub_question_id": "SUBQUESTION-001",
+          "content_range": {
+            "range_start": 0,
+            "range_end": 9,
+            "content_sha256": "6476f0e81e10980a7f3d8d3f31bc2baae7e8c58b8e8aa3457f620ddb5a55f6e7"
+          },
+          "action": "DIRECT_ANSWER",
+          "risk_level": "LOW",
+          "source_ids": [
+            "SOURCE-RULE-001"
+          ]
+        },
+        {
+          "segment_id": "SEGMENT-002",
+          "ordinal": 2,
+          "sub_question_id": "SUBQUESTION-002",
+          "content_range": {
+            "range_start": 9,
+            "range_end": 18,
+            "content_sha256": "feeb23a1d8b6f2045e6b03b2b2293cd093f59dcb2fb0de1b60f77385b4a556b9"
+          },
+          "action": "DIRECT_ANSWER",
+          "risk_level": "LOW",
+          "source_ids": [
+            "SOURCE-RAG-001"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "source_id": "SOURCE-RULE-001",
+          "source_type": "FIXED_RULE",
+          "scope": {
+            "scope_kind": "PRODUCT",
+            "tenant_id": "TENANT-SYNTHETIC",
+            "platform": "pdd",
+            "store_code": "STORE-SYNTHETIC",
+            "product_id": "PRODUCT-SYNTHETIC",
+            "sku_id": null
+          },
+          "rule_id": "RULE-PRODUCT-MATERIAL-001",
+          "rule_version": 1,
+          "rule_content_fingerprint": "83096bb8ecee12956ed3f3b978e840174c1dfae482998f495133e23a00685e35",
+          "rule_snapshot_revision": 1,
+          "rule_snapshot_fingerprint": "18bfaccf247de020c439e47888c131b96f5d80d402e2c7e4df4d5a4e2278a555",
+          "rule_source_materials": [
+            {
+              "material_id": "KMT-SYNTHETIC-PRODUCT-001",
+              "revision": 1,
+              "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "governance_status": "REVIEWED_VALID",
+              "scope": {
+                "scope_kind": "PRODUCT",
+                "tenant_id": "TENANT-SYNTHETIC",
+                "platform": "pdd",
+                "store_code": "STORE-SYNTHETIC",
+                "product_id": "PRODUCT-SYNTHETIC",
+                "sku_id": null
+              },
+              "reviewed_by": "operator-synthetic",
+              "reviewed_at": "2026-08-13T00:00:00Z"
+            }
+          ],
+          "knowledge_reference": null,
+          "knowledge_publication_fingerprint": null
+        },
+        {
+          "source_id": "SOURCE-RAG-001",
+          "source_type": "RAG_KNOWLEDGE",
+          "scope": {
+            "scope_kind": "PRODUCT",
+            "tenant_id": "TENANT-SYNTHETIC",
+            "platform": "pdd",
+            "store_code": "STORE-SYNTHETIC",
+            "product_id": "PRODUCT-SYNTHETIC",
+            "sku_id": null
+          },
+          "rule_id": null,
+          "rule_version": null,
+          "rule_content_fingerprint": null,
+          "rule_snapshot_revision": null,
+          "rule_snapshot_fingerprint": null,
+          "rule_source_materials": [],
+          "knowledge_reference": "KNOWLEDGE-PRODUCT-AGE-001",
+          "knowledge_publication_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "facts": [
+        {
+          "fact_id": "FACT-001",
+          "segment_id": "SEGMENT-001",
+          "content_range": {
+            "range_start": 0,
+            "range_end": 9,
+            "content_sha256": "6476f0e81e10980a7f3d8d3f31bc2baae7e8c58b8e8aa3457f620ddb5a55f6e7"
+          },
+          "source_ids": [
+            "SOURCE-RULE-001"
+          ]
+        },
+        {
+          "fact_id": "FACT-002",
+          "segment_id": "SEGMENT-002",
+          "content_range": {
+            "range_start": 9,
+            "range_end": 18,
+            "content_sha256": "feeb23a1d8b6f2045e6b03b2b2293cd093f59dcb2fb0de1b60f77385b4a556b9"
+          },
+          "source_ids": [
+            "SOURCE-RAG-001"
+          ]
+        }
+      ],
+      "warnings": [],
+      "missing_fields": [],
+      "blocker_codes": [],
+      "bundle_sha256": "4a12725506ed6d398d8cebc242aefc5c2bf0f16550b7d70fcb0ac15bc8583847"
+    }
+  },
+  "decided_at": "2026-08-13T00:02:01Z"
+}
