@@ -31,8 +31,25 @@ export type ChannelAgentBootstrap = {
   }
   safety: {
     manual_approval: true
-    auto_reply: false
+    auto_reply: boolean
     real_send_enabled: boolean
+    real_platform_activation_allowed?: boolean
+    controlled_auto?: {
+      runtime_mode: 'PILOT' | 'PRODUCTION_AUTO'
+      production_real_send_enabled: boolean
+      controlled_store_auto_enabled: boolean
+      policy_mode: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1'
+      kill_switch_enabled: boolean
+      ai_cs_store_id: string | null
+      platform_store_id: string | null
+      state_revision: number | null
+      state_reason: string
+      runner_active: boolean
+      control_available: boolean
+      auto_reply_running: boolean
+      control_error_code: string | null
+      updated_at: string | null
+    }
   }
 }
 
@@ -85,6 +102,20 @@ export async function requestChannelAgentSafeStop(): Promise<void> {
     }
   })
   if (!response.ok) throw new Error(`CHANNEL_AGENT_STOP_${response.status}`)
+}
+
+export function requestChannelAgentControlledAutoToggle(targetEnabled: boolean): Promise<{
+  schema_version: 'controlled-auto-toggle-response.v1'
+  status: 'TOGGLE_REQUESTED'
+  target_enabled: boolean
+}> {
+  return localJson('/local-api/v1/runtime/controlled-auto-toggle', {
+    method: 'POST',
+    headers: {
+      'X-Channel-Agent-Intent': 'HUMAN_CONFIRMED_CONTROLLED_AUTO_TOGGLE'
+    },
+    body: JSON.stringify({ target_enabled: targetEnabled })
+  })
 }
 
 export type ChannelAgentPddWindowLaunch = {

@@ -7,6 +7,17 @@
       </div>
 
       <div class="runtime-summary" aria-label="客服工作台摘要">
+        <button
+          type="button"
+          class="auto-reply-toggle"
+          :class="autoReplyRunning ? 'running' : 'paused'"
+          :disabled="autoToggleBusy || !autoControlAvailable"
+          :title="autoControlTitle"
+          data-testid="controlled-auto-toggle"
+          @click="toggleControlledAuto"
+        >
+          <i />{{ autoToggleBusy ? '切换中…' : autoControlLabel }}
+        </button>
         <span class="overall-status" :class="overallStatus.tone" data-testid="overall-runtime-status">
           <i />{{ overallStatus.label }}
         </span>
@@ -109,7 +120,12 @@
 
         <section class="detail-section">
           <strong>回复与发送安全</strong>
-          <label class="policy-control">
+          <div v-if="controlledAuto?.state_revision" class="controlled-policy-fact" data-testid="controlled-auto-policy">
+            <span>生产自动回复策略</span>
+            <strong>{{ controlledAuto.policy_mode }}</strong>
+            <small>每条客户消息仍会独立生成单次 Grant；本开关不会给 Sender 长期通配权限。</small>
+          </div>
+          <label v-else class="policy-control">
             <span>回复策略</span>
             <select
               :value="replyPolicy?.mode ?? 'MANUAL_CONFIRM'"
@@ -122,11 +138,12 @@
             </select>
           </label>
           <div class="safety-facts">
-            <span>人工确认 {{ bootstrap?.safety.manual_approval === true ? '已启用' : '状态未知' }}</span>
+            <span>{{ autoReplyRunning ? '逐消息自动授权已启用' : '新消息自动授权已暂停' }}</span>
             <strong>REAL_SEND = {{ bootstrap?.safety.real_send_enabled === true ? 'ON' : 'OFF' }}</strong>
           </div>
+          <p v-if="controlledAuto?.control_error_code" class="detail-error">{{ controlledAuto.control_error_code }}</p>
           <p v-if="replyPolicyError" class="detail-error">{{ replyPolicyError }}</p>
-          <small>人工确认只生成执行准备；真实发送是否允许，以当前安全门禁事实为准。</small>
+          <small>顶部开关控制生产 AUTO 是否为新消息签发单次授权；双店铺、目标、去重、UNKNOWN 不重试及 Kill Switch 始终有效。</small>
         </section>
 
         <section class="detail-section">
@@ -158,6 +175,7 @@ import {
 } from '@/api/offlineReplyControlClient'
 import {
   fetchChannelAgentBootstrap,
+  requestChannelAgentControlledAutoToggle,
   requestChannelAgentPddObserverRestart,
   requestChannelAgentPddWorkspaceRefresh,
   requestChannelAgentPddWindowOpen,
@@ -177,6 +195,7 @@ const switchingStore = ref(false)
 const openingPdd = ref(false)
 const refreshingPdd = ref(false)
 const restartingObserver = ref(false)
+const autoToggleBusy = ref(false)
 const selectedStore = ref('')
 const moreMenuOpen = ref(false)
 const runtimeDetailsOpen = ref(false)
@@ -190,6 +209,19 @@ const PDD_CUSTOMER_SERVICE_URL = 'https://mms.pinduoduo.com/chat-merchant/index.
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CONNECTING')
+const controlledAuto = computed(() => bootstrap.value?.safety.controlled_auto ?? null)
+const autoReplyRunning = computed(() => controlledAuto.value?.auto_reply_running === true)
+const autoControlAvailable = computed(() => controlledAuto.value?.control_available === true)
+const autoControlLabel = computed(() => {
+  if (!autoControlAvailable.value) return '自动回复不可用'
+  return autoReplyRunning.value ? '自动回复运行中' : '自动回复已暂停'
+})
+const autoControlTitle = computed(() => {
+  if (!autoControlAvailable.value) return '自动回复运行程序当前不可用'
+  return autoReplyRunning.value
+    ? '点击暂停新消息的自动回复与真实发送'
+    : '点击重新核对当前店铺和工作台后恢复自动回复'
+})
 const browserStatus = computed(() => bootstrap.value?.browser.status ?? 'STOPPED')
 const realMessageObservationEnabled = computed(() => (
   bootstrap.value?.browser.real_pdd_message_observation_enabled === true
@@ -340,8 +372,34 @@ const overallStatus = computed(() => {
 })
 
 const runtimeActionBusy = computed(() => (
-  loading.value || openingPdd.value || refreshingPdd.value || restartingObserver.value
+  loading.value || openingPdd.value || refreshingPdd.value || restartingObserver.value || autoToggleBusy.value
 ))
+
+async function toggleControlledAuto() {
+  if (autoToggleBusy.value || !autoControlAvailable.value) return
+  const target = !autoReplyRunning.value
+  autoToggleBusy.value = true
+  try {
+    await requestChannelAgentControlledAutoToggle(target)
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250))
+      await refresh()
+      if (autoReplyRunning.value === target) break
+      if (controlledAuto.value?.control_error_code) {
+        throw new Error(controlledAuto.value.control_error_code)
+      }
+    }
+    if (autoReplyRunning.value !== target) throw new Error('CONTROLLED_AUTO_TOGGLE_TIMEOUT')
+    ElMessage.success(target ? '自动回复已恢复运行。' : '自动回复已暂停，不再为新消息真实发送。')
+  } catch (toggleError) {
+    const code = toggleError instanceof Error ? toggleError.message : ''
+    ElMessage.error(code.includes('SCOPE') || code.includes('READY')
+      ? '切换失败：当前店铺、登录页面或观察状态尚未通过核对。'
+      : '自动回复模式切换失败，请查看运行详情。')
+  } finally {
+    autoToggleBusy.value = false
+  }
+}
 
 const desktopAssociationLabel = computed(() => {
   if (runtimeDetailsLoading.value && !desktopAgentStatus.value) return '检查中'
@@ -627,10 +685,11 @@ onBeforeUnmount(() => {
 .agent-desktop-bar{z-index:20;display:flex;align-items:center;gap:18px;min-height:56px;padding:7px 14px;border-bottom:1px solid #cfe0d6;background:#fff}
 .brand{display:flex;flex:0 0 auto;align-items:center;gap:9px}.brand-mark{display:grid;width:34px;height:34px;place-items:center;border-radius:10px;background:linear-gradient(135deg,#2f8b61,#72d7bd);color:#fff;font-size:13px;font-weight:900}.brand strong,.brand small{display:block}.brand strong{font-size:14px}.brand small{margin-top:1px;color:#72877c;font-size:9px}
 .runtime-summary{display:flex;min-width:0;align-items:center;gap:9px;margin-left:auto}.runtime-summary span{display:flex;align-items:center;gap:6px;color:#587064;font-size:10px;white-space:nowrap}.runtime-summary i{width:8px;height:8px;border-radius:50%;background:#d99b2b}.runtime-summary .healthy i{background:#29a875}.runtime-summary .offline{color:#a13c30}.runtime-summary .offline i{background:#c8584b}.runtime-summary .attention{color:#936108}.overall-status{padding:6px 8px;border-radius:999px;background:#edf3ef;font-weight:900}.overall-status.healthy{color:#25704e;background:#dff2e5}.overall-status.attention{color:#8b5c00;background:#fff1ca}.overall-status.offline{color:#9b382f;background:#ffebe8}
+.auto-reply-toggle{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid transparent;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer}.auto-reply-toggle.running{border-color:#a8d6ba;color:#17653f;background:#dff3e6}.auto-reply-toggle.running i{background:#22a66f;box-shadow:0 0 0 3px rgb(34 166 111 / 13%)}.auto-reply-toggle.paused{border-color:#d4dcd7;color:#66766e;background:#f2f5f3}.auto-reply-toggle.paused i{background:#87958e}.auto-reply-toggle:disabled{cursor:not-allowed;opacity:.62}
 .runtime-summary select{width:min(220px,24vw);padding:7px 28px 7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:10px}.store-summary{max-width:240px;overflow:hidden;text-overflow:ellipsis}.pending-summary{padding:6px 8px;border-radius:8px;background:#f1f7f3}.pending-summary strong{color:#206744;font-size:12px}
 .operator{display:flex;flex:0 0 auto;align-items:center;gap:7px;padding-left:12px;border-left:1px solid #dce8e0}.operator button,.action-alert button,.section-heading button,.workspace-url button,.drawer-actions button{padding:7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:10px;cursor:pointer}.operator button:disabled,.action-alert button:disabled,.runtime-drawer button:disabled{cursor:wait;opacity:.55}.more-wrap{position:relative}.operator .more-button{width:34px;padding:7px 0;font-weight:900;letter-spacing:.08em}.more-menu{position:absolute;top:42px;right:0;z-index:50;display:grid;width:170px;padding:7px;border:1px solid #cadcd0;border-radius:11px;background:#fff;box-shadow:0 16px 45px rgb(28 62 41 / 18%)}.more-menu .operator-identity{display:grid;gap:2px;padding:7px 8px 9px;border-bottom:1px solid #e3ece6}.operator-identity small{color:#788b81;font-size:8px}.operator-identity strong{overflow:hidden;text-overflow:ellipsis;font-size:10px;white-space:nowrap}.more-menu button{margin-top:5px;text-align:left}.more-menu .danger{border-color:#e2b8b2;color:#a13c30;background:#fff7f6}
 .action-alert{display:flex;align-items:center;gap:9px;min-height:38px;padding:5px 14px;border-bottom:1px solid #e3c57e;background:#fff7e3;color:#79520e}.action-alert>div{display:flex;min-width:0;align-items:center;gap:8px;margin-right:auto}.action-alert strong{font-size:11px;white-space:nowrap}.action-alert span{overflow:hidden;font-size:10px;text-overflow:ellipsis;white-space:nowrap}.action-alert.danger{border-color:#e7b7b2;background:#fff0ee;color:#943a30}.action-alert.info{border-color:#b9d2df;background:#eef7fb;color:#356b87}.action-alert .subtle{border-color:transparent;background:transparent}
 .agent-desktop-content{min-width:0;min-height:0;flex:1;padding:8px;overflow:hidden}
-.runtime-drawer-backdrop{position:fixed;inset:0;z-index:2000;display:flex;justify-content:flex-end;background:rgb(23 45 31 / 38%);backdrop-filter:blur(2px)}.runtime-drawer{box-sizing:border-box;width:min(440px,94vw);height:100%;padding:16px;overflow:auto;background:#f8fcf9;box-shadow:-20px 0 60px rgb(20 55 35 / 24%)}.runtime-drawer>header{display:flex;align-items:flex-start;justify-content:space-between;padding:2px 2px 14px;border-bottom:1px solid #d4e2d8}.runtime-drawer>header small{color:#4c8065;font-size:9px;font-weight:900;letter-spacing:.12em}.runtime-drawer>header h2{margin:4px 0 0;font-size:20px}.runtime-drawer>header button{width:32px;height:32px;border:1px solid #cadcd0;border-radius:9px;background:#fff;color:#597065;font-size:20px;cursor:pointer}.detail-section{display:grid;gap:10px;margin-top:13px;padding:13px;border:1px solid #c9ddcd;border-radius:12px;background:#fff}.detail-section>strong,.section-heading strong{font-size:12px}.section-heading{display:flex;align-items:center;justify-content:space-between}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}.detail-grid div{min-width:0;padding:8px;border-radius:8px;background:#f1f7f3}.detail-grid dt{color:#73867a;font-size:8px}.detail-grid dd{margin:4px 0 0;overflow:hidden;color:#284b38;font-size:10px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}.detail-grid dd.healthy{color:#25704e}.detail-grid dd.attention{color:#8b5c00}.detail-grid dd.offline{color:#a13c30}.policy-control{display:grid;gap:5px;color:#61766a;font-size:9px}.policy-control select{padding:8px;border:1px solid #bed3c4;border-radius:8px;background:#fff;color:#245a43;font-size:10px}.safety-facts{display:flex;align-items:center;justify-content:space-between;gap:8px}.safety-facts span{color:#446151;font-size:9px}.safety-facts strong{padding:5px 8px;border-radius:999px;color:#963d46;background:#fff0f1;font-size:9px}.detail-section>small{color:#6d8175;font-size:8px;line-height:1.5}.detail-error{margin:0;color:#aa4650;font-size:9px}.workspace-url{display:flex;gap:7px;align-items:center}.workspace-url code{min-width:0;flex:1;padding:8px;overflow:hidden;border-radius:7px;background:#eff6f1;color:#256345;font-size:9px;text-overflow:ellipsis;white-space:nowrap;user-select:all}.drawer-actions{display:flex;flex-wrap:wrap;gap:7px}
+.runtime-drawer-backdrop{position:fixed;inset:0;z-index:2000;display:flex;justify-content:flex-end;background:rgb(23 45 31 / 38%);backdrop-filter:blur(2px)}.runtime-drawer{box-sizing:border-box;width:min(440px,94vw);height:100%;padding:16px;overflow:auto;background:#f8fcf9;box-shadow:-20px 0 60px rgb(20 55 35 / 24%)}.runtime-drawer>header{display:flex;align-items:flex-start;justify-content:space-between;padding:2px 2px 14px;border-bottom:1px solid #d4e2d8}.runtime-drawer>header small{color:#4c8065;font-size:9px;font-weight:900;letter-spacing:.12em}.runtime-drawer>header h2{margin:4px 0 0;font-size:20px}.runtime-drawer>header button{width:32px;height:32px;border:1px solid #cadcd0;border-radius:9px;background:#fff;color:#597065;font-size:20px;cursor:pointer}.detail-section{display:grid;gap:10px;margin-top:13px;padding:13px;border:1px solid #c9ddcd;border-radius:12px;background:#fff}.detail-section>strong,.section-heading strong{font-size:12px}.section-heading{display:flex;align-items:center;justify-content:space-between}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}.detail-grid div{min-width:0;padding:8px;border-radius:8px;background:#f1f7f3}.detail-grid dt{color:#73867a;font-size:8px}.detail-grid dd{margin:4px 0 0;overflow:hidden;color:#284b38;font-size:10px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}.detail-grid dd.healthy{color:#25704e}.detail-grid dd.attention{color:#8b5c00}.detail-grid dd.offline{color:#a13c30}.policy-control{display:grid;gap:5px;color:#61766a;font-size:9px}.policy-control select{padding:8px;border:1px solid #bed3c4;border-radius:8px;background:#fff;color:#245a43;font-size:10px}.controlled-policy-fact{display:grid;gap:5px;padding:9px;border-radius:9px;background:#edf7f0}.controlled-policy-fact>span{color:#60766a;font-size:9px}.controlled-policy-fact>strong{color:#1f6946;font-size:11px}.controlled-policy-fact>small{color:#6d8175;font-size:8px;line-height:1.5}.safety-facts{display:flex;align-items:center;justify-content:space-between;gap:8px}.safety-facts span{color:#446151;font-size:9px}.safety-facts strong{padding:5px 8px;border-radius:999px;color:#963d46;background:#fff0f1;font-size:9px}.detail-section>small{color:#6d8175;font-size:8px;line-height:1.5}.detail-error{margin:0;color:#aa4650;font-size:9px}.workspace-url{display:flex;gap:7px;align-items:center}.workspace-url code{min-width:0;flex:1;padding:8px;overflow:hidden;border-radius:7px;background:#eff6f1;color:#256345;font-size:9px;text-overflow:ellipsis;white-space:nowrap;user-select:all}.drawer-actions{display:flex;flex-wrap:wrap;gap:7px}
 @media(max-width:900px){.agent-desktop-bar{gap:8px;padding:7px 9px}.brand small{display:none}.runtime-summary{gap:6px}.runtime-summary select{width:170px}.pending-summary{display:none}.operator{padding-left:6px}.detail-button{font-size:0}.detail-button::after{content:'详情';font-size:10px}.action-alert span{display:none}}
 </style>

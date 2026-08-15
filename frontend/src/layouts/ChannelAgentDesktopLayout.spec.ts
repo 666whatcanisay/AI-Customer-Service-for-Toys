@@ -10,6 +10,7 @@ import ChannelAgentDesktopLayout from './ChannelAgentDesktopLayout.vue'
 const desktopMocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
   safeStop: vi.fn(),
+  toggleAuto: vi.fn(),
   selectStore: vi.fn(),
   openPdd: vi.fn(),
   refreshPdd: vi.fn(),
@@ -21,6 +22,7 @@ const desktopMocks = vi.hoisted(() => ({
 
 vi.mock('@/api/channelAgentDesktopClient', () => ({
   fetchChannelAgentBootstrap: desktopMocks.bootstrap,
+  requestChannelAgentControlledAutoToggle: desktopMocks.toggleAuto,
   requestChannelAgentSafeStop: desktopMocks.safeStop,
   selectChannelAgentActiveStore: desktopMocks.selectStore,
   requestChannelAgentPddWindowOpen: desktopMocks.openPdd,
@@ -193,6 +195,77 @@ describe('ChannelAgentDesktopLayout', () => {
     expect(wrapper.text()).not.toContain('知识管理')
     expect(wrapper.text()).not.toContain('系统管理')
     wrapper.unmount()
+  })
+
+  it('shows and switches the authoritative production AUTO state', async () => {
+    vi.useFakeTimers()
+    const running = {
+      schema_version: '1.0',
+      agent: { process_status: 'RUNNING', runtime_status: 'ONLINE', version: '1.4.0', node_id: 'agent-1' },
+      browser: {
+        status: 'OPENED', pdd_login_state: 'CUSTOMER_SERVICE_READY',
+        message_source: 'REAL_PDD', real_pdd_message_observation_enabled: true
+      },
+      binding: {
+        authorized_store_ids: ['store-ref:1'], active_store_id: 'store-ref:1',
+        observed_store_id: '328616090', store_reference: 'store-ref:1'
+      },
+      safety: {
+        manual_approval: true, auto_reply: true, real_send_enabled: true,
+        controlled_auto: {
+          runtime_mode: 'PRODUCTION_AUTO', production_real_send_enabled: true,
+          controlled_store_auto_enabled: true, policy_mode: 'AUTO_ALL_MESSAGES_V1',
+          kill_switch_enabled: false, ai_cs_store_id: 'store-ref:1',
+          platform_store_id: '328616090', state_revision: 4, state_reason: 'ACTIVE',
+          runner_active: true, control_available: true, auto_reply_running: true,
+          control_error_code: null, updated_at: '2026-08-15T08:00:00Z'
+        }
+      }
+    }
+    const paused = {
+      ...running,
+      safety: {
+        ...running.safety,
+        auto_reply: false,
+        real_send_enabled: false,
+        controlled_auto: {
+          ...running.safety.controlled_auto,
+          runtime_mode: 'PILOT',
+          production_real_send_enabled: false,
+          controlled_store_auto_enabled: false,
+          kill_switch_enabled: true,
+          state_revision: 5,
+          state_reason: 'USER_PAUSED',
+          auto_reply_running: false
+        }
+      }
+    }
+    desktopMocks.bootstrap.mockResolvedValueOnce(running).mockResolvedValue(paused)
+    desktopMocks.toggleAuto.mockResolvedValue({
+      schema_version: 'controlled-auto-toggle-response.v1',
+      status: 'TOGGLE_REQUESTED',
+      target_enabled: false
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(ChannelAgentDesktopLayout, {
+      global: { plugins: [createPinia(), router, ElementPlus] }
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复运行中')
+
+    await wrapper.get('[data-testid="controlled-auto-toggle"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(desktopMocks.toggleAuto).toHaveBeenCalledWith(false)
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复已暂停')
+    wrapper.unmount()
+    vi.useRealTimers()
   })
 
   it('does not present the offline replay restart as real PDD observation', async () => {
