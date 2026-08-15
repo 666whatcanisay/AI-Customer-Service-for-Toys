@@ -153,7 +153,7 @@ describe('ReplyReadinessView', () => {
     })
     expect(apiMocks.listKnowledgeMaterials).toHaveBeenCalledWith(expect.objectContaining({ size: 100 }))
 
-    await wrapper.find('.text-button').trigger('click')
+    await wrapper.get('.row-actions .text-button').trigger('click')
     expect(wrapper.find('details.technical-details').exists()).toBe(true)
     expect(wrapper.find('details.technical-details').attributes('open')).toBeUndefined()
 
@@ -178,6 +178,26 @@ describe('ReplyReadinessView', () => {
     expect(wrapper.get('.scope-chip strong').text()).toBe(fullName)
     expect(wrapper.get('.scope-chip').text()).toContain(`PDD ID：${productId}`)
     expect(wrapper.findAll('.controls select')[1].text()).toContain(fullName)
+  })
+
+  it('keeps normal safety and scope information compact while preserving explicit controls', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.get('.safety-details').attributes('open')).toBeUndefined()
+    expect(wrapper.text()).toContain('production_usable=false')
+    expect(wrapper.text()).toContain('allow_auto_send=false')
+    expect(wrapper.get('.scope-toggle').attributes('aria-expanded')).toBe('false')
+    expect(wrapper.get('.scope-panel').attributes('style')).toContain('display: none')
+
+    await wrapper.get('.scope-toggle').trigger('click')
+    expect(wrapper.get('.scope-toggle').attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('.scope-panel').attributes('style') || '').not.toContain('display: none')
+
+    await wrapper.findAll('.workspace-tabs button')[1].trigger('click')
+    expect(wrapper.find('.debug-workbench').exists()).toBe(true)
+    expect(wrapper.find('.debug-composer').exists()).toBe(true)
+    expect(wrapper.find('.debug-output').exists()).toBe(true)
+    expect(wrapper.get('.debug-message textarea').attributes('rows')).toBe('3')
   })
 
   it('keeps successful scope data visible and reports the failed section precisely', async () => {

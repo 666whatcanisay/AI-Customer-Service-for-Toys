@@ -66,6 +66,8 @@ const categoryFilter = ref('')
 const actionFilter = ref<ReplyReadinessAction | ''>('')
 const questionSearch = ref('')
 const expandedItems = ref<string[]>([])
+const scopePanelOpen = ref(true)
+const runPanelOpen = ref(false)
 const scope = reactive({ store_code: '', product_id: '', sku_id: '', material_key: '' })
 const activeTab = computed({
   get: () => replyReadinessDebugState.tab,
@@ -127,6 +129,9 @@ const BLOCKER_LABELS: Record<string, string> = {
 const scopedProducts = computed(() => products.value.filter(
   (item) => item.technical_details.store_code === scope.store_code,
 ))
+const selectedStore = computed(() => stores.value.find(
+  (item) => item.technical_details.store_code === scope.store_code,
+))
 const selectedProduct = computed(() => scopedProducts.value.find(
   (item) => item.technical_details.product_id === scope.product_id,
 ))
@@ -144,6 +149,14 @@ const scopeReady = computed(() => Boolean(
   scope.store_code && scope.product_id && productDetail.value && questionSet.value
   && !materialLoadError.value && !questionSetLoadError.value && !scopeLoading.value,
 ))
+const scopePanelVisible = computed(() => (
+  scopePanelOpen.value || !scopeReady.value || Boolean(scopeError.value)
+))
+const runPanelForcedOpen = computed(() => Boolean(
+  running.value || runError.value || comparisonError.value
+  || (selectedRun.value && !selectedRun.value.result),
+))
+const runPanelVisible = computed(() => runPanelOpen.value || runPanelForcedOpen.value)
 const completedRuns = computed(() => runs.value.filter(
   (item) => item.status === 'COMPLETED' && item.result && item.run_id !== selectedRun.value?.run_id,
 ))
@@ -245,6 +258,16 @@ function selectTab(value: ReplyReadinessWorkspaceTab): void {
   debugError.value = ''
   if (value === 'DEBUG') rememberDebugScope()
   else syncRoute()
+}
+
+function toggleScopePanel(): void {
+  if (!scopeReady.value && scopePanelOpen.value) return
+  scopePanelOpen.value = !scopePanelOpen.value
+}
+
+function toggleRunPanel(): void {
+  if (runPanelForcedOpen.value && runPanelOpen.value) return
+  runPanelOpen.value = !runPanelOpen.value
 }
 
 function runStatusLabel(value: ReplyReadinessRun['status']): string {
@@ -469,7 +492,10 @@ async function loadProduct(options?: { requestedSku?: string; requestedMaterialK
       syncRoute()
     }
   } catch (reason: unknown) {
-    if (epoch === scopeLoadEpoch) scopeError.value = apiErrorMessage(reason)
+    if (epoch === scopeLoadEpoch) {
+      scopeError.value = apiErrorMessage(reason)
+      scopePanelOpen.value = true
+    }
   } finally {
     if (epoch === scopeLoadEpoch) scopeLoading.value = false
   }
@@ -505,7 +531,10 @@ async function changeSku(): Promise<void> {
       syncRoute()
     }
   } catch (reason: unknown) {
-    if (epoch === scopeLoadEpoch) scopeError.value = apiErrorMessage(reason)
+    if (epoch === scopeLoadEpoch) {
+      scopeError.value = apiErrorMessage(reason)
+      scopePanelOpen.value = true
+    }
   } finally {
     if (epoch === scopeLoadEpoch) scopeLoading.value = false
   }
@@ -686,11 +715,13 @@ onMounted(async () => {
           ? `${requestedMaterial}:${requestedRevision}`
           : '',
       })
+      if (scopeReady.value && !scopeError.value) scopePanelOpen.value = false
     } else if (requestedProduct) {
       routeNotice.value = '链接中的商品不属于当前店铺，请重新选择。'
     }
   } catch (reason: unknown) {
     scopeError.value = apiErrorMessage(reason)
+    scopePanelOpen.value = true
   } finally {
     initialLoading.value = false
   }
@@ -704,23 +735,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="page">
-    <div class="page-header">
+  <main class="page compact-page">
+    <div class="page-header compact-page-header">
       <div>
         <p class="eyebrow">PDD 回答优化</p>
         <h1>商品回答风险池</h1>
         <p>既可以运行36题风险池，也可以按当前正式知识和规则调试一条真实问法。</p>
       </div>
-      <RouterLink class="button secondary" to="/knowledge-review">知识审核队列</RouterLink>
+      <RouterLink class="button secondary compact-header-action" to="/knowledge-review">知识审核队列</RouterLink>
     </div>
 
     <section class="safety-banner" aria-label="隔离评测安全边界">
-      <strong>只读评测，不会发送</strong>
-      <span>不发布知识、不写正式向量库、不写会话或运行账本、不授予自动发送权。</span>
+      <div class="safety-primary"><strong>只读评测</strong><span>不会发送，不会改变正式知识或会话。</span></div>
       <span class="safety-flags" aria-label="不可用于生产且禁止自动发送">
         <b>不可用于生产</b><b>禁止自动发送</b>
-        <code>production_usable=false · allow_auto_send=false</code>
       </span>
+      <code>production_usable=false · allow_auto_send=false</code>
+      <details class="safety-details">
+        <summary>查看安全边界</summary>
+        <p>不发布知识、不写正式向量库、不写会话或运行账本、不创建审批、执行或发送记录。</p>
+      </details>
     </section>
 
     <nav class="workspace-tabs" aria-label="回答工作台模式" role="tablist">
@@ -733,17 +767,21 @@ onBeforeUnmount(() => {
     <p v-if="initialLoading" class="notice" role="status">正在读取可用店铺和商品…</p>
 
     <section v-else class="card scope-card" aria-labelledby="scope-heading">
-      <div class="section-title">
-        <div><span class="step">1</span><div><h2 id="scope-heading">选择商品范围</h2><p>范围变化后会立即清空不兼容的结果。</p></div></div>
+      <div class="scope-heading-row">
+        <div class="scope-title"><span class="step">1</span><div><h2 id="scope-heading">商品范围</h2><p v-if="!selectedProduct">先选择本次评测或调试使用的商品。</p></div></div>
         <div v-if="selectedProduct" class="scope-summary">
+          <span class="scope-store">{{ selectedStore?.store_name || scope.store_code }}</span>
           <span class="scope-chip" :title="selectedProduct.product_name">
             <strong>{{ selectedProduct.product_name }}</strong>
-            <small>PDD ID：{{ selectedProduct.technical_details.product_id }}</small>
-            <small v-if="selectedSku">SKU：{{ selectedSku.sku_name }}</small>
+            <small>PDD ID：{{ selectedProduct.technical_details.product_id }}<template v-if="selectedSku"> · SKU：{{ selectedSku.sku_name }}</template><template v-else> · 整个商品</template></small>
           </span>
           <span :class="['source-badge', (selectedProduct.data_source || 'UNKNOWN').toLowerCase()]">{{ dataSourceLabel(selectedProduct.data_source || 'UNKNOWN') }}</span>
+          <button class="text-button scope-toggle" type="button" aria-controls="reply-scope-controls" :aria-expanded="scopePanelVisible" @click="toggleScopePanel">
+            {{ scopePanelVisible ? (scopeReady ? '完成选择' : '选择范围') : '修改范围' }}
+          </button>
         </div>
       </div>
+      <div id="reply-scope-controls" v-show="scopePanelVisible" class="scope-panel">
       <div class="controls">
         <label>店铺
           <select v-model="scope.store_code" @change="changeStore">
@@ -784,13 +822,18 @@ onBeforeUnmount(() => {
       <button v-if="activeTab === 'POOL'" class="button run-button" type="button" :disabled="running || !scopeReady" @click="runEvaluation">
         {{ running ? '隔离评测进行中…' : '运行隔离评测' }}
       </button>
+      </div>
     </section>
 
     <template v-if="activeTab === 'POOL' && questionSet && scope.product_id">
       <section id="reply-pool-panel" class="card run-card" role="tabpanel" aria-labelledby="reply-pool-tab run-heading">
-        <div class="section-title">
-          <div><span class="step">2</span><div><h2 id="run-heading">选择评测结果</h2><p>只展示当前商品与SKU范围完全一致的历史。</p></div></div>
+        <div class="disclosure-heading">
+          <div><span class="step">2</span><div><h2 id="run-heading">运行与比较</h2><p>{{ selectedRun ? `${formatDate(selectedRun.requested_at)} · ${runStatusLabel(selectedRun.status)}` : '当前范围暂无历史运行' }}</p></div></div>
+          <button class="text-button disclosure-toggle" type="button" aria-controls="reply-run-controls" :aria-expanded="runPanelVisible" :disabled="runPanelForcedOpen" @click="toggleRunPanel">
+            {{ runPanelVisible ? (runPanelForcedOpen ? '状态需处理' : '收起') : '选择运行 / 比较' }}
+          </button>
         </div>
+        <div id="reply-run-controls" v-show="runPanelVisible" class="run-panel">
         <div class="run-toolbar">
           <label>当前运行
             <select v-model="selectedRunId" :disabled="runs.length === 0">
@@ -821,6 +864,7 @@ onBeforeUnmount(() => {
         </details>
         <p v-if="runError" class="notice error" role="alert">{{ runError }}</p>
         <p v-if="comparisonError" class="notice error" role="alert">{{ comparisonError }}</p>
+        </div>
       </section>
 
       <section v-if="selectedRun?.result" class="summary-grid" aria-label="风险汇总">
@@ -897,104 +941,305 @@ onBeforeUnmount(() => {
       <p v-else-if="selectedRun" class="notice">{{ runStatusLabel(selectedRun.status) }}，尚无可展示的新结果。</p>
       <p v-else class="empty-state standalone">当前范围尚无评测结果。可以选择知识修订后运行一次隔离评测。</p>
 
-      <section v-if="comparison" class="card comparison" aria-labelledby="comparison-heading">
-        <div class="section-title"><div><span class="step">4</span><div><h2 id="comparison-heading">运行变化</h2><p>只比较同一商品和SKU范围。</p></div></div></div>
-        <p v-if="comparison.changed_items.length === 0" class="empty-state">两次运行的风险、回答、缺口和证据均无变化。</p>
-        <template v-else>
-          <section v-for="group in COMPARISON_ORDER" :key="group" v-show="comparisonGroups[group].length" :class="['comparison-group', group.toLowerCase()]">
-            <h3>{{ group === 'WORSE' ? '风险恶化' : group === 'IMPROVED' ? '风险改善' : group === 'ANSWER_CHANGED' ? '回答发生变化' : '证据或缺口变化' }}（{{ comparisonGroups[group].length }}）</h3>
-            <article v-for="item in comparisonGroups[group]" :key="item.question_id">
-              <strong>{{ questionLabel(item.question_id) }}</strong>
-              <p>风险：{{ item.before_risk ? riskLabel(item.before_risk) : '新增问题' }} → {{ riskLabel(item.after_risk) }}</p>
-              <p>缺失：{{ item.missing_fact_keys_before.join('、') || '无' }} → {{ item.missing_fact_keys_after.join('、') || '无' }}</p>
-              <p>阻断：{{ item.blocker_codes_before.map(blockerLabel).join('；') || '无' }} → {{ item.blocker_codes_after.map(blockerLabel).join('；') || '无' }}</p>
-            </article>
-          </section>
-        </template>
-      </section>
+      <details v-if="comparison" class="card comparison compact-disclosure" :open="comparisonGroups.WORSE.length > 0">
+        <summary><span class="step">4</span><span><strong id="comparison-heading">运行变化</strong><small>{{ comparison.changed_items.length }} 项变化；风险恶化时自动展开</small></span></summary>
+        <div class="comparison-content">
+          <p v-if="comparison.changed_items.length === 0" class="empty-state">两次运行的风险、回答、缺口和证据均无变化。</p>
+          <template v-else>
+            <section v-for="group in COMPARISON_ORDER" :key="group" v-show="comparisonGroups[group].length" :class="['comparison-group', group.toLowerCase()]">
+              <h3>{{ group === 'WORSE' ? '风险恶化' : group === 'IMPROVED' ? '风险改善' : group === 'ANSWER_CHANGED' ? '回答发生变化' : '证据或缺口变化' }}（{{ comparisonGroups[group].length }}）</h3>
+              <article v-for="item in comparisonGroups[group]" :key="item.question_id">
+                <strong>{{ questionLabel(item.question_id) }}</strong>
+                <p>风险：{{ item.before_risk ? riskLabel(item.before_risk) : '新增问题' }} → {{ riskLabel(item.after_risk) }}</p>
+                <p>缺失：{{ item.missing_fact_keys_before.join('、') || '无' }} → {{ item.missing_fact_keys_after.join('、') || '无' }}</p>
+                <p>阻断：{{ item.blocker_codes_before.map(blockerLabel).join('；') || '无' }} → {{ item.blocker_codes_after.map(blockerLabel).join('；') || '无' }}</p>
+              </article>
+            </section>
+          </template>
+        </div>
+      </details>
 
-      <section class="actions card">
-        <div><strong>下一步</strong><p>补资料后回到这里复跑；保存草稿不会自动审核或发布。</p></div>
-        <RouterLink class="button secondary" :to="{ path: '/knowledge-editor', query: { store: scope.store_code, product: scope.product_id, ...(scope.sku_id ? { sku: scope.sku_id } : {}), ...materialReference() } }">创建知识新修订</RouterLink>
-        <RouterLink class="button secondary" :to="{ path: '/knowledge-review', query: { store: scope.store_code, product: scope.product_id } }">进入审核队列</RouterLink>
-        <RouterLink class="button secondary" to="/knowledge-center">查看知识治理</RouterLink>
-      </section>
+      <details class="actions card compact-disclosure">
+        <summary><span><strong>下一步</strong><small>补资料、审核或进入知识治理</small></span></summary>
+        <div class="action-links">
+          <RouterLink class="button secondary" :to="{ path: '/knowledge-editor', query: { store: scope.store_code, product: scope.product_id, ...(scope.sku_id ? { sku: scope.sku_id } : {}), ...materialReference() } }">创建知识新修订</RouterLink>
+          <RouterLink class="button secondary" :to="{ path: '/knowledge-review', query: { store: scope.store_code, product: scope.product_id } }">进入审核队列</RouterLink>
+          <RouterLink class="button secondary" to="/knowledge-center">查看知识治理</RouterLink>
+        </div>
+      </details>
     </template>
 
     <section v-else-if="activeTab === 'DEBUG' && scope.product_id" id="reply-debug-panel" class="card debug-card" role="tabpanel" aria-labelledby="reply-debug-tab debug-heading">
       <div class="section-title">
         <div><span class="step">2</span><div><h2 id="debug-heading">模拟一条客户消息</h2><p>使用当前正式ReplyRouter、已发布固定规则、Published RAG、Quality Gate与Evidence。</p></div></div>
       </div>
-      <label class="debug-message">客户原话
-        <textarea v-model="replyReadinessDebugState.customerMessage" maxlength="2000" rows="5" placeholder="例如：这个商品拼好后多大？" @input="invalidateDebugRequest"></textarea>
-        <small>{{ replyReadinessDebugState.customerMessage.length }} / 2000 字</small>
-      </label>
-      <div class="debug-actions">
-        <button class="button" type="button" :disabled="debugRunning || !scopeReady || !replyReadinessDebugState.customerMessage.trim()" @click="runPublishedDebug">
-          {{ debugRunning ? '正在调用正式只读Router…' : '运行单条调试' }}
-        </button>
-        <span>不会创建风险池运行、客户会话、审批、执行或发送记录。</span>
-      </div>
-      <p v-if="debugError" class="notice error" role="alert">{{ debugError }}</p>
+      <div class="debug-workbench">
+        <section class="debug-composer" aria-labelledby="debug-message-heading">
+          <div class="panel-kicker"><strong id="debug-message-heading">客户原话</strong><span>{{ replyReadinessDebugState.customerMessage.length }} / 2000 字</span></div>
+          <label class="debug-message"><span class="sr-only">客户原话</span>
+            <textarea v-model="replyReadinessDebugState.customerMessage" maxlength="2000" rows="3" placeholder="例如：这个商品拼好后多大？" @input="invalidateDebugRequest"></textarea>
+          </label>
+          <div class="debug-actions">
+            <button class="button" type="button" :disabled="debugRunning || !scopeReady || !replyReadinessDebugState.customerMessage.trim()" @click="runPublishedDebug">
+              {{ debugRunning ? '正在调用正式只读Router…' : '运行单条调试' }}
+            </button>
+            <span>不会创建风险池运行、客户会话、审批、执行或发送记录</span>
+          </div>
+        </section>
 
-      <article v-if="debugResult" class="debug-result" aria-live="polite">
-        <div class="debug-result-heading">
-          <div><p class="eyebrow">本次只读结果</p><h3>{{ debugResult.status === 'FAILED' ? '运行版本发生阻断性变化' : debugItem ? '已完成回答判断' : '需要人工处理' }}</h3></div>
-          <span v-if="debugItem" :class="['risk-pill', debugItem.effective_risk.toLowerCase()]">{{ riskLabel(debugItem.effective_risk) }}</span>
-        </div>
-        <template v-if="debugItem">
-          <dl class="debug-business">
-            <div><dt>回答</dt><dd>{{ debugItem.answer_preview || '本次不生成可直接发送的回答。' }}</dd></div>
-            <div><dt>处理方式</dt><dd>{{ actionLabel(debugItem.action) }}</dd></div>
-            <div><dt>回答来源</dt><dd>{{ originLabel(debugItem.origin) }}</dd></div>
-            <div><dt>质量门</dt><dd>{{ debugResult.quality_gate_status === 'PASS' ? '通过' : '转人工' }}</dd></div>
-            <div><dt>缺失资料</dt><dd>{{ debugItem.missing_fact_keys.join('、') || '无' }}</dd></div>
-            <div><dt>阻断原因</dt><dd>{{ debugItem.blocker_codes.map(blockerLabel).join('；') || '无' }}</dd></div>
-          </dl>
-          <p class="version-summary">{{ debugVersionSummary(debugResult) }} · 评测时间 {{ formatDate(debugResult.evaluated_at) }}</p>
-          <p v-if="previousDebugItem" class="debug-comparison">与上次调试相比：风险 {{ riskLabel(previousDebugItem.effective_risk) }} → {{ riskLabel(debugItem.effective_risk) }}；回答{{ previousDebugItem.answer_sha256 === debugItem.answer_sha256 ? '未变化' : '已变化' }}。</p>
-          <RouterLink class="button secondary" :to="{ path: '/knowledge-editor', query: debugSupplementQuery(debugItem) }">去知识编辑器补充资料</RouterLink>
-        </template>
-        <p v-else class="notice error">{{ blockerLabel(debugResult.failure_code || 'PRODUCTION_RUNTIME_VERSION_DRIFT') }}：{{ debugResult.drifted_dependencies.map(dependencyLabel).join('、') || '依赖集合无法可靠确认' }}。</p>
-        <details class="technical-details debug-technical">
-          <summary>生产版本与依赖详情</summary>
-          <dl>
-            <div><dt>实际依赖</dt><dd>{{ Object.entries(debugResult.dependency_usage).filter(([, used]) => used).map(([name]) => dependencyLabel(name)).join('、') || '无' }}</dd></div>
-            <div><dt>Router</dt><dd>{{ debugResult.router_build_fingerprint }}</dd></div>
-            <div><dt>ReplyRule</dt><dd>{{ debugResult.reply_rule_snapshot_fingerprint || '本次未使用或无已发布快照' }}</dd></div>
-            <div><dt>固定规则</dt><dd>{{ debugResult.rule_references.join('、') || '无' }}</dd></div>
-            <div><dt>RAG Collection</dt><dd>{{ debugResult.rag_collection_identity || '本次未使用或不可用' }}</dd></div>
-            <div><dt>Knowledge</dt><dd>{{ debugResult.knowledge_publication_fingerprint || '本次未使用或不可用' }}（{{ debugResult.knowledge_publication_status }}）</dd></div>
-            <div><dt>Model Config</dt><dd>{{ debugResult.model_config_identity }}</dd></div>
-            <div><dt>诊断变化</dt><dd>{{ debugResult.diagnostic_changes.map((item) => `${dependencyLabel(item.dependency)}：${item.before || '无'} → ${item.after || '无'}`).join('；') || '无' }}</dd></div>
-            <div><dt>调试编号</dt><dd>{{ debugResult.run_id }}</dd></div>
-            <div><dt>结果哈希</dt><dd>{{ debugResult.result_sha256 }}</dd></div>
-          </dl>
-        </details>
-      </article>
-      <p v-else class="empty-state standalone">输入一条客户原话后运行，即可看到当前正式规则和知识会如何回答。结果仅在当前浏览器进程内保留。</p>
+        <section class="debug-output" aria-label="调试回答结果" aria-live="polite">
+          <p v-if="debugError" class="notice error" role="alert">{{ debugError }}</p>
+          <article v-else-if="debugResult" class="debug-result">
+            <div class="debug-result-heading">
+              <div><p class="eyebrow">本次只读结果</p><h3>{{ debugResult.status === 'FAILED' ? '运行版本发生阻断性变化' : debugItem ? '已完成回答判断' : '需要人工处理' }}</h3></div>
+              <span v-if="debugItem" :class="['risk-pill', debugItem.effective_risk.toLowerCase()]">{{ riskLabel(debugItem.effective_risk) }}</span>
+            </div>
+            <template v-if="debugItem">
+              <dl class="debug-business">
+                <div class="debug-answer"><dt>回答</dt><dd>{{ debugItem.answer_preview || '本次不生成可直接发送的回答。' }}</dd></div>
+                <div><dt>处理方式</dt><dd>{{ actionLabel(debugItem.action) }}</dd></div>
+                <div><dt>回答来源</dt><dd>{{ originLabel(debugItem.origin) }}</dd></div>
+                <div><dt>质量门</dt><dd>{{ debugResult.quality_gate_status === 'PASS' ? '通过' : '转人工' }}</dd></div>
+                <div><dt>缺失资料</dt><dd>{{ debugItem.missing_fact_keys.join('、') || '无' }}</dd></div>
+                <div class="debug-blocker"><dt>阻断原因</dt><dd>{{ debugItem.blocker_codes.map(blockerLabel).join('；') || '无' }}</dd></div>
+              </dl>
+              <div class="debug-result-actions">
+                <p class="version-summary">{{ debugVersionSummary(debugResult) }} · {{ formatDate(debugResult.evaluated_at) }}</p>
+                <RouterLink class="button secondary" :to="{ path: '/knowledge-editor', query: debugSupplementQuery(debugItem) }">补充资料</RouterLink>
+              </div>
+              <p v-if="previousDebugItem" class="debug-comparison">与上次相比：风险 {{ riskLabel(previousDebugItem.effective_risk) }} → {{ riskLabel(debugItem.effective_risk) }}；回答{{ previousDebugItem.answer_sha256 === debugItem.answer_sha256 ? '未变化' : '已变化' }}。</p>
+            </template>
+            <p v-else class="notice error">{{ blockerLabel(debugResult.failure_code || 'PRODUCTION_RUNTIME_VERSION_DRIFT') }}：{{ debugResult.drifted_dependencies.map(dependencyLabel).join('、') || '依赖集合无法可靠确认' }}。</p>
+            <details class="technical-details debug-technical">
+              <summary>生产版本与依赖详情</summary>
+              <dl>
+                <div><dt>实际依赖</dt><dd>{{ Object.entries(debugResult.dependency_usage).filter(([, used]) => used).map(([name]) => dependencyLabel(name)).join('、') || '无' }}</dd></div>
+                <div><dt>Router</dt><dd>{{ debugResult.router_build_fingerprint }}</dd></div>
+                <div><dt>ReplyRule</dt><dd>{{ debugResult.reply_rule_snapshot_fingerprint || '本次未使用或无已发布快照' }}</dd></div>
+                <div><dt>固定规则</dt><dd>{{ debugResult.rule_references.join('、') || '无' }}</dd></div>
+                <div><dt>RAG Collection</dt><dd>{{ debugResult.rag_collection_identity || '本次未使用或不可用' }}</dd></div>
+                <div><dt>Knowledge</dt><dd>{{ debugResult.knowledge_publication_fingerprint || '本次未使用或不可用' }}（{{ debugResult.knowledge_publication_status }}）</dd></div>
+                <div><dt>Model Config</dt><dd>{{ debugResult.model_config_identity }}</dd></div>
+                <div><dt>诊断变化</dt><dd>{{ debugResult.diagnostic_changes.map((item) => `${dependencyLabel(item.dependency)}：${item.before || '无'} → ${item.after || '无'}`).join('；') || '无' }}</dd></div>
+                <div><dt>调试编号</dt><dd>{{ debugResult.run_id }}</dd></div>
+                <div><dt>结果哈希</dt><dd>{{ debugResult.result_sha256 }}</dd></div>
+              </dl>
+            </details>
+          </article>
+          <div v-else :class="['debug-placeholder', { running: debugRunning }]">
+            <strong>{{ debugRunning ? '正在生成只读回答…' : '回答结果会显示在这里' }}</strong>
+            <span>{{ debugRunning ? '当前页面不会产生任何发送或业务写入。' : '输入一条客户原话后运行，可同时查看回答、风险、处理方式和资料缺口。' }}</span>
+          </div>
+        </section>
+      </div>
     </section>
   </main>
 </template>
 
 <style scoped>
-.eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.safety-banner { display: grid; grid-template-columns: auto minmax(260px, 1fr) auto; align-items: center; gap: 8px 14px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #edd18d; border-radius: 12px; color: #6d4d08; background: #fff9e8; }
-.safety-banner strong { color: #5d4104; }.safety-flags { display: grid; grid-template-columns: repeat(2, max-content); justify-content: end; gap: 4px 6px; }.safety-flags b { padding: 4px 7px; border-radius: 999px; color: #754f00; background: #f8e7b6; font-size: 11px; }.safety-banner code { grid-column: 1 / -1; color: #7b5a12; font-size: 11px; text-align: right; }
-.workspace-tabs { display: flex; gap: 8px; margin: 0 0 18px; padding: 5px; width: max-content; border: 1px solid #d8e2ef; border-radius: 12px; background: #f6f8fb; }.workspace-tabs button { min-height: 38px; padding: 8px 16px; border: 0; border-radius: 8px; color: #526279; background: transparent; font: inherit; font-weight: 800; cursor: pointer; }.workspace-tabs button.active { color: #fff; background: #315f9f; box-shadow: 0 4px 12px rgb(49 95 159 / 20%); }.workspace-tabs button:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }
-.scope-card, .run-card { margin-bottom: 18px; }.section-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }.section-title > div { display: flex; align-items: center; gap: 11px; }.section-title h2, .section-title p { margin: 0; }.section-title h2 { color: #172554; font-size: 19px; }.section-title p { margin-top: 4px; color: #64748b; font-size: 13px; }.step { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 10px; color: #fff; background: #315f9f; font-size: 13px; font-weight: 800; }.scope-chip, .result-count { padding: 6px 10px; border-radius: 12px; color: #2d5a93; background: #edf4ff; font-size: 12px; font-weight: 700; }
-.scope-chip { display: grid; max-width: min(680px, 58vw); gap: 2px; text-align: left; overflow-wrap: anywhere; }.scope-chip strong { font-size: 13px; line-height: 1.45; }.scope-chip small { color: #64748b; font-weight: 600; }.scope-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; gap: 7px; }.source-badge { padding: 6px 9px; border-radius: 999px; color: #385675; background: #edf2f7; font-size: 12px; font-weight: 800; }.source-badge.initial_import { color: #17633a; background: #e8f7ee; }.source-badge.pilot { color: #285493; background: #edf4ff; }.source-badge.test { color: #8a4d00; background: #fff2da; }.source-warning { margin: 12px 0 0; padding: 10px 12px; border: 1px solid #edcf8d; border-radius: 8px; color: #7c4c05; background: #fff9e8; font-size: 13px; }.scope-part-error { margin: 12px 0 0; }.notice.warning { color: #7c4c05; background: #fff9e8; border-color: #edcf8d; }
-.controls, .run-toolbar, .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }.controls label, .run-toolbar label, .filters label { display: grid; min-width: 190px; gap: 6px; color: #526279; font-size: 13px; }.controls label { flex: 1 1 210px; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd7e6; border-radius: 8px; background: #fff; font: inherit; }.controls select:focus-visible, .run-toolbar select:focus-visible, .filters select:focus-visible, .filters input:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }.run-button { margin-top: 15px; }.inline-status { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; color: #385675; background: #f1f6fc; font-size: 13px; }.inline-status.success { color: #226346; background: #edf8f2; }
-.clear-filters { min-height: 42px; }
-.aggregation-note { margin: 12px 0 0; color: #526279; font-size: 13px; line-height: 1.55; }
-.run-technical { margin-top: 10px; color: #64748b; font-size: 12px; }.run-technical summary { width: max-content; cursor: pointer; color: #3e5f86; font-weight: 700; }.run-technical dl { display: grid; gap: 5px; margin: 9px 0 0; }.run-technical dl div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }.run-technical dt { color: #718096; }.run-technical dd { overflow-wrap: anywhere; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }.summary-card { display: grid; gap: 5px; padding: 16px; border: 1px solid #dce5f1; border-left-width: 4px; border-radius: 11px; text-align: left; background: #fff; cursor: pointer; }.summary-card:hover, .summary-card.active { box-shadow: 0 8px 20px rgb(30 52 86 / 12%); transform: translateY(-1px); }.summary-card:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }.summary-card span, .summary-card small { color: #64748b; font-size: 13px; }.summary-card strong { color: #172554; font-size: 28px; }.summary-card.low { border-left-color: #2f8f5b; }.summary-card.medium { border-left-color: #d5962e; }.summary-card.high { border-left-color: #c74b4b; }
-.result-card { padding: 0; overflow: hidden; }.result-title { padding: 20px 20px 0; }.filters { padding: 0 20px 18px; border-bottom: 1px solid #e3e9f1; }.filters .search-field { flex: 1 1 240px; }.table-wrap { overflow: auto; }.data-table caption { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); }.data-table td { min-width: 130px; line-height: 1.5; }.data-table td:first-child { min-width: 190px; }.data-table .answer-cell { min-width: 260px; }.data-table small { display: block; margin-top: 5px; color: #64748b; }.risk-pill { display: inline-flex; width: max-content; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; }.risk-pill.low { color: #17633a; background: #e8f7ee; }.risk-pill.medium { color: #8a4d00; background: #fff2da; }.risk-pill.high { color: #9b2929; background: #fff0f0; }.text-button { padding: 5px 8px; border: 0; color: #285493; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }.text-button:hover { text-decoration: underline; }.detail-row td { padding: 0 16px 18px; background: #f8fafc; }.business-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 18px; padding: 14px 0; }.business-detail p { margin: 0; }.technical-details { border-top: 1px solid #dce5ef; padding-top: 11px; color: #586a82; }.technical-details summary { cursor: pointer; font-weight: 700; }.technical-details dl { display: grid; gap: 8px; }.technical-details dl div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }.technical-details dt { color: #718096; }.technical-details dd { overflow-wrap: anywhere; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-.row-actions { white-space: nowrap; }.text-link { display: inline-block; padding: 5px 8px; color: #285493; font-weight: 700; text-decoration: none; }.text-link:hover { text-decoration: underline; }
-.empty-state { margin: 20px; padding: 24px; border: 1px dashed #b9c9de; border-radius: 12px; color: #526279; text-align: center; background: #f8fbff; }.empty-state p { margin: 0 0 12px; }.empty-state p:last-child { margin-bottom: 0; }.empty-state.standalone { margin: 0 0 18px; }.mobile-results { display: none; }.question-card { padding: 16px; border-top: 1px solid #e3e9f1; }.question-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }.question-heading strong, .question-heading small { display: block; }.question-heading small { margin-top: 4px; color: #64748b; }.question-card p { line-height: 1.55; }.mobile-action { color: #315f9f; font-weight: 700; }.gap-text { color: #7c4c05; }.question-card details { color: #586a82; }.question-card summary { cursor: pointer; font-weight: 700; }.question-card code { overflow-wrap: anywhere; font-size: 11px; }
-.comparison { margin-top: 18px; }.comparison-group { margin-top: 16px; padding: 14px; border-left: 4px solid #8ca0b8; border-radius: 9px; background: #f8fafc; }.comparison-group.worse { border-color: #c74b4b; background: #fff7f7; }.comparison-group.improved { border-color: #2f8f5b; background: #f3fbf6; }.comparison-group.answer_changed { border-color: #3f72b5; background: #f5f9ff; }.comparison-group h3 { margin: 0 0 10px; font-size: 15px; }.comparison-group article { padding: 10px 0; border-top: 1px solid rgb(120 140 165 / 20%); }.comparison-group article p { margin: 4px 0 0; color: #526279; font-size: 13px; }
-.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }.actions > div { flex: 1 1 260px; }.actions p { margin: 4px 0 0; color: #64748b; font-size: 13px; }.sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
-.debug-card { margin-bottom: 18px; }.debug-message { display: grid; gap: 7px; color: #526279; font-size: 13px; font-weight: 700; }.debug-message textarea { min-height: 128px; padding: 12px; border: 1px solid #cbd7e6; border-radius: 10px; resize: vertical; font: inherit; line-height: 1.6; }.debug-message textarea:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }.debug-message small { justify-self: end; color: #718096; font-weight: 400; }.debug-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }.debug-actions span { color: #64748b; font-size: 13px; }.debug-result { margin-top: 18px; padding: 18px; border: 1px solid #d9e4f1; border-radius: 12px; background: #f8fbff; }.debug-result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.debug-result-heading h3 { margin: 0; color: #172554; }.debug-business { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 18px 0; }.debug-business div:first-child { grid-column: 1 / -1; }.debug-business dt { color: #64748b; font-size: 12px; }.debug-business dd { margin: 4px 0 0; color: #263b55; line-height: 1.6; }.version-summary, .debug-comparison { padding: 10px 12px; border-radius: 8px; color: #385675; background: #edf4ff; font-size: 13px; }.debug-comparison { background: #f1f5f9; }.debug-technical { margin-top: 16px; }.debug-technical dl div { grid-template-columns: 130px minmax(0, 1fr); }
-@media (max-width: 900px) { .summary-grid { grid-template-columns: 1fr; }.business-detail { grid-template-columns: 1fr; }.section-title { align-items: flex-start; }.scope-chip { max-width: 60vw; } }
-@media (max-width: 680px) { .desktop-results { display: none; }.mobile-results { display: block; }.section-title { display: grid; }.section-title > div { align-items: flex-start; }.scope-chip { max-width: 100%; width: max-content; }.controls label, .run-toolbar label, .filters label { width: 100%; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; }.run-button { width: 100%; }.safety-banner { grid-template-columns: 1fr; align-items: flex-start; }.safety-flags { justify-content: start; }.safety-banner code { text-align: left; }.workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }.result-count { margin-left: 41px; }.actions { align-items: stretch; flex-direction: column; }.actions .button { width: 100%; }.debug-business { grid-template-columns: 1fr; }.debug-business div:first-child { grid-column: auto; }.debug-actions { align-items: stretch; flex-direction: column; }.debug-actions .button { width: 100%; } }
+.compact-page { width: min(1280px, 100%); padding: 18px 0 30px; }
+.compact-page-header { align-items: center; margin-bottom: 12px; }
+.compact-page-header h1 { margin-bottom: 2px; font-size: 28px; }
+.compact-page-header > div > p:last-child { font-size: 13px; }
+.compact-header-action { min-height: 34px; padding: 6px 11px; font-size: 13px; }
+.eyebrow { margin: 0 0 3px; color: #2b5fcc; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.safety-banner { position: relative; display: flex; align-items: center; gap: 8px 12px; margin-bottom: 10px; padding: 8px 12px; border: 1px solid #edd18d; border-radius: 10px; color: #6d4d08; background: #fff9e8; }
+.safety-primary { display: flex; flex: 1 1 auto; align-items: baseline; gap: 8px; min-width: 260px; }
+.safety-primary strong { color: #5d4104; }
+.safety-primary span { font-size: 12px; }
+.safety-flags { display: flex; gap: 5px; }
+.safety-flags b { padding: 3px 7px; border-radius: 999px; color: #754f00; background: #f8e7b6; font-size: 10px; }
+.safety-banner code { color: #7b5a12; font-size: 10px; white-space: nowrap; }
+.safety-details { color: #6d4d08; font-size: 11px; }
+.safety-details summary { color: #6b5522; cursor: pointer; font-weight: 700; white-space: nowrap; }
+.safety-details[open] p { position: absolute; z-index: 4; top: calc(100% + 6px); right: 0; width: min(520px, 80vw); margin: 0; padding: 10px 12px; border: 1px solid #edd18d; border-radius: 9px; background: #fffdf5; box-shadow: 0 10px 26px rgb(91 68 18 / 14%); line-height: 1.55; }
+.workspace-tabs { display: flex; gap: 5px; margin: 0 0 10px; padding: 3px; width: max-content; border: 1px solid #d8e2ef; border-radius: 10px; background: #f6f8fb; }
+.workspace-tabs button { min-height: 32px; padding: 6px 13px; border: 0; border-radius: 7px; color: #526279; background: transparent; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.workspace-tabs button.active { color: #fff; background: #315f9f; box-shadow: 0 3px 10px rgb(49 95 159 / 18%); }
+.workspace-tabs button:focus-visible, .text-button:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }
+.scope-card, .run-card { margin-bottom: 10px; padding: 12px 16px; }
+.scope-heading-row, .disclosure-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.scope-title, .disclosure-heading > div, .section-title > div { display: flex; align-items: center; gap: 10px; }
+.scope-title h2, .scope-title p, .disclosure-heading h2, .disclosure-heading p, .section-title h2, .section-title p { margin: 0; }
+.scope-title h2, .disclosure-heading h2, .section-title h2 { color: #172554; font-size: 17px; }
+.scope-title p, .disclosure-heading p, .section-title p { margin-top: 2px; color: #64748b; font-size: 12px; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+.step { display: grid; flex: 0 0 27px; width: 27px; height: 27px; place-items: center; border-radius: 9px; color: #fff; background: #315f9f; font-size: 12px; font-weight: 800; }
+.scope-summary { display: grid; flex: 1 1 auto; grid-template-columns: max-content minmax(260px, 1fr) max-content max-content; align-items: center; gap: 7px; min-width: 0; }
+.scope-store, .source-badge { padding: 5px 8px; border-radius: 999px; color: #385675; background: #edf2f7; font-size: 11px; font-weight: 800; }
+.scope-chip { display: grid; min-width: 0; gap: 1px; padding: 5px 9px; border-radius: 9px; color: #2d5a93; background: #edf4ff; text-align: left; overflow-wrap: anywhere; }
+.scope-chip strong { font-size: 12px; line-height: 1.35; }
+.scope-chip small { color: #64748b; font-size: 10px; font-weight: 600; }
+.source-badge.initial_import { color: #17633a; background: #e8f7ee; }
+.source-badge.pilot { color: #285493; background: #edf4ff; }
+.source-badge.test { color: #8a4d00; background: #fff2da; }
+.scope-toggle, .disclosure-toggle { white-space: nowrap; }
+.scope-panel, .run-panel { margin-top: 11px; padding-top: 11px; border-top: 1px solid #e5ebf3; }
+.controls, .run-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; }
+.controls label, .run-toolbar label, .filters label { display: grid; min-width: 170px; gap: 4px; color: #526279; font-size: 12px; }
+.controls label { flex: 1 1 190px; }
+.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; min-height: 36px; padding: 6px 9px; border: 1px solid #cbd7e6; border-radius: 7px; background: #fff; font: inherit; font-size: 13px; }
+.controls select:focus-visible, .run-toolbar select:focus-visible, .filters select:focus-visible, .filters input:focus-visible, .debug-message textarea:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }
+.run-button { margin-top: 10px; min-height: 36px; padding: 7px 13px; }
+.aggregation-note { margin: 9px 0 0; color: #526279; font-size: 12px; line-height: 1.45; }
+.inline-status, .source-warning, .scope-part-error { margin: 9px 0 0; padding: 7px 10px; border-radius: 7px; font-size: 12px; }
+.inline-status { color: #385675; background: #f1f6fc; }
+.inline-status.success { color: #226346; background: #edf8f2; }
+.source-warning, .notice.warning { border: 1px solid #edcf8d; color: #7c4c05; background: #fff9e8; }
+.disclosure-heading p { max-width: 560px; }
+.text-button { padding: 5px 8px; border: 0; color: #285493; background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.text-button:hover { text-decoration: underline; }
+.text-button:disabled { color: #718096; cursor: default; text-decoration: none; }
+.run-toolbar label { flex: 1 1 230px; }
+.run-toolbar .button { min-height: 36px; padding: 7px 12px; }
+.run-technical { margin-top: 8px; color: #64748b; font-size: 11px; }
+.run-technical summary { width: max-content; cursor: pointer; color: #3e5f86; font-weight: 700; }
+.run-technical dl { display: grid; gap: 5px; margin: 8px 0 0; }
+.run-technical dl div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+.run-technical dt { color: #718096; }
+.run-technical dd { overflow-wrap: anywhere; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.summary-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 1px 10px; padding: 9px 12px; border: 1px solid #dce5f1; border-left-width: 4px; border-radius: 9px; text-align: left; background: #fff; cursor: pointer; }
+.summary-card:hover, .summary-card.active { box-shadow: 0 6px 16px rgb(30 52 86 / 11%); transform: translateY(-1px); }
+.summary-card:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }
+.summary-card span, .summary-card small { color: #64748b; font-size: 11px; }
+.summary-card strong { grid-row: 1 / span 2; grid-column: 2; color: #172554; font-size: 23px; }
+.summary-card.low { border-left-color: #2f8f5b; }
+.summary-card.medium { border-left-color: #d5962e; }
+.summary-card.high { border-left-color: #c74b4b; }
+.result-card { padding: 0; overflow: hidden; }
+.result-title { padding: 12px 14px 8px; }
+.result-count { padding: 5px 8px; border-radius: 999px; color: #2d5a93; background: #edf4ff; font-size: 11px; font-weight: 700; }
+.filters { display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(130px, .75fr)) auto; align-items: end; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid #eef2f7; border-bottom: 1px solid #e3e9f1; }
+.clear-filters { min-height: 36px; padding: 7px 10px; }
+.table-wrap { max-height: min(56vh, 560px); overflow: auto; }
+.data-table caption { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); }
+.data-table th { position: sticky; z-index: 2; top: 0; background: #f8fafc; box-shadow: 0 1px #dfe7f1; }
+.data-table td { min-width: 120px; line-height: 1.45; }
+.data-table td:first-child { min-width: 180px; }
+.data-table .answer-cell { min-width: 250px; }
+.data-table small { display: block; margin-top: 4px; color: #64748b; }
+.risk-pill { display: inline-flex; width: max-content; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.risk-pill.low { color: #17633a; background: #e8f7ee; }
+.risk-pill.medium { color: #8a4d00; background: #fff2da; }
+.risk-pill.high { color: #9b2929; background: #fff0f0; }
+.detail-row td { padding: 0 16px 14px; background: #f8fafc; }
+.business-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 18px; padding: 12px 0; }
+.business-detail p { margin: 0; }
+.technical-details { border-top: 1px solid #dce5ef; padding-top: 9px; color: #586a82; }
+.technical-details summary { cursor: pointer; font-size: 12px; font-weight: 700; }
+.technical-details dl { display: grid; gap: 7px; }
+.technical-details dl div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }
+.technical-details dt { color: #718096; }
+.technical-details dd { overflow-wrap: anywhere; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.row-actions { white-space: nowrap; }
+.text-link { display: inline-block; padding: 5px 8px; color: #285493; font-weight: 700; text-decoration: none; }
+.text-link:hover { text-decoration: underline; }
+.empty-state { margin: 12px; padding: 16px; border: 1px dashed #b9c9de; border-radius: 10px; color: #526279; text-align: center; background: #f8fbff; }
+.empty-state p { margin: 0 0 10px; }
+.empty-state p:last-child { margin-bottom: 0; }
+.empty-state.standalone { margin: 0 0 10px; }
+.mobile-results { display: none; }
+.question-card { padding: 14px; border-top: 1px solid #e3e9f1; }
+.question-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.question-heading strong, .question-heading small { display: block; }
+.question-heading small { margin-top: 4px; color: #64748b; }
+.question-card p { line-height: 1.55; }
+.mobile-action { color: #315f9f; font-weight: 700; }
+.gap-text { color: #7c4c05; }
+.question-card details { color: #586a82; }
+.question-card summary { cursor: pointer; font-weight: 700; }
+.question-card code { overflow-wrap: anywhere; font-size: 11px; }
+.compact-disclosure { margin-top: 10px; padding: 11px 14px; }
+.compact-disclosure > summary { display: flex; align-items: center; gap: 10px; color: #172554; cursor: pointer; list-style: none; }
+.compact-disclosure > summary::-webkit-details-marker { display: none; }
+.compact-disclosure > summary::after { margin-left: auto; color: #5d7390; content: '展开'; font-size: 11px; font-weight: 700; }
+.compact-disclosure[open] > summary::after { content: '收起'; }
+.compact-disclosure > summary span { display: grid; gap: 2px; }
+.compact-disclosure > summary small { color: #64748b; font-weight: 400; }
+.comparison-content { padding-top: 4px; }
+.comparison-group { margin-top: 12px; padding: 12px; border-left: 4px solid #8ca0b8; border-radius: 8px; background: #f8fafc; }
+.comparison-group.worse { border-color: #c74b4b; background: #fff7f7; }
+.comparison-group.improved { border-color: #2f8f5b; background: #f3fbf6; }
+.comparison-group.answer_changed { border-color: #3f72b5; background: #f5f9ff; }
+.comparison-group h3 { margin: 0 0 8px; font-size: 14px; }
+.comparison-group article { padding: 8px 0; border-top: 1px solid rgb(120 140 165 / 20%); }
+.comparison-group article p { margin: 3px 0 0; color: #526279; font-size: 12px; }
+.action-links { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.action-links .button { min-height: 36px; padding: 7px 12px; }
+.sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
+.debug-card { margin-bottom: 10px; padding: 14px 16px; }
+.debug-workbench { display: grid; grid-template-columns: minmax(320px, .88fr) minmax(430px, 1.12fr); gap: 12px; align-items: stretch; }
+.debug-composer, .debug-output { min-width: 0; padding: 13px; border: 1px solid #d9e4f1; border-radius: 10px; background: #f8fbff; }
+.panel-kicker { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: #263b55; font-size: 12px; }
+.panel-kicker span { color: #718096; font-size: 11px; }
+.debug-message { display: grid; }
+.debug-message textarea { width: 100%; min-height: 88px; max-height: 220px; box-sizing: border-box; padding: 10px; border: 1px solid #cbd7e6; border-radius: 8px; resize: vertical; font: inherit; line-height: 1.5; }
+.debug-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 9px; }
+.debug-actions .button { min-height: 36px; padding: 7px 13px; }
+.debug-actions span { color: #64748b; font-size: 11px; }
+.debug-output { display: grid; align-content: start; min-height: 212px; }
+.debug-placeholder { display: grid; align-content: center; justify-items: center; min-height: 184px; gap: 6px; padding: 16px; color: #64748b; text-align: center; }
+.debug-placeholder strong { color: #385675; }
+.debug-placeholder span { max-width: 430px; font-size: 12px; line-height: 1.5; }
+.debug-placeholder.running { background: linear-gradient(110deg, transparent, rgb(226 237 250 / 75%), transparent); }
+.debug-result { min-width: 0; }
+.debug-result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.debug-result-heading h3 { margin: 0; color: #172554; font-size: 17px; }
+.debug-business { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px 9px; margin: 10px 0; }
+.debug-business div { min-width: 0; padding: 7px 9px; border-radius: 7px; background: #fff; }
+.debug-business .debug-answer { grid-column: 1 / -1; border: 1px solid #dce7f4; }
+.debug-business .debug-blocker { grid-column: span 2; }
+.debug-business dt { color: #64748b; font-size: 10px; }
+.debug-business dd { overflow-wrap: anywhere; margin: 2px 0 0; color: #263b55; font-size: 12px; line-height: 1.45; }
+.debug-result-actions { display: flex; align-items: center; gap: 8px; }
+.debug-result-actions .button { flex: 0 0 auto; min-height: 32px; padding: 5px 9px; font-size: 12px; }
+.version-summary, .debug-comparison { margin: 0; padding: 7px 9px; border-radius: 7px; color: #385675; background: #edf4ff; font-size: 11px; }
+.version-summary { flex: 1 1 auto; }
+.debug-comparison { margin-top: 8px; background: #f1f5f9; }
+.debug-technical { margin-top: 9px; }
+.debug-technical dl div { grid-template-columns: 120px minmax(0, 1fr); }
+@media (max-width: 1100px) {
+  .debug-workbench { grid-template-columns: 1fr; }
+  .debug-output { min-height: 180px; }
+  .scope-heading-row { align-items: flex-start; }
+  .scope-summary { grid-template-columns: max-content minmax(220px, 1fr) max-content; }
+  .scope-toggle { grid-column: 2 / -1; justify-self: end; }
+  .filters { grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(140px, .7fr)); }
+}
+@media (max-width: 900px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .business-detail { grid-template-columns: 1fr; }
+  .scope-heading-row { display: grid; }
+  .scope-summary { grid-template-columns: max-content minmax(0, 1fr) max-content; }
+  .filters { grid-template-columns: 1fr 1fr; }
+  .safety-banner { flex-wrap: wrap; }
+  .safety-primary { min-width: 100%; }
+}
+@media (max-width: 680px) {
+  .compact-page { padding-top: 14px; }
+  .desktop-results { display: none; }
+  .mobile-results { display: block; }
+  .compact-page-header, .section-title { align-items: flex-start; }
+  .scope-summary { grid-template-columns: 1fr auto; }
+  .scope-store { justify-self: start; }
+  .scope-chip { grid-column: 1 / -1; grid-row: 2; }
+  .scope-toggle { grid-column: auto; justify-self: auto; }
+  .controls label, .run-toolbar label, .filters label { width: 100%; }
+  .controls select, .run-toolbar select, .filters select, .filters input { width: 100%; }
+  .run-button { width: 100%; }
+  .safety-banner { align-items: flex-start; }
+  .safety-primary { display: grid; gap: 2px; }
+  .safety-banner code { width: 100%; }
+  .safety-details[open] p { position: static; width: auto; margin-top: 7px; box-shadow: none; }
+  .workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .filters { grid-template-columns: 1fr; }
+  .result-count { margin-left: 37px; }
+  .action-links { align-items: stretch; flex-direction: column; }
+  .action-links .button { width: 100%; }
+  .debug-business { grid-template-columns: 1fr; }
+  .debug-business .debug-answer, .debug-business .debug-blocker { grid-column: auto; }
+  .debug-actions, .debug-result-actions { align-items: stretch; flex-direction: column; }
+  .debug-actions .button, .debug-result-actions .button { width: 100%; }
+}
 </style>

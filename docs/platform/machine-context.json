@@ -4,10 +4,19 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "Real PDD Product Names and Knowledge Correction V1",
-  "current_stage": "C compatibility, Admin full-name/error UX, formal same-SHA deployment and four scoped immutable revision corrections are complete.",
-  "current_gate": "PASS / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_READY",
-  "status": "real_pdd_product_knowledge_correction_ready",
+  "current_task": "Reply Readiness Compact UI V1",
+  "current_stage": "Compact Admin UI, automated gates, same-SHA deployment and three-viewport error-state visual QA are complete; real-data browser recheck awaits a knowledge.manage login.",
+  "current_gate": "CONDITIONAL PASS / AI_CS_REPLY_READINESS_COMPACT_UI_READY",
+  "status": "reply_readiness_compact_ui_ready_pending_admin_visual_recheck",
+  "reply_readiness_compact_ui_v1": {
+    "gate": "CONDITIONAL PASS / AI_CS_REPLY_READINESS_COMPACT_UI_READY",
+    "scope": "Admin /reply-readiness layout and tests only; no API, schema, database, contract, knowledge, Engine, PDD or send change",
+    "ui": "Compact header and immutable safety state, collapsible scope/history/change details, desktop question-answer split, compact risk/filter controls and internally scrolling sticky-header result table",
+    "responsive": "1920x1080 and 1366x768 error state fit without page scroll; 390x844 has no horizontal overflow; console errors zero",
+    "tests": "ReplyReadinessView 12; Admin 40 files/117 tests; typecheck, production build and git diff check passed",
+    "deployment": "8420-8423 use the clean compact UI candidate; 18443/60801, Engine, PDD Profile, RAG Collection and real send unchanged",
+    "pending": "Current browser identity receives controlled 403 for missing knowledge.manage; super-admin re-login is required for the final real-product visual recheck without bypassing IAM"
+  },
   "real_pdd_product_knowledge_correction_v1": {
     "gate": "PASS / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_READY",
     "ui": "Full product display name from catalog with stable product ID as secondary technical information; split material/question/run errors",
