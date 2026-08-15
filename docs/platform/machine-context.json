@@ -5,16 +5,17 @@
   "line": "C",
   "version": "AI-CS V1.0.0",
   "current_task": "Real PDD Product Names and Knowledge Correction V1",
-  "current_stage": "C compatibility, Admin full-name/error UX and isolated immutable revision closures are validated; formal same-SHA deployment and scoped data maintenance remain.",
-  "current_gate": "CANDIDATE_VALIDATED / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_DEPLOYMENT_PENDING",
-  "status": "real_pdd_product_knowledge_correction_deployment_pending",
+  "current_stage": "C compatibility, Admin full-name/error UX, formal same-SHA deployment and four scoped immutable revision corrections are complete.",
+  "current_gate": "PASS / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_READY",
+  "status": "real_pdd_product_knowledge_correction_ready",
   "real_pdd_product_knowledge_correction_v1": {
-    "gate": "CANDIDATE_VALIDATED / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_DEPLOYMENT_PENDING",
+    "gate": "PASS / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_READY",
     "ui": "Full product display name from catalog with stable product ID as secondary technical information; split material/question/run errors",
     "compatibility": "Read-only projection only for proven RECORDED_PDD_20260814 legacy metadata; unknown malformed metadata returns controlled 409",
     "knowledge": "Four isolated immutable revision 2 records approved through existing lifecycle; revision 1 preserved",
     "closure": "Four products x 36 questions completed through real C input, A evaluator and C result verification",
-    "tests": "C 219; Admin 40 files/116 tests plus typecheck and production build; no formal DB/RAG/send write"
+    "tests": "C 219; Admin 40 files/116 tests plus typecheck and production build; formal read-only projections return four full names and eight immutable revision rows with zero pending session writes",
+    "deployment": "8420-8423 use clean commit 0dfb0ca9dc6ba940b14f650bc94c4d93a46eb5dd; database backup/current integrity ok; only four display names, four revision 2 rows and four upload receipts changed"
   },
   "reply_governance_8423_v1": {
     "gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING",
