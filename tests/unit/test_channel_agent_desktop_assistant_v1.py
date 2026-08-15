@@ -693,6 +693,68 @@ def test_desktop_projects_and_toggles_authoritative_controlled_auto(
         server.stop()
 
 
+def test_desktop_queues_human_controlled_auto_repair_for_live_store(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(parents=True)
+    (runtime / "channel-agent-state.json").write_text(
+        json.dumps({
+            "identity_status": "ACTIVE",
+            "pdd_login_state": "CUSTOMER_SERVICE_READY",
+            "observer_status": "OBSERVING",
+            "active_store_id": "c-store-1",
+            "pdd_store_id": "328616090",
+        }),
+        encoding="utf-8",
+    )
+    server = DesktopAssistantServer(data_root=tmp_path)
+    try:
+        server.start()
+        opener, origin, csrf = _authenticated_client(server)
+        blocked = Request(
+            f"{origin}/local-api/v1/runtime/controlled-auto-repair",
+            data=b"{}",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+            },
+        )
+        with pytest.raises(HTTPError) as forbidden:
+            opener.open(blocked, timeout=2)  # noqa: S310
+        assert forbidden.value.code == 403
+
+        request = Request(
+            f"{origin}/local-api/v1/runtime/controlled-auto-repair",
+            data=b"{}",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+                "X-Channel-Agent-Intent": "HUMAN_REQUESTED_CONTROLLED_AUTO_REPAIR",
+            },
+        )
+        with opener.open(request, timeout=2) as response:  # noqa: S310
+            result = json.loads(response.read().decode("utf-8"))
+        assert result == {
+            "schema_version": "controlled-auto-repair-response.v1",
+            "status": "REPAIR_REQUESTED",
+        }
+        queued = json.loads(
+            (runtime / "controlled-auto-repair.request").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert queued["ai_cs_store_id"] == "c-store-1"
+        assert queued["platform_store_id"] == "328616090"
+        assert queued["human_intent"] is True
+    finally:
+        server.stop()
+
+
 def test_active_store_selection_requires_intent_and_no_active_workflow(
     tmp_path: Path,
 ) -> None:

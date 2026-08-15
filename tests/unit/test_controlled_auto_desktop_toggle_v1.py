@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from channel_agent.binding import atomic_write_bytes
 from channel_agent.controlled_auto_runtime import ControlledAutoRuntimeStateStore
 from scripts.run_controlled_pdd_reply_pilot import (
+    _consume_desktop_repair,
     _consume_desktop_toggle,
     _retryable_production_candidate_error,
     _renew_observer_if_needed,
@@ -33,6 +34,20 @@ def _queue_toggle(data_root, target_enabled: bool) -> None:
         json.dumps({
             "schema_version": "controlled-auto-toggle-request.v1",
             "target_enabled": target_enabled,
+            "operator_reference": "desktop-local-operator",
+            "human_intent": True,
+            "requested_at": datetime.now(UTC).isoformat(),
+        }).encode("utf-8"),
+    )
+
+
+def _queue_repair(data_root) -> None:
+    atomic_write_bytes(
+        data_root / "runtime" / "controlled-auto-repair.request",
+        json.dumps({
+            "schema_version": "controlled-auto-repair-request.v1",
+            "ai_cs_store_id": "c-store-1",
+            "platform_store_id": "328616090",
             "operator_reference": "desktop-local-operator",
             "human_intent": True,
             "requested_at": datetime.now(UTC).isoformat(),
@@ -68,6 +83,24 @@ def test_desktop_toggle_pauses_and_resumes_same_verified_scope(tmp_path) -> None
     assert resumed.production_real_send_enabled is True
     assert resumed.controlled_store_auto_enabled is True
     assert resumed.kill_switch_enabled is False
+
+
+def test_desktop_repair_restores_only_a_paused_verified_scope(tmp_path) -> None:
+    _write_agent_state(tmp_path)
+    store = ControlledAutoRuntimeStateStore(tmp_path / "runtime.sqlite3")
+    _queue_repair(tmp_path)
+
+    repaired, error = _consume_desktop_repair(tmp_path, store)
+
+    assert error is None
+    assert repaired.runtime_mode == "PILOT"
+    assert repaired.production_real_send_enabled is False
+    assert repaired.controlled_store_auto_enabled is False
+    assert repaired.kill_switch_enabled is True
+    assert repaired.ai_cs_store_id == "c-store-1"
+    assert repaired.platform_store_id == "328616090"
+    assert repaired.policy_mode == "AUTO_ALL_MESSAGES_V1"
+    assert not (tmp_path / "runtime" / "controlled-auto-repair.request").exists()
 
 
 def test_production_auto_renews_expired_read_observer(tmp_path) -> None:

@@ -246,6 +246,10 @@ def _toggle_request_path(data_root: Path) -> Path:
     return data_root / "runtime" / "controlled-auto-toggle.request"
 
 
+def _repair_request_path(data_root: Path) -> Path:
+    return data_root / "runtime" / "controlled-auto-repair.request"
+
+
 def _publish_public_status(
     data_root: Path,
     state: ControlledAutoRuntimeStateV1,
@@ -362,6 +366,68 @@ def _consume_desktop_toggle(
         state = runtime_store.load()
     except (KeyError, OSError, UnicodeError, ValueError, json.JSONDecodeError):
         error_code = "AUTO_TOGGLE_REQUEST_INVALID"
+        state = runtime_store.load()
+    finally:
+        request_path.unlink(missing_ok=True)
+    return state, error_code
+
+
+def _consume_desktop_repair(
+    data_root: Path,
+    runtime_store: ControlledAutoRuntimeStateStore,
+) -> tuple[ControlledAutoRuntimeStateV1, str | None]:
+    """Repair only the paused AUTO scope after explicit local human intent."""
+
+    request_path = _repair_request_path(data_root)
+    state = runtime_store.load()
+    if not request_path.is_file():
+        return state, None
+    error_code: str | None = None
+    try:
+        payload = json.loads(request_path.read_text(encoding="utf-8"))
+        requested_at = datetime.fromisoformat(str(payload["requested_at"]))
+        if requested_at.tzinfo is None:
+            raise ValueError("repair time must be timezone-aware")
+        if (datetime.now(UTC) - requested_at.astimezone(UTC)).total_seconds() > 120:
+            raise ControlledReplyPilotError(
+                "desktop AUTO repair expired",
+                error_code="AUTO_REPAIR_EXPIRED",
+            )
+        if payload.get("schema_version") != "controlled-auto-repair-request.v1":
+            raise ValueError("repair schema is invalid")
+        if payload.get("human_intent") is not True:
+            raise ValueError("repair requires human intent")
+        observed = _current_store_identity(data_root)
+        requested = (
+            str(payload.get("ai_cs_store_id") or "").strip(),
+            str(payload.get("platform_store_id") or "").strip(),
+        )
+        if observed != requested:
+            raise ControlledReplyPilotError(
+                "live double Store identity changed during repair",
+                error_code="AUTO_REPAIR_STORE_SCOPE_MISMATCH",
+            )
+        policy_mode = (
+            state.policy_mode
+            if state.policy_mode in {"AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"}
+            else "AUTO_ALL_MESSAGES_V1"
+        )
+        state = runtime_store.prepare_production_auto_resume(
+            ai_cs_store_id=observed[0],
+            platform_store_id=observed[1],
+            policy_revision=state.policy_revision,
+            whitelist_revision=state.whitelist_revision,
+            operator=str(
+                payload.get("operator_reference") or "desktop-local-operator"
+            )[:160],
+            reason="USER_REPAIRED_PRODUCTION_AUTO_FROM_DESKTOP",
+            policy_mode=policy_mode,
+        )
+    except ControlledReplyPilotError as exc:
+        error_code = exc.error_code
+        state = runtime_store.load()
+    except (KeyError, OSError, UnicodeError, ValueError, json.JSONDecodeError):
+        error_code = "AUTO_REPAIR_REQUEST_INVALID"
         state = runtime_store.load()
     finally:
         request_path.unlink(missing_ok=True)
@@ -667,9 +733,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             successes = 0
             while True:
+                state, repair_error = _consume_desktop_repair(
+                    data_root, runtime_store
+                )
                 state, control_error = _consume_desktop_toggle(
                     data_root, runtime_store
                 )
+                control_error = repair_error or control_error
                 _publish_public_status(
                     data_root,
                     state,
@@ -777,13 +847,40 @@ def main(argv: list[str] | None = None) -> int:
                     now=datetime.now(UTC),
                 )
                 if response.outcome != "SUCCESS":
-                    runtime_store.fail_closed_after_terminal(
+                    paused = runtime_store.fail_closed_after_terminal(
                         outcome=response.outcome,
                         reason=response.error_code or "PRODUCTION_AUTO_SEND_NOT_CONFIRMED",
                     )
+                    if (
+                        paused.ai_cs_store_id is None
+                        or paused.platform_store_id is None
+                        or paused.policy_mode
+                        not in {"AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"}
+                    ):
+                        try:
+                            observed = _current_store_identity(data_root)
+                            paused = runtime_store.prepare_production_auto_resume(
+                                ai_cs_store_id=observed[0],
+                                platform_store_id=observed[1],
+                                policy_revision=state.policy_revision,
+                                whitelist_revision=state.whitelist_revision,
+                                operator="automatic-safety-controller",
+                                reason=(
+                                    f"{response.outcome}:"
+                                    f"{response.error_code or 'PRODUCTION_AUTO_SEND_NOT_CONFIRMED'}"
+                                )[:512],
+                                policy_mode=(
+                                    state.policy_mode
+                                    if state.policy_mode
+                                    in {"AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"}
+                                    else "AUTO_ALL_MESSAGES_V1"
+                                ),
+                            )
+                        except ControlledReplyPilotError:
+                            pass
                     _publish_public_status(
                         data_root,
-                        runtime_store.load(),
+                        paused,
                         runner_active=True,
                         control_error_code=(
                             response.error_code
@@ -792,12 +889,13 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     _print(
                         {
-                            "status": "STOPPED",
+                            "status": "PAUSED",
                             "reason": f"REAL_SEND_{response.outcome}",
                             "receipt_id": response.receipt_id,
                         }
                     )
-                    return 4
+                    time.sleep(max(args.poll_seconds, 0.1))
+                    continue
                 _record_auto_reply_success(
                     data_root,
                     decision_id=candidate.decision_id,

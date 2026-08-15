@@ -552,6 +552,54 @@ class DesktopAssistantServer:
             "target_enabled": target_enabled,
         }
 
+    def request_controlled_auto_repair(self) -> tuple[int, dict[str, Any]]:
+        """Queue a human-requested repair to a verified paused AUTO scope."""
+
+        state = self._read_json(
+            self.data_root / "runtime" / "channel-agent-state.json"
+        )
+        ai_cs_store_id = state.get("active_store_id")
+        platform_store_id = state.get("pdd_store_id")
+        if (
+            state.get("identity_status") != "ACTIVE"
+            or state.get("pdd_login_state") != "CUSTOMER_SERVICE_READY"
+            or state.get("observer_status") != "OBSERVING"
+            or not isinstance(ai_cs_store_id, str)
+            or not ai_cs_store_id.strip()
+            or not isinstance(platform_store_id, str)
+            or not platform_store_id.strip()
+        ):
+            return HTTPStatus.CONFLICT, {
+                "error": {"code": "CONTROLLED_AUTO_REPAIR_SCOPE_NOT_READY"}
+            }
+        request_path = (
+            self.data_root / "runtime" / "controlled-auto-repair.request"
+        )
+        with self._lock:
+            if request_path.exists():
+                return HTTPStatus.CONFLICT, {
+                    "error": {"code": "CONTROLLED_AUTO_REPAIR_ALREADY_PENDING"}
+                }
+            atomic_write_bytes(
+                request_path,
+                json.dumps(
+                    {
+                        "schema_version": "controlled-auto-repair-request.v1",
+                        "ai_cs_store_id": ai_cs_store_id.strip(),
+                        "platform_store_id": platform_store_id.strip(),
+                        "operator_reference": "desktop-local-operator",
+                        "human_intent": True,
+                        "requested_at": datetime.now(UTC).isoformat(),
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8"),
+            )
+        return HTTPStatus.ACCEPTED, {
+            "schema_version": "controlled-auto-repair-response.v1",
+            "status": "REPAIR_REQUESTED",
+        }
+
     def launch_pdd_workspace(self) -> tuple[int, dict[str, Any]]:
         """Open the dedicated PDD Edge profile after an explicit local click.
 
@@ -1802,6 +1850,20 @@ class _DesktopHandler(BaseHTTPRequestHandler):
                     HTTPStatus.BAD_REQUEST,
                     {"error": {"code": "INVALID_REQUEST"}},
                 )
+            return
+        if path == "/local-api/v1/runtime/controlled-auto-repair":
+            self._discard_request_body()
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_REQUESTED_CONTROLLED_AUTO_REPAIR"
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            status, response = self.server.runtime.request_controlled_auto_repair()
+            self._json(status, response)
             return
         if path == "/local-api/v1/browser/pdd/open":
             self._discard_request_body()
