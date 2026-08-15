@@ -77,6 +77,32 @@ def test_rag_sources_canonicalize_blank_optional_sku_scope() -> None:
     assert sources[1]["sku_id"] == "SKU-EXACT"
 
 
+def test_product_fact_topics_keep_answer_and_evidence_on_one_field() -> None:
+    results = [
+        {"content": 'particle_count: "约500颗"'},
+        {"content": 'assembled_size: "成品约20×5×5厘米"'},
+        {"content": 'product_scale: "比例约1:20"'},
+        {"content": 'package_type: "彩盒包装"'},
+        {"content": 'image_material_status: "详情页图片为产品实物拍摄展示"'},
+    ]
+
+    assert RAGService._results_for_answer_topics(
+        "这款积木大概多少颗？", results
+    ) == [results[0]]
+    assert RAGService._results_for_answer_topics(
+        "拼好以后大概多大？", results
+    ) == [results[1]]
+    assert RAGService._results_for_answer_topics("这个模型比例是多少？", results) == [
+        results[2]
+    ]
+    assert RAGService._results_for_answer_topics("这款是什么包装？", results) == [
+        results[3]
+    ]
+    assert RAGService._results_for_answer_topics("详情页是实物图吗？", results) == [
+        results[4]
+    ]
+
+
 def context(product_id: str = "P-Q80", sku_id: str | None = None):
     return FrozenChatContext(
         tenant_id="TENANT-PDD-SM-TEST",

@@ -239,11 +239,21 @@ class RAGService:
             r"多宽",
             r"多高",
             r"多少(?:厘米|毫米|cm|mm)",
-            r"(?:成品|包装).*多大",
+            r"(?:成品|包装|拼好|拼完).*多大",
         ):
             topics.append("size")
         if cls._question_has(question, r"多少颗", r"几颗", r"颗粒数", r"积木数量"):
             topics.append("count")
+        if cls._question_has(question, r"比例", r"几比几", r"1\s*[:：]\s*\d+"):
+            topics.append("scale")
+        if cls._question_has(
+            question, r"实物图", r"实拍图", r"详情图", r"成品图", r"详情页.*图"
+        ):
+            topics.append("photo")
+        if cls._question_has(
+            question, r"哪里发货", r"哪儿发货", r"从哪.*发", r"发货地"
+        ):
+            topics.append("ship_origin")
         if cls._question_has(question, r"颜色", r"什么色", r"哪种色"):
             topics.append("color")
         return tuple(dict.fromkeys(topics))
@@ -257,6 +267,9 @@ class RAGService:
             "material": "客户询问的商品材质；没有明确材质证据时不得推断",
             "size": "客户询问的成品或包装尺寸",
             "count": "客户询问的颗粒数或数量",
+            "scale": "客户询问的模型比例",
+            "photo": "客户询问的详情页图片或实物展示",
+            "ship_origin": "客户询问的商品发货地，不承诺物流时效",
             "color": "客户询问的颜色或款式颜色",
         }
         if not topics:
@@ -311,6 +324,9 @@ class RAGService:
             ),
             "size": ("尺寸", "长", "宽", "高", "厘米", "毫米", "cm", "mm", "×"),
             "count": ("颗粒", "颗积木", "数量", "共计"),
+            "scale": ("比例", "product_scale", ":", "："),
+            "photo": ("实物", "实拍", "详情页", "图片", "image_material_status"),
+            "ship_origin": ("发货地", "发货", "广东", "汕头", "ship_origin"),
             "color": (
                 "颜色",
                 "色款",
@@ -340,6 +356,45 @@ class RAGService:
             if any(keyword.lower() in fragment.lower() for keyword in allowed)
         ]
         return selected or [content]
+
+    @classmethod
+    def _results_for_answer_topics(
+        cls,
+        question: str,
+        results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Keep only evidence that can actually support the requested fact.
+
+        A product publication can contain both reviewed approximate facts and
+        ordinary exact facts.  Passing every retrieved chunk to the Router
+        makes a controlled answer appear to mix authorization classes even
+        when the customer asked for one field.  Topic filtering keeps the
+        answer, source list, and Evidence Bundle on the same fact boundary.
+        """
+
+        topics = cls._answer_topics(question)
+        if not topics:
+            return results
+        patterns = {
+            "age": r"(?:age|年龄|适龄|\d+\s*岁|小颗粒|成人陪同)",
+            "packaging": r"(?:package_type|包装|礼盒|礼袋|彩盒|袋装|盒装)",
+            "material": r"(?:material|材质|材料|ABS|塑料|木质|金属)",
+            "size": r"(?:assembled_size|尺寸|长宽高|\d+\s*[×xX]\s*\d+|厘米|cm)",
+            "count": r"(?:particle_count|颗粒|\d+\s*(?:颗|块|件|个积木))",
+            "scale": r"(?:product_scale|比例|\d+\s*[:：]\s*\d+)",
+            "photo": r"(?:image_material_status|实物|实拍|详情页|图片)",
+            "ship_origin": r"(?:ship_origin|发货地|广东|汕头)",
+            "color": r"(?:color|颜色|色款)",
+        }
+        selected = [
+            result
+            for result in results
+            if any(
+                re.search(patterns[topic], cls._answer_content(result), re.IGNORECASE)
+                for topic in topics
+            )
+        ]
+        return selected or results
 
     def build_context(
         self,
@@ -390,6 +445,9 @@ class RAGService:
             "material": r"(?:材质|材料|ABS|塑料|木质|金属|亚克力|硅胶|EVA|PVC|(?:^|\W)PP(?:\W|$)|(?:^|\W)PE(?:\W|$))",
             "size": r"(?:尺寸|长宽高|\d+(?:\.\d+)?\s*(?:厘米|毫米|cm|mm)|\d+\s*[×xX]\s*\d+)",
             "count": r"\d+\s*(?:颗|块|件|个积木)",
+            "scale": r"(?:product_scale|比例|\d+\s*[:：]\s*\d+)",
+            "photo": r"(?:image_material_status|实物|实拍|详情页|图片)",
+            "ship_origin": r"(?:ship_origin|发货地|广东|汕头)",
             "color": r"(?:颜色|色款|蓝色|粉色|红色|白色|黑色|黄色|紫色|绿色|橙色|灰色|棕色|透明)",
         }
         return all(
@@ -1107,11 +1165,10 @@ class RAGService:
                 "context": context.model_dump() if context else None,
             }
 
-        top_result = results[0]
         if context:
+            results = self._results_for_answer_topics(question, results)
             decision = self._structured_decision(question, context, results)
             results = decision["results"]
-            top_result = results[0]
             answer_action = decision["action"]
             risk_level = decision["risk_level"]
             retrieval["sources"] = self._source_items(results)
