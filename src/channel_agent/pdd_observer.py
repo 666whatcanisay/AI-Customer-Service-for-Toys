@@ -237,6 +237,39 @@ class PDDMessageObserver:
                 else None
             )
 
+            manual_current_conversation = bool(
+                cursor is None
+                and summary.unread_count is None
+                and not is_scheduled
+                and getattr(self._driver, "navigation_enabled", None) is False
+            )
+            if manual_current_conversation:
+                # With automatic navigation explicitly disabled, establish a
+                # high-water mark only for the conversation the operator has
+                # already selected.  ``capture_conversation`` rejects every
+                # other list row, so this path cannot click, scroll, or import
+                # another customer's history.  New messages arriving after
+                # this baseline enter the normal durable Observation flow.
+                try:
+                    baseline = self._driver.capture_conversation(summary)
+                except PDDConversationNotActive:
+                    continue
+                captured += 1
+                self._validate_capture(summary, baseline, evidence)
+                baseline = self._resolve_message_sequences(baseline)
+                baseline_sequence = max(
+                    (message.sequence for message in baseline.messages), default=0
+                )
+                if baseline_sequence:
+                    self._spool.establish_high_water(
+                        store_id=summary.store_id,
+                        platform_store_id=summary.platform_store_id,
+                        conversation_id=summary.conversation_id,
+                        cursor=_cursor(summary, baseline_sequence),
+                        source_sequence=baseline_sequence,
+                    )
+                    baselines += 1
+                continue
             if cursor is None and summary.unread_count is None and not is_scheduled:
                 manual += 1
                 self._diagnostic(

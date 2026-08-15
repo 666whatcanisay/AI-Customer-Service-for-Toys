@@ -18,7 +18,6 @@ from channel_agent.pdd_observer import (
     PDDObserverFatalError,
 )
 
-
 NOW = datetime(2026, 8, 11, 4, 0, tzinfo=UTC)
 DIGEST = "sha256:" + "a" * 64
 FINGERPRINT = "sha256:" + "b" * 64
@@ -56,6 +55,10 @@ class Driver:
         if isinstance(value, Exception):
             raise value
         return value
+
+
+class ManualCurrentConversationDriver(Driver):
+    navigation_enabled = False
 
 
 def summary(conversation: str, *, unread: int | None, sequence: int = 3):
@@ -183,6 +186,69 @@ def test_unknown_startup_unread_state_is_never_silently_baselined(tmp_path):
     assert result.manual_review_required == 1
     assert result.baselines_established == 0
     assert diagnostics[0][0] == "STARTUP_UNREAD_STATE_UNKNOWN"
+
+
+def test_manual_current_conversation_baselines_without_navigation_then_reads_new_message(
+    tmp_path,
+):
+    item = summary("conversation-1", unread=None)
+    driver = ManualCurrentConversationDriver(
+        [item],
+        {
+            item.conversation_id: snapshot(
+                item.conversation_id,
+                [message(1, "CUSTOMER", "old"), message(2, "OPERATOR", "done")],
+            )
+        },
+    )
+    forwarded = []
+    diagnostics = []
+    runtime = observer(tmp_path, driver, forwarded, diagnostics)
+
+    baseline = runtime.scan_once()
+
+    assert baseline.baselines_established == 1
+    assert baseline.manual_review_required == 0
+    assert forwarded == []
+    assert diagnostics == []
+
+    driver.snapshots[item.conversation_id] = snapshot(
+        item.conversation_id,
+        [
+            message(1, "CUSTOMER", "old"),
+            message(2, "OPERATOR", "done"),
+            message(3, "CUSTOMER", "new"),
+        ],
+    )
+    captured = runtime.scan_once()
+
+    assert captured.observations_forwarded == 1
+    assert forwarded[0].payload["content"] == "new"
+    assert forwarded[0].payload["origin"] == "LIVE_PDD"
+
+
+def test_manual_current_conversation_mode_never_selects_inactive_rows(tmp_path):
+    active = summary("active", unread=None)
+    inactive = summary("inactive", unread=None)
+    forwarded = []
+    diagnostics = []
+    result = observer(
+        tmp_path,
+        ManualCurrentConversationDriver(
+            [active, inactive],
+            {
+                "active": snapshot("active", [message(1, "OPERATOR", "done")]),
+                "inactive": PDDConversationNotActive("not selected"),
+            },
+        ),
+        forwarded,
+        diagnostics,
+    ).scan_once()
+
+    assert result.baselines_established == 1
+    assert result.manual_review_required == 0
+    assert forwarded == []
+    assert diagnostics == []
 
 
 def test_page_fingerprint_change_fails_closed(tmp_path):
