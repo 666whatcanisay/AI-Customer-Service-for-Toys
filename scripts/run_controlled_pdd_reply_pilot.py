@@ -434,6 +434,27 @@ def _consume_desktop_repair(
     return state, error_code
 
 
+def _pause_after_send_path_error(
+    data_root: Path,
+    runtime_store: ControlledAutoRuntimeStateStore,
+    *,
+    error_code: str,
+) -> ControlledAutoRuntimeStateV1:
+    """Keep the control mailbox alive after one terminal send-path rejection."""
+
+    paused = runtime_store.enable_kill_switch(
+        operator="automatic-safety-controller",
+        reason=error_code[:512],
+    )
+    _publish_public_status(
+        data_root,
+        paused,
+        runner_active=True,
+        control_error_code=error_code,
+    )
+    return paused
+
+
 def _renew_observer_if_needed(data_root: Path) -> None:
     state_path = data_root / "runtime" / "channel-agent-state.json"
     try:
@@ -822,6 +843,27 @@ def main(argv: list[str] | None = None) -> int:
                         expected_decision_id=candidate.decision_id,
                         policy_mode=state.policy_mode,
                     )
+                except ControlledReplyPilotError as exc:
+                    ledger.finish(
+                        candidate.decision_id,
+                        outcome="BLOCKED",
+                        receipt_id=None,
+                        now=datetime.now(UTC),
+                    )
+                    _pause_after_send_path_error(
+                        data_root,
+                        runtime_store,
+                        error_code=exc.error_code,
+                    )
+                    _print(
+                        {
+                            "status": "PAUSED",
+                            "reason": exc.error_code,
+                            "decision_id": candidate.decision_id,
+                        }
+                    )
+                    time.sleep(max(args.poll_seconds, 0.1))
+                    continue
                 except Exception:
                     ledger.finish(
                         candidate.decision_id,
@@ -829,17 +871,20 @@ def main(argv: list[str] | None = None) -> int:
                         receipt_id=None,
                         now=datetime.now(UTC),
                     )
-                    runtime_store.enable_kill_switch(
-                        operator="automatic-safety-controller",
-                        reason="PRODUCTION_AUTO_SEND_PATH_FAILED",
-                    )
-                    _publish_public_status(
+                    _pause_after_send_path_error(
                         data_root,
-                        runtime_store.load(),
-                        runner_active=True,
-                        control_error_code="PRODUCTION_AUTO_SEND_PATH_FAILED",
+                        runtime_store,
+                        error_code="PRODUCTION_AUTO_SEND_PATH_FAILED",
                     )
-                    raise
+                    _print(
+                        {
+                            "status": "PAUSED",
+                            "reason": "PRODUCTION_AUTO_SEND_PATH_FAILED",
+                            "decision_id": candidate.decision_id,
+                        }
+                    )
+                    time.sleep(max(args.poll_seconds, 0.1))
+                    continue
                 ledger.finish(
                     candidate.decision_id,
                     outcome=response.outcome,

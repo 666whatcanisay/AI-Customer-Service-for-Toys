@@ -8,6 +8,7 @@ from channel_agent.controlled_auto_runtime import ControlledAutoRuntimeStateStor
 from scripts.run_controlled_pdd_reply_pilot import (
     _consume_desktop_repair,
     _consume_desktop_toggle,
+    _pause_after_send_path_error,
     _retryable_production_candidate_error,
     _renew_observer_if_needed,
 )
@@ -101,6 +102,40 @@ def test_desktop_repair_restores_only_a_paused_verified_scope(tmp_path) -> None:
     assert repaired.platform_store_id == "328616090"
     assert repaired.policy_mode == "AUTO_ALL_MESSAGES_V1"
     assert not (tmp_path / "runtime" / "controlled-auto-repair.request").exists()
+
+
+def test_send_target_rejection_pauses_without_losing_repair_scope(tmp_path) -> None:
+    _write_agent_state(tmp_path)
+    store = ControlledAutoRuntimeStateStore(tmp_path / "runtime.sqlite3")
+    store.activate_production_auto(
+        ai_cs_store_id="c-store-1",
+        platform_store_id="328616090",
+        policy_revision=2,
+        whitelist_revision="auto-all-v1",
+        operator="operator",
+        reason="activate",
+        policy_mode="AUTO_ALL_MESSAGES_V1",
+    )
+
+    paused = _pause_after_send_path_error(
+        tmp_path,
+        store,
+        error_code="PDD_SEND_CURRENT_TARGET_MISMATCH",
+    )
+
+    assert paused.runtime_mode == "PILOT"
+    assert paused.production_real_send_enabled is False
+    assert paused.controlled_store_auto_enabled is False
+    assert paused.kill_switch_enabled is True
+    assert paused.ai_cs_store_id == "c-store-1"
+    assert paused.platform_store_id == "328616090"
+    status = json.loads(
+        (tmp_path / "runtime" / "controlled-auto-public-status.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert status["runner_active"] is True
+    assert status["control_error_code"] == "PDD_SEND_CURRENT_TARGET_MISMATCH"
 
 
 def test_production_auto_renews_expired_read_observer(tmp_path) -> None:
