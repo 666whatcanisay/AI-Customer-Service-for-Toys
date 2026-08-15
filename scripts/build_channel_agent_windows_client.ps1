@@ -24,7 +24,10 @@ function Get-GitBuildIdentity(
     if ($LASTEXITCODE -ne 0 -or $tree -notmatch '^[a-f0-9]{40}$') {
         throw "Cannot resolve source tree for $RepositoryName."
     }
-    $dirtyPaths = @(& git -C $Root status --porcelain --untracked-files=normal 2>$null)
+    $statusArguments = @(
+        '-C', $Root, 'status', '--porcelain', '--untracked-files=normal', '--'
+    ) + $ImplementationPaths
+    $dirtyPaths = @(& git @statusArguments 2>$null)
     if ($LASTEXITCODE -ne 0) { throw "Cannot inspect workspace state for $RepositoryName." }
     return [ordered]@{
         repository = $RepositoryName
