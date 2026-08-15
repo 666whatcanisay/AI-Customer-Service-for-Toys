@@ -358,6 +358,20 @@ def main(argv: list[str] | None = None) -> int:
                 deployment_scope=args.deployment_scope,
                 policy_mode=args.policy_mode,
             )
+            # Pilot and production share the immutable Decision ledger.  A
+            # successful one-shot must not look like new work when the
+            # production loop starts immediately afterwards.
+            ledger = ControlledAutoDecisionLedger(
+                assistant_root / "controlled-auto-decisions.sqlite3"
+            )
+            recorded_at = datetime.now(UTC)
+            if ledger.claim_once(response.decision_id, now=recorded_at):
+                ledger.finish(
+                    response.decision_id,
+                    outcome=response.outcome,
+                    receipt_id=response.receipt_id,
+                    now=recorded_at,
+                )
             _print(response.model_dump(mode="json"))
             return 0 if response.outcome == "SUCCESS" else 4
         if args.command == "enable-kill-switch":
