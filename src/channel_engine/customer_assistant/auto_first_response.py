@@ -141,12 +141,42 @@ class StoreApprovedAutoFirstResponseGateway:
         request: DecisionRequest,
     ) -> tuple[str, str, str, GatewayRiskLevel]:
         question = request.customer_message.casefold()
+        compact = "".join(question.split())
         product = request.context.get("product")
         product_reference = (
             product.get("product_reference")
             if isinstance(product, Mapping)
             else None
         )
+        product_contact_only = (
+            (
+                compact.startswith(("http://", "https://"))
+                and any(
+                    domain in compact
+                    for domain in ("yangkeduo.com", "pinduoduo.com")
+                )
+            )
+            or (
+                any(
+                    marker in compact
+                    for marker in ("商品id:", "商品id：", "查看商品规格")
+                )
+                and not any(
+                    marker in compact
+                    for marker in (
+                        "多少", "多大", "怎么", "什么", "哪", "吗", "呢",
+                        "？", "退款", "售后", "订单", "物流",
+                    )
+                )
+            )
+        )
+        if product_contact_only:
+            return (
+                "PRODUCT_CONTACT_GREETING",
+                "您好，请问需要什么帮助吗？",
+                "DIRECT_ANSWER",
+                GatewayRiskLevel.LOW,
+            )
         if any(marker in question for marker in ("误吞", "吞咽", "吞", "儿童", "小孩", "安全", "有毒")):
             return (
                 "SAFETY_SMALL_PARTS",

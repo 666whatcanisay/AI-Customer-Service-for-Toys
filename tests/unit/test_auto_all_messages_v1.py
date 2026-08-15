@@ -110,6 +110,25 @@ def test_unavailable_ai_produces_one_governed_price_fallback() -> None:
     assert "以当前商品页面显示为准" in (response.proposed_content or "")
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "https://mobile.yangkeduo.com/goods.html?goods_id=982904528556",
+        "商品ID：982904528556 粉白布加迪威龙积木 ￥14/2人团 查看商品规格",
+    ],
+)
+def test_product_contact_without_question_uses_store_greeting(message: str) -> None:
+    response = StoreApprovedAutoFirstResponseGateway(
+        RaisingGateway(), clock=lambda: NOW
+    ).decide(_request(message))
+
+    assert response.action is DecisionAction.SUGGEST_REPLY
+    assert response.risk_level is GatewayRiskLevel.LOW
+    assert response.metadata["ai_cs_action"] == "DIRECT_ANSWER"
+    assert response.metadata["fixed_reply_rule_id"] == "PRODUCT_CONTACT_GREETING"
+    assert response.proposed_content == "您好，请问需要什么帮助吗？"
+
+
 def test_unknown_product_produces_clarifying_first_response() -> None:
     response = StoreApprovedAutoFirstResponseGateway(
         RaisingGateway(), clock=lambda: NOW
