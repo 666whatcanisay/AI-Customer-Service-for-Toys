@@ -114,6 +114,59 @@ def test_changed_latest_message_id_reopens_when_page_has_no_stable_sequence(
     assert changed.state is PDDConversationCaptureState.PENDING
 
 
+def test_missing_attention_establishes_preview_baseline_without_scheduling_history(
+    tmp_path,
+) -> None:
+    store = DurablePDDConversationCaptureStore(
+        tmp_path / "spool.sqlite3", clock=lambda: NOW
+    )
+
+    baseline = observe(
+        store,
+        "conversation-a",
+        state=PDDReplyAttentionState.NONE,
+        seconds=None,
+        sequence=None,
+        message_id="preview-a",
+    )
+
+    assert baseline is not None
+    assert baseline.state is PDDConversationCaptureState.COMPLETED
+    assert baseline.attention_present is False
+    assert baseline.latest_message_id == "preview-a"
+    assert store.pending() == ()
+
+
+def test_preview_change_schedules_exact_conversation_when_attention_is_missing(
+    tmp_path,
+) -> None:
+    store = DurablePDDConversationCaptureStore(
+        tmp_path / "spool.sqlite3", clock=lambda: NOW
+    )
+    observe(
+        store,
+        "conversation-a",
+        state=PDDReplyAttentionState.NONE,
+        seconds=None,
+        sequence=None,
+        message_id="preview-a",
+    )
+
+    changed = observe(
+        store,
+        "conversation-a",
+        state=PDDReplyAttentionState.NONE,
+        seconds=None,
+        sequence=None,
+        message_id="preview-b",
+    )
+
+    assert changed is not None
+    assert changed.state is PDDConversationCaptureState.PENDING
+    assert changed.attention_present is False
+    assert [item.conversation_id for item in store.pending()] == ["conversation-a"]
+
+
 def test_countdown_reset_reopens_same_conversation_without_row_message_id(
     tmp_path,
 ) -> None:

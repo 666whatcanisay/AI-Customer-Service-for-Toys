@@ -103,6 +103,7 @@ class NavigableDriver:
         self.snapshots = dict(snapshots)
         self.active: str | None = None
         self.navigated: list[str] = []
+        self.allow_attention_missing: list[bool] = []
 
     def selector_evidence(self, capability: str) -> PDDSelectorRuntimeEvidence:
         assert capability == "OBSERVE"
@@ -124,9 +125,9 @@ class NavigableDriver:
         return self.snapshots[item.conversation_id]
 
     def navigate_to_conversation(self, item, *, allow_attention_missing=False):
-        del allow_attention_missing
         self.active = item.conversation_id
         self.navigated.append(item.conversation_id)
+        self.allow_attention_missing.append(allow_attention_missing)
 
 
 class UnstableNavigableDriver(NavigableDriver):
@@ -297,6 +298,78 @@ def test_same_buyer_new_message_reopens_without_replaying_old_observation(tmp_pa
     assert record is not None
     assert record.state is PDDConversationCaptureState.COMPLETED
     assert record.captured_message_high_watermark == 2
+
+
+def test_preview_change_navigates_exact_row_when_pdd_attention_marker_is_missing(
+    tmp_path,
+) -> None:
+    first = summary(
+        "conversation-a",
+        sequence=1,
+        position=0,
+        attention=PDDReplyAttentionState.NONE,
+        attention_seconds=None,
+    )
+    second = summary(
+        "conversation-a",
+        sequence=2,
+        position=0,
+        attention=PDDReplyAttentionState.NONE,
+        attention_seconds=None,
+    )
+    driver = NavigableDriver(
+        [second],
+        {
+            second.conversation_id: PDDWorkspaceSnapshot(
+                store_id="store-1",
+                platform_store_id="328616090",
+                conversation_id=second.conversation_id,
+                customer_reference=customer_reference(second.conversation_id),
+                page_fingerprint=FINGERPRINT,
+                selector_evidence_hash=DIGEST,
+                page_state="CUSTOMER_SERVICE_RUNNING",
+                messages=(
+                    PDDWorkspaceMessage(
+                        external_message_id="conversation-a-message-1",
+                        sender="CUSTOMER",
+                        content="historical-content",
+                        timestamp=NOW - timedelta(minutes=1),
+                        sequence=1,
+                    ),
+                    PDDWorkspaceMessage(
+                        external_message_id="conversation-a-message-2",
+                        sender="CUSTOMER",
+                        content="new-content",
+                        timestamp=NOW + timedelta(seconds=2),
+                        sequence=2,
+                    ),
+                ),
+                captured_at=NOW + timedelta(seconds=2),
+            )
+        },
+    )
+    observer, _, capture_store, forwarded = build_observer(tmp_path, driver)
+    capture_store.observe_attention(
+        store_id=first.store_id,
+        platform_store_id=first.platform_store_id,
+        conversation_id=first.conversation_id,
+        attention_state=first.attention_state,
+        attention_verified=False,
+        attention_seconds=None,
+        attention_evidence_hash=None,
+        page_position=first.page_position,
+        latest_sequence=None,
+        latest_message_id=first.latest_message_id,
+    )
+
+    result = observer.scan_once()
+
+    assert result.observations_forwarded == 1
+    assert driver.navigated == ["conversation-a"]
+    assert driver.allow_attention_missing == [True]
+    assert [item.external_message_id for item in forwarded] == [
+        "conversation-a-message-2",
+    ]
 
 
 def test_unstable_target_returns_durable_task_to_pending(tmp_path) -> None:

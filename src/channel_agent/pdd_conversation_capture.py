@@ -127,10 +127,40 @@ class DurablePDDConversationCaptureStore:
             ).fetchone()
             if row is None:
                 if not present:
+                    # PDD may change or temporarily omit its red "reply due"
+                    # marker.  Keep a privacy-safe row-preview baseline so a
+                    # later preview change can still schedule this exact
+                    # conversation without treating every historical row as
+                    # pending on startup.
+                    if latest_message_id is None:
+                        connection.commit()
+                        return None
+                    connection.execute(
+                        """
+                        INSERT INTO pdd_conversation_captures (
+                            store_id, platform_store_id, conversation_id, state,
+                            attention_state, attention_present, attention_seconds,
+                            attention_evidence_hash, page_position,
+                            captured_message_high_watermark, latest_message_id,
+                            first_observed_at, last_observed_at, attempts, last_error_code
+                        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?, 0, NULL)
+                        """,
+                        (
+                            *scope,
+                            PDDConversationCaptureState.COMPLETED.value,
+                            attention_state.value,
+                            attention_seconds,
+                            attention_evidence_hash,
+                            page_position,
+                            latest_message_id,
+                            now.isoformat(),
+                            now.isoformat(),
+                        ),
+                    )
                     connection.commit()
-                    return None
-                connection.execute(
-                    """
+                else:
+                    connection.execute(
+                        """
                     INSERT INTO pdd_conversation_captures (
                         store_id, platform_store_id, conversation_id, state,
                         attention_state, attention_present, attention_seconds,
@@ -139,17 +169,17 @@ class DurablePDDConversationCaptureStore:
                         first_observed_at, last_observed_at, attempts, last_error_code
                     ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, 0, NULL, ?, ?, 0, NULL)
                     """,
-                    (
-                        *scope,
-                        PDDConversationCaptureState.PENDING.value,
-                        attention_state.value,
-                        attention_seconds,
-                        attention_evidence_hash,
-                        page_position,
-                        now.isoformat(),
-                        now.isoformat(),
-                    ),
-                )
+                        (
+                            *scope,
+                            PDDConversationCaptureState.PENDING.value,
+                            attention_state.value,
+                            attention_seconds,
+                            attention_evidence_hash,
+                            page_position,
+                            now.isoformat(),
+                            now.isoformat(),
+                        ),
+                    )
             else:
                 state = PDDConversationCaptureState(str(row[0]))
                 was_present = bool(row[1])
@@ -177,15 +207,10 @@ class DurablePDDConversationCaptureStore:
                         )
                     )
                 )
-                if (
-                    present
-                    and state is PDDConversationCaptureState.COMPLETED
-                    and (
-                        not was_present
-                        or sequence_advanced
-                        or message_changed
-                        or countdown_restarted
-                    )
+                if state is PDDConversationCaptureState.COMPLETED and (
+                    sequence_advanced
+                    or message_changed
+                    or (present and (not was_present or countdown_restarted))
                 ):
                     state = PDDConversationCaptureState.PENDING
                 connection.execute(

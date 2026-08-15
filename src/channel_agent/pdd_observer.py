@@ -227,6 +227,15 @@ class PDDMessageObserver:
                 continue
             cursor = self._spool.conversation_cursor(*identity)
             is_scheduled = identity in scheduled_set
+            capture_record = (
+                self._capture_store.get(
+                    summary.store_id,
+                    summary.platform_store_id,
+                    summary.conversation_id,
+                )
+                if is_scheduled and self._capture_store is not None
+                else None
+            )
 
             if cursor is None and summary.unread_count is None and not is_scheduled:
                 manual += 1
@@ -256,21 +265,15 @@ class PDDMessageObserver:
             except PDDConversationNotActive:
                 if is_scheduled and getattr(self._driver, "navigation_enabled", False):
                     try:
-                        record = (
-                            self._capture_store.get(
-                                summary.store_id,
-                                summary.platform_store_id,
-                                summary.conversation_id,
-                            )
-                            if self._capture_store is not None
-                            else None
-                        )
                         self._driver.navigate_to_conversation(
                             summary,
                             allow_attention_missing=(
-                                record is not None
-                                and record.last_error_code
-                                == "RECOVERED_AFTER_NAVIGATION_INTERRUPTION"
+                                capture_record is not None
+                                and (
+                                    not capture_record.attention_present
+                                    or capture_record.last_error_code
+                                    == "RECOVERED_AFTER_NAVIGATION_INTERRUPTION"
+                                )
                             ),
                         )
                         snapshot = self._driver.capture_conversation(summary)
@@ -368,6 +371,13 @@ class PDDMessageObserver:
             pending, unknown = _unhandled_customer_messages(
                 snapshot.messages,
                 after_sequence=after_sequence,
+                not_before=(
+                    capture_record.first_observed_at
+                    if cursor is None
+                    and capture_record is not None
+                    and not capture_record.attention_present
+                    else None
+                ),
             )
             if unknown:
                 manual += 1
@@ -582,8 +592,14 @@ def _unhandled_customer_messages(
     messages: tuple[PDDWorkspaceMessage, ...],
     *,
     after_sequence: int,
+    not_before: datetime | None = None,
 ) -> tuple[tuple[PDDWorkspaceMessage, ...], tuple[PDDWorkspaceMessage, ...]]:
-    new_messages = tuple(message for message in messages if message.sequence > after_sequence)
+    new_messages = tuple(
+        message
+        for message in messages
+        if message.sequence > after_sequence
+        and (not_before is None or message.timestamp >= not_before)
+    )
     last_operator_sequence = max(
         (message.sequence for message in new_messages if message.sender == "OPERATOR"),
         default=after_sequence,
