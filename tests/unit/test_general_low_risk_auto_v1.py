@@ -291,6 +291,31 @@ def test_runtime_mode_governance_and_kill_switch_are_mode_aware(tmp_path) -> Non
     assert stopped.kill_switch_enabled is True
     assert stopped.production_real_send_enabled is False
     assert stopped.controlled_store_auto_enabled is False
+    assert stopped.ai_cs_store_id == AI_CS_STORE
+    assert stopped.platform_store_id == PLATFORM_STORE
+
+
+def test_prepare_resume_scope_never_enables_sender(tmp_path) -> None:
+    store = ControlledAutoRuntimeStateStore(tmp_path / "runtime.sqlite3")
+
+    prepared = store.prepare_production_auto_resume(
+        ai_cs_store_id=AI_CS_STORE,
+        platform_store_id=PLATFORM_STORE,
+        policy_revision=6,
+        whitelist_revision="single-store-auto-all-v2",
+        operator="tester",
+        reason="verified desktop recovery",
+        policy_mode="AUTO_ALL_MESSAGES_V1",
+    )
+
+    assert prepared.runtime_mode == "PILOT"
+    assert prepared.production_real_send_enabled is False
+    assert prepared.controlled_store_auto_enabled is False
+    assert prepared.controlled_pilot_send_enabled is False
+    assert prepared.kill_switch_enabled is True
+    assert prepared.ai_cs_store_id == AI_CS_STORE
+    assert prepared.platform_store_id == PLATFORM_STORE
+    assert prepared.policy_mode == "AUTO_ALL_MESSAGES_V1"
 
 
 def test_human_pause_retains_verified_scope_for_explicit_resume(tmp_path) -> None:

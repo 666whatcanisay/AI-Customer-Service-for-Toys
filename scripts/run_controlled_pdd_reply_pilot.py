@@ -98,6 +98,14 @@ def _parser() -> argparse.ArgumentParser:
     activate.add_argument("--reason", required=True)
     activate.add_argument("--confirmation-phrase", required=True)
 
+    prepare_resume = subparsers.add_parser("prepare-production-auto-resume")
+    add_policy_arguments(prepare_resume)
+    add_auto_policy_mode(prepare_resume)
+    prepare_resume.add_argument("--operator-reference", required=True)
+    prepare_resume.add_argument("--ai-cs-store-id", required=True)
+    prepare_resume.add_argument("--platform-store-id", required=True)
+    prepare_resume.add_argument("--reason", required=True)
+
     production = subparsers.add_parser("run-production-auto")
     production.add_argument("--operator-reference", required=True)
     production.add_argument("--poll-seconds", type=float, default=0.5)
@@ -623,6 +631,25 @@ def main(argv: list[str] | None = None) -> int:
                     error_code="PRODUCTION_AUTO_CONFIRMATION_INVALID",
                 )
             state = runtime_store.activate_production_auto(
+                ai_cs_store_id=expected[0],
+                platform_store_id=expected[1],
+                policy_revision=args.policy_revision,
+                whitelist_revision=args.whitelist_revision,
+                operator=args.operator_reference,
+                reason=args.reason,
+                policy_mode=args.policy_mode,
+            )
+            _print(state.model_dump(mode="json"))
+            return 0
+        if args.command == "prepare-production-auto-resume":
+            observed = _current_store_identity(data_root)
+            expected = (args.ai_cs_store_id.strip(), args.platform_store_id.strip())
+            if observed != expected:
+                raise ControlledReplyPilotError(
+                    "live double Store identity does not match the requested resume scope",
+                    error_code="PRODUCTION_RESUME_SCOPE_MISMATCH",
+                )
+            state = runtime_store.prepare_production_auto_resume(
                 ai_cs_store_id=expected[0],
                 platform_store_id=expected[1],
                 policy_revision=args.policy_revision,

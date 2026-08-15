@@ -198,6 +198,36 @@ class ControlledAutoRuntimeStateStore:
             reason=reason,
         )
 
+    def prepare_production_auto_resume(
+        self,
+        *,
+        ai_cs_store_id: str,
+        platform_store_id: str,
+        policy_revision: int,
+        whitelist_revision: str,
+        operator: str,
+        reason: str,
+        policy_mode: Literal[
+            "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+        ] = "AUTO_LOW_RISK",
+    ) -> ControlledAutoRuntimeStateV1:
+        """Freeze a verified resume scope while every sending switch stays off."""
+
+        return self._replace(
+            runtime_mode="PILOT",
+            production_real_send_enabled=False,
+            controlled_pilot_send_enabled=False,
+            controlled_store_auto_enabled=False,
+            ai_cs_store_id=ai_cs_store_id,
+            platform_store_id=platform_store_id,
+            policy_mode=policy_mode,
+            policy_revision=policy_revision,
+            whitelist_revision=whitelist_revision,
+            kill_switch_enabled=True,
+            changed_by=operator,
+            reason=reason,
+        )
+
     def enable_kill_switch(
         self, *, operator: str, reason: str
     ) -> ControlledAutoRuntimeStateV1:
@@ -207,9 +237,9 @@ class ControlledAutoRuntimeStateStore:
             production_real_send_enabled=False,
             controlled_pilot_send_enabled=False,
             controlled_store_auto_enabled=False,
-            ai_cs_store_id=None,
-            platform_store_id=None,
-            policy_mode="MANUAL_CONFIRM",
+            ai_cs_store_id=current.ai_cs_store_id,
+            platform_store_id=current.platform_store_id,
+            policy_mode=current.policy_mode,
             policy_revision=current.policy_revision,
             whitelist_revision=current.whitelist_revision,
             kill_switch_enabled=True,
