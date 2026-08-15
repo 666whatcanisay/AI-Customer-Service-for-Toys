@@ -675,15 +675,19 @@ class DesktopAssistantServer:
         snapshots = snapshots_reader() if callable(snapshots_reader) else ()
         if snapshots:
             return self._with_controlled_auto_state(
-                self._with_read_state(self._snapshots_feed(
-                    tuple(item.model_dump(mode="json") for item in snapshots)
-                ))
+                self._with_manual_reply_state(
+                    self._with_read_state(self._snapshots_feed(
+                        tuple(item.model_dump(mode="json") for item in snapshots)
+                    ))
+                )
             )
         snapshot = self.event_journal.assistant_snapshot()
         if snapshot is not None:
             return self._with_controlled_auto_state(
-                self._with_read_state(
-                    self._snapshot_feed(snapshot.model_dump(mode="json"))
+                self._with_manual_reply_state(
+                    self._with_read_state(
+                        self._snapshot_feed(snapshot.model_dump(mode="json"))
+                    )
                 )
             )
         value = self._read_json(
@@ -693,8 +697,10 @@ class DesktopAssistantServer:
             / "assistant-feed.json"
         )
         if value:
-            return self._with_controlled_auto_state(value)
-        return self._with_controlled_auto_state({
+            return self._with_controlled_auto_state(
+                self._with_manual_reply_state(value)
+            )
+        return self._with_controlled_auto_state(self._with_manual_reply_state({
             # Keep the empty runtime feed on the exact same contract as the
             # real PDD observer and the synthetic adapter.  The desktop UI
             # intentionally validates every safety fact before it will render
@@ -714,7 +720,7 @@ class DesktopAssistantServer:
                 "receiptCount": 0,
                 "sendCount": 0,
             },
-        })
+        }))
 
     def _with_controlled_auto_state(self, feed: dict[str, Any]) -> dict[str, Any]:
         controlled = self._controlled_auto_status()
@@ -808,6 +814,29 @@ class DesktopAssistantServer:
                 conversation["revision"] = revision
         return feed
 
+    def _with_manual_reply_state(self, feed: dict[str, Any]) -> dict[str, Any]:
+        replied_revision = getattr(self.event_journal, "replied_revision", None)
+        if not callable(replied_revision):
+            return feed
+        for conversation in feed.get("conversations", []):
+            if not isinstance(conversation, dict):
+                continue
+            conversation_id = conversation.get("conversationId")
+            revision = conversation.get("revision")
+            if not isinstance(conversation_id, str) or not isinstance(revision, int):
+                continue
+            confirmed_revision = replied_revision(conversation_id)
+            if confirmed_revision < revision:
+                continue
+            conversation["requiresHuman"] = False
+            conversation["attentionLevel"] = "NONE"
+            conversation["unreadCount"] = 0
+            conversation["state"] = "MANUALLY_REPLIED_CONFIRMED"
+            conversation["processingStage"] = "MANUALLY_REPLIED_CONFIRMED"
+            conversation["manualReplyConfirmed"] = True
+            conversation["manualReplyConfirmedRevision"] = confirmed_revision
+        return feed
+
     def mark_conversation_read(self, conversation_id: str) -> dict[str, Any]:
         snapshots_reader = getattr(self.event_journal, "assistant_snapshots", None)
         snapshots = snapshots_reader() if callable(snapshots_reader) else ()
@@ -829,6 +858,30 @@ class DesktopAssistantServer:
             "schema_version": DESKTOP_API_VERSION,
             "conversation_id": conversation_id,
             "read_revision": revision,
+        }
+
+    def mark_conversation_replied(self, conversation_id: str) -> dict[str, Any]:
+        snapshots_reader = getattr(self.event_journal, "assistant_snapshots", None)
+        snapshots = snapshots_reader() if callable(snapshots_reader) else ()
+        snapshot = next(
+            (item for item in snapshots if item.conversation_id == conversation_id),
+            None,
+        )
+        if snapshot is None:
+            single = self.event_journal.assistant_snapshot()
+            if single is not None and single.conversation_id == conversation_id:
+                snapshot = single
+        if snapshot is None:
+            raise DesktopAssistantError("assistant conversation does not exist")
+        marker = getattr(self.event_journal, "mark_conversation_replied", None)
+        if not callable(marker):
+            raise DesktopAssistantError("assistant reply cursor is unavailable")
+        revision = marker(conversation_id, snapshot.revision)
+        return {
+            "schema_version": DESKTOP_API_VERSION,
+            "conversation_id": conversation_id,
+            "replied_revision": revision,
+            "status": "MANUALLY_REPLIED_CONFIRMED",
         }
 
     @staticmethod
@@ -1802,6 +1855,32 @@ class _DesktopHandler(BaseHTTPRequestHandler):
                 self._json(
                     HTTPStatus.OK,
                     self.server.runtime.mark_conversation_read(conversation_id),
+                )
+            except DesktopAssistantError:
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": {"code": "ASSISTANT_CONVERSATION_NOT_FOUND"}},
+                )
+            return
+        replied_match = re.fullmatch(
+            r"/local-api/v1/conversations/([^/]+)/replied", path
+        )
+        if replied_match is not None:
+            self._discard_request_body()
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_CONFIRMED_CONVERSATION_REPLIED"
+            ):
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            try:
+                conversation_id = unquote(replied_match.group(1))
+                self._json(
+                    HTTPStatus.OK,
+                    self.server.runtime.mark_conversation_replied(conversation_id),
                 )
             except DesktopAssistantError:
                 self._json(

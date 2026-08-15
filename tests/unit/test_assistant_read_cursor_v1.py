@@ -47,6 +47,20 @@ def test_read_cursor_is_metadata_only_monotonic_and_restart_durable(
     assert restarted.read_revision("conversation-1") == 3
 
 
+def test_manual_reply_cursor_is_metadata_only_monotonic_and_restart_durable(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "assistant-events.sqlite3"
+    first = AssistantEventJournal(path)
+    assert first.replied_revision("conversation-1") == 0
+    assert first.mark_conversation_replied("conversation-1", 3) == 3
+    assert first.mark_conversation_replied("conversation-1", 2) == 3
+
+    restarted = AssistantEventJournal(path)
+    assert restarted.replied_revision("conversation-1") == 3
+    assert restarted.read_revision("conversation-1") == 3
+
+
 def test_desktop_multi_conversation_feed_uses_read_cursor(tmp_path: Path) -> None:
     journal = AssistantEventJournal(tmp_path / "assistant-events.sqlite3")
     journal.update_snapshots((_snapshot(),))
@@ -64,6 +78,28 @@ def test_desktop_multi_conversation_feed_uses_read_cursor(tmp_path: Path) -> Non
     read = runtime.assistant_feed()["conversations"][0]
     assert read["unreadCount"] == 0
     assert read["readRevision"] == 3
+
+
+def test_manual_reply_confirmation_clears_attention_until_a_new_revision(
+    tmp_path: Path,
+) -> None:
+    journal = AssistantEventJournal(tmp_path / "assistant-events.sqlite3")
+    journal.update_snapshots((_snapshot(revision=3),))
+    runtime = DesktopAssistantServer(data_root=tmp_path, event_journal=journal)
+
+    result = runtime.mark_conversation_replied("conversation-1")
+    assert result["replied_revision"] == 3
+    confirmed = runtime.assistant_feed()["conversations"][0]
+    assert confirmed["attentionLevel"] == "NONE"
+    assert confirmed["requiresHuman"] is False
+    assert confirmed["unreadCount"] == 0
+    assert confirmed["manualReplyConfirmed"] is True
+    assert confirmed["processingStage"] == "MANUALLY_REPLIED_CONFIRMED"
+
+    journal.update_snapshots((_snapshot(revision=4),))
+    new_message = runtime.assistant_feed()["conversations"][0]
+    assert new_message["attentionLevel"] == "UNANSWERED"
+    assert new_message.get("manualReplyConfirmed") is None
 
 
 def test_desktop_feed_uses_verified_customer_message_id_and_keeps_old_snapshot_compatible(

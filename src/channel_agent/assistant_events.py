@@ -135,6 +135,52 @@ class AssistantEventJournal:
             ).fetchone()
         return 0 if row is None else int(row[0])
 
+    def mark_conversation_replied(self, conversation_id: str, revision: int) -> int:
+        """Persist a human assertion that this exact conversation revision is replied.
+
+        The marker contains identifiers and a revision only.  A later Host revision
+        automatically makes the conversation actionable again.
+        """
+
+        if not conversation_id.strip() or len(conversation_id) > 255:
+            raise ValueError("assistant conversation id is invalid")
+        if revision < 1:
+            raise ValueError("assistant conversation revision is invalid")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO assistant_reply_cursors(conversation_id, revision)
+                VALUES(?, ?)
+                ON CONFLICT(conversation_id) DO UPDATE SET
+                    revision=MAX(assistant_reply_cursors.revision, excluded.revision)
+                """,
+                (conversation_id, revision),
+            )
+            connection.execute(
+                """
+                INSERT INTO assistant_read_cursors(conversation_id, revision)
+                VALUES(?, ?)
+                ON CONFLICT(conversation_id) DO UPDATE SET
+                    revision=MAX(assistant_read_cursors.revision, excluded.revision)
+                """,
+                (conversation_id, revision),
+            )
+            row = connection.execute(
+                "SELECT revision FROM assistant_reply_cursors WHERE conversation_id=?",
+                (conversation_id,),
+            ).fetchone()
+        with self._changed:
+            self._changed.notify_all()
+        return int(row[0])
+
+    def replied_revision(self, conversation_id: str) -> int:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT revision FROM assistant_reply_cursors WHERE conversation_id=?",
+                (conversation_id,),
+            ).fetchone()
+        return 0 if row is None else int(row[0])
+
     def _initialize(self) -> None:
         with self._connect() as connection:
             connection.execute(
@@ -149,6 +195,14 @@ class AssistantEventJournal:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS assistant_read_cursors(
+                    conversation_id TEXT PRIMARY KEY,
+                    revision INTEGER NOT NULL CHECK(revision >= 1)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS assistant_reply_cursors(
                     conversation_id TEXT PRIMARY KEY,
                     revision INTEGER NOT NULL CHECK(revision >= 1)
                 )

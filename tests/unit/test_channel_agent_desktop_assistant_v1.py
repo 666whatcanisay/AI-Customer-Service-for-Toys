@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from http.cookiejar import CookieJar
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,6 +13,7 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 import pytest
 
 from channel_agent.config import ChannelAgentConfig
+from channel_agent.control_v2 import AgentAssistantSnapshot
 from channel_agent.desktop import DesktopAssistantServer
 from channel_agent.observation_stages import ObservationStage
 
@@ -396,6 +397,66 @@ def test_safe_stop_endpoint_only_writes_stop_marker_after_same_origin_post(
         with opener.open(request, timeout=2) as response:  # noqa: S310
             assert response.status == 202
         assert (tmp_path / "runtime" / "stop.request").read_text(encoding="ascii") == "stop\n"
+    finally:
+        server.stop()
+
+
+def test_manual_replied_endpoint_requires_intent_and_marks_only_current_revision(
+    tmp_path: Path,
+) -> None:
+    now = datetime.now(UTC)
+    server = DesktopAssistantServer(data_root=tmp_path)
+    server.event_journal.update_snapshots((AgentAssistantSnapshot(
+        agent_id="agent-1",
+        device_id="device-1",
+        store_id="store-1",
+        conversation_id="conversation/a",
+        revision=7,
+        status="WAITING_APPROVAL",
+        turn_id="turn-1",
+        decision_id="decision-1",
+        request_id="request-1",
+        customer_reference="customer-1",
+        current_question="privacy filtered question",
+        action="REPLY",
+        reply_content="answer",
+        risk_level="LOW",
+        updated_at=now,
+        expires_at=now + timedelta(minutes=5),
+    ),))
+    try:
+        server.start()
+        opener, origin, csrf = _authenticated_client(server)
+        url = f"{origin}/local-api/v1/conversations/conversation%2Fa/replied"
+        blocked = Request(
+            url,
+            data=b"{}",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+            },
+        )
+        with pytest.raises(HTTPError) as forbidden:
+            opener.open(blocked, timeout=2)  # noqa: S310
+        assert forbidden.value.code == 403
+
+        request = Request(
+            url,
+            data=b"{}",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+                "X-Channel-Agent-Intent": "HUMAN_CONFIRMED_CONVERSATION_REPLIED",
+            },
+        )
+        with opener.open(request, timeout=2) as response:  # noqa: S310
+            result = json.loads(response.read().decode("utf-8"))
+        assert result["replied_revision"] == 7
+        assert server.assistant_feed()["conversations"][0]["attentionLevel"] == "NONE"
     finally:
         server.stop()
 
