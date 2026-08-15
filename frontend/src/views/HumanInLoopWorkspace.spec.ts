@@ -153,6 +153,7 @@ describe('HumanInLoopWorkspace', () => {
       finalAnswerSummary: '您好，这款积木建议 5 岁以上使用，并请家长陪同。',
       createdBy: '11111111-1111-4111-8111-111111111111'
     }), 'interaction-key-1')
+    await wrapper.get('[data-testid="decision-panel-expand"]').trigger('click')
     expect(wrapper.get('[data-testid="interaction-receipt"]').text()).toContain('采用结果已记录')
     expect(wrapper.get('[data-testid="interaction-receipt"]').text()).not.toContain('AIE-001')
     expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('已采用')
@@ -316,6 +317,7 @@ describe('HumanInLoopWorkspace', () => {
     await wrapper.get('[data-testid="generate-draft"]').trigger('click'); await flushPromises()
     await wrapper.get('[data-testid="direct-accept"]').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-testid="active-conversation-status"]').text()).toContain('待人工发送')
+    await wrapper.get('[data-testid="decision-panel-expand"]').trigger('click')
     await wrapper.get('[data-testid="complete-conversation"]').trigger('click')
     expect(wrapper.get('[data-testid="active-conversation-status"]').text()).toContain('已完成')
   })

@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,14 +11,32 @@ const desktopMocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
   safeStop: vi.fn(),
   selectStore: vi.fn(),
-  openPdd: vi.fn()
+  openPdd: vi.fn(),
+  refreshPdd: vi.fn(),
+  restartObserver: vi.fn(),
+  getDesktopStatus: vi.fn(),
+  getPolicy: vi.fn(),
+  setPolicy: vi.fn()
 }))
 
 vi.mock('@/api/channelAgentDesktopClient', () => ({
   fetchChannelAgentBootstrap: desktopMocks.bootstrap,
   requestChannelAgentSafeStop: desktopMocks.safeStop,
   selectChannelAgentActiveStore: desktopMocks.selectStore,
-  requestChannelAgentPddWindowOpen: desktopMocks.openPdd
+  requestChannelAgentPddWindowOpen: desktopMocks.openPdd,
+  requestChannelAgentPddWorkspaceRefresh: desktopMocks.refreshPdd,
+  requestChannelAgentPddObserverRestart: desktopMocks.restartObserver
+}))
+
+vi.mock('@/api/desktopAgentClient', () => ({
+  desktopAgentClient: { getStatus: desktopMocks.getDesktopStatus }
+}))
+
+vi.mock('@/api/offlineReplyControlClient', () => ({
+  offlineReplyControlClient: {
+    getPolicy: desktopMocks.getPolicy,
+    setPolicy: desktopMocks.setPolicy
+  }
 }))
 
 describe('ChannelAgentDesktopLayout', () => {
@@ -68,8 +87,8 @@ describe('ChannelAgentDesktopLayout', () => {
         status: 'OPENED',
         pdd_login_state: 'CUSTOMER_SERVICE_READY',
         pdd_workspace_refresh_available: true,
-        message_source: 'OFFLINE_REPLAY',
-        real_pdd_message_observation_enabled: false
+        message_source: 'REAL_PDD',
+        real_pdd_message_observation_enabled: true
       },
       binding: {
         authorized_store_ids: ['store-ref:1', 'store-ref:2'],
@@ -78,6 +97,20 @@ describe('ChannelAgentDesktopLayout', () => {
         store_reference: 'store-ref:1'
       },
       safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
+    })
+    desktopMocks.getDesktopStatus.mockResolvedValue({
+      userId: '11111111-1111-4111-8111-111111111111', storeId: 1,
+      storeCode: 'store-ref:1', associationState: 'READY',
+      agent: {
+        agentId: 'agent-1', deviceId: 'device-1', deviceName: 'CS-PC-01',
+        agentVersion: '1.4.0', identityStatus: 'ACTIVE', onlineStatus: 'ONLINE',
+        runtimeStatus: 'RUNNING', productionEligible: true, bindingRevision: 1,
+        lastHeartbeat: '2026-08-15T01:00:00Z'
+      }, checkedAt: '2026-08-15T01:00:01Z'
+    })
+    desktopMocks.getPolicy.mockResolvedValue({
+      storeId: '1', mode: 'MANUAL_CONFIRM', revision: 1,
+      updatedBy: 'admin', updatedAt: '2026-08-15T01:00:00Z'
     })
   })
 
@@ -116,21 +149,21 @@ describe('ChannelAgentDesktopLayout', () => {
     await router.push('/')
     await router.isReady()
     const wrapper = mount(ChannelAgentDesktopLayout, {
-      global: { plugins: [router, ElementPlus] }
+      global: { plugins: [createPinia(), router, ElementPlus] }
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('PDD 已停止')
+    expect(wrapper.get('[data-testid="runtime-action-alert"]').text()).toContain('PDD 专属窗口未启动')
     await wrapper.get('[data-testid="open-pdd-window"]').trigger('click')
     await flushPromises()
 
     expect(desktopMocks.openPdd).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('PDD 等待扫码')
+    expect(wrapper.get('[data-testid="runtime-action-alert"]').text()).toContain('等待扫码登录')
     expect(wrapper.find('[data-testid="open-pdd-window"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('shows only the customer desktop shell with Agent, PDD and safety status', async () => {
+  it('keeps the healthy header minimal and moves diagnostics into runtime details', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div>客服会话内容</div>' } }]
@@ -138,24 +171,25 @@ describe('ChannelAgentDesktopLayout', () => {
     await router.push('/')
     await router.isReady()
     const wrapper = mount(ChannelAgentDesktopLayout, {
-      global: { plugins: [router, ElementPlus] }
+      global: { plugins: [createPinia(), router, ElementPlus] }
     })
     await flushPromises()
 
     expect(wrapper.get('[data-testid="agent-desktop-shell"]').text()).toContain('AI 客服助手')
-    expect(wrapper.text()).toContain('Agent 在线')
-    expect(wrapper.text()).toContain('PDD 客服工作台已就绪')
-    expect(wrapper.get('[data-testid="message-source-status"]').text()).toContain('消息源 离线回放')
-    expect(wrapper.get('[data-testid="message-source-status"]').classes()).toContain('attention')
-    expect(wrapper.get('[data-testid="pdd-workspace-guide"]').text()).toContain(
-      'https://mms.pinduoduo.com/chat-merchant/index.html#'
-    )
-    expect(wrapper.text()).toContain('当前店铺 玩具乐园积木店 · PDD 328616090')
-    expect(wrapper.get('[data-testid="active-store-status"]').classes()).toContain('healthy')
+    expect(wrapper.get('[data-testid="overall-runtime-status"]').text()).toContain('就绪')
+    expect(wrapper.find('[data-testid="runtime-action-alert"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="message-source-status"]').exists()).toBe(false)
     expect(wrapper.get('select[aria-label="当前工作店铺"]').element).toBeInstanceOf(HTMLSelectElement)
     expect(wrapper.get('select[aria-label="当前工作店铺"]').text()).toContain('玩具乐园积木店 · PDD 328616090')
     expect(wrapper.get('select[aria-label="当前工作店铺"]').text()).toContain('旧测试店铺（未绑定PDD）')
-    expect(wrapper.text()).toContain('人工确认模式')
+    await wrapper.get('[data-testid="open-runtime-details"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="message-source-status"]').text()).toContain('真实消息读取 已启用')
+    expect(wrapper.get('[data-testid="runtime-details-drawer"]').text()).toContain(
+      'https://mms.pinduoduo.com/chat-merchant/index.html#'
+    )
+    expect(wrapper.get('[data-testid="runtime-details-drawer"]').text()).toContain('CS-PC-01')
+    expect(wrapper.get('[data-testid="runtime-details-drawer"]').text()).toContain('REAL_SEND = OFF')
     expect(wrapper.text()).not.toContain('知识管理')
     expect(wrapper.text()).not.toContain('系统管理')
     wrapper.unmount()
@@ -189,10 +223,14 @@ describe('ChannelAgentDesktopLayout', () => {
     await router.push('/')
     await router.isReady()
     const wrapper = mount(ChannelAgentDesktopLayout, {
-      global: { plugins: [router, ElementPlus] }
+      global: { plugins: [createPinia(), router, ElementPlus] }
     })
     await flushPromises()
 
+    expect(wrapper.get('[data-testid="runtime-action-alert"]').text()).toContain('当前为离线回放')
+    expect(wrapper.find('[data-testid="restart-pdd-observer"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="open-runtime-details"]').trigger('click')
+    await flushPromises()
     const restart = wrapper.get('[data-testid="restart-pdd-observer"]')
     expect(restart.text()).toContain('当前为离线回放')
     expect((restart.element as HTMLButtonElement).disabled).toBe(true)
@@ -224,12 +262,14 @@ describe('ChannelAgentDesktopLayout', () => {
     await router.push('/')
     await router.isReady()
     const wrapper = mount(ChannelAgentDesktopLayout, {
-      global: { plugins: [router, ElementPlus] }
+      global: { plugins: [createPinia(), router, ElementPlus] }
     })
     await flushPromises()
 
+    await wrapper.get('[data-testid="open-runtime-details"]').trigger('click')
+    await flushPromises()
     expect(wrapper.get('[data-testid="message-source-status"]').text()).toContain('真实消息读取 已启用')
-    expect(wrapper.get('[data-testid="message-source-status"]').classes()).toContain('healthy')
+    expect(wrapper.get('[data-testid="overall-runtime-status"]').text()).toContain('就绪')
     wrapper.unmount()
   })
 })

@@ -1,5 +1,5 @@
 <template>
-  <section class="desktop-agent-panel" data-testid="desktop-agent-panel">
+  <section class="desktop-agent-panel" :class="`mode-${mode}`" data-testid="desktop-agent-panel">
     <div class="desktop-heading">
       <div>
         <small>客服电脑接入</small>
@@ -13,7 +13,7 @@
       </button>
     </div>
 
-    <div class="desktop-association" data-testid="desktop-agent-association">
+    <div v-if="mode !== 'alert'" class="desktop-association" data-testid="desktop-agent-association">
       <div><small>当前客服</small><strong>{{ userName || '身份未加载' }}</strong></div>
       <div><small>当前设备</small><strong>{{ deviceLabel }}</strong></div>
       <div><small>当前店铺</small><strong>{{ storeName || '店铺未加载' }}</strong></div>
@@ -63,6 +63,7 @@ const props = defineProps<{
   bindingBusy: boolean
   bindingGrant: DesktopBindingGrant | null
   canBind: boolean
+  mode?: 'full' | 'alert'
 }>()
 
 const emit = defineEmits<{
@@ -73,6 +74,7 @@ const emit = defineEmits<{
 
 const agentId = ref('')
 const deviceId = ref('')
+const mode = computed(() => props.mode ?? 'full')
 
 const statusLabel = computed(() => {
   if (props.errorKind === 'server_unreachable' || props.errorKind === 'timeout') return '服务器不可达'
@@ -132,6 +134,8 @@ const submitBinding = (): void => {
 
 <style scoped>
 .desktop-agent-panel { display: grid; grid-template-columns: minmax(160px, .8fr) minmax(540px, 2.4fr) minmax(240px, 1fr); gap: 14px; align-items: center; padding: 12px 15px; border: 1px solid var(--workspace-border-strong); border-radius: 14px; color: var(--workspace-text); background: linear-gradient(110deg, #f8fcf8, #e5f3e8); box-shadow: 0 10px 28px rgb(48 95 61 / 10%); }
+.desktop-agent-panel.mode-alert { grid-template-columns: minmax(240px, auto) minmax(0, 1fr); gap: 10px; padding: 7px 10px; border-color: #dfbd71; border-radius: 10px; background: var(--workspace-warning-soft); box-shadow: none; }
+.mode-alert .desktop-heading > div { display: none; }.mode-alert .desktop-heading { justify-content: flex-start; }.mode-alert .desktop-heading button { order: -1; }.mode-alert .desktop-notice { padding: 5px 7px; background: transparent; }.mode-alert .desktop-notice.danger { color: var(--workspace-danger); }.mode-alert .desktop-notice.warning { color: var(--workspace-warning); }
 .desktop-heading { display: flex; align-items: center; gap: 8px; }.desktop-heading > div { margin-right: auto; }.desktop-heading small,.desktop-association small { display:block;color:var(--workspace-muted);font-size:9px;font-weight:800; }.desktop-heading strong { font-size:13px; }.desktop-heading button,.binding-form button,.binding-grant button { padding:6px 9px;border:1px solid var(--workspace-border-strong);border-radius:8px;color:var(--workspace-accent-strong);background:#fff;font-size:9px;cursor:pointer; }.desktop-heading button:disabled,.binding-form button:disabled { opacity:.45;cursor:not-allowed; }
 .status-pill { flex:0 0 auto;padding:5px 7px;border-radius:999px;background:#eef1ef;color:#6f7f74;font-size:9px;font-weight:900; }.status-pill.healthy{background:#dcefe1;color:var(--workspace-accent-strong)}.status-pill.warning{background:var(--workspace-warning-soft);color:var(--workspace-warning)}.status-pill.danger{background:var(--workspace-danger-soft);color:var(--workspace-danger)}
 .desktop-association { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px; }.desktop-association div{min-width:0}.desktop-association strong{display:block;margin-top:3px;overflow:hidden;color:var(--workspace-text);font-size:9px;text-overflow:ellipsis;white-space:nowrap}

@@ -28,6 +28,52 @@ const draft: ReplyDraft = {
 }
 
 describe('DecisionCenter execution preparation boundary', () => {
+  it('keeps an empty workspace to one compact rail without placeholder metrics', async () => {
+    const wrapper = mount(DecisionCenter, {
+      props: {
+        draft: null, conversation: null, receiptId: '', feedbackReceiptId: '', collapsed: true
+      }
+    })
+
+    expect(wrapper.get('[data-testid="decision-center"]').text()).toContain('未选择会话')
+    expect(wrapper.text()).not.toContain('置信度')
+    expect(wrapper.text()).not.toContain('知识覆盖')
+    await wrapper.get('[data-testid="decision-panel-expand"]').trigger('click')
+    expect(wrapper.emitted('toggle')).toHaveLength(1)
+  })
+
+  it('highlights a waiting high-risk decision while remaining collapsed', () => {
+    const wrapper = mount(DecisionCenter, {
+      props: {
+        draft: { ...draft, state: 'HUMAN_REVIEW', decisionState: 'WAITING_HUMAN', riskLevel: 'HIGH' },
+        conversation,
+        receiptId: '', feedbackReceiptId: '', collapsed: true
+      }
+    })
+
+    expect(wrapper.get('[data-testid="decision-center"]').classes()).toContain('needs-attention')
+    expect(wrapper.text()).toContain('待确认 1')
+    expect(wrapper.text()).toContain('风险 高')
+    expect(wrapper.text()).toContain('REAL_SEND')
+  })
+
+  it('reveals the reply and emits the existing human confirmation action when expanded', async () => {
+    const reviewDraft = {
+      ...draft, state: 'HUMAN_REVIEW' as const, decisionState: 'WAITING_HUMAN' as const,
+      hostState: 'WAITING_APPROVAL', preparationId: null
+    }
+    const wrapper = mount(DecisionCenter, {
+      props: {
+        draft: reviewDraft, conversation, receiptId: '', feedbackReceiptId: '', collapsed: false
+      }
+    })
+
+    expect(wrapper.text()).toContain('建议回复')
+    expect(wrapper.text()).toContain('REAL_SEND = OFF')
+    await wrapper.get('[data-testid="decision-confirm"]').trigger('click')
+    expect(wrapper.emitted('confirm')?.[0]).toEqual(['DIRECT_ACCEPT'])
+  })
+
   it('never presents an execution preparation as a real send receipt', () => {
     const wrapper = mount(DecisionCenter, {
       props: { draft, conversation, receiptId: '', feedbackReceiptId: '' }
