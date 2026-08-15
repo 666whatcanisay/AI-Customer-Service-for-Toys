@@ -148,6 +148,17 @@ def test_selector_reader_can_read_an_attribute_from_the_message_row_itself() -> 
     assert "nodes.push(scope)" in expression
 
 
+def test_selector_reader_ignores_only_non_rendered_transition_duplicates() -> None:
+    expression = _read_expression(
+        '{"selectors":{},"probes":[],"path":"/chat-merchant/index.html"}',
+        capture=True,
+    )
+
+    assert "candidate.getClientRects().length > 0" in expression
+    assert "const bounded = rendered.length ? rendered : nodes" in expression
+    assert "bounded.length > b.maximum_matches" in expression
+
+
 def test_capture_prefers_latest_verified_product_card_vue_identity() -> None:
     expression = _read_expression(
         '{"selectors":{"product_card":{"selector":".commonCard .good-content","required":false,"maximum_matches":100},"message_item":{"selector":"li.onemsg","required":true,"maximum_matches":500}},"probes":[],"path":"/chat-merchant/index.html"}',

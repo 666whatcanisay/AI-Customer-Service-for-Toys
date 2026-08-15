@@ -735,8 +735,17 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     const nodes = [];
     if (scope !== document && typeof scope.matches === 'function' && scope.matches(b.selector)) nodes.push(scope);
     nodes.push(...Array.from(scope.querySelectorAll(b.selector)));
-    if (nodes.length > b.maximum_matches || (b.required && nodes.length === 0)) throw new Error('selector boundary');
-    const node = nodes[0];
+    // PDD briefly keeps the outgoing and incoming chat panels in the DOM
+    // during a view transition.  Both can retain the `active` class, but the
+    // outgoing copy has no rendered boxes.  Ignore only those non-rendered
+    // transition copies; if more than one rendered target remains, preserve
+    // the strict fail-closed selector boundary.
+    const rendered = nodes.filter((candidate) =>
+      typeof candidate.getClientRects !== 'function' || candidate.getClientRects().length > 0
+    );
+    const bounded = rendered.length ? rendered : nodes;
+    if (bounded.length > b.maximum_matches || (b.required && bounded.length === 0)) throw new Error('selector boundary');
+    const node = bounded[0];
     if (!node) return null;
     return String(b.attribute ? (node.getAttribute(b.attribute) || '') : (node.textContent || '')).trim();
   }};
