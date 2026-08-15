@@ -35,7 +35,6 @@ from channel_engine.models import ReceiptOutcome
 from .pdd_login import EdgePDDTargetResolver, PDDCDPPageTarget
 from .pdd_workspace import (
     PDD_WORKSPACE_URL,
-    ExistingPDDWorkspaceObserver,
     PDDWorkspaceSnapshot,
 )
 
@@ -177,6 +176,13 @@ class PDDWorkspaceActionPort(Protocol):
         expected_current_uid: str,
         content: str,
     ) -> PDDWorkspaceActionResult: ...
+
+
+@runtime_checkable
+class PDDWorkspaceSnapshotProvider(Protocol):
+    """Read the currently active PDD conversation for exact-target checks."""
+
+    def capture(self) -> PDDWorkspaceSnapshot: ...
 
 
 class WebSocketPDDWorkspaceActionPort:
@@ -373,7 +379,7 @@ class ControlledPDDWorkspaceBrowserSender:
     def __init__(
         self,
         *,
-        observer: ExistingPDDWorkspaceObserver,
+        observer: PDDWorkspaceSnapshotProvider,
         profile_path: str | Path,
         resolver: EdgePDDTargetResolver,
         action_port: PDDWorkspaceActionPort,
@@ -458,7 +464,7 @@ class ControlledPDDWorkspaceBrowserSender:
                 for item in current.visible_history:
                     if (
                         item.external_message_id not in before_ids
-                        and item.sender == "operator"
+                        and str(item.sender).casefold() == "operator"
                         and item.content == content
                     ):
                         return PDDWorkspaceSendResult(
@@ -495,14 +501,27 @@ class ControlledPDDWorkspaceBrowserSender:
                 "current PDD customer does not match the approved reply",
                 error_code="PDD_SEND_CUSTOMER_MISMATCH",
             )
-        if not any(
-            item.external_message_id == expected_customer_message_id
-            and item.sender == "customer"
-            for item in snapshot.visible_history
-        ):
+        target_index = next(
+            (
+                index
+                for index, item in enumerate(snapshot.visible_history)
+                if item.external_message_id == expected_customer_message_id
+                and str(item.sender).casefold() == "customer"
+            ),
+            None,
+        )
+        if target_index is None:
             raise PDDWorkspaceSendError(
                 "approved customer message is no longer visible in the target conversation",
                 error_code="PDD_SEND_MESSAGE_TARGET_MISSING",
+            )
+        if any(
+            str(item.sender).casefold() == "operator"
+            for item in snapshot.visible_history[target_index + 1 :]
+        ):
+            raise PDDWorkspaceSendError(
+                "the approved customer message already has a later operator reply",
+                error_code="PDD_SEND_CUSTOMER_ALREADY_ANSWERED",
             )
 
     def _assert_probe(
@@ -537,10 +556,10 @@ class ControlledPDDWorkspaceBrowserSender:
                 "PDD reply box contains unsent operator text",
                 error_code="PDD_SEND_INPUT_NOT_EMPTY",
             )
-        expected = "pdd-conversation:" + hashlib.sha256(
+        legacy_expected = "pdd-conversation:" + hashlib.sha256(
             f"{snapshot.store_id}\0{probe.current_uid}".encode("utf-8")
         ).hexdigest()
-        if expected != snapshot.conversation_id:
+        if snapshot.conversation_id not in {probe.current_uid, legacy_expected}:
             raise PDDWorkspaceSendError(
                 "PDD conversation changed before the controlled send",
                 error_code="PDD_SEND_CONVERSATION_CHANGED",
@@ -721,5 +740,6 @@ __all__ = [
     "PDDWorkspaceSendProbe",
     "PDDWorkspaceSendResult",
     "PDDWorkspaceSendState",
+    "PDDWorkspaceSnapshotProvider",
     "WebSocketPDDWorkspaceActionPort",
 ]

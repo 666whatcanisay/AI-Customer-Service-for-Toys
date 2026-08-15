@@ -92,6 +92,8 @@ class _Harness:
         policy_mode: str,
         question: str = QUESTION,
         reply_text: str = REPLY,
+        risk_level: GatewayRiskLevel = GatewayRiskLevel.LOW,
+        ai_cs_action: str = "DIRECT_ANSWER",
     ) -> AIReplyPackage:
         self.now += timedelta(seconds=2)
         message = BufferedCustomerMessage.from_redacted(
@@ -152,8 +154,8 @@ class _Harness:
                     source_kind="PRODUCT_KNOWLEDGE",
                 ),
             ),
-            risk_level=GatewayRiskLevel.LOW,
-            ai_cs_action="DIRECT_ANSWER",
+            risk_level=risk_level,
+            ai_cs_action=ai_cs_action,
             gateway_version="gateway-test-v1",
             generated_at=self.now,
         )
@@ -181,7 +183,7 @@ class _Harness:
                         "state": "WAITING_APPROVAL",
                         "qualityStatus": "PASS",
                         "policyMode": policy_mode,
-                        "action": "DIRECT_ANSWER",
+                        "action": package.ai_cs_action,
                     },
                 },
                 ensure_ascii=False,
@@ -225,6 +227,29 @@ def test_manual_preview_uses_existing_endpoint_and_persists_hash_only_baseline(
         REPLY.encode("utf-8")
     ).hexdigest()
     assert REPLY not in harness.orchestrator.baseline_path.read_text(encoding="utf-8")
+
+
+def test_manual_preview_allows_human_confirmed_medium_controlled_answer(
+    tmp_path,
+) -> None:
+    harness = _Harness(tmp_path)
+    harness.add_reply(
+        message_id="message-medium",
+        decision_id="decision-medium",
+        policy_mode="MANUAL_CONFIRM",
+        risk_level=GatewayRiskLevel.MEDIUM,
+        ai_cs_action="CONTROLLED_ANSWER",
+    )
+
+    preview, candidate, reply = harness.orchestrator.preview_manual(
+        policy_revision=1,
+        whitelist_revision="allowlist-1",
+    )
+
+    assert preview.mode == "MANUAL_CONFIRM"
+    assert candidate.risk_level == "MEDIUM"
+    assert candidate.action == "CONTROLLED_ANSWER"
+    assert reply == REPLY
 
 
 def test_pilot_state_write_retries_transient_windows_sharing_conflict(

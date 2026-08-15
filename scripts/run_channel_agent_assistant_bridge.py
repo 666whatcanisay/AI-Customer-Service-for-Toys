@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 
 from pydantic import ValidationError
 
@@ -26,16 +27,16 @@ from channel_agent.controlled_send_grant import (
 )
 from channel_agent.logger import SafeAgentLogger
 from channel_agent.pdd_login import EdgePDDTargetResolver
-from channel_agent.pdd_workspace import (
-    ExistingPDDWorkspaceObserver,
-    FixedReadOnlyPDDWorkspaceEvaluator,
-    PDDWorkspaceSelectorContract,
+from channel_agent.pdd_observer import PDDConversationNotActive
+from channel_agent.pdd_readonly_driver import (
+    EvidenceBackedPDDReadOnlyDriver,
+    load_pdd_observer_evidence,
 )
 from channel_agent.pdd_workspace_send import (
     ControlledPDDWorkspaceBrowserSender,
+    PDDWorkspaceOutboundSelectorContract,
     WebSocketPDDWorkspaceActionPort,
 )
-from channel_engine.browser.cdp_readonly import WebSocketCDPEvaluator
 from channel_engine.customer_assistant import SQLiteConversationBuffer
 from channel_engine.storage import (
     SqlAlchemyUnitOfWork,
@@ -49,6 +50,26 @@ def _parser() -> argparse.ArgumentParser:
         description="Serve the local Channel Agent feed and approved-reply boundary."
     )
     parser.add_argument("--data-root", default=".runtime/pdd-login-observation-v1")
+    parser.add_argument(
+        "--assistant-root",
+        default=None,
+        help="Override the Host assistant runtime containing buffer/feed state.",
+    )
+    parser.add_argument(
+        "--engine-database-path",
+        default=None,
+        help="Use the canonical Channel Engine database for Approval/Receipt facts.",
+    )
+    parser.add_argument(
+        "--send-selector-contract",
+        required=True,
+        help="Verified PRODUCTION outbound selector contract JSON.",
+    )
+    parser.add_argument(
+        "--enable-controlled-send",
+        action="store_true",
+        help="Explicitly enable the one-Grant approved-reply boundary.",
+    )
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8430)
     parser.add_argument(
@@ -58,7 +79,60 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
+class _ActiveEvidenceBackedSnapshotProvider:
+    """Expose the formal live-reader identities to the unique send boundary."""
+
+    def __init__(self, driver: EvidenceBackedPDDReadOnlyDriver) -> None:
+        self._driver = driver
+        self._active_conversation_id: str | None = None
+
+    def capture(self):
+        summaries = self._driver.scan_conversations()
+        ordered = sorted(
+            summaries,
+            key=lambda item: item.conversation_id != self._active_conversation_id,
+        )
+        for summary in ordered:
+            try:
+                snapshot = self._driver.capture_conversation(summary)
+            except PDDConversationNotActive:
+                continue
+            self._active_conversation_id = summary.conversation_id
+            return SimpleNamespace(
+                store_id=snapshot.store_id,
+                platform_store_id=snapshot.platform_store_id,
+                conversation_id=snapshot.conversation_id,
+                customer_reference=snapshot.customer_reference,
+                product=SimpleNamespace(
+                    product_reference=snapshot.product.product_id,
+                    product_name=snapshot.product.product_name,
+                    sku_reference=snapshot.product.sku_id,
+                    sku_name=snapshot.product.sku_name,
+                    attributes=snapshot.product.attributes,
+                ),
+                visible_history=tuple(
+                    SimpleNamespace(
+                        external_message_id=item.external_message_id,
+                        sender=item.sender.casefold(),
+                        content=item.content,
+                        timestamp=item.timestamp,
+                    )
+                    for item in snapshot.messages
+                    if item.sender != "UNKNOWN"
+                ),
+                captured_at=snapshot.captured_at,
+            )
+        raise RuntimeError("the active PDD conversation cannot be identified uniquely")
+
+
+def _build_service(
+    data_root: Path,
+    *,
+    assistant_root: Path,
+    engine_database_path: Path,
+    send_selector_contract_path: Path,
+    controlled_send_enabled: bool,
+) -> tuple[ApprovedReplyService, object]:
     config = load_agent_config(data_root / "config" / "agent.json")
     if (
         not config.browser_enabled
@@ -68,7 +142,9 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
         or config.auto_reply_enabled
     ):
         raise RuntimeError("Channel Agent controlled-send safety configuration is invalid")
-    enabled = os.getenv("PDD_CONTROLLED_SEND_ENABLED", "").casefold() == "true"
+    enabled = controlled_send_enabled or (
+        os.getenv("PDD_CONTROLLED_SEND_ENABLED", "").casefold() == "true"
+    )
     manager = ChannelAgentBrowserManager(
         agent_id=config.agent_id,
         data_root=data_root,
@@ -76,33 +152,41 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
         logger=SafeAgentLogger(data_root / "logs" / "approved-reply-bridge.jsonl"),
     )
     state = manager.browser_status()
-    public = state.public_view(data_root)
     manager.close_resources()
     if state.status.value != "READY" or state.pid is None:
         raise RuntimeError("existing Agent-owned Edge session is not READY")
 
+    state_path = data_root / "runtime" / "channel-agent-state.json"
+    state_value = json.loads(state_path.read_text(encoding="utf-8"))
+    ai_cs_store_id = state_value.get("active_store_id")
+    platform_store_id = state_value.get("pdd_store_id")
+    if (
+        not isinstance(ai_cs_store_id, str)
+        or not ai_cs_store_id.strip()
+        or not isinstance(platform_store_id, str)
+        or not platform_store_id.strip()
+    ):
+        raise RuntimeError("current double Store identity is unavailable")
+    evidence_path = config.pdd_observation_evidence_path
+    if evidence_path is None:
+        raise RuntimeError("verified PDD observation evidence is unavailable")
+    if not evidence_path.is_absolute():
+        evidence_path = (data_root / "config" / evidence_path).resolve()
     resolver = EdgePDDTargetResolver(timeout_seconds=1.0)
-    observer = ExistingPDDWorkspaceObserver(
-        browser_id=state.browser_id,
-        profile_path=state.profile_path,
-        profile_reference=str(public["profile_reference"]),
-        resolver=resolver,
-        evaluator=FixedReadOnlyPDDWorkspaceEvaluator(
-            WebSocketCDPEvaluator(timeout_seconds=2.0),
-            PDDWorkspaceSelectorContract(),
-        ),
-        human_verified_product_attributes=(
-            {
-                "applicable_age": os.environ["PDD_PRODUCT_APPLICABLE_AGE"].strip(),
-                "applicable_age_source": "operator_confirmed",
-            }
-            if os.getenv("PDD_PRODUCT_APPLICABLE_AGE", "").strip()
-            else None
-        ),
+    observer = _ActiveEvidenceBackedSnapshotProvider(
+        EvidenceBackedPDDReadOnlyDriver(
+            profile_path=state.profile_path,
+            store_id=ai_cs_store_id.strip(),
+            platform_store_id=platform_store_id.strip(),
+            evidence=load_pdd_observer_evidence(evidence_path),
+            resolver=resolver,
+        )
     )
     observer.capture()
-    assistant_root = data_root / "runtime" / "real-pdd-assistant"
-    database_url = f"sqlite:///{(assistant_root / 'channel-engine.sqlite3').as_posix()}"
+    send_selector_contract = PDDWorkspaceOutboundSelectorContract.model_validate_json(
+        send_selector_contract_path.read_text(encoding="utf-8")
+    )
+    database_url = f"sqlite:///{engine_database_path.as_posix()}"
     engine, session_factory = create_engine_and_session(database_url)
     create_schema(engine)
 
@@ -118,13 +202,13 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
         profile_path=state.profile_path,
         resolver=resolver,
         action_port=WebSocketPDDWorkspaceActionPort(timeout_seconds=3.0),
+        contract=send_selector_contract,
     )
     auto_runtime_store = ControlledAutoRuntimeStateStore(
         assistant_root / "controlled-auto-runtime.sqlite3"
     )
 
     def current_store_identity() -> tuple[str, str]:
-        state_path = data_root / "runtime" / "channel-agent-state.json"
         value = json.loads(state_path.read_text(encoding="utf-8"))
         ai_cs_store_id = value.get("active_store_id")
         platform_store_id = value.get("pdd_store_id")
@@ -249,10 +333,26 @@ def main(argv: list[str] | None = None) -> int:
         print("approved reply bridge may bind only to loopback", file=sys.stderr)
         return 4
     data_root = Path(args.data_root).resolve()
-    service, engine = _build_service(data_root)
+    assistant_root = (
+        Path(args.assistant_root).resolve()
+        if args.assistant_root
+        else data_root / "runtime" / "real-pdd-assistant"
+    )
+    engine_database_path = (
+        Path(args.engine_database_path).resolve()
+        if args.engine_database_path
+        else assistant_root / "channel-engine.sqlite3"
+    )
+    service, engine = _build_service(
+        data_root,
+        assistant_root=assistant_root,
+        engine_database_path=engine_database_path,
+        send_selector_contract_path=Path(args.send_selector_contract).resolve(),
+        controlled_send_enabled=args.enable_controlled_send,
+    )
     server = _Server((args.bind, args.port), _Handler)
     server.service = service
-    server.feed_path = data_root / "runtime" / "real-pdd-assistant" / "assistant-feed.json"
+    server.feed_path = assistant_root / "assistant-feed.json"
     server.allowed_origin = args.allowed_origin
     try:
         server.serve_forever(poll_interval=0.25)

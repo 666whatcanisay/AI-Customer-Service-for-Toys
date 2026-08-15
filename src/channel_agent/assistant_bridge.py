@@ -32,10 +32,10 @@ from .controlled_send_grant import (
     ControlledSendGrantV1,
     normalized_question_sha256,
 )
-from .pdd_workspace import ExistingPDDWorkspaceObserver
 from .pdd_workspace_send import (
     ControlledPDDWorkspaceBrowserSender,
     ControlledPDDWorkspaceExecutionAdapter,
+    PDDWorkspaceSnapshotProvider,
 )
 
 ApprovedReplyIntent = Literal["HUMAN_CONFIRMED_SEND", "AUTO_POLICY_PILOT_SEND"]
@@ -115,7 +115,7 @@ class ApprovedReplyService:
         feed_path: str | Path,
         buffer: SQLiteConversationBuffer,
         uow_factory: Callable[[], SqlAlchemyUnitOfWork],
-        observer: ExistingPDDWorkspaceObserver,
+        observer: PDDWorkspaceSnapshotProvider,
         browser_sender: ControlledPDDWorkspaceBrowserSender,
         controlled_send_grant_store: ControlledSendGrantStore,
         controlled_send_enabled: bool,

@@ -620,15 +620,24 @@ class ControlledReplyPilotOrchestrator:
             )
             and package.evidence_bundle_sha256 is not None
         )
+        manual_eligible = (
+            package.ai_cs_action
+            in {"DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY"}
+            and not package.required_fields
+        )
         if (
             quality != "PASS"
             or policy_mode != expected_policy_mode
             or package.action != "SUGGEST_REPLY"
             or not reply_text
             or not (
-                all_messages_eligible
-                if expected_policy_mode == "AUTO_ALL_MESSAGES_V1"
-                else low_risk_eligible
+                manual_eligible
+                if expected_policy_mode == "MANUAL_CONFIRM"
+                else (
+                    all_messages_eligible
+                    if expected_policy_mode == "AUTO_ALL_MESSAGES_V1"
+                    else low_risk_eligible
+                )
             )
         ):
             raise ControlledReplyPilotError(

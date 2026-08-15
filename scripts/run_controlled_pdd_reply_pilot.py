@@ -10,6 +10,7 @@ from channel_agent.controlled_auto_runtime import (
     ControlledAutoDecisionLedger,
     ControlledAutoRuntimeStateStore,
 )
+from channel_agent.binding import atomic_write_bytes
 from channel_agent.controlled_reply_pilot import (
     ControlledReplyPilotError,
     ControlledReplyPilotOrchestrator,
@@ -27,6 +28,11 @@ def _parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--data-root", default=".runtime/pdd-login-observation-v1")
+    parser.add_argument(
+        "--assistant-root",
+        default=None,
+        help="Override the Host assistant runtime containing the durable buffer/feed.",
+    )
     parser.add_argument("--bridge-url", default="http://127.0.0.1:8430")
     parser.add_argument("--allowed-origin", default="http://127.0.0.1:8421")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -98,12 +104,18 @@ def _parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("status")
     subparsers.add_parser("revoke")
+    sync_feed = subparsers.add_parser("sync-feed")
+    sync_feed.add_argument(
+        "--policy-mode",
+        choices=("MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"),
+        default="MANUAL_CONFIRM",
+    )
     return parser
 
 
 def _orchestrator(args: argparse.Namespace) -> ControlledReplyPilotOrchestrator:
     data_root = Path(args.data_root).resolve()
-    assistant_root = data_root / "runtime" / "real-pdd-assistant"
+    assistant_root = _assistant_root(data_root, args.assistant_root)
     return ControlledReplyPilotOrchestrator(
         feed_path=assistant_root / "assistant-feed.json",
         buffer=SQLiteConversationBuffer(
@@ -122,14 +134,75 @@ def _orchestrator(args: argparse.Namespace) -> ControlledReplyPilotOrchestrator:
     )
 
 
-def _assistant_root(data_root: Path) -> Path:
-    return data_root / "runtime" / "real-pdd-assistant"
-
-
-def _runtime_store(data_root: Path) -> ControlledAutoRuntimeStateStore:
-    return ControlledAutoRuntimeStateStore(
-        _assistant_root(data_root) / "controlled-auto-runtime.sqlite3"
+def _assistant_root(data_root: Path, override: str | None = None) -> Path:
+    return (
+        Path(override).resolve()
+        if override
+        else data_root / "runtime" / "real-pdd-assistant"
     )
+
+
+def _runtime_store(
+    data_root: Path,
+    assistant_root: Path | None = None,
+) -> ControlledAutoRuntimeStateStore:
+    return ControlledAutoRuntimeStateStore(
+        (assistant_root or _assistant_root(data_root))
+        / "controlled-auto-runtime.sqlite3"
+    )
+
+
+def _sync_feed(
+    orchestrator: ControlledReplyPilotOrchestrator,
+    *,
+    policy_mode: str,
+) -> dict[str, object]:
+    waiting = [
+        (context, package)
+        for context, package in orchestrator.buffer.stored_replies()
+        if package.state == "WAITING_APPROVAL"
+        and package.action == "SUGGEST_REPLY"
+        and package.reply_content
+    ]
+    if not waiting:
+        raise ControlledReplyPilotError(
+            "no durable reply is waiting for approval",
+            error_code="PILOT_REPLY_NOT_AVAILABLE",
+        )
+    context, package = max(waiting, key=lambda item: item[1].generated_at)
+    current_ids = context.current_turn_message_ids
+    if not current_ids:
+        raise ControlledReplyPilotError(
+            "the durable reply has no customer message identity",
+            error_code="PILOT_REPLY_MESSAGE_ID_MISSING",
+        )
+    feed: dict[str, object] = {
+        "safety": {
+            "realSend": False,
+            "autoReply": False,
+        },
+        "reply": {
+            "decisionId": package.decision_id,
+            "messageId": current_ids[-1],
+            "conversationId": package.conversation_id,
+            "answer": package.reply_content,
+            "state": package.state,
+            "qualityStatus": package.quality_gate_status,
+            "policyMode": policy_mode,
+            "action": package.ai_cs_action,
+        },
+        "updatedAt": datetime.now(UTC).isoformat(),
+    }
+    atomic_write_bytes(
+        orchestrator.feed_path,
+        json.dumps(
+            feed,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8"),
+    )
+    return feed
 
 
 def _current_store_identity(data_root: Path) -> tuple[str, str]:
@@ -200,8 +273,17 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     orchestrator = _orchestrator(args)
     data_root = Path(args.data_root).resolve()
-    runtime_store = _runtime_store(data_root)
+    assistant_root = _assistant_root(data_root, args.assistant_root)
+    runtime_store = _runtime_store(data_root, assistant_root)
     try:
+        if args.command == "sync-feed":
+            _print(
+                _sync_feed(
+                    orchestrator,
+                    policy_mode=args.policy_mode,
+                )
+            )
+            return 0
         if args.command == "preview-manual":
             preview, candidate, reply_text = orchestrator.preview_manual(
                 policy_revision=args.policy_revision,
@@ -316,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "run-production-auto":
             _require_execute_flag(args)
             ledger = ControlledAutoDecisionLedger(
-                _assistant_root(data_root) / "controlled-auto-decisions.sqlite3"
+                assistant_root / "controlled-auto-decisions.sqlite3"
             )
             successes = 0
             while True:

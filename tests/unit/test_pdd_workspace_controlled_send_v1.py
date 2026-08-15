@@ -235,6 +235,25 @@ def test_controlled_send_rejects_changed_conversation_before_browser_action() ->
     assert actions.action_calls == 0
 
 
+def test_controlled_send_rejects_customer_message_already_answered() -> None:
+    customer = _message(CUSTOMER_MESSAGE_ID, "customer", "new question")
+    operator = _message(OPERATOR_MESSAGE_ID, "operator", "existing answer")
+    actions = _ActionPort()
+    sender = _sender(_Observer([_snapshot(customer, operator)]), actions)
+
+    with pytest.raises(PDDWorkspaceSendError) as caught:
+        sender.send(
+            content="second answer",
+            expected_store_id=STORE_ID,
+            expected_conversation_id=CONVERSATION_ID,
+            expected_customer_reference=CUSTOMER_REFERENCE,
+            expected_customer_message_id=CUSTOMER_MESSAGE_ID,
+        )
+
+    assert caught.value.error_code == "PDD_SEND_CUSTOMER_ALREADY_ANSWERED"
+    assert actions.action_calls == 0
+
+
 def test_trigger_without_confirmed_operator_echo_is_unknown_and_never_retried() -> None:
     customer = _message(CUSTOMER_MESSAGE_ID, "customer", "客户问题")
     actions = _ActionPort()
