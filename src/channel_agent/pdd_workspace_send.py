@@ -150,6 +150,13 @@ class PDDWorkspaceActionResult(PDDWorkspaceSendModel):
     error_code: str | None = None
 
 
+class PDDWorkspaceActionPreparation(PDDWorkspaceSendModel):
+    ready: bool
+    x: float | None = None
+    y: float | None = None
+    error_code: str | None = None
+
+
 class PDDWorkspaceSendResult(PDDWorkspaceSendModel):
     state: PDDWorkspaceSendState
     outcome: ReceiptOutcome
@@ -263,7 +270,7 @@ class WebSocketPDDWorkspaceActionPort:
   const s = {selector};
   const expectedUid = {expected};
   const content = {reply};
-  const reject = (code) => ({{triggered: false, error_code: code}});
+  const reject = (code) => ({{ready: false, x: null, y: null, error_code: code}});
   if (String(location.href || '') !== s.page_url) return reject('PDD_SEND_PAGE_CHANGED');
   const scope = document.querySelector(s.conversation_marker);
   if (!scope || String(scope.getAttribute('currentuid') || '') !== expectedUid) {{
@@ -295,18 +302,98 @@ class WebSocketPDDWorkspaceActionPort:
     input.dispatchEvent(new Event('input', {{bubbles: true, composed: true}}));
     return reject('PDD_SEND_CONVERSATION_CHANGED');
   }}
-  send.click();
-  return {{triggered: true, error_code: null}};
+  const rect = send.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  const hit = document.elementFromPoint(x, y);
+  if (rect.width <= 0 || rect.height <= 0 || !(hit === send || send.contains(hit))) {{
+    return reject('PDD_SEND_CONTROL_NOT_ACTIONABLE');
+  }}
+  return {{ready: true, x, y, error_code: null}};
 }})()
 """.strip()
-        value = self._evaluate(target, expression, action=True)
+        value = self._evaluate(target, expression, action=False)
         if not isinstance(value, dict):
             raise PDDWorkspaceSendError(
                 "PDD send action returned an invalid payload",
-                error_code="PDD_SEND_ACTION_INVALID_UNKNOWN",
-                trigger_may_have_occurred=True,
+                error_code="PDD_SEND_ACTION_PREPARATION_INVALID",
             )
-        return PDDWorkspaceActionResult.model_validate(value)
+        preparation = PDDWorkspaceActionPreparation.model_validate(value)
+        if not preparation.ready or preparation.x is None or preparation.y is None:
+            return PDDWorkspaceActionResult(
+                triggered=False,
+                error_code=preparation.error_code or "PDD_SEND_REJECTED",
+            )
+        self._dispatch_trusted_click(
+            target,
+            x=preparation.x,
+            y=preparation.y,
+        )
+        return PDDWorkspaceActionResult(triggered=True)
+
+    def _dispatch_trusted_click(
+        self,
+        target: PDDCDPPageTarget,
+        *,
+        x: float,
+        y: float,
+    ) -> None:
+        """Use CDP Input events because PDD ignores untrusted DOM ``click()``."""
+
+        connection = None
+        trigger_may_have_occurred = False
+        try:
+            connection = websocket.create_connection(
+                target.websocket_url,
+                timeout=self._timeout,
+                suppress_origin=True,
+                http_proxy_host=None,
+            )
+            for event_type in ("mousePressed", "mouseReleased"):
+                with self._lock:
+                    self._sequence += 1
+                    command_id = self._sequence
+                params: dict[str, object] = {
+                    "type": event_type,
+                    "x": x,
+                    "y": y,
+                    "button": "left",
+                    "clickCount": 1,
+                }
+                command = json.dumps(
+                    {
+                        "id": command_id,
+                        "method": "Input.dispatchMouseEvent",
+                        "params": params,
+                    },
+                    separators=(",", ":"),
+                )
+                connection.send(command)
+                if event_type == "mousePressed":
+                    trigger_may_have_occurred = True
+                while True:
+                    raw = connection.recv()
+                    if not isinstance(raw, str):
+                        raise ValueError("binary CDP response")
+                    response = json.loads(raw)
+                    if not isinstance(response, dict) or response.get("id") != command_id:
+                        continue
+                    if "error" in response:
+                        raise ValueError("CDP trusted click rejected")
+                    break
+        except (OSError, ValueError, json.JSONDecodeError, websocket.WebSocketException) as exc:
+            raise PDDWorkspaceSendError(
+                "PDD trusted browser click failed",
+                error_code=(
+                    "PDD_SEND_ACTION_TRANSPORT_UNKNOWN"
+                    if trigger_may_have_occurred
+                    else "PDD_SEND_ACTION_TRANSPORT_UNAVAILABLE"
+                ),
+                trigger_may_have_occurred=trigger_may_have_occurred,
+            ) from exc
+        finally:
+            if connection is not None:
+                connection.close()
 
     def _evaluate(
         self,
