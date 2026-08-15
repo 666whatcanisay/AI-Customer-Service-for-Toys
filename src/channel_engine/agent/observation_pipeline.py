@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -119,12 +119,21 @@ class AgentObservationContextProvider:
         history: SQLiteConversationBuffer,
         *,
         offline_control=None,
+        catalog_tenant_bindings: Mapping[str, str] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._store = control_store
         self._history = history
         self._offline_control = offline_control
+        self._catalog_tenant_bindings = dict(catalog_tenant_bindings or {})
         self._clock = clock
+
+    def _catalog_tenant_id(self, payload: PDDObservationPayload) -> str:
+        """Resolve catalog tenancy from the Host-owned Store binding when present."""
+
+        return self._catalog_tenant_bindings.get(
+            payload.store_id, payload.catalog_tenant_id
+        )
 
     def _payload(self, store_id: str, conversation_id: str) -> PDDObservationPayload:
         raw = self._store.latest_observation_payload(store_id, conversation_id)
@@ -159,7 +168,7 @@ class AgentObservationContextProvider:
         )
         return PageContext(
             store_id=store_id,
-            catalog_tenant_id=payload.catalog_tenant_id,
+            catalog_tenant_id=self._catalog_tenant_id(payload),
             catalog_platform=payload.catalog_platform,
             store_name=payload.store_name,
             conversation_id=conversation_id,

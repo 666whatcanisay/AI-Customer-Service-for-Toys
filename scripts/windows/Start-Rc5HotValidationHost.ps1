@@ -10,7 +10,9 @@ param(
     [string]$OfflineRuntimeRoot,
     [string]$GatewayBaseUrl = 'http://127.0.0.1:8420',
     [string]$DeviceCredentialIndex,
-    [string]$AgentSpoolPath
+    [string]$AgentSpoolPath,
+    [string]$CatalogStoreId,
+    [string]$CatalogTenantId
 )
 
 $ErrorActionPreference = 'Stop'
@@ -97,6 +99,16 @@ $env:CHANNEL_ENGINE_GATEWAY_CLIENT_ID = 'channel-engine'
 $env:CHANNEL_ENGINE_GATEWAY_KEY_ID = 'gateway-key-v1'
 $env:CHANNEL_ENGINE_GATEWAY_TIMEOUT_SECONDS = '18'
 $env:CHANNEL_ENGINE_AUTO_POLICY_MODE = 'AUTO_ALL_MESSAGES_V1'
+if ([bool]$CatalogStoreId -ne [bool]$CatalogTenantId) {
+    throw 'CatalogStoreId and CatalogTenantId must be configured together.'
+}
+if ($CatalogStoreId) {
+    $env:CHANNEL_ENGINE_CATALOG_STORE_ID = $CatalogStoreId.Trim()
+    $env:CHANNEL_ENGINE_CATALOG_TENANT_ID = $CatalogTenantId.Trim()
+} else {
+    Remove-Item Env:\CHANNEL_ENGINE_CATALOG_STORE_ID -ErrorAction SilentlyContinue
+    Remove-Item Env:\CHANNEL_ENGINE_CATALOG_TENANT_ID -ErrorAction SilentlyContinue
+}
 
 $process = Start-Process -FilePath $python -ArgumentList @(
     (Join-Path $repoRoot 'scripts\run_channel_engine_production_host.py'),
@@ -148,6 +160,8 @@ $configSnapshot = [ordered]@{
     gateway_base_url = $env:CHANNEL_ENGINE_GATEWAY_BASE_URL
     gateway_environment = $env:CHANNEL_ENGINE_GATEWAY_ENVIRONMENT
     auto_policy_mode = $env:CHANNEL_ENGINE_AUTO_POLICY_MODE
+    catalog_store_id = if ($CatalogStoreId) { $env:CHANNEL_ENGINE_CATALOG_STORE_ID } else { $null }
+    catalog_tenant_id = if ($CatalogTenantId) { $env:CHANNEL_ENGINE_CATALOG_TENANT_ID } else { $null }
     gateway_key_reference_sha256 = if (Test-Path -LiteralPath $GatewayKeyReference -PathType Leaf) { (Get-FileHash -LiteralPath $GatewayKeyReference -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null }
     real_send_enabled = $false
 }

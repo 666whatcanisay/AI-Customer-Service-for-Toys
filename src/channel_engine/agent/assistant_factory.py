@@ -143,10 +143,20 @@ def build_host_assistant_composition(
         secret,
         retry_policy=GatewayRetryPolicy(max_attempts=1),
     )
+    catalog_store_id = source.get("CHANNEL_ENGINE_CATALOG_STORE_ID", "").strip()
+    catalog_tenant_id = source.get("CHANNEL_ENGINE_CATALOG_TENANT_ID", "").strip()
+    if bool(catalog_store_id) != bool(catalog_tenant_id):
+        raise ValueError(
+            "CHANNEL_ENGINE_CATALOG_STORE_ID and "
+            "CHANNEL_ENGINE_CATALOG_TENANT_ID must be configured together"
+        )
     provider = AgentObservationContextProvider(
         control_store,
         buffer,
         offline_control=offline_control,
+        catalog_tenant_bindings=(
+            {catalog_store_id: catalog_tenant_id} if catalog_store_id else None
+        ),
         clock=clock,
     )
     assistant = CustomerAssistantRuntime(

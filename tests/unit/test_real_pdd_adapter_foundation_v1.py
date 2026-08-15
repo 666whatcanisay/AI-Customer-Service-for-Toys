@@ -200,6 +200,34 @@ def test_real_page_operator_history_enters_context_without_synthetic_fallback() 
     ]
 
 
+def test_host_owned_store_binding_overrides_agent_catalog_tenant() -> None:
+    observation = PDDWorkspaceObservationMapper(
+        agent_id="agent-1", device_id="device-1"
+    ).map_customer_messages(_snapshot())[0]
+    store = SimpleNamespace(
+        latest_observation_payload=lambda *_args: observation.payload,
+    )
+    history = SimpleNamespace(load_history=lambda **_kwargs: ())
+    provider = AgentObservationContextProvider(
+        store,
+        history,
+        catalog_tenant_bindings={STORE: "c-tenant-production"},
+    )
+
+    page = provider.capture_page_context(
+        store_id=STORE,
+        conversation_id=CONVERSATION,
+    )
+
+    assert (
+        PDDObservationPayload.model_validate_json(
+            json.dumps(observation.payload, ensure_ascii=False, separators=(",", ":"))
+        ).catalog_tenant_id
+        == "CHANNEL-AGENT-PILOT"
+    )
+    assert page.catalog_tenant_id == "c-tenant-production"
+
+
 def test_real_provider_is_bounded_and_rejects_non_real_items() -> None:
     real = NormalizedChannelObservation.synthetic(
         provider_id="seed",
