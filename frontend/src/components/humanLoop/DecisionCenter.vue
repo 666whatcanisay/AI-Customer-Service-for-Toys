@@ -22,7 +22,7 @@
       <span data-testid="active-conversation-status">{{ conversationStatusLabel }}</span>
       <span v-if="requiresHuman" class="rail-risk" :class="riskTone">风险 {{ riskLabel }}</span>
       <b v-if="requiresHuman">需人工 1</b>
-      <small>REAL_SEND<br />{{ autoMode ? 'ON' : 'OFF' }}</small>
+      <small>REAL_SEND<br />{{ realSendEnabled ? 'ON' : 'OFF' }}</small>
       <i aria-hidden="true">‹</i>
     </button>
 
@@ -77,7 +77,7 @@
         data-testid="decision-confirm"
         @click="$emit('confirm', confirmAction)"
       >{{ confirmLabel }}</button>
-      <p class="send-boundary">REAL_SEND = OFF · 确认不代表真实发送</p>
+      <p class="send-boundary">{{ sendBoundaryLabel }}</p>
 
       <details class="decision-details">
         <summary>查看判断详情</summary>
@@ -97,7 +97,7 @@
       <section v-if="draft?.preparationId" class="receipt-card" data-testid="execution-preparation">
         <span>执行准备</span>
         <strong>已准备，尚未发送真实 PDD 消息</strong>
-        <small>准备编号 {{ draft.preparationId }}</small>
+        <small>准备编号 {{ draft.preparationId }}；是否成功发送以真实 Receipt 为准。</small>
       </section>
 
       <section v-if="feedbackReceiptId" class="receipt-card issue-receipt" data-testid="decision-feedback-receipt">
@@ -120,7 +120,7 @@
           @click="$emit('reopen')"
         >重新打开会话</button>
         <small v-if="conversation.status === 'WAITING_REPLY' && !draft?.preparationId">复制不等于发送；请在外部渠道完成处理后再点击。</small>
-        <small v-else-if="draft?.preparationId" data-testid="prepared-send-boundary">执行已准备；真实 PDD 发送未启用，不能标记为已发送。</small>
+        <small v-else-if="draft?.preparationId" data-testid="prepared-send-boundary">执行已准备；未产生真实 Receipt 前不能标记为已发送。</small>
       </section>
 
       <details class="safety-card">
@@ -129,7 +129,7 @@
           <li>AI 只生成建议</li>
           <li>客服必须人工确认</li>
           <li>人工确认仅生成执行准备，不代表发送成功</li>
-          <li>真实 PDD 发送与真实 Receipt 当前均关闭</li>
+          <li>{{ realSendEnabled ? '真实发送已启用，但每条消息仍需独立授权并生成 Receipt' : '真实 PDD 发送与真实 Receipt 当前均关闭' }}</li>
           <li>不退款、不修改订单</li>
         </ul>
       </details>
@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject, type Ref } from 'vue'
 
 import type { ReplyDraft, WorkspaceConversation } from '@/stores/humanLoopWorkspace'
 import { CONVERSATION_STATUS_LABELS } from '@/workspace/customerSession'
@@ -168,6 +168,11 @@ defineEmits<{
 const evidenceCount = computed(() => props.draft?.citations.length ?? 0)
 const isManualReply = computed(() => props.draft?.replySource === 'MANUAL')
 const autoMode = computed(() => props.conversation?.autoReplyRunning === true)
+const realSendEnabledRef = inject<Readonly<Ref<boolean>>>('channelAgentRealSendEnabled', computed(() => false))
+const realSendEnabled = computed(() => realSendEnabledRef.value)
+const sendBoundaryLabel = computed(() => realSendEnabled.value
+  ? 'REAL_SEND = ON · 仍须通过逐消息授权；成功与否以真实 Receipt 为准'
+  : 'REAL_SEND = OFF · 确认不代表真实发送')
 const requiresHuman = computed(() => props.conversation?.requiresHuman === true)
 const autoHandled = computed(() => autoMode.value && !requiresHuman.value)
 const conversationStatusLabel = computed(() => props.conversation

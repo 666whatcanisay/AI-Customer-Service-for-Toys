@@ -172,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, provide, ref } from 'vue'
 import { RouterView } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { storeToRefs } from 'pinia'
@@ -224,6 +224,8 @@ let refreshTimer: ReturnType<typeof setInterval> | undefined
 const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CONNECTING')
 const controlledAuto = computed(() => bootstrap.value?.safety.controlled_auto ?? null)
 const autoReplyRunning = computed(() => controlledAuto.value?.auto_reply_running === true)
+const realSendEnabled = computed(() => bootstrap.value?.safety.real_send_enabled === true)
+provide('channelAgentRealSendEnabled', realSendEnabled)
 const autoControlAvailable = computed(() => controlledAuto.value?.control_available === true)
 const autoRepairNeeded = computed(() => {
   const runtime = controlledAuto.value

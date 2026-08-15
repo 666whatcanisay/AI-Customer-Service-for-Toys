@@ -57,6 +57,22 @@ describe('DecisionCenter execution preparation boundary', () => {
     expect(wrapper.text()).toContain('REAL_SEND')
   })
 
+  it('shows the shared production real-send state instead of guessing from the conversation', () => {
+    const wrapper = mount(DecisionCenter, {
+      global: {
+        provide: { channelAgentRealSendEnabled: { value: true } }
+      },
+      props: {
+        draft: { ...draft, state: 'HUMAN_REVIEW', decisionState: 'WAITING_HUMAN' },
+        conversation: { ...conversation, autoReplyRunning: false, requiresHuman: true },
+        receiptId: '', feedbackReceiptId: '', collapsed: false
+      }
+    })
+
+    expect(wrapper.text()).toContain('REAL_SEND = ON')
+    expect(wrapper.text()).toContain('逐消息授权')
+  })
+
   it('reveals the reply and emits the existing human confirmation action when expanded', async () => {
     const reviewDraft = {
       ...draft, state: 'HUMAN_REVIEW' as const, decisionState: 'WAITING_HUMAN' as const,
@@ -82,7 +98,7 @@ describe('DecisionCenter execution preparation boundary', () => {
     expect(wrapper.get('[data-testid="execution-preparation"]').text())
       .toContain('尚未发送真实 PDD 消息')
     expect(wrapper.get('[data-testid="prepared-send-boundary"]').text())
-      .toContain('不能标记为已发送')
+      .toContain('未产生真实 Receipt 前不能标记为已发送')
     expect(wrapper.find('[data-testid="execution-receipt"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="complete-conversation"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('已确认发送到当前 PDD 会话')
