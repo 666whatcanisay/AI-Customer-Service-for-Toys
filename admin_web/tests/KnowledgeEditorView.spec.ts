@@ -87,7 +87,7 @@ describe('KnowledgeEditorView', () => {
 
   it('submits Chinese product knowledge without asking the operator for technical fields', async () => {
     const { wrapper } = await mountEditor()
-    expect(wrapper.text()).toContain('手工补充知识')
+    expect(wrapper.text()).toContain('知识编辑器')
     expect(wrapper.text()).toContain('SKU差异知识')
     expect(wrapper.text()).not.toContain('product_id')
     expect(wrapper.text()).not.toContain('tenant_id')

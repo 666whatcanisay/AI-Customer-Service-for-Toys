@@ -3,10 +3,29 @@
   "project_name": "AI Customer Service for Toys control",
   "line": "CONTROL",
   "version": "1.0.0",
-  "status": "ai_cs_minimal_arch_fix_ready_source_only",
-  "current_task": "AI-CS Minimal Architecture Fix and Source Freeze V1",
-  "current_stage": "A/C/Admin source blockers are repaired: source DB head identity is 0023, dependency-aware rule snapshot validation is coherent, debug requests are epoch-isolated and process-limited, and TEST sources are visible. Formal Runtime remains untouched at 0019.",
-  "current_gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY / FORMAL_RUNTIME_UNCHANGED",
+  "status": "ai_cs_8423_reply_governance_deployment_pending",
+  "current_task": "8423 Reply Governance Availability V1",
+  "current_stage": "Navigation, permission, database backup and isolated closure gates passed; clean-candidate deployment and 8423 browser acceptance remain.",
+  "current_gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING",
+  "reply_governance_8423_v1": {
+    "date": "2026-08-15",
+    "gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING",
+    "urls": ["http://127.0.0.1:8423/reply-readiness", "http://127.0.0.1:8423/knowledge-editor"],
+    "authorization": "knowledge.manage for route and navigation; ADMIN/OPERATOR visible; CUSTOMER_SERVICE hidden and denied",
+    "database": "R027 already at 0023_reply_readiness_v1; online backup integrity ok; no repeat migration",
+    "tests": "A 239/3 skipped; C 216; Admin 40 files/114 plus typecheck/build; real 36-question evaluator and synthetic C-to-A HTTP PASS",
+    "safety": "15174 and ui.architect retired; 18443/60801, Engine, PDD Profile and real send untouched",
+    "report": "docs/control/AI-CS-8423-Reply-Governance-Availability-V1-Report.md"
+  },
+  "architecture_ui_closure_v1": {
+    "date": "2026-08-15",
+    "gate": "PASS / AI_CS_ARCHITECTURE_UI_CLOSURE_READY / SOURCE_ONLY",
+    "architecture": "monotonic question-set extension merge; expired inactive debug-rate buckets reclaimed; Vite proxy targets overridable for isolated parallel environments",
+    "ui": "filter recovery, ARIA tabs, persistent Chinese safety flags, collapsible mobile navigation and responsive topbar",
+    "tests": "A 239 passed/3 skipped; C 216; Admin 38 files/110 plus typecheck/build; real 36-question evaluator and synthetic C-to-A HTTP PASS",
+    "runtime": "isolated 19080/19081/15174 with synthetic data only; formal Runtime/PDD/send untouched",
+    "report": "docs/control/AI-CS-Architecture-UI-Closure-Fix-V1-Report.md"
+  },
   "minimal_arch_fix_v1": {
     "date": "2026-08-14",
     "gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import {
   getAdminOverview,
@@ -17,7 +17,7 @@ import {
 type ServiceState = 'loading' | 'available' | 'unavailable' | 'not-probed'
 type EnvironmentState = 'loading' | 'internal-production' | 'unknown'
 type NavigationMode = 'simple' | 'advanced'
-type NavigationItem = { label: string; to: string }
+type NavigationItem = { label: string; to: string; requiredPermission?: string }
 type NavigationGroup = { label: string; items: NavigationItem[] }
 
 const NAVIGATION_MODE_STORAGE_KEY = 'ai-cs-admin-navigation-mode-v1'
@@ -29,6 +29,8 @@ const simpleNavigationItems: NavigationItem[] = [
   { label: '运营工作台', to: '/overview' },
   { label: '店铺与商品', to: '/store-management' },
   { label: '知识', to: '/knowledge-center' },
+  { label: '商品回答风险池', to: '/reply-readiness', requiredPermission: 'knowledge.manage' },
+  { label: '知识编辑器', to: '/knowledge-editor', requiredPermission: 'knowledge.manage' },
   { label: '导入', to: '/import-center' },
   { label: '客服运营', to: '/customer-operations' },
   { label: 'AI状态', to: '/ai-capabilities' },
@@ -36,15 +38,8 @@ const simpleNavigationItems: NavigationItem[] = [
 
 const advancedNavigationGroups: NavigationGroup[] = [
   {
-    label: 'PDD 回答治理',
-    items: [
-      { label: '商品风险调整池', to: '/reply-readiness' },
-    ],
-  },
-  {
     label: '知识治理',
     items: [
-      { label: '手工补充知识', to: '/knowledge-editor' },
       { label: '知识审核队列', to: '/knowledge-review' },
       { label: '知识缺口', to: '/knowledge-gaps' },
       { label: '资料上传与审核', to: '/knowledge-materials' },
@@ -96,9 +91,13 @@ const checkedAt = ref('')
 const showTechnicalDetails = ref(false)
 const refreshing = ref(false)
 const navigationMode = ref<NavigationMode>(initialNavigationMode())
+const mobileNavigationOpen = ref(false)
+const visibleSimpleNavigationItems = computed(() => simpleNavigationItems.filter((item) => (
+  !item.requiredPermission || auth.hasPermission(item.requiredPermission)
+)))
 
 const navigationModeDescription = computed(() => navigationMode.value === 'simple'
-  ? '显示日常运营最常用的 6 个入口。'
+  ? '显示当前账号可用的常用入口。'
   : '展开知识治理、运营复盘和系统诊断入口。')
 
 function setNavigationMode(mode: NavigationMode): void {
@@ -163,19 +162,30 @@ const runtimeDetails = {
 
 const signOut = async () => { await auth.logout(); await router.replace('/login') }
 
+watch(() => route.fullPath, () => { mobileNavigationOpen.value = false })
 onMounted(() => { if (route.meta.public !== true) void refreshStatus() })
 </script>
 
 <template>
   <RouterView v-if="route.meta.public === true" />
   <div v-else class="product-shell">
-    <aside class="product-sidebar" aria-label="运营管理中心导航">
-      <RouterLink class="brand" to="/overview">
-        <span class="brand-mark" aria-hidden="true">AI</span>
-        <span><strong>AI客服平台</strong><small>运营管理中心</small></span>
-      </RouterLink>
+    <aside :class="['product-sidebar', { 'mobile-open': mobileNavigationOpen }]" aria-label="运营管理中心导航">
+      <div class="sidebar-header">
+        <RouterLink class="brand" to="/overview">
+          <span class="brand-mark" aria-hidden="true">AI</span>
+          <span><strong>AI客服平台</strong><small>运营管理中心</small></span>
+        </RouterLink>
+        <button
+          class="mobile-navigation-toggle"
+          type="button"
+          aria-controls="admin-navigation-content"
+          :aria-expanded="mobileNavigationOpen"
+          @click="mobileNavigationOpen = !mobileNavigationOpen"
+        >{{ mobileNavigationOpen ? '收起' : '菜单' }}</button>
+      </div>
 
-      <section class="navigation-mode" aria-label="导航显示模式">
+      <div id="admin-navigation-content" class="mobile-navigation-content">
+        <section class="navigation-mode" aria-label="导航显示模式">
         <div class="navigation-mode__heading">
           <strong>导航模式</strong>
           <span>{{ navigationMode === 'simple' ? '简洁' : '高级' }}</span>
@@ -198,13 +208,13 @@ onMounted(() => { if (route.meta.public !== true) void refreshStatus() })
         </div>
         <small>{{ navigationModeDescription }}</small>
         <small>模式只改变导航显示，不改变页面权限。</small>
-      </section>
+        </section>
 
-      <nav class="product-nav" aria-label="运营管理中心导航">
+        <nav class="product-nav" aria-label="运营管理中心导航">
         <section class="nav-group">
           <h2>常用工作</h2>
           <RouterLink
-            v-for="item in simpleNavigationItems"
+            v-for="item in visibleSimpleNavigationItems"
             :key="item.to"
             :to="item.to"
             class="nav-link"
@@ -235,16 +245,17 @@ onMounted(() => { if (route.meta.public !== true) void refreshStatus() })
             </RouterLink>
           </section>
         </template>
-      </nav>
+        </nav>
 
-      <section v-if="navigationMode === 'advanced'" class="planned-capabilities" aria-label="规划中的业务能力">
-        <strong>后续能力</strong>
-        <p>ERP 镜像、售后助手和退款风险辅助仍在规划中，当前没有自动业务动作。</p>
-      </section>
+        <section v-if="navigationMode === 'advanced'" class="planned-capabilities" aria-label="规划中的业务能力">
+          <strong>后续能力</strong>
+          <p>ERP 镜像、售后助手和退款风险辅助仍在规划中，当前没有自动业务动作。</p>
+        </section>
 
-      <div class="sidebar-boundary">
-        <strong>内部运营管理</strong>
-        <p>页面权限由服务端校验；系统不自动发送、修改订单、退款或写入 ERP。</p>
+        <div class="sidebar-boundary">
+          <strong>内部运营管理</strong>
+          <p>页面权限由服务端校验；系统不自动发送、修改订单、退款或写入 ERP。</p>
+        </div>
       </div>
     </aside>
 
@@ -302,11 +313,14 @@ a { color: #285493; }
 
 .product-shell { --sidebar-width: 248px; display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); width: 100%; min-height: 100vh; }
 .product-sidebar { display: flex; min-height: 100vh; flex-direction: column; padding: 20px 14px; background: linear-gradient(180deg, #14284d, #0d1e3b); color: #eaf1ff; box-shadow: 8px 0 28px rgb(18 40 77 / 12%); }
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .brand { display: flex; gap: 11px; align-items: center; padding: 0 7px 20px; color: #fff; text-decoration: none; }
 .brand-mark { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 13px; background: linear-gradient(135deg, #6fa1ff, #53d1b1); color: #0e2344; font-size: 13px; font-weight: 900; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 17px; }
 .brand small { margin-top: 3px; color: #9fb2d1; font-size: 12px; }
+.mobile-navigation-toggle { display: none; padding: 7px 10px; border: 1px solid rgb(160 183 220 / 35%); border-radius: 8px; color: #fff; background: rgb(255 255 255 / 8%); font: inherit; font-size: 12px; cursor: pointer; }
+.mobile-navigation-content { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .navigation-mode { display: grid; gap: 8px; margin-bottom: 14px; padding: 10px; border: 1px solid rgb(160 183 220 / 22%); border-radius: 11px; background: rgb(255 255 255 / 5%); }
 .navigation-mode__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .navigation-mode__heading strong { font-size: 12px; }
@@ -342,6 +356,9 @@ a { color: #285493; }
 .service-statuses .unavailable i { background: #e8a321; }
 .service-statuses button, .technical-toggle { padding: 5px 8px; border: 1px solid #ccd8e8; border-radius: 8px; background: #fff; color: #365174; font: inherit; font-size: 12px; cursor: pointer; }
 .service-statuses button:disabled { cursor: wait; opacity: .6; }
+.admin-identity { display: flex; min-width: 0; align-items: center; gap: 7px; }
+.admin-identity strong { overflow: hidden; max-width: 130px; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-identity button { padding: 5px 8px; border: 1px solid #ccd8e8; border-radius: 8px; background: #fff; color: #365174; font: inherit; font-size: 12px; cursor: pointer; }
 .environment-banner { margin: 0; padding: 8px 22px; border-bottom: 1px solid #f2d596; background: #fff8e7; color: #77510a; font-size: 12px; line-height: 1.5; }
 .technical-panel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 14px; padding: 12px 22px; border-bottom: 1px solid #dce6f2; background: #f7faff; }
 .technical-panel div { display: grid; gap: 3px; min-width: 0; }
@@ -368,6 +385,6 @@ a { color: #285493; }
 .metric { padding: 14px; border-radius: 10px; background: #f5f7fb; }
 .metric strong { display: block; margin-top: 5px; font-size: 22px; }
 @media (max-width: 1080px) { .product-shell { grid-template-columns: 210px minmax(0, 1fr); } .technical-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 820px) { .product-shell { grid-template-columns: 1fr; } .product-sidebar { min-height: auto; padding: 13px; } .product-nav { grid-template-columns: repeat(3, minmax(150px, 1fr)); } .sidebar-boundary { display: none; } .product-topbar { flex-wrap: wrap; padding: 10px 14px; } .service-statuses { margin-left: 0; } .product-content { padding: 0 14px 28px; } .environment-banner, .technical-panel { padding-right: 14px; padding-left: 14px; } }
-@media (max-width: 560px) { .product-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } .service-statuses span { font-size: 11px; } .technical-toggle { display: none; } .technical-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page-header { align-items: flex-start; flex-direction: column; } .table-wrap { overflow-x: auto; } }
+@media (max-width: 820px) { .product-shell { grid-template-columns: 1fr; } .product-sidebar { min-height: auto; padding: 13px; } .product-sidebar .brand { padding-bottom: 0; } .mobile-navigation-toggle { display: inline-flex; } .product-sidebar:not(.mobile-open) .mobile-navigation-content { display: none; } .mobile-navigation-content { padding-top: 12px; } .product-nav { grid-template-columns: repeat(3, minmax(150px, 1fr)); } .sidebar-boundary { display: none; } .product-topbar { flex-wrap: wrap; gap: 8px 12px; padding: 10px 14px; } .product-topbar > :first-child { flex: 1 1 auto; } .service-statuses { order: 4; width: 100%; margin-left: 0; flex-wrap: wrap; } .admin-identity { margin-left: auto; } .product-content { padding: 0 14px 28px; } .environment-banner, .technical-panel { padding-right: 14px; padding-left: 14px; } }
+@media (max-width: 560px) { .brand-mark { width: 38px; height: 38px; border-radius: 11px; } .product-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } .service-statuses { gap: 7px; } .service-statuses span { font-size: 11px; } .admin-identity strong { max-width: 90px; } .technical-toggle { display: none; } .technical-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page-header { align-items: flex-start; flex-direction: column; } .table-wrap { overflow-x: auto; } }
 </style>

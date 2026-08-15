@@ -104,11 +104,26 @@ class ReplyReadinessService:
                     continue
                 questions[candidate.question_id] = current.model_copy(update={
                     "aliases": list(dict.fromkeys([*current.aliases, *candidate.aliases])),
-                    "policy_risk_floor": candidate.policy_risk_floor,
-                    "expected_action": candidate.expected_action,
-                    "required_fact_keys": candidate.required_fact_keys,
-                    "requires_realtime_lookup": candidate.requires_realtime_lookup,
-                    "prohibited_claims": candidate.prohibited_claims,
+                    "policy_risk_floor": max(
+                        (current.policy_risk_floor, candidate.policy_risk_floor),
+                        key=_RISK.__getitem__,
+                    ),
+                    "expected_action": max(
+                        (current.expected_action, candidate.expected_action),
+                        key=_ACTION.__getitem__,
+                    ),
+                    "required_fact_keys": list(dict.fromkeys([
+                        *current.required_fact_keys,
+                        *candidate.required_fact_keys,
+                    ])),
+                    "requires_realtime_lookup": (
+                        current.requires_realtime_lookup
+                        or candidate.requires_realtime_lookup
+                    ),
+                    "prohibited_claims": list(dict.fromkeys([
+                        *current.prohibited_claims,
+                        *candidate.prohibited_claims,
+                    ])),
                 })
         ordered = sorted(questions.values(), key=lambda item: item.question_id)
         fingerprint = canonical_sha256({
@@ -122,12 +137,30 @@ class ReplyReadinessService:
         )
 
     def create_extension(self, payload: QuestionSetExtensionCreate) -> QuestionSetExtensionProjection:
-        self.scope(payload.store_code, payload.product_id or self._first_product(payload.store_code), None)
+        scope = self.scope(
+            payload.store_code,
+            payload.product_id or self._first_product(payload.store_code),
+            None,
+        )
+        effective = {
+            item.question_id: item
+            for item in self.effective_question_set(scope).questions
+        }
         baseline = {
             item["question_id"]: PddReplyReadinessQuestionV1.model_validate(item)
             for item in BASELINE_QUESTIONS
         }
         for candidate in payload.questions:
+            existing = effective.get(candidate.question_id)
+            if (
+                existing is not None
+                and candidate.canonical_question != existing.canonical_question
+            ):
+                raise AppError(
+                    "REPLY_READINESS_EXTENSION_QUESTION_ID_CONFLICT",
+                    "同一问题ID不能表示不同的标准问法。",
+                    status_code=422,
+                )
             current = baseline.get(candidate.question_id)
             if current is None:
                 continue
