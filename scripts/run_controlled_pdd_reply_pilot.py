@@ -411,6 +411,17 @@ def main(argv: list[str] | None = None) -> int:
                 ):
                     _print({"status": "STOPPED", "reason": "PRODUCTION_AUTO_DISABLED"})
                     return 0
+                # The formal Windows Agent persists new Decisions in the
+                # shared durable buffer.  Refresh the small bridge feed from
+                # that source on every production poll so unattended AUTO is
+                # not dependent on somebody invoking ``sync-feed`` manually.
+                try:
+                    _sync_feed(orchestrator, policy_mode=state.policy_mode)
+                except ControlledReplyPilotError as exc:
+                    if exc.error_code == "PILOT_REPLY_NOT_AVAILABLE":
+                        time.sleep(max(args.poll_seconds, 0.1))
+                        continue
+                    raise
                 try:
                     candidate = orchestrator.current_general_auto_candidate(
                         policy_revision=state.policy_revision,
