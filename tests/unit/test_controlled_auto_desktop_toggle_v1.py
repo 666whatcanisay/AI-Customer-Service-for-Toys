@@ -7,6 +7,7 @@ from channel_agent.binding import atomic_write_bytes
 from channel_agent.controlled_auto_runtime import ControlledAutoRuntimeStateStore
 from scripts.run_controlled_pdd_reply_pilot import (
     _consume_desktop_toggle,
+    _retryable_production_candidate_error,
     _renew_observer_if_needed,
 )
 
@@ -81,3 +82,10 @@ def test_production_auto_renews_expired_read_observer(tmp_path) -> None:
     )
     assert payload["human_intent"] is True
     assert payload["reason"] == "PRODUCTION_AUTO_OBSERVER_SESSION_RENEWAL"
+
+
+def test_transient_store_identity_gap_does_not_terminate_production_runner() -> None:
+    assert _retryable_production_candidate_error(
+        "PILOT_DOUBLE_STORE_IDENTITY_UNAVAILABLE"
+    )
+    assert not _retryable_production_candidate_error("GENERAL_AUTO_SCOPE_INCOMPLETE")

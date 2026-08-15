@@ -275,6 +275,12 @@ def _publish_public_status(
     )
 
 
+def _retryable_production_candidate_error(error_code: str) -> bool:
+    return error_code in {
+        "PILOT_DOUBLE_STORE_IDENTITY_UNAVAILABLE",
+    }
+
+
 def _consume_desktop_toggle(
     data_root: Path,
     runtime_store: ControlledAutoRuntimeStateStore,
@@ -679,6 +685,15 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 except ControlledReplyPilotError as exc:
                     if exc.error_code == "PILOT_QUALITY_GATE_BLOCKED":
+                        time.sleep(max(args.poll_seconds, 0.1))
+                        continue
+                    if _retryable_production_candidate_error(exc.error_code):
+                        _publish_public_status(
+                            data_root,
+                            runtime_store.load(),
+                            runner_active=True,
+                            control_error_code=exc.error_code,
+                        )
                         time.sleep(max(args.poll_seconds, 0.1))
                         continue
                     raise
