@@ -93,7 +93,8 @@ def test_product_fact_topics_keep_answer_and_evidence_on_one_field() -> None:
         "拼好以后大概多大？", results
     ) == [results[1]]
     assert RAGService._results_for_answer_topics("这个模型比例是多少？", results) == [
-        results[2]
+        results[1],
+        results[2],
     ]
     assert RAGService._results_for_answer_topics("这款是什么包装？", results) == [
         results[3]
@@ -101,6 +102,35 @@ def test_product_fact_topics_keep_answer_and_evidence_on_one_field() -> None:
     assert RAGService._results_for_answer_topics("详情页是实物图吗？", results) == [
         results[4]
     ]
+
+
+def test_reviewed_structured_product_facts_have_stable_customer_wording() -> None:
+    results = [
+        {"content": 'particle_count: "约500颗"'},
+        {"content": 'assembled_size: "成品约20×5×5厘米"'},
+        {"content": 'product_scale: "比例约1:20"'},
+        {"content": 'package_type: "彩盒包装"'},
+        {"content": 'image_material_status: "详情页图片为产品实物拍摄展示"'},
+        {"content": 'ship_origin: "广东汕头"'},
+    ]
+
+    assert "500颗" in RAGService._approved_structured_fact_answer(
+        "有多少粒", results
+    )
+    size = RAGService._approved_structured_fact_answer("长度和宽度是多少", results)
+    assert size is not None and all(value in size for value in ("20厘米", "5厘米"))
+    scale = RAGService._approved_structured_fact_answer("1:1复刻吗", results)
+    assert scale is not None and "1:20" in scale and "20厘米" in scale
+    assert "1:1" not in scale
+    assert "彩盒包装" in RAGService._approved_structured_fact_answer(
+        "货柜礼盒是什么", results
+    )
+    assert "实拍" in RAGService._approved_structured_fact_answer(
+        "有拼好的实物图吗", results
+    )
+    assert "广东汕头" in RAGService._approved_structured_fact_answer(
+        "哪里发货", results
+    )
 
 
 def context(product_id: str = "P-Q80", sku_id: str | None = None):

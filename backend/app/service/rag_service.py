@@ -238,11 +238,21 @@ class RAGService:
             r"多长",
             r"多宽",
             r"多高",
+            r"多大",
+            r"车长",
+            r"长度",
+            r"宽度",
             r"多少(?:厘米|毫米|cm|mm)",
             r"(?:成品|包装|拼好|拼完).*多大",
         ):
             topics.append("size")
-        if cls._question_has(question, r"多少颗", r"几颗", r"颗粒数", r"积木数量"):
+        if cls._question_has(
+            question,
+            r"多少(?:颗|粒|块)",
+            r"几(?:颗|粒|块)",
+            r"颗粒数",
+            r"积木数量",
+        ):
             topics.append("count")
         if cls._question_has(question, r"比例", r"几比几", r"1\s*[:：]\s*\d+"):
             topics.append("scale")
@@ -375,6 +385,12 @@ class RAGService:
         topics = cls._answer_topics(question)
         if not topics:
             return results
+        evidence_topics = list(topics)
+        if "scale" in evidence_topics and "size" not in evidence_topics:
+            # The approved historic scale answer also states the finished
+            # size.  Keep that second fact inside the same product scope and
+            # include it in the resulting Evidence Bundle.
+            evidence_topics.append("size")
         patterns = {
             "age": r"(?:age|年龄|适龄|\d+\s*岁|小颗粒|成人陪同)",
             "packaging": r"(?:package_type|包装|礼盒|礼袋|彩盒|袋装|盒装)",
@@ -391,10 +407,84 @@ class RAGService:
             for result in results
             if any(
                 re.search(patterns[topic], cls._answer_content(result), re.IGNORECASE)
-                for topic in topics
+                for topic in evidence_topics
             )
         ]
         return selected or results
+
+    @staticmethod
+    def _structured_product_fact_value(
+        results: list[dict[str, Any]], field_name: str
+    ) -> str | None:
+        prefix = f"{field_name}:"
+        for result in results:
+            content = str(result.get("content") or "").strip()
+            if not content.startswith(prefix):
+                continue
+            raw_value = content[len(prefix) :].strip()
+            try:
+                value = json.loads(raw_value)
+            except (TypeError, ValueError):
+                value = raw_value
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    @classmethod
+    def _approved_structured_fact_answer(
+        cls,
+        question: str,
+        results: list[dict[str, Any]],
+    ) -> str | None:
+        """Render reviewed product fields without letting the model alter numbers."""
+
+        topics = cls._answer_topics(question)
+        if len(topics) != 1:
+            return None
+        topic = topics[0]
+        if topic == "count":
+            value = cls._structured_product_fact_value(results, "particle_count")
+            if value:
+                normalized = value.removeprefix("约")
+                return f"亲，这款商品颗粒数量约为{normalized}，具体以实际清点为准哦。"
+        if topic == "size":
+            value = cls._structured_product_fact_value(results, "assembled_size")
+            if value:
+                numbers = re.findall(r"\d+(?:\.\d+)?", value)
+                if len(numbers) >= 3:
+                    return (
+                        f"亲，这款商品拼好后长约{numbers[0]}厘米、"
+                        f"宽约{numbers[1]}厘米、高约{numbers[2]}厘米。"
+                    )
+                return f"亲，这款商品{value}，具体以实物为准哦。"
+        if topic == "scale":
+            scale = cls._structured_product_fact_value(results, "product_scale")
+            if scale:
+                ratio = re.search(r"\d+\s*[:：]\s*\d+", scale)
+                rendered = ratio.group(0).replace("：", ":") if ratio else scale
+                size = cls._structured_product_fact_value(results, "assembled_size")
+                numbers = re.findall(r"\d+(?:\.\d+)?", size or "")
+                if len(numbers) >= 3:
+                    return (
+                        f"亲，这款模型比例约为{rendered}，拼好后长约{numbers[0]}厘米、"
+                        f"宽约{numbers[1]}厘米、高约{numbers[2]}厘米。"
+                    )
+                return f"亲，这款模型比例约为{rendered}。"
+        if topic == "packaging":
+            value = cls._structured_product_fact_value(results, "package_type")
+            if value:
+                return f"亲，这款商品采用{value}哦。"
+        if topic == "photo":
+            value = cls._structured_product_fact_value(
+                results, "image_material_status"
+            )
+            if value:
+                return "亲，详情页图片为产品实拍展示，您可以直接参考页面效果哦。"
+        if topic == "ship_origin":
+            value = cls._structured_product_fact_value(results, "ship_origin")
+            if value:
+                return f"亲，这款商品从{value}发货，具体物流时效以订单页面为准哦。"
+        return None
 
     def build_context(
         self,
@@ -1175,7 +1265,14 @@ class RAGService:
         else:
             answer_action = "ANSWER"
             risk_level = None
-        if context and answer_action in SAFETY_ACTION_MESSAGES:
+        approved_fact_answer = (
+            self._approved_structured_fact_answer(question, results)
+            if context
+            else None
+        )
+        if approved_fact_answer is not None:
+            answer = approved_fact_answer
+        elif context and answer_action in SAFETY_ACTION_MESSAGES:
             answer = self._guarded_answer(question, answer_action, results)
         else:
             answer_context = self.build_context(results, question)
