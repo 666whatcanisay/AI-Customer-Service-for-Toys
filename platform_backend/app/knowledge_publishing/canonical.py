@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.knowledge_materials.models import KnowledgeMaterial
 from app.test_catalog.models import (
     TestFaq,
     TestProduct,
@@ -15,6 +17,19 @@ from app.test_catalog.models import (
     TestSku,
     TestStore,
 )
+
+_REVIEWED_MATERIAL_STATUSES = {
+    "APPROVED_FOR_ANALYSIS",
+    "ANALYZING",
+    "ANALYZED",
+}
+_APPROXIMATE_PRODUCT_FIELDS = {
+    "particle_count": "颗粒数量",
+    "assembled_size": "成品尺寸",
+    "product_scale": "商品比例",
+}
+_APPROXIMATE_VALUE_RE = re.compile(r"(?:约|大约|左右|近似|以实际.*为准)")
+_REVIEWED_APPROXIMATE_RE = re.compile(r"(?:约数已审核|中风险受控回答|仅允许近似回答)")
 
 
 PRODUCT_FIELDS = (
@@ -60,6 +75,86 @@ def _clean(value: Any) -> Any:
     return value
 
 
+def _reviewed_approximate_controls(
+    session: Session,
+    product: TestProduct,
+    raw: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Return only human-reviewed approximate facts that match product data.
+
+    Knowledge materials are immutable revisions.  Only the latest revision of
+    each material can authorize a control marker, and the marker is accepted
+    only when both the material body and its review note explicitly describe
+    the approximate-value constraint.  This keeps ordinary imported text from
+    silently upgrading itself into reviewed evidence.
+    """
+
+    rows = list(
+        session.scalars(
+            select(KnowledgeMaterial)
+            .where(
+                KnowledgeMaterial.store_code == product.store_code,
+                KnowledgeMaterial.product_id == product.product_id,
+                KnowledgeMaterial.sku_id.is_(None),
+            )
+            .order_by(KnowledgeMaterial.material_id, KnowledgeMaterial.revision.desc())
+        )
+    )
+    latest: dict[str, KnowledgeMaterial] = {}
+    for row in rows:
+        latest.setdefault(row.material_id, row)
+
+    controls: dict[str, dict[str, Any]] = {}
+    for material in latest.values():
+        if material.material_status not in _REVIEWED_MATERIAL_STATUSES:
+            continue
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", material.content_hash or ""):
+            continue
+        try:
+            body = json.loads(material.analysis_text or "{}")
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(body, dict):
+            continue
+
+        review_text = " ".join(
+            value
+            for value in (material.review_note, material.analysis_text)
+            if isinstance(value, str)
+        )
+        if not _REVIEWED_APPROXIMATE_RE.search(review_text):
+            continue
+
+        facts = body.get("facts")
+        fact_map = facts if isinstance(facts, dict) else {}
+        records = body.get("数据记录")
+        record = records[0] if isinstance(records, list) and records else {}
+        if not isinstance(record, dict):
+            record = {}
+        if record and str(record.get("是否人工确认") or "").strip() != "是":
+            continue
+
+        for field_name, display_name in _APPROXIMATE_PRODUCT_FIELDS.items():
+            product_value = _clean(raw.get(field_name))
+            material_value = _clean(
+                fact_map.get(field_name) or record.get(display_name)
+            )
+            if (
+                not isinstance(product_value, str)
+                or not isinstance(material_value, str)
+                or product_value != material_value
+                or not _APPROXIMATE_VALUE_RE.search(product_value)
+            ):
+                continue
+            controls[field_name] = {
+                "controlled_answer_kind": "REVIEWED_APPROXIMATE_FACT",
+                "material_id": material.material_id,
+                "material_revision": material.revision,
+                "material_content_hash": material.content_hash,
+            }
+    return controls
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalProductKnowledge:
     tenant_id: str
@@ -89,6 +184,7 @@ def build_canonical_product_knowledge(
         else "UNKNOWN"
     )
     raw = _json_dict(product.raw_data_json)
+    reviewed_controls = _reviewed_approximate_controls(session, product, raw)
     skus = list(
         session.scalars(
             select(TestSku)
@@ -121,6 +217,7 @@ def build_canonical_product_knowledge(
         "store_code": product.store_code,
         "product_id": product.product_id,
         "product_name": product.product_name_display or product.product_name_official,
+        "reviewed_answer_controls": reviewed_controls,
         "product": {
             "age_min": product.age_min,
             "age_max": product.age_max,
@@ -138,7 +235,8 @@ def build_canonical_product_knowledge(
                 **{
                     key: _clean(_json_dict(sku.raw_data_json).get(key))
                     for key in SKU_FIELDS
-                    if _clean(_json_dict(sku.raw_data_json).get(key)) not in (None, "", [])
+                    if _clean(_json_dict(sku.raw_data_json).get(key))
+                    not in (None, "", [])
                 },
             }
             for sku in skus
@@ -187,10 +285,14 @@ def build_canonical_product_knowledge(
     source_ids = tuple(
         dict.fromkeys(
             [
+                *[str(item).strip() for item in raw_source_ids if str(item).strip()],
                 *[
-                    str(item).strip()
-                    for item in raw_source_ids
-                    if str(item).strip()
+                    (
+                        f"C-REVIEWED-MATERIAL:{control['material_id']}:"
+                        f"r{control['material_revision']}:"
+                        f"{control['material_content_hash']}"
+                    )
+                    for control in reviewed_controls.values()
                 ],
                 f"C-APPROVED-PRODUCT:{product.product_id}",
             ]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import re
 import time
 import urllib.parse
@@ -26,13 +26,12 @@ from app.service.ai_capability import (
     RuntimeMetrics,
     render_customer_answer_prompt,
 )
+from app.service.product_knowledge_publisher import ProductKnowledgePublisher
 from app.service.test_knowledge import (
     PlatformTestKnowledgeClient,
     TestKnowledgeIndex,
 )
 from app.service.vector_store import VectorStore
-from app.service.product_knowledge_publisher import ProductKnowledgePublisher
-
 
 logger = logging.getLogger(__name__)
 REFUSAL_MESSAGE = "知识库中未找到足够可靠的相关内容，无法回答该问题。"
@@ -230,9 +229,7 @@ class RAGService:
             question, r"包装", r"礼盒", r"礼袋", r"彩盒", r"袋装", r"盒装"
         ):
             topics.append("packaging")
-        if cls._question_has(
-            question, r"材质", r"材料", r"什么做的", r"什么料"
-        ):
+        if cls._question_has(question, r"材质", r"材料", r"什么做的", r"什么料"):
             topics.append("material")
         if cls._question_has(
             question,
@@ -331,11 +328,7 @@ class RAGService:
                 "透明",
             ),
         }
-        allowed = tuple(
-            keyword
-            for topic in topics
-            for keyword in keywords[topic]
-        )
+        allowed = tuple(keyword for topic in topics for keyword in keywords[topic])
         fragments = [
             fragment.strip()
             for fragment in re.split(r"[。！？!?；;\n]+", content)
@@ -552,8 +545,9 @@ class RAGService:
         return "；".join(parts)
 
     def _source_items(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [
-            {
+        sources: list[dict[str, Any]] = []
+        for result in results:
+            source = {
                 "source_name": result.get("source_name", ""),
                 "page": int(result.get("page", 0)),
                 "chunk_id": result.get("chunk_id", ""),
@@ -568,8 +562,11 @@ class RAGService:
                 # product-level, while every non-blank SKU remains exact.
                 "sku_id": result.get("sku_id") or None,
             }
-            for result in results
-        ]
+            controlled_answer_kind = result.get("controlled_answer_kind")
+            if controlled_answer_kind:
+                source["controlled_answer_kind"] = controlled_answer_kind
+            sources.append(source)
+        return sources
 
     def retrieve(
         self,
@@ -577,8 +574,10 @@ class RAGService:
         top_k: int | None = None,
         context: FrozenChatContext | None = None,
     ) -> dict[str, Any]:
-        limit = max(top_k or self.settings.top_k, 6) if context else (
-            top_k or self.settings.top_k
+        limit = (
+            max(top_k or self.settings.top_k, 6)
+            if context
+            else (top_k or self.settings.top_k)
         )
         if context is None:
             results = self.vector_store.search(question, top_k=limit)
@@ -739,9 +738,10 @@ class RAGService:
         age_safety = "age" in self._answer_topics(question) or self._question_has(
             question, r"[几多五六0-9]+岁", r"小孩", r"儿童", r"小颗粒"
         )
-        config_ambiguous = self._question_has(
-            question, r"带.*遥控", r"带灯", r"遥控灯"
-        ) and not context.sku_id
+        config_ambiguous = (
+            self._question_has(question, r"带.*遥控", r"带灯", r"遥控灯")
+            and not context.sku_id
+        )
         source_trace = self._question_has(question, r"依据", r"哪张图", r"来源")
         reference_relation = self._question_has(
             question, r"同一款", r"另一个链接", r"reference"
@@ -811,9 +811,7 @@ class RAGService:
         ):
             action, risk = "CONTROLLED_ANSWER", "HIGH"
         elif exact_result and question_numbers:
-            evidence_numbers = set(
-                re.findall(r"\d+", exact_result.get("content", ""))
-            )
+            evidence_numbers = set(re.findall(r"\d+", exact_result.get("content", "")))
             # Product/SKU identifiers also contain digits; only treat a number
             # as a conflicting claim when it is at least three digits long.
             unsupported = {
@@ -829,8 +827,7 @@ class RAGService:
             result
             for result in results
             if result.get("knowledge_type") == "SKU_FACT"
-            and claimed_numbers
-            & set(re.findall(r"\d+", result.get("content", "")))
+            and claimed_numbers & set(re.findall(r"\d+", result.get("content", "")))
         ]
         if matching_sku_facts and not context.sku_id:
             preferred = matching_sku_facts[0]
@@ -850,13 +847,11 @@ class RAGService:
             if result is not preferred and result not in ordered
         )
         ordered.extend(result for result in results if result not in ordered)
-        if (
-            not context.product_id.startswith("__STORE_LEVEL_")
-            and action in {"DIRECT_ANSWER", "CONTROLLED_ANSWER"}
-        ):
-            product_results = [
-                result for result in ordered if result.get("product_id")
-            ]
+        if not context.product_id.startswith("__STORE_LEVEL_") and action in {
+            "DIRECT_ANSWER",
+            "CONTROLLED_ANSWER",
+        }:
+            product_results = [result for result in ordered if result.get("product_id")]
             if product_results:
                 relevant_store_safety = [
                     result
@@ -881,7 +876,9 @@ class RAGService:
         if action == "ASK_CLARIFY" and not context.sku_id:
             fields.append("sku_id")
         elif action == "REQUIRE_LOOKUP":
-            if self._question_has(question, r"发货", r"到货", r"物流", r"赠品", r"活动"):
+            if self._question_has(
+                question, r"发货", r"到货", r"物流", r"赠品", r"活动"
+            ):
                 if not (
                     context.verified_transaction
                     and context.verified_transaction.order_reference
@@ -1068,8 +1065,7 @@ class RAGService:
             and not context.product_id.startswith("__STORE_LEVEL_")
             and not self._question_allows_store_guard_without_product(question)
             and not any(
-                result.get("product_id") == context.product_id
-                for result in results
+                result.get("product_id") == context.product_id for result in results
             )
         )
 
@@ -1103,7 +1099,9 @@ class RAGService:
                 "warnings": (
                     ["KNOWLEDGE_NOT_PUBLISHED"]
                     if knowledge_not_published
-                    else ["NO_SCOPED_KNOWLEDGE"] if context else []
+                    else ["NO_SCOPED_KNOWLEDGE"]
+                    if context
+                    else []
                 ),
                 "required_fields": [],
                 "context": context.model_dump() if context else None,
@@ -1197,9 +1195,7 @@ class RAGService:
             "latency_ms": round((time.perf_counter() - start) * 1000, 1),
             "request_id": request_id,
             "risk_level": risk_level,
-            "warnings": (
-                ["SUGGESTION_ONLY", "AUTO_SEND_DISABLED"] if context else []
-            ),
+            "warnings": (["SUGGESTION_ONLY", "AUTO_SEND_DISABLED"] if context else []),
             "required_fields": (
                 self._required_fields(question, context, answer_action)
                 if context

@@ -2,15 +2,15 @@ import json
 from datetime import datetime, timezone
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
+from app.errors import AppError
+from app.knowledge_materials.models import KnowledgeMaterial
 from app.knowledge_publishing.ai_client import AiKnowledgePublicationClient
 from app.knowledge_publishing.canonical import build_canonical_product_knowledge
 from app.knowledge_publishing.models import ProductKnowledgePublication
-from app.errors import AppError
 from app.knowledge_publishing.schemas import ProductKnowledgePublishCommand
 from app.knowledge_publishing.service import ProductKnowledgePublishingService
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 from tests.test_customer_catalog_api import _seed_product, _seed_scope
 
 
@@ -60,15 +60,23 @@ def test_publish_is_approved_only_incremental_and_idempotent(
     client: TestClient, session: Session, monkeypatch
 ) -> None:
     product = _approved_product(session)
-    monkeypatch.setattr(AiKnowledgePublicationClient, "publish", lambda self, payload: _publish_result(payload))
+    monkeypatch.setattr(
+        AiKnowledgePublicationClient,
+        "publish",
+        lambda self, payload: _publish_result(payload),
+    )
 
     before = client.get("/api/v1/admin/product-knowledge/products").json()["items"][0]
     assert before["ai_knowledge"]["status"] == "NOT_GENERATED"
     assert before["ai_knowledge"]["chunk_count"] == 0
 
-    url = f"/api/v1/admin/product-knowledge/products/{product.product_id}/ai-publications"
+    url = (
+        f"/api/v1/admin/product-knowledge/products/{product.product_id}/ai-publications"
+    )
     command = {"operator": "pytest-operator", "confirmation_note": "人工确认发布"}
-    first = client.post(url, json=command, headers={"Idempotency-Key": "publish-product-001"})
+    first = client.post(
+        url, json=command, headers={"Idempotency-Key": "publish-product-001"}
+    )
     assert first.status_code == 200
     body = first.json()
     assert body["changed"] is True
@@ -77,7 +85,9 @@ def test_publish_is_approved_only_incremental_and_idempotent(
     assert body["ai_knowledge"]["embedding_count"] == 2
     assert body["publication_receipt"]["publication_receipt_id"] == "RAG-RECEIPT-001"
 
-    replay = client.post(url, json=command, headers={"Idempotency-Key": "publish-product-001"})
+    replay = client.post(
+        url, json=command, headers={"Idempotency-Key": "publish-product-001"}
+    )
     assert replay.status_code == 200
     assert replay.headers["Idempotency-Replayed"] == "true"
     receipts = client.get(
@@ -89,7 +99,10 @@ def test_publish_is_approved_only_incremental_and_idempotent(
     session.commit()
     changed = client.get("/api/v1/admin/product-knowledge/products").json()["items"][0]
     assert changed["ai_knowledge"]["status"] == "NEED_RESYNC"
-    assert changed["ai_knowledge"]["indexed_fingerprint"] != changed["ai_knowledge"]["current_fingerprint"]
+    assert (
+        changed["ai_knowledge"]["indexed_fingerprint"]
+        != changed["ai_knowledge"]["current_fingerprint"]
+    )
 
 
 def test_publish_accepts_formalized_initial_import_source(
@@ -155,11 +168,82 @@ def test_canonical_product_knowledge_keeps_product_level_pdd_facts(
     }
 
 
+def test_canonical_marks_only_matching_human_reviewed_approximate_facts(
+    session: Session,
+) -> None:
+    product = _approved_product(
+        session,
+        product_id="982904528556",
+        data_source="PILOT",
+    )
+    product.raw_data_json = json.dumps(
+        {
+            "particle_count": "约500颗",
+            "assembled_size": "约20×5×5厘米",
+            "package_type": "彩盒包装",
+        },
+        ensure_ascii=False,
+    )
+    session.add(
+        KnowledgeMaterial(
+            material_id="KMT-REVIEWED-982904528556",
+            revision=2,
+            store_code=product.store_code,
+            product_id=product.product_id,
+            sku_id=None,
+            material_type="PRODUCT_SPEC",
+            display_name="reviewed product facts",
+            original_filename="reviewed.json",
+            content_hash=f"sha256:{'a' * 64}",
+            redaction_version="v1",
+            recognition_summary={},
+            analysis_text=json.dumps(
+                {
+                    "数据记录": [
+                        {
+                            "颗粒数量": "约500颗",
+                            "成品尺寸": "约20×5×5厘米",
+                            "包装内容": "彩盒包装",
+                            "是否人工确认": "是",
+                            "备注": "约数已审核，仅允许近似回答",
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            raw_storage_path="controlled/reviewed.json",
+            material_status="APPROVED_FOR_ANALYSIS",
+            submitted_by="pytest",
+            reviewed_by="pytest-reviewer",
+            review_note="约数仅允许中风险受控回答",
+        )
+    )
+    session.commit()
+
+    canonical = build_canonical_product_knowledge(session, product)
+    document = json.loads(canonical.document)
+
+    assert set(document["reviewed_answer_controls"]) == {
+        "particle_count",
+        "assembled_size",
+    }
+    assert (
+        document["reviewed_answer_controls"]["particle_count"]["controlled_answer_kind"]
+        == "REVIEWED_APPROXIMATE_FACT"
+    )
+    assert any(
+        source_id.startswith("C-REVIEWED-MATERIAL:KMT-REVIEWED-982904528556:r2:")
+        for source_id in canonical.source_ids
+    )
+
+
 def test_publish_rejects_unapproved_and_records_sync_failure(
     client: TestClient, session: Session, monkeypatch
 ) -> None:
     product = _approved_product(session, product_id="PRODUCT-FAIL")
-    url = f"/api/v1/admin/product-knowledge/products/{product.product_id}/ai-publications"
+    url = (
+        f"/api/v1/admin/product-knowledge/products/{product.product_id}/ai-publications"
+    )
     command = {"operator": "pytest-operator", "confirmation_note": "人工确认发布"}
 
     product.review_status = "DRAFT"
@@ -176,7 +260,9 @@ def test_publish_rejects_unapproved_and_records_sync_failure(
         raise AiKnowledgePublicationUnavailable("isolated failure")
 
     monkeypatch.setattr(AiKnowledgePublicationClient, "publish", fail_publish)
-    failed = client.post(url, json=command, headers={"Idempotency-Key": "publish-failure"})
+    failed = client.post(
+        url, json=command, headers={"Idempotency-Key": "publish-failure"}
+    )
     assert failed.status_code == 502
     row = session.get(ProductKnowledgePublication, product.product_id)
     assert row is not None

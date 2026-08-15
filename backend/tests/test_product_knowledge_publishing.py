@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 
 def publication_payload(*, fingerprint: str, document: str, key: str = "publish-one"):
@@ -139,3 +140,76 @@ def test_publication_accepts_formalized_initial_import_source(api_client):
 
     assert response.status_code == 200
     assert response.json()["status"] == "PUBLISHED"
+
+
+def test_reviewed_approximate_fields_are_published_as_separate_controlled_facts(
+    api_client,
+):
+    client, _ = api_client
+    document = json.dumps(
+        {
+            "schema_version": "c-product-knowledge-document.v1",
+            "reviewed_answer_controls": {
+                "particle_count": {
+                    "controlled_answer_kind": "REVIEWED_APPROXIMATE_FACT",
+                    "material_id": "KMT-REVIEWED",
+                    "material_revision": 2,
+                    "material_content_hash": f"sha256:{'a' * 64}",
+                }
+            },
+            "product": {
+                "particle_count": "约500颗",
+                "package_type": "彩盒包装",
+                "common_customer_questions": ["多少颗粒", "什么包装"],
+            },
+            "skus": [],
+            "faqs": [],
+            "safety_rules": [],
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    fingerprint = hashlib.sha256(document.encode("utf-8")).hexdigest()
+    payload = publication_payload(fingerprint=fingerprint, document=document)
+
+    response = client.post(
+        "/api/admin/ai/knowledge-publications/products",
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    controlled = client.post(
+        "/api/chat",
+        json={
+            "question": "particle_count: 约500颗",
+            "context": {
+                "tenant_id": payload["tenant_id"],
+                "platform": payload["platform"],
+                "store_code": payload["store_code"],
+                "product_id": payload["product_id"],
+                "sku_id": None,
+            },
+        },
+    ).json()["data"]
+    assert controlled["action"] == "CONTROLLED_ANSWER"
+    assert controlled["risk_level"] == "MEDIUM"
+    assert (
+        controlled["sources"][0]["controlled_answer_kind"]
+        == "REVIEWED_APPROXIMATE_FACT"
+    )
+
+    direct = client.post(
+        "/api/chat",
+        json={
+            "question": "package_type: 彩盒包装",
+            "context": {
+                "tenant_id": payload["tenant_id"],
+                "platform": payload["platform"],
+                "store_code": payload["store_code"],
+                "product_id": payload["product_id"],
+                "sku_id": None,
+            },
+        },
+    ).json()["data"]
+    assert direct["action"] == "DIRECT_ANSWER"
+    assert direct["risk_level"] == "LOW"

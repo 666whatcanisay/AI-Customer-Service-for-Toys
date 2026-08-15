@@ -11,7 +11,6 @@ from typing import Any
 from app.models.chat import FrozenChatContext
 from app.service.vector_store import VectorStore
 
-
 EXPECTED_TENANT_ID = "TENANT-PDD-SM-TEST"
 EXPECTED_VERSION = "V0.3.1"
 EXPECTED_SCHEMA_VERSION = "0.3.1-test"
@@ -107,9 +106,7 @@ def parse_test_knowledge_package(
         )
     tenant_id = _required_string(raw, "tenant_id")
     if tenant_id != EXPECTED_TENANT_ID:
-        raise TestKnowledgeValidationError(
-            f"tenant_id must be {EXPECTED_TENANT_ID}"
-        )
+        raise TestKnowledgeValidationError(f"tenant_id must be {EXPECTED_TENANT_ID}")
     if raw.get("test_data_mode") is not True:
         raise TestKnowledgeValidationError("test_data_mode must be true")
     if raw.get("production_usable") is not False:
@@ -119,9 +116,7 @@ def parse_test_knowledge_package(
     if raw.get("allow_auto_send") is not False:
         raise TestKnowledgeValidationError("allow_auto_send must be false")
     if raw.get("response_mode") != "SUGGESTION_ONLY":
-        raise TestKnowledgeValidationError(
-            "response_mode must be SUGGESTION_ONLY"
-        )
+        raise TestKnowledgeValidationError("response_mode must be SUGGESTION_ONLY")
     if raw.get("platform") != "pdd" or raw.get("store_code") != "PDD-SM":
         raise TestKnowledgeValidationError("platform/store_code scope is invalid")
 
@@ -136,18 +131,14 @@ def parse_test_knowledge_package(
         if not isinstance(item_payload, dict):
             raise TestKnowledgeValidationError("each item must be an object")
         if item_payload.get("allow_auto_send") is True:
-            raise TestKnowledgeValidationError(
-                "item allow_auto_send must not be true"
-            )
+            raise TestKnowledgeValidationError("item allow_auto_send must not be true")
         item_tenant = str(item_payload.get("tenant_id") or tenant_id).strip()
         if item_tenant != EXPECTED_TENANT_ID:
             raise TestKnowledgeValidationError("item tenant_id is invalid")
         if item_payload.get("test_data_mode") is not True:
             raise TestKnowledgeValidationError("item test_data_mode must be true")
         if item_payload.get("production_usable") is not False:
-            raise TestKnowledgeValidationError(
-                "item production_usable must be false"
-            )
+            raise TestKnowledgeValidationError("item production_usable must be false")
         if item_payload.get("platform") != "pdd":
             raise TestKnowledgeValidationError("item platform must be pdd")
         if item_payload.get("store_code") != "PDD-SM":
@@ -165,9 +156,7 @@ def parse_test_knowledge_package(
             )
         risk_level = _required_string(item_payload, "risk_level")
         if risk_level not in RISK_LEVELS:
-            raise TestKnowledgeValidationError(
-                f"unsupported risk_level: {risk_level}"
-            )
+            raise TestKnowledgeValidationError(f"unsupported risk_level: {risk_level}")
         source_ids = item_payload.get("source_ids")
         if not isinstance(source_ids, list) or not source_ids:
             raise TestKnowledgeValidationError("source_ids must be non-empty")
@@ -220,9 +209,7 @@ def parse_test_knowledge_package(
         if not items[-1].knowledge_id:
             raise TestKnowledgeValidationError("knowledge_id is required")
 
-    missing_types = REQUIRED_KNOWLEDGE_TYPES - {
-        item.knowledge_type for item in items
-    }
+    missing_types = REQUIRED_KNOWLEDGE_TYPES - {item.knowledge_type for item in items}
     if missing_types:
         raise TestKnowledgeValidationError(
             "package missing required knowledge types: "
@@ -291,9 +278,7 @@ class PlatformTestKnowledgeClient:
 
     def fetch_evaluations(self, package_id: str) -> dict[str, Any]:
         escaped = urllib.parse.quote(package_id, safe="")
-        return self._get_json(
-            f"/api/v1/test-knowledge-packages/{escaped}/evaluations"
-        )
+        return self._get_json(f"/api/v1/test-knowledge-packages/{escaped}/evaluations")
 
 
 class TestKnowledgeIndex:
@@ -367,9 +352,7 @@ class TestKnowledgeIndex:
         return {"$in": values} if len(values) > 1 else {"$eq": values[0]}
 
     @staticmethod
-    def _product_where(
-        context: FrozenChatContext, sku_id: str
-    ) -> dict[str, Any]:
+    def _product_where(context: FrozenChatContext, sku_id: str) -> dict[str, Any]:
         return {
             "$and": [
                 {"tenant_id": {"$eq": context.tenant_id}},
@@ -431,9 +414,7 @@ class TestKnowledgeIndex:
             ]
         else:
             scoped_queries = [(self._product_scope_where(context), False)]
-        scoped_queries.append(
-            (self._store_guard_where(context, "SAFETY_RULE"), False)
-        )
+        scoped_queries.append((self._store_guard_where(context, "SAFETY_RULE"), False))
         scoped_queries.extend(
             (
                 self._store_guard_where(context, "FAQ", action),
@@ -464,6 +445,9 @@ class TestKnowledgeIndex:
                         "title": metadata.get("title", ""),
                         "answer_action": metadata.get("answer_action", "REFUSE"),
                         "risk_level": metadata.get("risk_level", "HIGH"),
+                        "controlled_answer_kind": metadata.get(
+                            "controlled_answer_kind"
+                        ),
                         "source_ids": json.loads(metadata.get("source_ids", "[]")),
                         "package_id": metadata.get("package_id", ""),
                         "knowledge_version": metadata.get(
@@ -479,8 +463,10 @@ class TestKnowledgeIndex:
                 result["content"] = metadata.get("content", result["content"])
                 results.append(result)
         results.sort(
-            key=lambda item: float(item["distance"])
-            - (EXACT_SKU_DISTANCE_BONUS if item["_exact_sku"] else 0)
+            key=lambda item: (
+                float(item["distance"])
+                - (EXACT_SKU_DISTANCE_BONUS if item["_exact_sku"] else 0)
+            )
         )
         selected = results[: max(top_k, 6)]
         required_support = [
