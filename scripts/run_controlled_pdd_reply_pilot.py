@@ -156,6 +156,8 @@ def _sync_feed(
     orchestrator: ControlledReplyPilotOrchestrator,
     *,
     policy_mode: str,
+    real_send_enabled: bool = False,
+    auto_reply_enabled: bool = False,
 ) -> dict[str, object]:
     waiting = [
         (context, package)
@@ -178,8 +180,8 @@ def _sync_feed(
         )
     feed: dict[str, object] = {
         "safety": {
-            "realSend": False,
-            "autoReply": False,
+            "realSend": real_send_enabled,
+            "autoReply": auto_reply_enabled,
         },
         "reply": {
             "decisionId": package.decision_id,
@@ -430,7 +432,12 @@ def main(argv: list[str] | None = None) -> int:
                 # that source on every production poll so unattended AUTO is
                 # not dependent on somebody invoking ``sync-feed`` manually.
                 try:
-                    _sync_feed(orchestrator, policy_mode=state.policy_mode)
+                    _sync_feed(
+                        orchestrator,
+                        policy_mode=state.policy_mode,
+                        real_send_enabled=True,
+                        auto_reply_enabled=True,
+                    )
                 except ControlledReplyPilotError as exc:
                     if exc.error_code == "PILOT_REPLY_NOT_AVAILABLE":
                         time.sleep(max(args.poll_seconds, 0.1))
