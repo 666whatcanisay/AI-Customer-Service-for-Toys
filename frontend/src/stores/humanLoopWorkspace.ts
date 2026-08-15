@@ -39,7 +39,11 @@ export interface WorkspaceConversation {
   processingStage?: string | null
   riskLevel?: RiskLevel | null
   qualityStatus?: string | null
-  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
+  requiresHuman?: boolean
+  attentionLevel?: 'HUMAN_REQUIRED' | 'UNANSWERED' | 'NONE'
+  autoReplyRunning?: boolean
+  autoReplyReceiptId?: string | null
   preparationId?: string | null
   traceId?: string | null
   messages: WorkspaceMessage[]
@@ -63,7 +67,7 @@ export interface ReplyDraft {
   requiredFields: string[]
   hostState: string | null
   qualityStatus: string | null
-  policyMode: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  policyMode: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
   preparationId: string | null
   traceId: string | null
   createdAt: string
@@ -131,6 +135,10 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       riskLevel: seed.riskLevel,
       qualityStatus: seed.qualityStatus,
       policyMode: seed.policyMode,
+      requiresHuman: seed.requiresHuman === true,
+      attentionLevel: seed.attentionLevel ?? 'UNANSWERED',
+      autoReplyRunning: seed.autoReplyRunning === true,
+      autoReplyReceiptId: seed.autoReplyReceiptId,
       preparationId: seed.preparationId,
       traceId: seed.traceId,
       messages: seed.messages.map((message) => ({
@@ -159,6 +167,10 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       riskLevel: seed.riskLevel,
       qualityStatus: seed.qualityStatus,
       policyMode: seed.policyMode,
+      requiresHuman: seed.requiresHuman === true,
+      attentionLevel: seed.attentionLevel ?? 'UNANSWERED',
+      autoReplyRunning: seed.autoReplyRunning === true,
+      autoReplyReceiptId: seed.autoReplyReceiptId,
       preparationId: seed.preparationId,
       traceId: seed.traceId,
       messages: seed.messages.map((message) => ({
@@ -228,7 +240,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     requiredFields: string[]
     hostState?: string | null
     qualityStatus?: string | null
-    policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+    policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
     preparationId?: string | null
     traceId?: string | null
   }): void {

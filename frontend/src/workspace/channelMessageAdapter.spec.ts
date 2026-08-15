@@ -72,6 +72,34 @@ describe('HttpChannelAgentMessageAdapter', () => {
     })
   })
 
+  it('accepts a truthful v2 production-auto feed and exposes the running state', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...safeChannelAgentFeed(),
+        schemaVersion: 'channel-agent-workspace-feed.v2',
+        conversations: [{
+          conversationId: 'conversation-auto', customerLabel: 'customer-auto', unreadCount: 1,
+          source: 'CHANNEL_AGENT', messages: [], attentionLevel: 'UNANSWERED'
+        }],
+        safety: {
+          ...safeChannelAgentFeed().safety,
+          autoReply: true,
+          realSend: true
+        }
+      })
+    }))
+
+    await expect(new HttpChannelAgentMessageAdapter().listConversations())
+      .resolves.toEqual([
+        expect.objectContaining({
+          conversationId: 'conversation-auto',
+          autoReplyRunning: true,
+          attentionLevel: 'UNANSWERED'
+        })
+      ])
+  })
+
   it('uses the selected conversation product context and never another conversation fallback', async () => {
     const reply = {
       conversationId: 'conversation-b', customerReference: `sha256:${'b'.repeat(64)}`,

@@ -1,7 +1,11 @@
 <template>
   <aside
     class="decision-center"
-    :class="{ collapsed, 'needs-attention': needsReview || draft?.riskLevel === 'HIGH' }"
+    :class="{
+      collapsed,
+      'needs-attention': requiresHuman,
+      'awaiting-auto': autoHandled && conversation?.attentionLevel === 'UNANSWERED'
+    }"
     aria-label="决策中心"
     data-testid="decision-center"
   >
@@ -9,25 +13,32 @@
       v-if="collapsed"
       type="button"
       class="decision-rail"
-      :aria-label="`展开人工确认：${decisionLabel}`"
+      :aria-label="`展开处理详情：${decisionLabel}`"
       data-testid="decision-panel-expand"
       @click="$emit('toggle')"
     >
-      <span class="rail-kicker">人工确认</span>
+      <span class="rail-kicker">{{ requiresHuman ? '人工处理' : '自动回复' }}</span>
       <strong>{{ decisionLabel }}</strong>
       <span data-testid="active-conversation-status">{{ conversationStatusLabel }}</span>
-      <span class="rail-risk" :class="riskTone">风险 {{ riskLabel }}</span>
-      <b v-if="needsReview">待确认 1</b>
-      <small>REAL_SEND<br />OFF</small>
+      <span v-if="requiresHuman" class="rail-risk" :class="riskTone">风险 {{ riskLabel }}</span>
+      <b v-if="requiresHuman">需人工 1</b>
+      <small>REAL_SEND<br />{{ autoMode ? 'ON' : 'OFF' }}</small>
       <i aria-hidden="true">‹</i>
     </button>
 
     <template v-else>
       <header class="decision-header">
-        <div><p>回复确认</p><h2>人工确认</h2></div>
+        <div><p>{{ autoHandled ? '自动处理' : '回复确认' }}</p><h2>{{ autoHandled ? '自动回复' : '人工处理' }}</h2></div>
         <button type="button" aria-label="收起人工确认" data-testid="decision-panel-collapse" @click="$emit('toggle')">›</button>
       </header>
 
+      <section v-if="autoHandled" class="auto-status" :class="conversation?.attentionLevel === 'UNANSWERED' ? 'pending' : 'sent'" data-testid="automatic-reply-status">
+        <span>当前状态</span>
+        <strong>{{ decisionLabel }}</strong>
+        <small>{{ conversation?.attentionLevel === 'UNANSWERED' ? '系统正在生成或发送本条回复，无需人工确认。' : '本条会话不需要人工确认；需要人工时会转为红色卡片。' }}</small>
+      </section>
+
+      <template v-else>
       <section class="decision-status" :class="decisionTone">
         <span>当前状态</span>
         <strong>{{ decisionLabel }}</strong>
@@ -122,6 +133,7 @@
           <li>不退款、不修改订单</li>
         </ul>
       </details>
+      </template>
     </template>
   </aside>
 </template>
@@ -155,6 +167,9 @@ defineEmits<{
 
 const evidenceCount = computed(() => props.draft?.citations.length ?? 0)
 const isManualReply = computed(() => props.draft?.replySource === 'MANUAL')
+const autoMode = computed(() => props.conversation?.autoReplyRunning === true)
+const requiresHuman = computed(() => props.conversation?.requiresHuman === true)
+const autoHandled = computed(() => autoMode.value && !requiresHuman.value)
 const conversationStatusLabel = computed(() => props.conversation
   ? CONVERSATION_STATUS_LABELS[props.conversation.status]
   : '未选择')
@@ -169,6 +184,10 @@ const conversationNextStep = computed(() => {
 
 const decisionLabel = computed(() => {
   if (!props.conversation) return '未选择会话'
+  if (props.conversation.attentionLevel === 'HUMAN_REQUIRED') return '需要人工处理'
+  if (autoMode.value && props.conversation.attentionLevel === 'UNANSWERED') return '等待自动回复'
+  if (autoMode.value && props.conversation.hostState === 'AUTO_REPLIED') return '已自动回复'
+  if (autoMode.value) return '自动回复运行中'
   if (props.draft?.preparationId) return '执行已准备'
   if (props.draft?.decisionState === 'APPROVED') return isManualReply.value ? '人工回复已确认' : '已采用'
   if (props.draft?.decisionState === 'REJECTED') return '已拒绝'
@@ -230,13 +249,15 @@ const confirmLabel = computed(() => ({
 .decision-center { min-width: 0; min-height: 0; padding: 14px 12px; overflow: auto; border-left: 1px solid var(--workspace-border); color: var(--workspace-text); background: var(--workspace-panel-soft); }
 .decision-center.collapsed { padding: 0; overflow: hidden; }
 .decision-rail { display: flex; width: 100%; height: 100%; min-height: 0; flex-direction: column; align-items: center; gap: 10px; padding: 16px 8px; border: 0; color: var(--workspace-text); background: var(--workspace-panel-soft); cursor: pointer; }
-.decision-rail:hover { background: #e8f4eb; }.decision-center.needs-attention .decision-rail { box-shadow: inset 3px 0 #d49325; background: #fff9e9; }
+.decision-rail:hover { background: #e8f4eb; }
+.decision-center.needs-attention .decision-rail { box-shadow: inset 4px 0 #bd4550; background: #fff0f1; }.decision-center.awaiting-auto .decision-rail { box-shadow: inset 4px 0 #d49325; background: #fff8e4; }
 .rail-kicker { color: var(--workspace-accent); font-size: 8px; font-weight: 900; letter-spacing: .08em; writing-mode: vertical-rl; }
 .decision-rail > strong { max-width: 86px; color: var(--workspace-text); font-size: 13px; line-height: 1.35; text-align: center; }.decision-rail > span:not(.rail-kicker):not(.rail-risk) { color: var(--workspace-muted); font-size: 9px; text-align: center; }
 .rail-risk { padding: 5px 7px; border-radius: 999px; color: var(--workspace-muted); background: #fff; font-size: 9px; white-space: nowrap; }.rail-risk.risk-low{color:var(--workspace-accent)}.rail-risk.risk-medium{color:var(--workspace-warning)}.rail-risk.risk-high{color:var(--workspace-danger);background:var(--workspace-danger-soft)}
 .decision-rail b { padding: 5px 7px; border-radius: 999px; color: #8b5c00; background: #fff0c9; font-size: 9px; }.decision-rail small { margin-top: auto;color:var(--workspace-danger);font-size:8px;font-weight:900;line-height:1.45;text-align:center}.decision-rail i{display:grid;width:25px;height:25px;place-items:center;border:1px solid var(--workspace-border);border-radius:8px;background:#fff;color:var(--workspace-accent);font-size:18px;font-style:normal}
 .decision-header { display:flex;align-items:flex-start;justify-content:space-between;gap:10px }.decision-header p { margin: 0 0 4px; color: var(--workspace-accent); font-size: 8px; font-weight: 800; letter-spacing: .14em; }.decision-header h2 { margin: 0 0 12px; color: var(--workspace-text); font-size: 17px; }.decision-header button{display:grid;width:28px;height:28px;place-items:center;border:1px solid var(--workspace-border);border-radius:8px;background:#fff;color:var(--workspace-accent);font-size:18px;cursor:pointer}
 .decision-status { display: grid; gap: 5px; padding: 12px; border: 1px solid #dfbd71; border-radius: 11px; background: var(--workspace-warning-soft); }
+.auto-status{display:grid;gap:6px;padding:13px;border:1px solid #8fbea0;border-radius:11px;background:#e6f5e9}.auto-status.pending{border-color:#dfbd71;background:#fff5d7}.auto-status span,.auto-status small{color:var(--workspace-text-soft);font-size:9px;line-height:1.45}.auto-status strong{color:var(--workspace-accent-strong);font-size:15px}.auto-status.pending strong{color:#8d6117}
 .decision-status.approved { border-color: #8fbea0; background: #e3f3e7; }
 .decision-status.rejected { border-color: #dfa8ae; background: var(--workspace-danger-soft); }
 .decision-status span, .essential-metrics span, .receipt-card span,.reply-preview span { color: var(--workspace-muted); font-size: 9px; }

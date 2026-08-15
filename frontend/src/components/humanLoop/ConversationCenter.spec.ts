@@ -40,3 +40,56 @@ describe('ConversationCenter', () => {
     expect(item.text()).not.toContain('待人工发送')
   })
 })
+
+describe('ConversationCenter attention ordering', () => {
+  it('pins human-required red cards, then unanswered yellow cards, with newest first', () => {
+    const makeConversation = (
+      conversationId: string,
+      attentionLevel: 'HUMAN_REQUIRED' | 'UNANSWERED' | 'NONE',
+      receivedAt: string
+    ): WorkspaceConversation => ({
+      conversationId,
+      customerLabel: conversationId,
+      unreadCount: 1,
+      source: 'CHANNEL_AGENT',
+      status: 'NEW',
+      attentionLevel,
+      requiresHuman: attentionLevel === 'HUMAN_REQUIRED',
+      messages: [{
+        messageId: `message-${conversationId}`,
+        conversationId,
+        customerLabel: conversationId,
+        content: conversationId,
+        receivedAt,
+        source: 'CHANNEL_AGENT',
+        senderRole: 'CUSTOMER',
+        direction: 'INBOUND'
+      }]
+    })
+    const wrapper = mount(ConversationCenter, {
+      props: {
+        conversations: [
+          makeConversation('normal', 'NONE', '2026-08-15T08:30:00Z'),
+          makeConversation('yellow-old', 'UNANSWERED', '2026-08-15T08:10:00Z'),
+          makeConversation('red-old', 'HUMAN_REQUIRED', '2026-08-15T08:00:00Z'),
+          makeConversation('yellow-new', 'UNANSWERED', '2026-08-15T08:20:00Z'),
+          makeConversation('red-new', 'HUMAN_REQUIRED', '2026-08-15T08:25:00Z')
+        ],
+        activeConversationId: '',
+        agentStatus: 'ONLINE',
+        conversationCounts: { NEW: 5, PROCESSING: 0, WAITING_REPLY: 0, COMPLETED: 0 }
+      }
+    })
+
+    expect(wrapper.findAll('.conversation-item').map((item) => item.attributes('data-testid')))
+      .toEqual([
+        'conversation-red-new',
+        'conversation-red-old',
+        'conversation-yellow-new',
+        'conversation-yellow-old',
+        'conversation-normal'
+      ])
+    expect(wrapper.get('[data-testid="conversation-red-new"]').classes()).toContain('requires-human')
+    expect(wrapper.get('[data-testid="conversation-yellow-new"]').classes()).toContain('awaiting-reply')
+  })
+})

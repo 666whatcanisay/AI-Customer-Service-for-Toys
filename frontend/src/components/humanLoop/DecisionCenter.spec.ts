@@ -46,13 +46,13 @@ describe('DecisionCenter execution preparation boundary', () => {
     const wrapper = mount(DecisionCenter, {
       props: {
         draft: { ...draft, state: 'HUMAN_REVIEW', decisionState: 'WAITING_HUMAN', riskLevel: 'HIGH' },
-        conversation,
+        conversation: { ...conversation, requiresHuman: true, attentionLevel: 'HUMAN_REQUIRED' },
         receiptId: '', feedbackReceiptId: '', collapsed: true
       }
     })
 
     expect(wrapper.get('[data-testid="decision-center"]').classes()).toContain('needs-attention')
-    expect(wrapper.text()).toContain('待确认 1')
+    expect(wrapper.text()).toContain('需人工 1')
     expect(wrapper.text()).toContain('风险 高')
     expect(wrapper.text()).toContain('REAL_SEND')
   })
@@ -87,5 +87,25 @@ describe('DecisionCenter execution preparation boundary', () => {
     expect(wrapper.find('[data-testid="complete-conversation"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('已确认发送到当前 PDD 会话')
     expect(wrapper.text()).not.toContain('已发送并生成不可变回执')
+  })
+})
+
+describe('DecisionCenter automatic mode', () => {
+  it('reduces a running automatic conversation to status-only content', () => {
+    const wrapper = mount(DecisionCenter, {
+      props: {
+        draft,
+        conversation: {
+          ...conversation,
+          autoReplyRunning: true,
+          requiresHuman: false,
+          attentionLevel: 'UNANSWERED'
+        },
+        receiptId: '', feedbackReceiptId: '', collapsed: false
+      }
+    })
+
+    expect(wrapper.find('[data-testid="automatic-reply-status"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="decision-confirm"]').exists()).toBe(false)
   })
 })

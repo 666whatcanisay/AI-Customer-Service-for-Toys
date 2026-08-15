@@ -16,7 +16,13 @@
       @bind="requestDesktopBinding"
       @clear-grant="clearDesktopBindingGrant"
     />
-    <div class="human-loop-workspace-grid" :class="{ 'decision-expanded': decisionExpanded }">
+    <div
+      class="human-loop-workspace-grid"
+      :class="{
+        'decision-expanded': showDecisionCenter && decisionExpanded,
+        'without-decision': !showDecisionCenter
+      }"
+    >
     <ConversationCenter
       :conversations="conversations"
       :active-conversation-id="activeConversationId"
@@ -60,6 +66,7 @@
       @copy="copyApprovedReply"
     />
     <DecisionCenter
+      v-if="showDecisionCenter"
       :draft="activeDraft"
       :conversation="activeConversation"
       :receipt-id="interactionReceiptId"
@@ -77,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { storeToRefs } from 'pinia'
 
@@ -167,6 +174,23 @@ const desktopAgentNeedsAttention = computed(() => Boolean(
 const showDesktopAgentPanel = computed(() => (
   !desktopMode || desktopAgentBindingRequired.value || desktopAgentNeedsAttention.value
 ))
+const automaticWorkspaceMode = computed(() => (
+  conversations.value.some((conversation) => conversation.autoReplyRunning === true)
+))
+const showDecisionCenter = computed(() => (
+  activeConversation.value?.requiresHuman === true || !automaticWorkspaceMode.value
+))
+
+watch(
+  () => [
+    activeConversation.value?.autoReplyRunning,
+    activeConversation.value?.requiresHuman
+  ],
+  ([autoRunning, requiresHuman]) => {
+    if (autoRunning === true && requiresHuman !== true) decisionExpanded.value = false
+    if (requiresHuman === true) decisionExpanded.value = true
+  }
+)
 
 const resetResolution = (): void => {
   resolution.value = null
@@ -678,6 +702,10 @@ const syncChannelAgentFeed = async (): Promise<void> => {
         existing.riskLevel = seed.riskLevel
         existing.qualityStatus = seed.qualityStatus
         existing.policyMode = seed.policyMode
+        existing.requiresHuman = seed.requiresHuman === true
+        existing.attentionLevel = seed.attentionLevel ?? 'UNANSWERED'
+        existing.autoReplyRunning = seed.autoReplyRunning === true
+        existing.autoReplyReceiptId = seed.autoReplyReceiptId
         existing.preparationId = seed.preparationId
         existing.traceId = seed.traceId
         if (existing.conversationId !== activeConversationId.value) {
@@ -687,6 +715,10 @@ const syncChannelAgentFeed = async (): Promise<void> => {
         for (const message of seed.messages) {
           if (!known.has(message.messageId)) workspace.receiveMessage(message)
         }
+        existing.messages.sort((left, right) => (
+          new Date(left.receivedAt).getTime() - new Date(right.receivedAt).getTime()
+          || left.messageId.localeCompare(right.messageId)
+        ))
       }
     }
 
@@ -827,11 +859,13 @@ onBeforeUnmount(() => {
   transition: grid-template-columns 180ms ease;
 }
 .human-loop-workspace-grid.decision-expanded { grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(260px, 290px); }
+.human-loop-workspace-grid.without-decision { grid-template-columns: minmax(210px, 240px) minmax(0, 1fr); }
 
 @media (max-width: 1280px) {
   .human-loop-workspace-grid {
     grid-template-columns: 205px minmax(0, 1fr) 108px;
   }
   .human-loop-workspace-grid.decision-expanded { grid-template-columns: 205px minmax(0, 1fr) 270px; }
+  .human-loop-workspace-grid.without-decision { grid-template-columns: 205px minmax(0, 1fr); }
 }
 </style>

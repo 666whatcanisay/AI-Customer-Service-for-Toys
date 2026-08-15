@@ -47,7 +47,12 @@
         :key="conversation.conversationId"
         type="button"
         class="conversation-item"
-        :class="{ active: conversation.conversationId === activeConversationId }"
+        :class="{
+          active: conversation.conversationId === activeConversationId,
+          'requires-human': conversation.attentionLevel === 'HUMAN_REQUIRED',
+          'awaiting-reply': conversation.attentionLevel === 'UNANSWERED'
+        }"
+        :data-attention-level="conversation.attentionLevel ?? 'NONE'"
         :data-testid="`conversation-${conversation.conversationId}`"
         @click="$emit('select', conversation.conversationId)"
       >
@@ -60,7 +65,13 @@
           <span class="message-preview">{{ conversation.messages.at(-1)?.content }}</span>
           <span class="conversation-meta">
             <em v-if="conversation.source !== 'CHANNEL_AGENT'">{{ sourceLabel(conversation.source) }}</em>
-            <span v-if="conversation.processingStage" class="processing-stage">
+            <span v-if="conversation.attentionLevel === 'HUMAN_REQUIRED'" class="processing-stage human-required">
+              转人工
+            </span>
+            <span v-else-if="conversation.attentionLevel === 'UNANSWERED'" class="processing-stage unanswered">
+              未回复
+            </span>
+            <span v-else-if="conversation.processingStage" class="processing-stage">
               {{ processingStageLabel(conversation.processingStage) }}
             </span>
             <b v-else :class="`conversation-${conversation.status.toLowerCase()}`">
@@ -137,9 +148,28 @@ const intakeMode = ref<'APPEND' | 'NEW'>(props.activeConversationId ? 'APPEND' :
 const customerLabel = ref('')
 const manualMessage = ref('')
 
-const filteredConversations = computed(() => statusFilter.value === 'ALL'
-  ? props.conversations
-  : props.conversations.filter((item) => item.status === statusFilter.value))
+const latestMessageTime = (conversation: WorkspaceConversation): number => {
+  const value = conversation.messages.at(-1)?.receivedAt
+  const parsed = value ? new Date(value).getTime() : 0
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const attentionPriority = (conversation: WorkspaceConversation): number => ({
+  HUMAN_REQUIRED: 0,
+  UNANSWERED: 1,
+  NONE: 2
+}[conversation.attentionLevel ?? 'NONE'])
+
+const filteredConversations = computed(() => {
+  const source = statusFilter.value === 'ALL'
+    ? props.conversations
+    : props.conversations.filter((item) => item.status === statusFilter.value)
+  return [...source].sort((left, right) => (
+    attentionPriority(left) - attentionPriority(right)
+    || latestMessageTime(right) - latestMessageTime(left)
+    || left.conversationId.localeCompare(right.conversationId)
+  ))
+})
 
 watch(() => props.activeConversationId, (value) => {
   intakeMode.value = value ? 'APPEND' : 'NEW'
@@ -195,6 +225,8 @@ header h2 { margin: 0; color: var(--workspace-text); font-size: 18px; }
 .source-notice { display: grid; gap: 3px; margin: 0 12px 8px; padding: 9px 10px; border: 1px solid #b7d3bd; border-radius: 10px; background: #e8f5eb; }.source-notice strong { color: var(--workspace-accent-strong); font-size: 10px; }.source-notice span { color: var(--workspace-text-soft); font-size: 9px; line-height: 1.45; }
 .queue-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 12px 8px; }.queue-toolbar label { color: var(--workspace-text-soft); font-size: 9px; font-weight: 800; }.queue-toolbar select { flex: 1; min-width: 0; padding: 6px 7px; border: 1px solid var(--workspace-border); border-radius: 7px; color: var(--workspace-text); background: #fff; font-size: 9px; }
 .conversation-list { min-height: 0; padding: 0 8px; overflow-x: hidden; overflow-y: auto; }.conversation-item { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 7px; width: 100%; margin-bottom: 4px; padding: 7px 8px; border: 1px solid transparent; border-radius: 9px; color: inherit; background: transparent; text-align: left; cursor: pointer; }.conversation-item:hover { background: #eaf5ec; }.conversation-item.active { border-color: var(--workspace-border-strong); background: linear-gradient(135deg, #dcefe1, #edf8ef); box-shadow: 0 4px 12px rgb(47 125 87 / 8%); }
+.conversation-item.requires-human { border-color: #df9b9f; background: #fff0f0; }.conversation-item.requires-human.active { border-color: #c95b64; background: #ffe2e4; box-shadow: 0 4px 13px rgb(175 55 65 / 13%); }.conversation-item.awaiting-reply { border-color: #dfbd71; background: #fff7df; }.conversation-item.awaiting-reply.active { border-color: #c89429; background: #ffefbd; box-shadow: 0 4px 13px rgb(157 109 24 / 12%); }
 .avatar { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: #cde5d3; color: var(--workspace-accent-strong); font-size: 9px; font-weight: 900; }.conversation-copy { display: grid; min-width: 0; gap: 3px; }.conversation-title { display: flex; min-width: 0; justify-content: space-between; gap: 6px; }.conversation-title strong { overflow: hidden; color: var(--workspace-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.conversation-title time { flex: 0 0 auto; color: var(--workspace-muted); font-size: 8px; }.message-preview { overflow: hidden; color: var(--workspace-text-soft); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.conversation-meta { display: flex; min-width: 0; align-items: center; gap: 4px; }.conversation-meta em { overflow: hidden; margin-right: auto; color: var(--workspace-muted); font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }.processing-stage { overflow: hidden; max-width: 88px; padding: 2px 5px; border-radius: 999px; color: #315e45; background: #e4efe7; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }.conversation-meta b { padding: 2px 5px; border-radius: 999px; color: #356b50; background: #dcefe1; font-size: 8px; white-space: nowrap; }.conversation-meta b.conversation-waiting_reply { color: #8d6117; background: #fff0ca; }.conversation-meta b.conversation-completed { color: #2e7151; background: #d9eee0; }.conversation-meta i { display: grid; min-width: 17px; height: 17px; place-items: center; border-radius: 999px; color: #fff; background: var(--workspace-accent); font-size: 8px; font-style: normal; }.conversation-empty { margin: 8px; padding: 14px; border: 1px dashed var(--workspace-border-strong); border-radius: 10px; color: var(--workspace-muted); background: rgb(255 255 255 / 55%); font-size: 9px; line-height: 1.5; text-align: center; }
+.processing-stage.human-required { color: #a73540; background: #ffdadd; }.processing-stage.unanswered { color: #8d6117; background: #ffe8a9; }
 .manual-message-form { display: grid; gap: 7px; margin: 8px 12px 12px; padding: 10px; border: 1px solid var(--workspace-border); border-radius: 11px; background: #fff; }.intake-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }.manual-message-form label { color: var(--workspace-text-soft); font-size: 9px; font-weight: 800; }.manual-message-form input, .manual-message-form textarea { resize: none; padding: 8px; border: 1px solid var(--workspace-border); border-radius: 8px; outline: none; color: var(--workspace-text); background: #fbfefb; font-size: 9px; line-height: 1.45; }.manual-message-form input:focus, .manual-message-form textarea:focus { border-color: var(--workspace-accent); box-shadow: 0 0 0 3px rgb(47 125 87 / 10%); }.manual-message-form > button { padding: 8px; border: 0; border-radius: 8px; color: #fff; background: var(--workspace-accent); font-size: 9px; font-weight: 800; cursor: pointer; }.manual-message-form button:disabled { opacity: .42; cursor: not-allowed; }
 </style>

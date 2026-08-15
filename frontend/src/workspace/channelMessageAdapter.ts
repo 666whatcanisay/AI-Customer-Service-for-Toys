@@ -22,7 +22,11 @@ export interface ChannelConversationSeed {
   processingStage?: string | null
   riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | null
   qualityStatus?: string | null
-  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
+  requiresHuman?: boolean
+  attentionLevel?: 'HUMAN_REQUIRED' | 'UNANSWERED' | 'NONE'
+  autoReplyRunning?: boolean
+  autoReplyReceiptId?: string | null
   preparationId?: string | null
   traceId?: string | null
   productContext?: ChannelAgentProductContext | null
@@ -65,7 +69,7 @@ export interface ChannelAgentReplySeed {
   requiredFields: string[]
   state?: string | null
   qualityStatus?: string | null
-  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | null
+  policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
   preparationId?: string | null
   traceId?: string | null
   product: {
@@ -92,7 +96,7 @@ type ChannelAgentFeed = {
   safety: {
     readOnly: true
     autoReply: boolean
-    realSend: false
+    realSend: boolean
     browserWriteOperations: 0
     executionCount: 0
     receiptCount: 0
@@ -109,11 +113,17 @@ const isChannelAgentFeed = (value: unknown): value is ChannelAgentFeed => {
     || feed.schemaVersion === 'channel-agent-workspace-feed.v2'
   const validAutomaticPreparation = feed.safety?.autoReply === false
     || feed.schemaVersion === 'channel-agent-workspace-feed.v2'
+  const validRealSend = feed.safety?.realSend === false
+    || (
+      feed.schemaVersion === 'channel-agent-workspace-feed.v2'
+      && feed.safety?.autoReply === true
+      && feed.safety?.realSend === true
+    )
   return supportedVersion
     && Array.isArray(feed.conversations)
     && feed.safety?.readOnly === true
     && validAutomaticPreparation
-    && feed.safety.realSend === false
+    && validRealSend
     && feed.safety.browserWriteOperations === 0
     && feed.safety.executionCount === 0
     && feed.safety.receiptCount === 0
@@ -134,7 +144,10 @@ export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
     const payload: unknown = await response.json()
     if (!isChannelAgentFeed(payload)) throw new Error('Channel Agent 会话安全校验失败')
     this.feed = payload
-    return structuredClone(payload.conversations)
+    return structuredClone(payload.conversations.map((conversation) => ({
+      ...conversation,
+      autoReplyRunning: payload.safety.autoReply === true && payload.safety.realSend === true
+    })))
   }
 
   async latestReply(conversationId?: string): Promise<ChannelAgentReplySeed | null> {
