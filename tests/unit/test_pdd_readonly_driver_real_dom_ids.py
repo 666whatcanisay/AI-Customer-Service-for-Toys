@@ -289,6 +289,26 @@ def test_navigation_requires_v22_and_an_explicit_navigation_port() -> None:
     )
     assert driver.navigation_enabled is False
 
+    opted_in = EvidenceBackedPDDReadOnlyDriver(
+        store_id="store-001",
+        platform_store_id="328616090",
+        evidence=evidence,
+        page_port=RealDOMShapePort(evidence.page_fingerprint),
+        navigation_port=object(),  # type: ignore[arg-type]
+        allow_navigation=True,
+    )
+    assert opted_in.navigation_enabled is True
+
+    opted_out = EvidenceBackedPDDReadOnlyDriver(
+        store_id="store-001",
+        platform_store_id="328616090",
+        evidence=evidence,
+        page_port=RealDOMShapePort(evidence.page_fingerprint),
+        navigation_port=object(),  # type: ignore[arg-type]
+        allow_navigation=False,
+    )
+    assert opted_out.navigation_enabled is False
+
 
 def test_navigation_evidence_rejects_required_attention_on_every_row() -> None:
     with pytest.raises(ValidationError, match="optional and unique"):

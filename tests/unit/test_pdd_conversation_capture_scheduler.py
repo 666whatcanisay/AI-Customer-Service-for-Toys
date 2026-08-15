@@ -179,6 +179,13 @@ def test_preview_identity_upgrade_rebaselines_without_scheduling_history(tmp_pat
         sequence=None,
         message_id="sha256:" + "a" * 64,
     )
+    store.mark_failure(
+        store_id="store-1",
+        platform_store_id="328616090",
+        conversation_id="conversation-a",
+        error_code="PDD_CAPTURE_NO_CUSTOMER_MESSAGE",
+        manual_review=True,
+    )
 
     upgraded = observe(
         store,
@@ -192,6 +199,7 @@ def test_preview_identity_upgrade_rebaselines_without_scheduling_history(tmp_pat
     assert upgraded is not None
     assert upgraded.state is PDDConversationCaptureState.COMPLETED
     assert upgraded.latest_message_id == "preview-sha256:" + "b" * 64
+    assert upgraded.last_error_code is None
     assert store.pending() == ()
 
 

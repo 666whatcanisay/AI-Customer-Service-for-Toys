@@ -472,6 +472,7 @@ class EvidenceBackedPDDReadOnlyDriver:
         evaluator: ReadOnlyCDPEvaluator | None = None,
         page_port: PDDPageReadPort | None = None,
         navigation_port: WebSocketPDDConversationNavigationPort | None = None,
+        allow_navigation: bool = False,
         clock: Any = lambda: datetime.now(UTC),
     ) -> None:
         self._store_id = store_id
@@ -488,7 +489,7 @@ class EvidenceBackedPDDReadOnlyDriver:
                 resolver=resolver,
                 evaluator=evaluator,
             )
-            if evidence.navigation_enabled and navigation_port is None:
+            if allow_navigation and evidence.navigation_enabled and navigation_port is None:
                 navigation_port = WebSocketPDDConversationNavigationPort(
                     profile_path=profile_path,
                     applicable_path=evidence.applicable_path,
@@ -500,7 +501,8 @@ class EvidenceBackedPDDReadOnlyDriver:
                     evaluator=evaluator,
                 )
         self._page_port = page_port
-        self._navigation_port = navigation_port
+        self._navigation_port = navigation_port if allow_navigation else None
+        self._allow_navigation = allow_navigation
         self._clock = clock
 
     @property
@@ -513,7 +515,11 @@ class EvidenceBackedPDDReadOnlyDriver:
 
     @property
     def navigation_enabled(self) -> bool:
-        return self._evidence.navigation_enabled and self._navigation_port is not None
+        return (
+            self._allow_navigation
+            and self._evidence.navigation_enabled
+            and self._navigation_port is not None
+        )
 
     def navigate_to_conversation(
         self,

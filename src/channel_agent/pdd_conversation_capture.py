@@ -251,7 +251,10 @@ class DurablePDDConversationCaptureStore:
                         now.isoformat(),
                         1 if preview_identity_upgraded else 0,
                         latest_message_id,
-                        1 if state is PDDConversationCaptureState.PENDING else 0,
+                        1
+                        if preview_identity_upgraded
+                        or state is PDDConversationCaptureState.PENDING
+                        else 0,
                         *scope,
                     ),
                 )

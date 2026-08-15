@@ -238,7 +238,11 @@ def test_pdd_login_observation_requires_explicit_browser_and_official_url() -> N
         "agent_id": "agent-pdd-observe",
         "device_id": "device-pdd-observe",
     }
-    assert ChannelAgentConfig(**base).pdd_login_observation_enabled is False
+    default_config = ChannelAgentConfig(**base)
+    assert default_config.pdd_login_observation_enabled is False
+    assert default_config.pdd_conversation_navigation_enabled is False
+    with pytest.raises(ValidationError):
+        ChannelAgentConfig(**base, pdd_conversation_navigation_enabled=True)
     with pytest.raises(ValidationError):
         ChannelAgentConfig(**base, pdd_login_observation_enabled=True)
     with pytest.raises(ValidationError):

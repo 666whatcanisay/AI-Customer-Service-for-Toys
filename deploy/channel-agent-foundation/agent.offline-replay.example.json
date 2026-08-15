@@ -19,6 +19,7 @@
   "pdd_customer_service_url": null,
   "customer_assistant_enabled": true,
   "message_observation_enabled": true,
+  "pdd_conversation_navigation_enabled": false,
   "observation_stage": "AI_SUGGESTIONS",
   "observer_mode": "OBSERVE_ONLY",
   "pdd_observation_evidence_path": null,

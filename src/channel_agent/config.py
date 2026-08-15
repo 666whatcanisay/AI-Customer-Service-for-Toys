@@ -62,6 +62,7 @@ class ChannelAgentConfig(BaseModel):
     pdd_customer_service_url: str | None = None
     customer_assistant_enabled: bool = False
     message_observation_enabled: bool = False
+    pdd_conversation_navigation_enabled: bool = False
     observation_stage: ObservationStage = ObservationStage.DISABLED
     observer_mode: Literal["OBSERVE_ONLY", "CONTROLLED_SEND"] = "OBSERVE_ONLY"
     pdd_observation_evidence_path: Path | None = None
@@ -220,6 +221,10 @@ class ChannelAgentConfig(BaseModel):
             raise ValueError(
                 "message observation requires the customer assistant and PDD browser runtime"
             )
+        if self.pdd_conversation_navigation_enabled and not self.message_observation_enabled:
+            raise ValueError(
+                "PDD conversation navigation requires message observation"
+            )
         if self.message_observation_enabled and self.observation_stage is ObservationStage.DISABLED:
             raise ValueError("message observation requires an explicit observation stage")
         if (
@@ -318,6 +323,9 @@ class ChannelAgentConfig(BaseModel):
             "pdd_customer_service_url": self.pdd_customer_service_url,
             "customer_assistant_enabled": self.customer_assistant_enabled,
             "message_observation_enabled": self.message_observation_enabled,
+            "pdd_conversation_navigation_enabled": (
+                self.pdd_conversation_navigation_enabled
+            ),
             "observation_stage": self.observation_stage.value,
             "observer_mode": self.observer_mode,
             "pdd_observation_evidence_configured": (

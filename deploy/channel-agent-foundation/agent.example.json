@@ -25,6 +25,7 @@
   "pdd_customer_service_url": "https://mms.pinduoduo.com/chat-merchant/index.html#/",
   "customer_assistant_enabled": false,
   "message_observation_enabled": false,
+  "pdd_conversation_navigation_enabled": false,
   "observation_stage": "DISABLED",
   "observer_mode": "OBSERVE_ONLY",
   "pdd_observation_evidence_path": null,

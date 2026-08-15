@@ -900,6 +900,7 @@ class WindowsAgentHost:
                 store_id=store_id,
                 platform_store_id=platform_store_id,
                 evidence=evidence,
+                allow_navigation=config.pdd_conversation_navigation_enabled,
             )
         reference_tokenizer = None
         if config.development_profile != "OFFLINE_REPLAY":
@@ -924,7 +925,7 @@ class WindowsAgentHost:
         )
         capture_store = (
             DurablePDDConversationCaptureStore(spool_path)
-            if evidence.navigation_enabled
+            if driver.navigation_enabled
             else None
         )
         client = None
