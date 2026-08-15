@@ -75,6 +75,26 @@ def _clean(value: Any) -> Any:
     return value
 
 
+def _reviewed_value_matches(
+    field_name: str,
+    product_value: str,
+    material_value: str,
+) -> bool:
+    """Compare a reviewed value after removing field-label-only prefixes."""
+
+    prefixes = {
+        "particle_count": r"^(?:颗粒(?:数量|数)?[:：]?)",
+        "assembled_size": r"^(?:成品(?:尺寸|长度)?|拼好后(?:尺寸)?|拼完后(?:尺寸)?)(?:[:：])?",
+        "product_scale": r"^(?:(?:商品|模型)?比例[:：]?)",
+    }
+
+    def normalized(value: str) -> str:
+        compact = re.sub(r"\s+", "", value).strip()
+        return re.sub(prefixes[field_name], "", compact)
+
+    return normalized(product_value) == normalized(material_value)
+
+
 def _reviewed_approximate_controls(
     session: Session,
     product: TestProduct,
@@ -140,7 +160,9 @@ def _reviewed_approximate_controls(
             if (
                 not isinstance(product_value, str)
                 or not isinstance(material_value, str)
-                or product_value != material_value
+                or not _reviewed_value_matches(
+                    field_name, product_value, material_value
+                )
                 or not _APPROXIMATE_VALUE_RE.search(product_value)
             ):
                 continue

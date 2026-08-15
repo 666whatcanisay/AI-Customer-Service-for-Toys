@@ -225,7 +225,8 @@ def test_canonical_marks_only_matching_human_reviewed_approximate_facts(
     product.raw_data_json = json.dumps(
         {
             "particle_count": "约500颗",
-            "assembled_size": "约20×5×5厘米",
+            "assembled_size": "成品约20×5×5厘米",
+            "product_scale": "比例约1:20",
             "package_type": "彩盒包装",
         },
         ensure_ascii=False,
@@ -249,6 +250,7 @@ def test_canonical_marks_only_matching_human_reviewed_approximate_facts(
                         {
                             "颗粒数量": "约500颗",
                             "成品尺寸": "约20×5×5厘米",
+                            "商品比例": "约1:20",
                             "包装内容": "彩盒包装",
                             "是否人工确认": "是",
                             "备注": "约数已审核，仅允许近似回答",
@@ -272,6 +274,7 @@ def test_canonical_marks_only_matching_human_reviewed_approximate_facts(
     assert set(document["reviewed_answer_controls"]) == {
         "particle_count",
         "assembled_size",
+        "product_scale",
     }
     assert (
         document["reviewed_answer_controls"]["particle_count"]["controlled_answer_kind"]
