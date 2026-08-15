@@ -7,17 +7,28 @@
       </div>
 
       <div class="runtime-summary" aria-label="客服工作台摘要">
-        <button
-          type="button"
-          class="auto-reply-toggle"
-          :class="autoReplyRunning ? 'running' : 'paused'"
-          :disabled="autoToggleBusy || !autoControlAvailable"
-          :title="autoControlTitle"
-          data-testid="controlled-auto-toggle"
-          @click="toggleControlledAuto"
-        >
-          <i />{{ autoToggleBusy ? '切换中…' : autoControlLabel }}
-        </button>
+        <div class="auto-control-cluster">
+          <button
+            type="button"
+            class="auto-reply-toggle"
+            :class="autoReplyRunning ? 'running' : 'paused'"
+            :disabled="autoToggleBusy || autoRepairBusy || !autoControlAvailable"
+            :title="autoControlTitle"
+            data-testid="controlled-auto-toggle"
+            @click="toggleControlledAuto"
+          >
+            <i />{{ autoToggleBusy ? '切换中…' : autoControlLabel }}
+          </button>
+          <button
+            v-if="autoRepairNeeded"
+            type="button"
+            class="auto-repair-button"
+            :disabled="autoRepairBusy"
+            title="重新核对当前店铺与工作台，恢复为暂停可开启状态"
+            data-testid="controlled-auto-repair"
+            @click="repairControlledAuto"
+          >{{ autoRepairBusy ? '修复中…' : '一键修复' }}</button>
+        </div>
         <span class="overall-status" :class="overallStatus.tone" data-testid="overall-runtime-status">
           <i />{{ overallStatus.label }}
         </span>
@@ -175,6 +186,7 @@ import {
 } from '@/api/offlineReplyControlClient'
 import {
   fetchChannelAgentBootstrap,
+  requestChannelAgentControlledAutoRepair,
   requestChannelAgentControlledAutoToggle,
   requestChannelAgentPddObserverRestart,
   requestChannelAgentPddWorkspaceRefresh,
@@ -196,6 +208,7 @@ const openingPdd = ref(false)
 const refreshingPdd = ref(false)
 const restartingObserver = ref(false)
 const autoToggleBusy = ref(false)
+const autoRepairBusy = ref(false)
 const selectedStore = ref('')
 const moreMenuOpen = ref(false)
 const runtimeDetailsOpen = ref(false)
@@ -212,6 +225,14 @@ const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CON
 const controlledAuto = computed(() => bootstrap.value?.safety.controlled_auto ?? null)
 const autoReplyRunning = computed(() => controlledAuto.value?.auto_reply_running === true)
 const autoControlAvailable = computed(() => controlledAuto.value?.control_available === true)
+const autoRepairNeeded = computed(() => {
+  const runtime = controlledAuto.value
+  return !runtime?.control_available
+    || Boolean(runtime.control_error_code)
+    || !runtime.ai_cs_store_id
+    || !runtime.platform_store_id
+    || !['AUTO_LOW_RISK', 'AUTO_ALL_MESSAGES_V1'].includes(runtime.policy_mode)
+})
 const autoControlLabel = computed(() => {
   if (!autoControlAvailable.value) return '自动回复不可用'
   return autoReplyRunning.value ? '自动回复运行中' : '自动回复已暂停'
@@ -372,8 +393,33 @@ const overallStatus = computed(() => {
 })
 
 const runtimeActionBusy = computed(() => (
-  loading.value || openingPdd.value || refreshingPdd.value || restartingObserver.value || autoToggleBusy.value
+  loading.value || openingPdd.value || refreshingPdd.value || restartingObserver.value
+    || autoToggleBusy.value || autoRepairBusy.value
 ))
+
+async function repairControlledAuto() {
+  if (autoRepairBusy.value || !autoRepairNeeded.value) return
+  autoRepairBusy.value = true
+  try {
+    await requestChannelAgentControlledAutoRepair()
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250))
+      await refresh()
+      if (!autoRepairNeeded.value && autoControlAvailable.value) break
+    }
+    if (autoRepairNeeded.value || !autoControlAvailable.value) {
+      throw new Error(controlledAuto.value?.control_error_code || 'CONTROLLED_AUTO_REPAIR_TIMEOUT')
+    }
+    ElMessage.success('自动回复已修复并保持暂停，请确认后再点击开启。')
+  } catch (repairError) {
+    const code = repairError instanceof Error ? repairError.message : ''
+    ElMessage.error(code.includes('SCOPE') || code.includes('READY')
+      ? '修复失败：请确认已登录当前店铺、工作台和真实消息读取均正常。'
+      : '一键修复失败，请查看运行详情后重试。')
+  } finally {
+    autoRepairBusy.value = false
+  }
+}
 
 async function toggleControlledAuto() {
   if (autoToggleBusy.value || !autoControlAvailable.value) return
@@ -685,7 +731,7 @@ onBeforeUnmount(() => {
 .agent-desktop-bar{z-index:20;display:flex;align-items:center;gap:18px;min-height:56px;padding:7px 14px;border-bottom:1px solid #cfe0d6;background:#fff}
 .brand{display:flex;flex:0 0 auto;align-items:center;gap:9px}.brand-mark{display:grid;width:34px;height:34px;place-items:center;border-radius:10px;background:linear-gradient(135deg,#2f8b61,#72d7bd);color:#fff;font-size:13px;font-weight:900}.brand strong,.brand small{display:block}.brand strong{font-size:14px}.brand small{margin-top:1px;color:#72877c;font-size:9px}
 .runtime-summary{display:flex;min-width:0;align-items:center;gap:9px;margin-left:auto}.runtime-summary span{display:flex;align-items:center;gap:6px;color:#587064;font-size:10px;white-space:nowrap}.runtime-summary i{width:8px;height:8px;border-radius:50%;background:#d99b2b}.runtime-summary .healthy i{background:#29a875}.runtime-summary .offline{color:#a13c30}.runtime-summary .offline i{background:#c8584b}.runtime-summary .attention{color:#936108}.overall-status{padding:6px 8px;border-radius:999px;background:#edf3ef;font-weight:900}.overall-status.healthy{color:#25704e;background:#dff2e5}.overall-status.attention{color:#8b5c00;background:#fff1ca}.overall-status.offline{color:#9b382f;background:#ffebe8}
-.auto-reply-toggle{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid transparent;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer}.auto-reply-toggle.running{border-color:#a8d6ba;color:#17653f;background:#dff3e6}.auto-reply-toggle.running i{background:#22a66f;box-shadow:0 0 0 3px rgb(34 166 111 / 13%)}.auto-reply-toggle.paused{border-color:#d4dcd7;color:#66766e;background:#f2f5f3}.auto-reply-toggle.paused i{background:#87958e}.auto-reply-toggle:disabled{cursor:not-allowed;opacity:.62}
+.auto-control-cluster{display:flex;align-items:center;gap:5px}.auto-reply-toggle{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid transparent;border-radius:999px;font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer}.auto-reply-toggle.running{border-color:#a8d6ba;color:#17653f;background:#dff3e6}.auto-reply-toggle.running i{background:#22a66f;box-shadow:0 0 0 3px rgb(34 166 111 / 13%)}.auto-reply-toggle.paused{border-color:#d4dcd7;color:#66766e;background:#f2f5f3}.auto-reply-toggle.paused i{background:#87958e}.auto-reply-toggle:disabled{cursor:not-allowed;opacity:.62}.auto-repair-button{padding:7px 10px;border:1px solid #e1b55a;border-radius:999px;background:#fff6dc;color:#8a5a00;font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer}.auto-repair-button:hover{background:#ffedb8}.auto-repair-button:disabled{cursor:wait;opacity:.62}
 .runtime-summary select{width:min(220px,24vw);padding:7px 28px 7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:10px}.store-summary{max-width:240px;overflow:hidden;text-overflow:ellipsis}.pending-summary{padding:6px 8px;border-radius:8px;background:#f1f7f3}.pending-summary strong{color:#206744;font-size:12px}
 .operator{display:flex;flex:0 0 auto;align-items:center;gap:7px;padding-left:12px;border-left:1px solid #dce8e0}.operator button,.action-alert button,.section-heading button,.workspace-url button,.drawer-actions button{padding:7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:10px;cursor:pointer}.operator button:disabled,.action-alert button:disabled,.runtime-drawer button:disabled{cursor:wait;opacity:.55}.more-wrap{position:relative}.operator .more-button{width:34px;padding:7px 0;font-weight:900;letter-spacing:.08em}.more-menu{position:absolute;top:42px;right:0;z-index:50;display:grid;width:170px;padding:7px;border:1px solid #cadcd0;border-radius:11px;background:#fff;box-shadow:0 16px 45px rgb(28 62 41 / 18%)}.more-menu .operator-identity{display:grid;gap:2px;padding:7px 8px 9px;border-bottom:1px solid #e3ece6}.operator-identity small{color:#788b81;font-size:8px}.operator-identity strong{overflow:hidden;text-overflow:ellipsis;font-size:10px;white-space:nowrap}.more-menu button{margin-top:5px;text-align:left}.more-menu .danger{border-color:#e2b8b2;color:#a13c30;background:#fff7f6}
 .action-alert{display:flex;align-items:center;gap:9px;min-height:38px;padding:5px 14px;border-bottom:1px solid #e3c57e;background:#fff7e3;color:#79520e}.action-alert>div{display:flex;min-width:0;align-items:center;gap:8px;margin-right:auto}.action-alert strong{font-size:11px;white-space:nowrap}.action-alert span{overflow:hidden;font-size:10px;text-overflow:ellipsis;white-space:nowrap}.action-alert.danger{border-color:#e7b7b2;background:#fff0ee;color:#943a30}.action-alert.info{border-color:#b9d2df;background:#eef7fb;color:#356b87}.action-alert .subtle{border-color:transparent;background:transparent}

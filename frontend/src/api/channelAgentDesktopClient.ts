@@ -118,6 +118,19 @@ export function requestChannelAgentControlledAutoToggle(targetEnabled: boolean):
   })
 }
 
+export function requestChannelAgentControlledAutoRepair(): Promise<{
+  schema_version: 'controlled-auto-repair-response.v1'
+  status: 'REPAIR_REQUESTED'
+}> {
+  return localJson('/local-api/v1/runtime/controlled-auto-repair', {
+    method: 'POST',
+    headers: {
+      'X-Channel-Agent-Intent': 'HUMAN_REQUESTED_CONTROLLED_AUTO_REPAIR'
+    },
+    body: '{}'
+  })
+}
+
 export type ChannelAgentPddWindowLaunch = {
   schema_version: 'channel-agent-pdd-window-launch.v1'
   status: 'OPENING' | 'READY'

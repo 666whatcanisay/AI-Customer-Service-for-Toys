@@ -11,6 +11,7 @@ const desktopMocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
   safeStop: vi.fn(),
   toggleAuto: vi.fn(),
+  repairAuto: vi.fn(),
   selectStore: vi.fn(),
   openPdd: vi.fn(),
   refreshPdd: vi.fn(),
@@ -23,6 +24,7 @@ const desktopMocks = vi.hoisted(() => ({
 vi.mock('@/api/channelAgentDesktopClient', () => ({
   fetchChannelAgentBootstrap: desktopMocks.bootstrap,
   requestChannelAgentControlledAutoToggle: desktopMocks.toggleAuto,
+  requestChannelAgentControlledAutoRepair: desktopMocks.repairAuto,
   requestChannelAgentSafeStop: desktopMocks.safeStop,
   selectChannelAgentActiveStore: desktopMocks.selectStore,
   requestChannelAgentPddWindowOpen: desktopMocks.openPdd,
@@ -263,6 +265,74 @@ describe('ChannelAgentDesktopLayout', () => {
     await flushPromises()
 
     expect(desktopMocks.toggleAuto).toHaveBeenCalledWith(false)
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复已暂停')
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
+  it('offers one-click repair and restores AUTO to a paused usable state', async () => {
+    vi.useFakeTimers()
+    const broken = {
+      schema_version: '1.0',
+      agent: { process_status: 'RUNNING', runtime_status: 'ONLINE', version: '1.4.0', node_id: 'agent-1' },
+      browser: {
+        status: 'OPENED', pdd_login_state: 'CUSTOMER_SERVICE_READY',
+        message_source: 'REAL_PDD', real_pdd_message_observation_enabled: true
+      },
+      binding: {
+        authorized_store_ids: ['store-ref:1'], active_store_id: 'store-ref:1',
+        observed_store_id: '328616090', store_reference: 'store-ref:1'
+      },
+      safety: {
+        manual_approval: true, auto_reply: false, real_send_enabled: false,
+        controlled_auto: {
+          runtime_mode: 'PILOT', production_real_send_enabled: false,
+          controlled_store_auto_enabled: false, policy_mode: 'MANUAL_CONFIRM',
+          kill_switch_enabled: true, ai_cs_store_id: null, platform_store_id: null,
+          state_revision: 8, state_reason: 'UNKNOWN_SEND_RESULT', runner_active: true,
+          control_available: true, auto_reply_running: false,
+          control_error_code: 'PDD_SEND_CONFIRMATION_TIMEOUT_UNKNOWN',
+          updated_at: '2026-08-15T09:00:00Z'
+        }
+      }
+    }
+    const repaired = {
+      ...broken,
+      safety: {
+        ...broken.safety,
+        controlled_auto: {
+          ...broken.safety.controlled_auto,
+          policy_mode: 'AUTO_ALL_MESSAGES_V1', ai_cs_store_id: 'store-ref:1',
+          platform_store_id: '328616090', state_revision: 9,
+          state_reason: 'USER_REPAIRED_PRODUCTION_AUTO_FROM_DESKTOP',
+          control_error_code: null
+        }
+      }
+    }
+    desktopMocks.bootstrap.mockResolvedValueOnce(broken).mockResolvedValue(repaired)
+    desktopMocks.repairAuto.mockResolvedValue({
+      schema_version: 'controlled-auto-repair-response.v1',
+      status: 'REPAIR_REQUESTED'
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(ChannelAgentDesktopLayout, {
+      global: { plugins: [createPinia(), router, ElementPlus] }
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="controlled-auto-repair"]').text()).toContain('一键修复')
+
+    await wrapper.get('[data-testid="controlled-auto-repair"]').trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(desktopMocks.repairAuto).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="controlled-auto-repair"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复已暂停')
     wrapper.unmount()
     vi.useRealTimers()
