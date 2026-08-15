@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -83,6 +85,60 @@ _NON_AI_KNOWLEDGE_TEMPLATES = {
     KnowledgeTemplateType.AI_FEEDBACK.value,
     KnowledgeTemplateType.KNOWLEDGE_GAP.value,
 }
+_RECORDED_PDD_LEGACY_SOURCE = "RECORDED_PDD_20260814"
+_RECORDED_PDD_LEGACY_KEYS = {
+    "template_type",
+    "detected_fields",
+    "missing_expected_fields",
+    "record_count",
+    "privacy_filtered",
+    "source_origin",
+    "reference_answer_visible_to_ai",
+    "scope_requirement",
+}
+
+
+def _recognition_summary(item: KnowledgeMaterial) -> KnowledgeTemplateRecognitionSummary:
+    """Project one narrowly identified legacy PDD record to the current Admin schema.
+
+    The stored revision remains immutable.  Only the response projection is
+    adapted, and unrelated malformed metadata continues to fail closed.
+    """
+
+    raw = item.recognition_summary or {}
+    try:
+        return KnowledgeTemplateRecognitionSummary.model_validate(raw)
+    except ValidationError as exc:
+        if (
+            raw.get("source_origin") != _RECORDED_PDD_LEGACY_SOURCE
+            or raw.get("privacy_filtered") is not True
+            or not set(raw).issubset(_RECORDED_PDD_LEGACY_KEYS)
+        ):
+            raise AppError(
+                "KNOWLEDGE_MATERIAL_METADATA_INCOMPATIBLE",
+                "知识资料元数据与当前版本不兼容，请由运营人员核对来源后创建新修订。",
+                status_code=409,
+            ) from exc
+        suffix = Path(item.original_filename).suffix.lower()
+        try:
+            return KnowledgeTemplateRecognitionSummary.model_validate(
+                {
+                    "readable": True,
+                    "file_extension": suffix or ".json",
+                    "detected_fields": raw.get("detected_fields") or [],
+                    "missing_expected_fields": raw.get("missing_expected_fields") or [],
+                    "privacy_reminder": "仅使用已脱敏商品事实，不得暴露原始客户会话信息。",
+                    "template_type": raw.get("template_type"),
+                    "record_count": raw.get("record_count") or 0,
+                    "warnings": [],
+                }
+            )
+        except ValidationError as projection_error:
+            raise AppError(
+                "KNOWLEDGE_MATERIAL_METADATA_INCOMPATIBLE",
+                "知识资料元数据与当前版本不兼容，请由运营人员核对来源后创建新修订。",
+                status_code=409,
+            ) from projection_error
 
 
 def _summary(item: KnowledgeMaterial) -> KnowledgeMaterialSummary:
@@ -97,7 +153,7 @@ def _summary(item: KnowledgeMaterial) -> KnowledgeMaterialSummary:
         original_filename=item.original_filename,
         content_hash=item.content_hash,
         redaction_version=item.redaction_version,
-        recognition_summary=KnowledgeTemplateRecognitionSummary.model_validate(item.recognition_summary),
+        recognition_summary=_recognition_summary(item),
         material_status=item.material_status,
         submitted_by=item.submitted_by,
         reviewed_by=item.reviewed_by,
@@ -114,7 +170,7 @@ def _receipt(item: KnowledgeMaterial) -> KnowledgeMaterialReceipt:
         revision=item.revision,
         content_hash=item.content_hash,
         material_status=item.material_status,
-        recognition_summary=KnowledgeTemplateRecognitionSummary.model_validate(item.recognition_summary),
+        recognition_summary=_recognition_summary(item),
     )
 
 

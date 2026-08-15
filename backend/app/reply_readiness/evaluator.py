@@ -80,6 +80,11 @@ _FIELD_LABELS = {
     "authenticity_evidence": ("品牌授权证据",),
 }
 _ESTIMATE_MARKERS = ("估测", "估计", "大约", "约", "左右", "可能")
+_REVIEWED_MATERIAL_STATUSES = {"APPROVED_FOR_ANALYSIS", "ANALYZING", "ANALYZED"}
+_APPROXIMATE_REVIEW_MARKER = "约数已审核"
+_REVIEWED_APPROXIMATE_SOURCE_SHA256 = (
+    "267a15bd54208388cbfa01718052e16f400aef4d2da1b68be5f30531bbbe3d24"
+)
 _ACTION_ORDER = {
     ExpectedAction.DIRECT_ANSWER: 1,
     ExpectedAction.CONTROLLED_ANSWER: 2,
@@ -276,20 +281,22 @@ def _facts(
     dict[str, str],
     dict[str, str],
     dict[str, list[ReplyReadinessKnowledgeSnapshotV1]],
+    set[str],
 ]:
     facts: dict[str, str] = {}
     blockers: dict[str, str] = {}
     fact_sources: dict[str, list[ReplyReadinessKnowledgeSnapshotV1]] = {}
+    approximate_facts: set[str] = set()
     for key, labels in _FIELD_LABELS.items():
         pairs = [
-            (record.values[label], record.source)
+            (record.values[label], record.source, record)
             for record in records
             if record.source.template_type == "PRODUCT_KNOWLEDGE"
             or (record.source.template_type == "SKU_DIFFERENCE" and key == "variant_difference")
             for label in labels
             if record.values.get(label)
         ]
-        unique = list(dict.fromkeys(value for value, _ in pairs))
+        unique = list(dict.fromkeys(value for value, _, _ in pairs))
         if not unique:
             continue
         joined = "；".join(unique)
@@ -301,11 +308,24 @@ def _facts(
             blockers[key] = "FACT_CONFLICT"
             continue
         if any(marker in joined for marker in _ESTIMATE_MARKERS):
-            blockers[key] = "FACT_ESTIMATED"
-            continue
+            reviewed_approximate = all(
+                source.material_status in _REVIEWED_MATERIAL_STATUSES
+                and record.values.get("是否人工确认") in {"是", "已确认"}
+                and _APPROXIMATE_REVIEW_MARKER in record.values.get("备注", "")
+                and (
+                    f"sha256:{_REVIEWED_APPROXIMATE_SOURCE_SHA256}"
+                    in record.values.get("资料来源", "").casefold()
+                )
+                and bool(record.values.get("来源日期"))
+                for _, source, record in pairs
+            )
+            if not reviewed_approximate:
+                blockers[key] = "FACT_ESTIMATED"
+                continue
+            approximate_facts.add(key)
         facts[key] = joined if key == "variant_difference" else unique[0]
-        fact_sources[key] = _unique_sources([source for _, source in pairs])
-    return facts, blockers, fact_sources
+        fact_sources[key] = _unique_sources([source for _, source, _ in pairs])
+    return facts, blockers, fact_sources, approximate_facts
 
 
 def _risk_from_label(value: str | None) -> RiskLevel:
@@ -406,6 +426,7 @@ def _answer(
     facts: Mapping[str, str],
     faq_answer: str | None = None,
     safety_answer: str | None = None,
+    approximate: bool = False,
 ) -> str:
     if faq_answer:
         answer = faq_answer
@@ -421,20 +442,30 @@ def _answer(
     if question.required_fact_keys:
         values = [facts[key] for key in question.required_fact_keys]
         if question.question_id == "PDD-PARTICLE-COUNT":
-            return f"亲，这款商品的颗粒数量是{values[0]}。"
+            answer = f"亲，这款商品的颗粒数量是{values[0]}。"
+            return _approximate_answer(answer) if approximate else answer
         if question.question_id == "PDD-FINISHED-SIZE":
-            return f"亲，这款商品拼好后的成品尺寸是{values[0]}。"
+            answer = f"亲，这款商品拼好后的成品尺寸是{values[0]}。"
+            return _approximate_answer(answer) if approximate else answer
         if question.question_id == "PDD-MATERIAL":
-            return f"亲，这款商品的材质是{values[0]}。"
+            answer = f"亲，这款商品的材质是{values[0]}。"
+            return _approximate_answer(answer) if approximate else answer
         if question.question_id == "PDD-SHIP-ORIGIN":
-            return f"亲，这款商品从{values[0]}发货。"
+            answer = f"亲，这款商品从{values[0]}发货。"
+            return _approximate_answer(answer) if approximate else answer
         answer = f"亲，当前已确认的信息是：{'；'.join(values)}。"
         if safety_answer and safety_answer not in answer:
             answer = f"{answer}{safety_answer}"
-        return answer
+        return _approximate_answer(answer) if approximate else answer
     if safety_answer:
         return safety_answer
     return "亲，已收到您的问题。"
+
+
+def _approximate_answer(answer: str) -> str:
+    if "具体以实物或实际清点为准" in answer:
+        return answer
+    return f"{answer.rstrip('。')}，具体以实物或实际清点为准。"
 
 
 def _blockers(result: Mapping[str, Any]) -> list[str]:
@@ -505,7 +536,7 @@ class ReplyReadinessEvaluator:
             if source.sku_id and source.sku_id != payload.scope.sku_id:
                 raise ValueError("reply-readiness knowledge SKU scope drifted")
         records = _knowledge_records(sources)
-        facts, fact_blockers, fact_sources = _facts(records)
+        facts, fact_blockers, fact_sources, approximate_facts = _facts(records)
         scope = FrozenChatContext(
             tenant_id=payload.scope.tenant_id,
             platform=payload.scope.platform,
@@ -529,12 +560,22 @@ class ReplyReadinessEvaluator:
                 if key in fact_blockers
             ]
             local_blockers.extend(faq_blockers)
+            approximate_answer = any(
+                key in approximate_facts for key in question.required_fact_keys
+            )
             relevant_sources = _unique_sources([
                 *[source for key in question.required_fact_keys for source in fact_sources.get(key, [])],
                 *faq_sources,
                 *safety_sources,
             ])
-            knowledge_risk = max([faq_risk, safety_risk], key=_RISK.__getitem__)
+            knowledge_risk = max(
+                [
+                    faq_risk,
+                    safety_risk,
+                    RiskLevel.MEDIUM if approximate_answer else RiskLevel.LOW,
+                ],
+                key=_RISK.__getitem__,
+            )
 
             def sandbox_rag(_: str, __: Mapping[str, Any]) -> dict[str, Any]:
                 if question.requires_realtime_lookup or question.policy_risk_floor is RiskLevel.HIGH:
@@ -559,6 +600,8 @@ class ReplyReadinessEvaluator:
                 required_fields: list[str] = []
                 if knowledge_risk is RiskLevel.HIGH:
                     action = ExpectedAction.TRANSFER_HUMAN
+                elif approximate_answer and _ACTION_ORDER[action] < _ACTION_ORDER[ExpectedAction.CONTROLLED_ANSWER]:
+                    action = ExpectedAction.CONTROLLED_ANSWER
                 elif faq_manual and _ACTION_ORDER[action] < _ACTION_ORDER[ExpectedAction.CONTROLLED_ANSWER]:
                     action = ExpectedAction.CONTROLLED_ANSWER
                 if action is ExpectedAction.ASK_CLARIFY:
@@ -575,6 +618,15 @@ class ReplyReadinessEvaluator:
                         "sku_id": source.sku_id,
                         "knowledge_version": source.content_hash.removeprefix("sha256:"),
                         "source_ids": [_source_id(source)],
+                        **(
+                            {
+                                "controlled_answer_kind": (
+                                    "REVIEWED_APPROXIMATE_FACT"
+                                )
+                            }
+                            if approximate_answer
+                            else {}
+                        ),
                     }
                     for source in relevant_sources
                 ]
@@ -589,7 +641,13 @@ class ReplyReadinessEvaluator:
                         "source_ids": [f"policy:{question.question_id}"],
                     }]
                 return {
-                    "answer": _answer(question, facts, faq_answer, safety_answer),
+                    "answer": _answer(
+                        question,
+                        facts,
+                        faq_answer,
+                        safety_answer,
+                        approximate=approximate_answer,
+                    ),
                     "action": action.value,
                     "risk_level": max([question.policy_risk_floor, knowledge_risk], key=_RISK.__getitem__).value,
                     "sources": source_rows,

@@ -59,6 +59,7 @@ _RISK_PRIORITY = {
 }
 _SUGGEST_ACTIONS = frozenset(_ACTION_PRIORITY)
 _SAFE_RAG_WARNINGS = frozenset({"SUGGESTION_ONLY", "AUTO_SEND_DISABLED"})
+_REVIEWED_APPROXIMATE_CONTROL_KIND = "REVIEWED_APPROXIMATE_FACT"
 _RAG_FAILURE_WARNINGS = frozenset(
     {
         "RAG_RUNTIME_ERROR",
@@ -75,6 +76,10 @@ _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _PROHIBITED_AUTO_CLAIMS = (
     re.compile(r"(?:一定|肯定|百分之百|100%|绝对安全|无条件退款|无条件赔付)"),
     re.compile(r"(?<!不)(?:保证|确保).{0,16}(?:发货|到货|送达|退款|赔付|安全)"),
+)
+_APPROXIMATE_NUMERIC_FACT = re.compile(
+    r"(?:估测|估计|大约|约)\s*\d|\d(?:[\d.×xX*乘\s]|厘米|cm|颗|件|个|:){0,16}(?:左右|上下|约)",
+    flags=re.I,
 )
 _APPROVED_SYNONYMS = (
     ("什么材料", "什么材质"),
@@ -251,6 +256,22 @@ class ReplyRouter:
                     blocker=blocker,
                 )
                 return self._manual(blocker, plan=plan)
+            if matched is not None:
+                rendered, _, render_blocker = self._render_rule(
+                    matched.rule, scope
+                )
+                if (
+                    render_blocker is None
+                    and rendered is not None
+                    and matched.rule.action is ReplyAction.DIRECT_ANSWER
+                    and matched.rule.risk_level is ReplyRiskLevel.LOW
+                    and _APPROXIMATE_NUMERIC_FACT.search(rendered)
+                ):
+                    # Legacy fixed rules can predate the reviewed-approximate
+                    # evidence policy.  Re-evaluate them through the governed
+                    # knowledge path instead of treating an estimate as a
+                    # low-risk fixed fact.
+                    matched = None
             route = SubQuestionRoute.FIXED_RULE if matched else SubQuestionRoute.RAG
             routes.append(route)
             pending.append((fragment, matched.rule if matched else None))
@@ -425,6 +446,14 @@ class ReplyRouter:
             return self._quality_manual("QUALITY_AGGREGATE_DECISION_MISMATCH")
         if any(pattern.search(answer) for pattern in _PROHIBITED_AUTO_CLAIMS):
             return self._quality_manual("QUALITY_PROHIBITED_CLAIM")
+        if (
+            action is ReplyAction.DIRECT_ANSWER
+            and risk_level is ReplyRiskLevel.LOW
+            and _APPROXIMATE_NUMERIC_FACT.search(answer)
+        ):
+            return self._quality_manual(
+                "QUALITY_APPROXIMATE_FACT_REQUIRES_CONTROLLED"
+            )
 
         frozen_scope = self._frozen_evidence_scope(scope)
         source_by_reference = {
@@ -524,9 +553,25 @@ class ReplyRouter:
 
             if segment.route is not SubQuestionRoute.RAG:
                 return self._quality_manual("QUALITY_ROUTE_INVALID")
+            reviewed_approximate = (
+                segment.action is ReplyAction.CONTROLLED_ANSWER
+                and segment.risk_level is ReplyRiskLevel.MEDIUM
+                and all(
+                    source_by_reference.get(reference, {}).get(
+                        "controlled_answer_kind"
+                    )
+                    == _REVIEWED_APPROXIMATE_CONTROL_KIND
+                    for reference in segment.source_references
+                )
+            )
             if (
-                segment.action is not ReplyAction.DIRECT_ANSWER
-                or segment.risk_level is not ReplyRiskLevel.LOW
+                not (
+                    (
+                        segment.action is ReplyAction.DIRECT_ANSWER
+                        and segment.risk_level is ReplyRiskLevel.LOW
+                    )
+                    or reviewed_approximate
+                )
                 or segment.rule_id is not None
                 or segment.rule_version is not None
             ):
@@ -1092,6 +1137,7 @@ class ReplyRouter:
         if len(sources) > 32:
             return False, "RAG_SOURCE_LIMIT_EXCEEDED"
         source_ids: set[str] = set()
+        controlled_answer_kinds: list[str | None] = []
         for source in sources:
             if not isinstance(source, dict):
                 return False, "RAG_SOURCE_INVALID"
@@ -1106,6 +1152,13 @@ class ReplyRouter:
             if chunk_id.strip() in source_ids:
                 return False, "RAG_SOURCE_ID_DUPLICATED"
             source_ids.add(chunk_id.strip())
+            controlled_answer_kind = source.get("controlled_answer_kind")
+            if controlled_answer_kind not in {
+                None,
+                _REVIEWED_APPROXIMATE_CONTROL_KIND,
+            }:
+                return False, "RAG_CONTROLLED_ANSWER_KIND_INVALID"
+            controlled_answer_kinds.append(controlled_answer_kind)
             product_id = source.get("product_id")
             sku_id = source.get("sku_id")
             if product_id is not None and product_id != scope.product_id:
@@ -1117,6 +1170,16 @@ class ReplyRouter:
             and not any(source.get("product_id") == scope.product_id for source in sources)
         ):
             return False, "RAG_SOURCE_PRODUCT_SCOPE_UNPROVEN"
+        is_reviewed_approximate = (
+            action == ReplyAction.CONTROLLED_ANSWER.value
+            and risk == ReplyRiskLevel.MEDIUM.value
+            and all(
+                item == _REVIEWED_APPROXIMATE_CONTROL_KIND
+                for item in controlled_answer_kinds
+            )
+        )
+        if any(controlled_answer_kinds) and not is_reviewed_approximate:
+            return False, "RAG_CONTROLLED_ANSWER_KIND_MISMATCH"
         return True, None
 
     @staticmethod

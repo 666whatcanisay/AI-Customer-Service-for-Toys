@@ -167,6 +167,31 @@ describe('ReplyReadinessView', () => {
     expect(wrapper.find('#reply-pool-tab').attributes('aria-selected')).toBe('true')
   })
 
+  it('shows the complete product name with its stable PDD identity', async () => {
+    const fullName = '合成长名称积木机械模型儿童拼装益智玩具礼物测试商品'
+    const productId = 'PDD-SYNTHETIC-LONG-001'
+    apiMocks.listProductKnowledgeProducts.mockResolvedValue({
+      items: [{ product_name: fullName, data_source: 'PILOT', technical_details: { store_code: 'STORE', product_id: productId } }],
+    })
+    const wrapper = await mountView(`/reply-readiness?store=STORE&product=${productId}`)
+
+    expect(wrapper.get('.scope-chip strong').text()).toBe(fullName)
+    expect(wrapper.get('.scope-chip').text()).toContain(`PDD ID：${productId}`)
+    expect(wrapper.findAll('.controls select')[1].text()).toContain(fullName)
+  })
+
+  it('keeps successful scope data visible and reports the failed section precisely', async () => {
+    apiMocks.listKnowledgeMaterials.mockRejectedValue(new Error('materials unavailable'))
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('知识资料修订加载失败：')
+    expect(wrapper.text()).toContain('materials unavailable')
+    expect(wrapper.text()).toContain('现在有货吗')
+    expect(wrapper.get('.run-button').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).not.toContain('36题问题集加载失败')
+    expect(wrapper.text()).not.toContain('历史评测加载失败')
+  })
+
   it('clears product results and loads only the selected SKU history', async () => {
     const wrapper = await mountView()
     apiMocks.listReplyReadinessRuns.mockResolvedValueOnce({ items: [run('SKU')], total: 1 })

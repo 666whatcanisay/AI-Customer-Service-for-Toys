@@ -416,6 +416,76 @@ def test_conflicting_or_estimated_facts_remain_high(
     assert blocker in item.blocker_codes
 
 
+def test_reviewed_approximate_fact_is_a_controlled_medium_answer(tmp_path: Path) -> None:
+    store = ReplyRuleSnapshotStore(tmp_path / "snapshots")
+    publication = _publication(store)
+    source = _source(
+        "KMT-REVIEWED-APPROXIMATE",
+        "PRODUCT_KNOWLEDGE",
+        [{
+            "颗粒数量": "约1000颗",
+            "资料来源": "脱敏PDD记录；sha256:267a15bd54208388cbfa01718052e16f400aef4d2da1b68be5f30531bbbe3d24；DOCX:image6.png",
+            "来源日期": "2026-08-14",
+            "是否人工确认": "是",
+            "备注": "约数已审核，仅允许近似回答",
+        }],
+        status="APPROVED_FOR_ANALYSIS",
+    )
+
+    result = ReplyReadinessEvaluator(store).evaluate(
+        _payload_with_sources(publication, [source])
+    )
+    item = _items(result)["PDD-PARTICLE-COUNT"]
+
+    assert item.effective_risk == "MEDIUM"
+    assert item.action == "CONTROLLED_ANSWER"
+    assert "约1000颗" in item.answer_preview
+    assert "具体以实物或实际清点为准" in item.answer_preview
+    assert item.blocker_codes == []
+    assert item.citation_ids == ["material:KMT-REVIEWED-APPROXIMATE:v1"]
+
+
+@pytest.mark.parametrize(
+    ("status", "confirmation", "source", "note"),
+    [
+        ("RECOGNIZED", "是", "sha256:267a15bd54208388cbfa01718052e16f400aef4d2da1b68be5f30531bbbe3d24", "约数已审核"),
+        ("APPROVED_FOR_ANALYSIS", "否", "sha256:267a15bd54208388cbfa01718052e16f400aef4d2da1b68be5f30531bbbe3d24", "约数已审核"),
+        ("APPROVED_FOR_ANALYSIS", "是", "PDD记录", "约数已审核"),
+        ("APPROVED_FOR_ANALYSIS", "是", "sha256:267a15bd54208388cbfa01718052e16f400aef4d2da1b68be5f30531bbbe3d24", "普通备注"),
+        ("APPROVED_FOR_ANALYSIS", "是", f"sha256:{'a' * 64}", "约数已审核"),
+    ],
+)
+def test_approximate_fact_without_complete_governance_stays_high(
+    tmp_path: Path,
+    status: str,
+    confirmation: str,
+    source: str,
+    note: str,
+) -> None:
+    store = ReplyRuleSnapshotStore(tmp_path / "snapshots")
+    publication = _publication(store)
+    material = _source(
+        "KMT-UNVERIFIED-APPROXIMATE",
+        "PRODUCT_KNOWLEDGE",
+        [{
+            "颗粒数量": "约1000颗",
+            "资料来源": source,
+            "来源日期": "2026-08-14",
+            "是否人工确认": confirmation,
+            "备注": note,
+        }],
+        status=status,
+    )
+
+    item = _items(ReplyReadinessEvaluator(store).evaluate(
+        _payload_with_sources(publication, [material])
+    ))["PDD-PARTICLE-COUNT"]
+
+    assert item.effective_risk == "HIGH"
+    assert item.action == "TRANSFER_HUMAN"
+    assert "FACT_ESTIMATED_PARTICLE_COUNT" in item.blocker_codes
+
+
 def test_rule_snapshot_drift_fails_the_entire_run(tmp_path: Path) -> None:
     store = ReplyRuleSnapshotStore(tmp_path / "snapshots")
     publication = _publication(store)

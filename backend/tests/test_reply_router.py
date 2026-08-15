@@ -479,6 +479,93 @@ def test_quality_gate_rejects_medium_rag_and_realtime_fixed_intent(
     ]
 
 
+def test_quality_gate_allows_only_governed_reviewed_approximate_rag(
+    tmp_path: Path,
+) -> None:
+    reviewed = _rag_result(
+        "成品长度约40厘米，具体以实物或实际清点为准。",
+        action="CONTROLLED_ANSWER",
+        risk="MEDIUM",
+    )
+    reviewed["sources"][0][
+        "controlled_answer_kind"
+    ] = "REVIEWED_APPROXIMATE_FACT"
+    reviewed_router = _router(
+        tmp_path / "reviewed-approximate", lambda question, context: reviewed
+    )
+    message = "成品有多长？"
+    reviewed_result = reviewed_router.decide(
+        message, _turn(message), _scope()
+    )
+    assert reviewed_result["action"] == "CONTROLLED_ANSWER"
+    assert reviewed_result["risk_level"] == "MEDIUM"
+    assert reviewed_result["quality_gate_status"] == "PASS"
+
+    invalid = _rag_result(
+        "成品长度约40厘米。",
+        action="CONTROLLED_ANSWER",
+        risk="MEDIUM",
+    )
+    invalid["sources"][0]["controlled_answer_kind"] = "UNREVIEWED_ESTIMATE"
+    invalid_router = _router(
+        tmp_path / "invalid-approximate", lambda question, context: invalid
+    )
+    invalid_result = invalid_router.decide(message, _turn(message), _scope())
+    assert invalid_result["action"] == "TRANSFER_HUMAN"
+    assert "ROUTER_BLOCKED_RAG_CONTROLLED_ANSWER_KIND_INVALID" in invalid_result[
+        "warnings"
+    ]
+
+
+def test_legacy_low_risk_approximate_fixed_rule_uses_governed_rag(
+    tmp_path: Path,
+) -> None:
+    rag_result = _rag_result(
+        "颗粒数量约1000颗，具体以实物或实际清点为准。",
+        action="CONTROLLED_ANSWER",
+        risk="MEDIUM",
+    )
+    rag_result["sources"][0][
+        "controlled_answer_kind"
+    ] = "REVIEWED_APPROXIMATE_FACT"
+    router = _router(
+        tmp_path,
+        lambda question, context: rag_result,
+        rules=[
+            _rule(
+                "RULE-LEGACY-APPROXIMATE",
+                alias="多少颗",
+                reply="这款约1000颗。",
+            )
+        ],
+    )
+    message = "多少颗？"
+
+    result = router.decide(message, _turn(message), _scope())
+
+    assert result["action"] == "CONTROLLED_ANSWER"
+    assert result["risk_level"] == "MEDIUM"
+    assert result["reply_router_trace"]["origin"] == "RAG"
+
+
+def test_low_risk_rag_cannot_hide_an_approximate_numeric_fact(
+    tmp_path: Path,
+) -> None:
+    router = _router(
+        tmp_path,
+        lambda question, context: _rag_result("这款约1000颗。"),
+    )
+    message = "多少颗？"
+
+    result = router.decide(message, _turn(message), _scope())
+
+    assert result["action"] == "TRANSFER_HUMAN"
+    assert (
+        "ROUTER_BLOCKED_QUALITY_APPROXIMATE_FACT_REQUIRES_CONTROLLED"
+        in result["warnings"]
+    )
+
+
 def test_tenant_rule_evidence_is_a_valid_ancestor_of_product_scope(
     tmp_path: Path,
 ) -> None:

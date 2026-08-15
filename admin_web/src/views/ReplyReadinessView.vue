@@ -45,6 +45,9 @@ const running = ref(false)
 const debugRunning = ref(false)
 const debugError = ref('')
 const scopeError = ref('')
+const materialLoadError = ref('')
+const questionSetLoadError = ref('')
+const runHistoryLoadError = ref('')
 const runError = ref('')
 const comparisonError = ref('')
 const routeNotice = ref('')
@@ -138,7 +141,8 @@ const categoryOptions = computed(() => Array.from(new Set(
   (questionSet.value?.questions || []).map((item) => item.category),
 )).sort())
 const scopeReady = computed(() => Boolean(
-  scope.store_code && scope.product_id && productDetail.value && questionSet.value && !scopeLoading.value,
+  scope.store_code && scope.product_id && productDetail.value && questionSet.value
+  && !materialLoadError.value && !questionSetLoadError.value && !scopeLoading.value,
 ))
 const completedRuns = computed(() => runs.value.filter(
   (item) => item.status === 'COMPLETED' && item.result && item.run_id !== selectedRun.value?.run_id,
@@ -337,6 +341,9 @@ function resetEvaluationState(): void {
   runError.value = ''
   comparisonError.value = ''
   runMessage.value = ''
+  materialLoadError.value = ''
+  questionSetLoadError.value = ''
+  runHistoryLoadError.value = ''
 }
 
 function stopPolling(): void {
@@ -378,7 +385,7 @@ async function loadScopeData(epoch: number, requestedMaterialKey = ''): Promise<
   const storeCode = scope.store_code
   const productId = scope.product_id
   const skuId = scope.sku_id
-  const [materials, effectiveQuestions, runList] = await Promise.all([
+  const [materialsResult, questionsResult, runsResult] = await Promise.allSettled([
     listKnowledgeMaterials({
       store_code: storeCode,
       product_id: productId,
@@ -401,7 +408,16 @@ async function loadScopeData(epoch: number, requestedMaterialKey = ''): Promise<
   if (epoch !== scopeLoadEpoch || storeCode !== scope.store_code
     || productId !== scope.product_id || skuId !== scope.sku_id) return
 
-  const exactMaterials = materials.items
+  materialLoadError.value = materialsResult.status === 'rejected'
+    ? `知识资料修订加载失败：${apiErrorMessage(materialsResult.reason)}`
+    : ''
+  questionSetLoadError.value = questionsResult.status === 'rejected'
+    ? `36题问题集加载失败：${apiErrorMessage(questionsResult.reason)}`
+    : ''
+  runHistoryLoadError.value = runsResult.status === 'rejected'
+    ? `历史评测加载失败：${apiErrorMessage(runsResult.reason)}`
+    : ''
+  const exactMaterials = (materialsResult.status === 'fulfilled' ? materialsResult.value.items : [])
     .filter((item) => (item.sku_id === null || item.sku_id === (skuId || null))
       && ['RECOGNIZED', 'REVIEWING'].includes(item.material_status)
       && ['PRODUCT_KNOWLEDGE', 'SKU_DIFFERENCE', 'FAQ', 'SAFETY_RULE'].includes(
@@ -409,8 +425,9 @@ async function loadScopeData(epoch: number, requestedMaterialKey = ''): Promise<
       ))
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at) || right.revision - left.revision)
   materialRevisions.value = exactMaterials
-  questionSet.value = effectiveQuestions
-  runs.value = runList.items.filter((item) => item.sku_id === (skuId || null))
+  questionSet.value = questionsResult.status === 'fulfilled' ? questionsResult.value : null
+  runs.value = (runsResult.status === 'fulfilled' ? runsResult.value.items : [])
+    .filter((item) => item.sku_id === (skuId || null))
   selectedRunId.value = runs.value[0]?.run_id || ''
   if (requestedMaterialKey) {
     if (exactMaterials.some((item) => `${item.material_id}:${item.revision}` === requestedMaterialKey)) {
@@ -719,7 +736,11 @@ onBeforeUnmount(() => {
       <div class="section-title">
         <div><span class="step">1</span><div><h2 id="scope-heading">选择商品范围</h2><p>范围变化后会立即清空不兼容的结果。</p></div></div>
         <div v-if="selectedProduct" class="scope-summary">
-          <span class="scope-chip">{{ selectedProduct.product_name }}<template v-if="selectedSku"> · {{ selectedSku.sku_name }}</template></span>
+          <span class="scope-chip" :title="selectedProduct.product_name">
+            <strong>{{ selectedProduct.product_name }}</strong>
+            <small>PDD ID：{{ selectedProduct.technical_details.product_id }}</small>
+            <small v-if="selectedSku">SKU：{{ selectedSku.sku_name }}</small>
+          </span>
           <span :class="['source-badge', (selectedProduct.data_source || 'UNKNOWN').toLowerCase()]">{{ dataSourceLabel(selectedProduct.data_source || 'UNKNOWN') }}</span>
         </div>
       </div>
@@ -733,7 +754,7 @@ onBeforeUnmount(() => {
         <label>商品
           <select v-model="scope.product_id" :disabled="!scope.store_code" @change="loadProduct()">
             <option value="">请选择商品</option>
-            <option v-for="product in scopedProducts" :key="product.technical_details.product_id || product.product_name" :value="product.technical_details.product_id || ''">{{ product.product_name }}</option>
+            <option v-for="product in scopedProducts" :key="product.technical_details.product_id || product.product_name" :value="product.technical_details.product_id || ''" :title="product.product_name">{{ product.product_name }}</option>
           </select>
         </label>
         <label>评测范围
@@ -754,6 +775,9 @@ onBeforeUnmount(() => {
       <p v-if="activeTab === 'POOL'" class="aggregation-note">系统会自动聚合当前商品最新已审核资料；SKU评测还会加入精确SKU资料。这里仅选择一份待审核修订覆盖同一资料的已审核版本。</p>
       <p v-else class="aggregation-note">单条调试直接调用当前正式A服务，只读使用已发布规则与知识；商品知识不可用时由真实Router按实际路由决定是否转人工。</p>
       <p v-if="selectedProduct?.data_source === 'TEST'" class="source-warning">当前为测试资料：允许调试，但不代表正式商品事实，也不会授予自动发送权。</p>
+      <p v-if="materialLoadError" class="notice error scope-part-error" role="alert">{{ materialLoadError }} 当前不能运行评测，请先修复资料读取。</p>
+      <p v-if="questionSetLoadError" class="notice error scope-part-error" role="alert">{{ questionSetLoadError }}</p>
+      <p v-if="runHistoryLoadError" class="notice warning scope-part-error" role="status">{{ runHistoryLoadError }} 你仍可在资料和问题集就绪后运行新评测。</p>
       <p v-if="scopeLoading" class="inline-status" role="status">正在切换范围并读取对应问题、资料和运行历史…</p>
       <p v-else-if="scopeReady && activeTab === 'POOL'" class="inline-status success">范围已就绪：{{ questionSet?.questions.length }} 个基线问题，{{ materialRevisions.length }} 个可用资料修订。</p>
       <p v-else-if="scopeReady" class="inline-status success">正式只读调试范围已就绪。</p>
@@ -958,8 +982,8 @@ onBeforeUnmount(() => {
 .safety-banner { display: grid; grid-template-columns: auto minmax(260px, 1fr) auto; align-items: center; gap: 8px 14px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #edd18d; border-radius: 12px; color: #6d4d08; background: #fff9e8; }
 .safety-banner strong { color: #5d4104; }.safety-flags { display: grid; grid-template-columns: repeat(2, max-content); justify-content: end; gap: 4px 6px; }.safety-flags b { padding: 4px 7px; border-radius: 999px; color: #754f00; background: #f8e7b6; font-size: 11px; }.safety-banner code { grid-column: 1 / -1; color: #7b5a12; font-size: 11px; text-align: right; }
 .workspace-tabs { display: flex; gap: 8px; margin: 0 0 18px; padding: 5px; width: max-content; border: 1px solid #d8e2ef; border-radius: 12px; background: #f6f8fb; }.workspace-tabs button { min-height: 38px; padding: 8px 16px; border: 0; border-radius: 8px; color: #526279; background: transparent; font: inherit; font-weight: 800; cursor: pointer; }.workspace-tabs button.active { color: #fff; background: #315f9f; box-shadow: 0 4px 12px rgb(49 95 159 / 20%); }.workspace-tabs button:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }
-.scope-card, .run-card { margin-bottom: 18px; }.section-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }.section-title > div { display: flex; align-items: center; gap: 11px; }.section-title h2, .section-title p { margin: 0; }.section-title h2 { color: #172554; font-size: 19px; }.section-title p { margin-top: 4px; color: #64748b; font-size: 13px; }.step { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 10px; color: #fff; background: #315f9f; font-size: 13px; font-weight: 800; }.scope-chip, .result-count { padding: 6px 10px; border-radius: 999px; color: #2d5a93; background: #edf4ff; font-size: 12px; font-weight: 700; }
-.scope-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }.source-badge { padding: 6px 9px; border-radius: 999px; color: #385675; background: #edf2f7; font-size: 12px; font-weight: 800; }.source-badge.initial_import { color: #17633a; background: #e8f7ee; }.source-badge.pilot { color: #285493; background: #edf4ff; }.source-badge.test { color: #8a4d00; background: #fff2da; }.source-warning { margin: 12px 0 0; padding: 10px 12px; border: 1px solid #edcf8d; border-radius: 8px; color: #7c4c05; background: #fff9e8; font-size: 13px; }
+.scope-card, .run-card { margin-bottom: 18px; }.section-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }.section-title > div { display: flex; align-items: center; gap: 11px; }.section-title h2, .section-title p { margin: 0; }.section-title h2 { color: #172554; font-size: 19px; }.section-title p { margin-top: 4px; color: #64748b; font-size: 13px; }.step { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 10px; color: #fff; background: #315f9f; font-size: 13px; font-weight: 800; }.scope-chip, .result-count { padding: 6px 10px; border-radius: 12px; color: #2d5a93; background: #edf4ff; font-size: 12px; font-weight: 700; }
+.scope-chip { display: grid; max-width: min(680px, 58vw); gap: 2px; text-align: left; overflow-wrap: anywhere; }.scope-chip strong { font-size: 13px; line-height: 1.45; }.scope-chip small { color: #64748b; font-weight: 600; }.scope-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; gap: 7px; }.source-badge { padding: 6px 9px; border-radius: 999px; color: #385675; background: #edf2f7; font-size: 12px; font-weight: 800; }.source-badge.initial_import { color: #17633a; background: #e8f7ee; }.source-badge.pilot { color: #285493; background: #edf4ff; }.source-badge.test { color: #8a4d00; background: #fff2da; }.source-warning { margin: 12px 0 0; padding: 10px 12px; border: 1px solid #edcf8d; border-radius: 8px; color: #7c4c05; background: #fff9e8; font-size: 13px; }.scope-part-error { margin: 12px 0 0; }.notice.warning { color: #7c4c05; background: #fff9e8; border-color: #edcf8d; }
 .controls, .run-toolbar, .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }.controls label, .run-toolbar label, .filters label { display: grid; min-width: 190px; gap: 6px; color: #526279; font-size: 13px; }.controls label { flex: 1 1 210px; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd7e6; border-radius: 8px; background: #fff; font: inherit; }.controls select:focus-visible, .run-toolbar select:focus-visible, .filters select:focus-visible, .filters input:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }.run-button { margin-top: 15px; }.inline-status { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; color: #385675; background: #f1f6fc; font-size: 13px; }.inline-status.success { color: #226346; background: #edf8f2; }
 .clear-filters { min-height: 42px; }
 .aggregation-note { margin: 12px 0 0; color: #526279; font-size: 13px; line-height: 1.55; }
@@ -971,6 +995,6 @@ onBeforeUnmount(() => {
 .comparison { margin-top: 18px; }.comparison-group { margin-top: 16px; padding: 14px; border-left: 4px solid #8ca0b8; border-radius: 9px; background: #f8fafc; }.comparison-group.worse { border-color: #c74b4b; background: #fff7f7; }.comparison-group.improved { border-color: #2f8f5b; background: #f3fbf6; }.comparison-group.answer_changed { border-color: #3f72b5; background: #f5f9ff; }.comparison-group h3 { margin: 0 0 10px; font-size: 15px; }.comparison-group article { padding: 10px 0; border-top: 1px solid rgb(120 140 165 / 20%); }.comparison-group article p { margin: 4px 0 0; color: #526279; font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }.actions > div { flex: 1 1 260px; }.actions p { margin: 4px 0 0; color: #64748b; font-size: 13px; }.sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
 .debug-card { margin-bottom: 18px; }.debug-message { display: grid; gap: 7px; color: #526279; font-size: 13px; font-weight: 700; }.debug-message textarea { min-height: 128px; padding: 12px; border: 1px solid #cbd7e6; border-radius: 10px; resize: vertical; font: inherit; line-height: 1.6; }.debug-message textarea:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }.debug-message small { justify-self: end; color: #718096; font-weight: 400; }.debug-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }.debug-actions span { color: #64748b; font-size: 13px; }.debug-result { margin-top: 18px; padding: 18px; border: 1px solid #d9e4f1; border-radius: 12px; background: #f8fbff; }.debug-result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.debug-result-heading h3 { margin: 0; color: #172554; }.debug-business { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 18px 0; }.debug-business div:first-child { grid-column: 1 / -1; }.debug-business dt { color: #64748b; font-size: 12px; }.debug-business dd { margin: 4px 0 0; color: #263b55; line-height: 1.6; }.version-summary, .debug-comparison { padding: 10px 12px; border-radius: 8px; color: #385675; background: #edf4ff; font-size: 13px; }.debug-comparison { background: #f1f5f9; }.debug-technical { margin-top: 16px; }.debug-technical dl div { grid-template-columns: 130px minmax(0, 1fr); }
-@media (max-width: 900px) { .summary-grid { grid-template-columns: 1fr; }.business-detail { grid-template-columns: 1fr; }.section-title { align-items: flex-start; }.scope-chip { max-width: 45%; } }
+@media (max-width: 900px) { .summary-grid { grid-template-columns: 1fr; }.business-detail { grid-template-columns: 1fr; }.section-title { align-items: flex-start; }.scope-chip { max-width: 60vw; } }
 @media (max-width: 680px) { .desktop-results { display: none; }.mobile-results { display: block; }.section-title { display: grid; }.section-title > div { align-items: flex-start; }.scope-chip { max-width: 100%; width: max-content; }.controls label, .run-toolbar label, .filters label { width: 100%; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; }.run-button { width: 100%; }.safety-banner { grid-template-columns: 1fr; align-items: flex-start; }.safety-flags { justify-content: start; }.safety-banner code { text-align: left; }.workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }.result-count { margin-left: 41px; }.actions { align-items: stretch; flex-direction: column; }.actions .button { width: 100%; }.debug-business { grid-template-columns: 1fr; }.debug-business div:first-child { grid-column: auto; }.debug-actions { align-items: stretch; flex-direction: column; }.debug-actions .button { width: 100%; } }
 </style>

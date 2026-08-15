@@ -4,10 +4,18 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "8423 Reply Governance Availability V1",
-  "current_stage": "C/Admin candidate and R027 database backup are validated; clean-candidate 8420-8423 deployment and browser acceptance remain.",
-  "current_gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING; REAL_PDD_* remains NOT_VERIFIED",
-  "status": "ai_cs_8423_reply_governance_deployment_pending",
+  "current_task": "Real PDD Product Names and Knowledge Correction V1",
+  "current_stage": "C compatibility, Admin full-name/error UX and isolated immutable revision closures are validated; formal same-SHA deployment and scoped data maintenance remain.",
+  "current_gate": "CANDIDATE_VALIDATED / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_DEPLOYMENT_PENDING",
+  "status": "real_pdd_product_knowledge_correction_deployment_pending",
+  "real_pdd_product_knowledge_correction_v1": {
+    "gate": "CANDIDATE_VALIDATED / AI_CS_REAL_PDD_PRODUCT_KNOWLEDGE_CORRECTION_DEPLOYMENT_PENDING",
+    "ui": "Full product display name from catalog with stable product ID as secondary technical information; split material/question/run errors",
+    "compatibility": "Read-only projection only for proven RECORDED_PDD_20260814 legacy metadata; unknown malformed metadata returns controlled 409",
+    "knowledge": "Four isolated immutable revision 2 records approved through existing lifecycle; revision 1 preserved",
+    "closure": "Four products x 36 questions completed through real C input, A evaluator and C result verification",
+    "tests": "C 219; Admin 40 files/116 tests plus typecheck and production build; no formal DB/RAG/send write"
+  },
   "reply_governance_8423_v1": {
     "gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING",
     "navigation": "Simple mode shows reply-readiness and knowledge-editor; advanced mode has no duplicate; both require knowledge.manage",

@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.knowledge_materials.models import KnowledgeMaterial
 
 
 def _upload(
@@ -56,6 +57,122 @@ def _analysis_payload(snapshot: dict[str, object]) -> dict[str, object]:
             }
         ],
     }
+
+
+def test_recorded_pdd_legacy_metadata_has_read_only_compatible_projection(
+    client: TestClient, session
+) -> None:
+    material = KnowledgeMaterial(
+        material_id="KMT-PDD-LEGACY",
+        revision=1,
+        store_code="STORE-ONE",
+        product_id="PRODUCT-ONE",
+        sku_id=None,
+        material_type="PRODUCT_SPEC",
+        display_name="脱敏PDD商品资料",
+        original_filename="recorded-pdd.json",
+        content_hash="sha256:" + "a" * 64,
+        recognition_summary={
+            "template_type": "PRODUCT_KNOWLEDGE",
+            "detected_fields": ["颗粒数量"],
+            "missing_expected_fields": [],
+            "record_count": 1,
+            "privacy_filtered": True,
+            "source_origin": "RECORDED_PDD_20260814",
+            "reference_answer_visible_to_ai": False,
+            "scope_requirement": "PRODUCT_ONLY",
+        },
+        analysis_text='{"facts":{"particle_count":"约1000颗"}}',
+        raw_storage_path="controlled/legacy/source.json",
+        material_status="APPROVED_FOR_ANALYSIS",
+        submitted_by="operations-tester",
+    )
+    session.add(material)
+    session.commit()
+
+    response = client.get(
+        "/api/v1/admin/knowledge-materials",
+        params={"store_code": "STORE-ONE", "product_id": "PRODUCT-ONE"},
+    )
+
+    assert response.status_code == 200
+    summary = response.json()["items"][0]["recognition_summary"]
+    assert summary["readable"] is True
+    assert summary["file_extension"] == ".json"
+    assert summary["template_type"] == "PRODUCT_KNOWLEDGE"
+    assert "source_origin" not in summary
+    assert material.recognition_summary["source_origin"] == "RECORDED_PDD_20260814"
+
+
+def test_unknown_malformed_knowledge_metadata_fails_with_controlled_error(
+    client: TestClient, session
+) -> None:
+    session.add(
+        KnowledgeMaterial(
+            material_id="KMT-UNKNOWN-LEGACY",
+            revision=1,
+            store_code="STORE-ONE",
+            product_id="PRODUCT-ONE",
+            sku_id=None,
+            material_type="PRODUCT_SPEC",
+            display_name="未知来源资料",
+            original_filename="unknown.json",
+            content_hash="sha256:" + "b" * 64,
+            recognition_summary={"template_type": "PRODUCT_KNOWLEDGE"},
+            analysis_text="{}",
+            raw_storage_path="controlled/unknown/source.json",
+            material_status="RECOGNIZED",
+            submitted_by="operations-tester",
+        )
+    )
+    session.commit()
+
+    response = client.get(
+        "/api/v1/admin/knowledge-materials",
+        params={"store_code": "STORE-ONE", "product_id": "PRODUCT-ONE"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "KNOWLEDGE_MATERIAL_METADATA_INCOMPATIBLE"
+
+
+def test_known_legacy_source_with_invalid_field_types_returns_controlled_error(
+    client: TestClient, session
+) -> None:
+    session.add(
+        KnowledgeMaterial(
+            material_id="KMT-KNOWN-LEGACY-MALFORMED",
+            revision=1,
+            store_code="STORE-ONE",
+            product_id="PRODUCT-ONE",
+            sku_id=None,
+            material_type="PRODUCT_SPEC",
+            display_name="已知来源但字段损坏的资料",
+            original_filename="legacy.json",
+            content_hash="sha256:" + "c" * 64,
+            recognition_summary={
+                "template_type": "PRODUCT_KNOWLEDGE",
+                "detected_fields": {"not": "a-list"},
+                "missing_expected_fields": [],
+                "record_count": 1,
+                "privacy_filtered": True,
+                "source_origin": "RECORDED_PDD_20260814",
+            },
+            analysis_text="{}",
+            raw_storage_path="controlled/legacy/source.json",
+            material_status="RECOGNIZED",
+            submitted_by="operations-tester",
+        )
+    )
+    session.commit()
+
+    response = client.get(
+        "/api/v1/admin/knowledge-materials",
+        params={"store_code": "STORE-ONE", "product_id": "PRODUCT-ONE"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "KNOWLEDGE_MATERIAL_METADATA_INCOMPATIBLE"
 
 
 def test_controlled_material_lifecycle_export_writeback_and_customer_projection(
