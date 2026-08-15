@@ -456,6 +456,10 @@ def test_gateway_maps_all_existing_ai_actions_without_executing(
         ("我的订单什么时候到？", "订单详情页", "MEDIUM"),
         ("我要退款怎么办？", "发起售后申请", "MEDIUM"),
         ("孩子误吞小颗粒怎么办？", "及时就医", "HIGH"),
+        ("这款积木拼好后有多大？", "详情页和所选规格标注", "MEDIUM"),
+        ("这款积木一共有多少颗粒？", "标注的颗粒数量", "MEDIUM"),
+        ("这个商品主要是什么材质？", "对应规格的材质说明", "MEDIUM"),
+        ("这个商品是什么包装？", "所选规格的包装说明", "MEDIUM"),
     ],
 )
 def test_auto_all_messages_maps_manual_routes_to_governed_fixed_reply(

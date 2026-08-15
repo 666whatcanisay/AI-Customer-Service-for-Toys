@@ -495,15 +495,54 @@ class GatewayServer:
             answer = "亲，价格、优惠和库存会实时变化，请以当前商品页面显示为准哦。"
             action = "CONTROLLED_ANSWER"
             risk_level = "MEDIUM"
+        elif any(
+            keyword in compact
+            for keyword in (
+                "拼好后有多大",
+                "拼装后有多大",
+                "拼起来多大",
+                "成品尺寸",
+                "商品尺寸",
+                "长宽高",
+            )
+        ):
+            rule_id = "auto-first-product-size-page-v1"
+            answer = (
+                "亲，不同款式拼装后的尺寸会有差异，"
+                "具体请以当前商品详情页和所选规格标注的尺寸为准哦。"
+            )
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
+        elif "颗粒" in compact:
+            rule_id = "auto-first-product-pieces-page-v1"
+            answer = (
+                "亲，不同款式的颗粒数量会有差异，"
+                "具体请以当前商品详情页和所选规格标注的颗粒数量为准哦。"
+            )
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
+        elif "材质" in compact:
+            rule_id = "auto-first-product-material-page-v1"
+            answer = "亲，具体材质请以当前商品详情页对应规格的材质说明为准哦。"
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
+        elif any(keyword in compact for keyword in ("包装", "彩盒", "礼盒")):
+            rule_id = "auto-first-product-package-page-v1"
+            answer = "亲，具体包装方式请以当前商品详情页和所选规格的包装说明为准哦。"
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
         elif scope.product_id.startswith("__STORE_LEVEL_"):
             rule_id = "auto-first-product-clarify-v1"
             answer = "亲，请发一下您咨询的商品卡片或商品名称，我马上帮您确认哦。"
             action = "ASK_CLARIFY"
             risk_level = "MEDIUM"
         else:
-            rule_id = "auto-first-general-clarify-v1"
-            answer = "亲，您的消息已收到。请再补充一下具体想了解的问题，我马上帮您确认哦。"
-            action = "ASK_CLARIFY"
+            rule_id = "auto-first-general-page-check-v1"
+            answer = (
+                "亲，您的问题已收到，我正在按当前商品和规格核对；"
+                "页面已有标注的信息请先以当前详情页为准哦。"
+            )
+            action = "CONTROLLED_ANSWER"
             risk_level = "MEDIUM"
 
         evidence = GatewayServer._fixed_reply_evidence(
