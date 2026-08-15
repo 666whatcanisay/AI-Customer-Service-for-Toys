@@ -562,7 +562,11 @@ class RAGService:
                 "knowledge_version": result.get("knowledge_version"),
                 "source_ids": result.get("source_ids") or [],
                 "product_id": result.get("product_id"),
-                "sku_id": result.get("sku_id"),
+                # Chroma metadata cannot retain ``None`` and existing
+                # product-level publications encode an absent SKU as "".
+                # Keep the Router's scope semantics canonical: blank means
+                # product-level, while every non-blank SKU remains exact.
+                "sku_id": result.get("sku_id") or None,
             }
             for result in results
         ]

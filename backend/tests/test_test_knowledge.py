@@ -43,6 +43,40 @@ def load_json(name: str) -> dict:
     return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
 
 
+def test_rag_sources_canonicalize_blank_optional_sku_scope() -> None:
+    service = object.__new__(RAGService)
+
+    sources = service._source_items(
+        [
+            {
+                "source_name": "product-level-source",
+                "page": 0,
+                "chunk_id": "chunk-product-level",
+                "distance": 0.01,
+                "content": "product fact",
+                "knowledge_version": "v1",
+                "source_ids": ["source-1"],
+                "product_id": "982904528556",
+                "sku_id": "",
+            },
+            {
+                "source_name": "sku-source",
+                "page": 1,
+                "chunk_id": "chunk-sku",
+                "distance": 0.02,
+                "content": "sku fact",
+                "knowledge_version": "v1",
+                "source_ids": ["source-2"],
+                "product_id": "982904528556",
+                "sku_id": "SKU-EXACT",
+            },
+        ]
+    )
+
+    assert sources[0]["sku_id"] is None
+    assert sources[1]["sku_id"] == "SKU-EXACT"
+
+
 def context(product_id: str = "P-Q80", sku_id: str | None = None):
     return FrozenChatContext(
         tenant_id="TENANT-PDD-SM-TEST",
