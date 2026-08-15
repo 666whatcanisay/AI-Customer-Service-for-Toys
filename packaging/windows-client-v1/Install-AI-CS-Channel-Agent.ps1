@@ -92,17 +92,61 @@ function Get-InstallOwnedProcesses([string]$InstallDirectory) {
 }
 
 function Stop-KnownAgentLauncher([string]$InstallDirectory, [string]$AgentDataRoot) {
-    $Executable = Join-Path $InstallDirectory 'ChannelAgent.exe'
-    if (Test-Path -LiteralPath $Executable -PathType Leaf) {
-        $escapedDataRoot = $AgentDataRoot.Replace('"', '\"')
-        $stopProcess = Start-Process -FilePath $Executable `
-            -ArgumentList "stop --data-root `"$escapedDataRoot`" --wait-seconds 12" `
-            -WindowStyle Hidden -Wait -PassThru
-        if ($stopProcess.ExitCode -ne 0 -and -not $Force) {
-            throw 'The existing Channel Agent could not be stopped safely.'
+    $ownedBeforeStop = @(Get-InstallOwnedProcesses $InstallDirectory)
+    $runtimeProcesses = @($ownedBeforeStop | Where-Object {
+        $_.ProcessName -in @('python', 'pythonw')
+    })
+
+    if ($runtimeProcesses.Count -gt 0) {
+        # An in-place upgrade must not turn a code refresh into a PDD logout.
+        # Ask the running host to detach from the dedicated Edge session while
+        # preserving that browser process and profile.  The new runtime will
+        # attach to the same DevTools session after the directory switch.
+        $runtimeDirectory = Join-Path $AgentDataRoot 'runtime'
+        New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+        $reloadRequest = Join-Path $runtimeDirectory 'reload.request'
+        $reloadTemporary = "$reloadRequest.upgrade-$([Guid]::NewGuid().ToString('N'))"
+        '{"reason":"PACKAGE_UPGRADE","preserve_browser":true}' |
+            Set-Content -LiteralPath $reloadTemporary -Encoding ASCII
+        Move-Item -LiteralPath $reloadTemporary -Destination $reloadRequest -Force
+
+        $reloadDeadline = [DateTime]::UtcNow.AddSeconds(15)
+        do {
+            $runtimeProcesses = @(Get-InstallOwnedProcesses $InstallDirectory | Where-Object {
+                $_.ProcessName -in @('python', 'pythonw')
+            })
+            if ($runtimeProcesses.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 250
+        } while ([DateTime]::UtcNow -lt $reloadDeadline)
+    }
+
+    # Compatibility fallback for an older or unhealthy runtime that cannot
+    # consume browser-preserving reload requests. This path remains bounded and
+    # is only allowed to proceed automatically when -Force was requested.
+    if ($runtimeProcesses.Count -gt 0) {
+        if (-not $Force) {
+            throw 'The existing Channel Agent could not preserve its browser during upgrade.'
+        }
+        $Executable = Join-Path $InstallDirectory 'ChannelAgent.exe'
+        if (Test-Path -LiteralPath $Executable -PathType Leaf) {
+            $escapedDataRoot = $AgentDataRoot.Replace('"', '\"')
+            $stopProcess = Start-Process -FilePath $Executable `
+                -ArgumentList "stop --data-root `"$escapedDataRoot`" --wait-seconds 12" `
+                -WindowStyle Hidden -Wait -PassThru
+            if ($stopProcess.ExitCode -ne 0 -and -not $Force) {
+                throw 'The existing Channel Agent could not be stopped safely.'
+            }
         }
     }
-    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+
+    # The native tray does not own the browser. Once the Python host has
+    # detached, terminating only the exact installed launcher is safe and is
+    # required before the install directory can be atomically replaced.
+    @(Get-InstallOwnedProcesses $InstallDirectory) |
+        Where-Object { $_.ProcessName -eq 'ChannelAgent' } |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
     do {
         $matching = @(Get-InstallOwnedProcesses $InstallDirectory)
         if ($matching.Count -eq 0) { return }

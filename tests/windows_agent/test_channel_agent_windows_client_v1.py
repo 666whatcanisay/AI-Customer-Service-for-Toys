@@ -546,6 +546,9 @@ def test_windows_installer_supports_in_place_upgrade_without_deleting_data() -> 
     assert "$existingInstall" in installer
     assert "Stop-KnownAgentLauncher $InstallRoot $DataRoot" in installer
     assert "$stopProcess.ExitCode" in installer
+    assert "'reload.request'" in installer
+    assert '"preserve_browser":true' in installer
+    assert "Where-Object { $_.ProcessName -eq 'ChannelAgent' }" in installer
     assert "Assert-PackageIntegrity $stageRoot" in installer
     assert "Get-InstallOwnedProcesses $InstallDirectory" in installer
     assert ".inc-$transactionId" in installer
