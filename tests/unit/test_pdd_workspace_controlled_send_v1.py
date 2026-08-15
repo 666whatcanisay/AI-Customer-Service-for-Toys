@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from channel_agent.pdd_workspace_send import (
     PDDWorkspaceSendError,
     PDDWorkspaceSendProbe,
     PDDWorkspaceSendState,
+    WebSocketPDDWorkspaceActionPort,
 )
 from channel_engine.customer_assistant import (
     ConversationHistoryEntry,
@@ -272,3 +274,36 @@ def test_trigger_without_confirmed_operator_echo_is_unknown_and_never_retried() 
     assert result.customer_message_sent is None
     assert result.error_code == "PDD_SEND_CONFIRMATION_TIMEOUT_UNKNOWN"
     assert actions.action_calls == 1
+
+
+def test_trusted_click_dispatches_real_pointer_sequence(monkeypatch) -> None:
+    sent: list[dict[str, object]] = []
+
+    class _Connection:
+        def send(self, raw: str) -> None:
+            sent.append(json.loads(raw))
+
+        def recv(self) -> str:
+            return json.dumps({"id": sent[-1]["id"], "result": {}})
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(
+        "channel_agent.pdd_workspace_send.websocket.create_connection",
+        lambda *_args, **_kwargs: _Connection(),
+    )
+    target = _Resolver().resolve(Path("profile"))
+
+    WebSocketPDDWorkspaceActionPort()._dispatch_trusted_click(
+        target,
+        x=120.5,
+        y=240.25,
+    )
+
+    assert [item["params"]["type"] for item in sent] == [
+        "mouseMoved",
+        "mousePressed",
+        "mouseReleased",
+    ]
+    assert [item["params"]["buttons"] for item in sent] == [0, 1, 0]

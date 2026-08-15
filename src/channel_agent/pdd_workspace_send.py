@@ -349,7 +349,15 @@ class WebSocketPDDWorkspaceActionPort:
                 suppress_origin=True,
                 http_proxy_host=None,
             )
-            for event_type in ("mousePressed", "mouseReleased"):
+            # PDD's workspace ignores a bare press/release pair when the
+            # pointer has not first entered the control.  Dispatch the same
+            # sequence as a real mouse and include the button bitmask that
+            # Chromium uses for trusted pointer/mouse events.
+            for event_type, buttons in (
+                ("mouseMoved", 0),
+                ("mousePressed", 1),
+                ("mouseReleased", 0),
+            ):
                 with self._lock:
                     self._sequence += 1
                     command_id = self._sequence
@@ -358,6 +366,7 @@ class WebSocketPDDWorkspaceActionPort:
                     "x": x,
                     "y": y,
                     "button": "left",
+                    "buttons": buttons,
                     "clickCount": 1,
                 }
                 command = json.dumps(
