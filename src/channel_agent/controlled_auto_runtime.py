@@ -26,7 +26,9 @@ class ControlledAutoRuntimeStateV1(BaseModel):
     controlled_store_auto_enabled: bool = False
     ai_cs_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     platform_store_id: str | None = Field(default=None, min_length=1, max_length=160)
-    policy_mode: Literal["MANUAL_CONFIRM", "AUTO_LOW_RISK"] = "MANUAL_CONFIRM"
+    policy_mode: Literal[
+        "MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+    ] = "MANUAL_CONFIRM"
     policy_revision: int = Field(ge=1)
     whitelist_revision: str = Field(min_length=1, max_length=160)
     kill_switch_enabled: bool = True
@@ -48,7 +50,7 @@ class ControlledAutoRuntimeStateV1(BaseModel):
             or self.controlled_pilot_send_enabled
             or not self.ai_cs_store_id
             or not self.platform_store_id
-            or self.policy_mode != "AUTO_LOW_RISK"
+            or self.policy_mode not in {"AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"}
             or self.kill_switch_enabled
         ):
             raise ValueError("PRODUCTION_AUTO state is incomplete or unsafe")
@@ -122,6 +124,9 @@ class ControlledAutoRuntimeStateStore:
         kill_switch_enabled: bool = False,
         policy_revision: int = 1,
         whitelist_revision: str = "pilot",
+        policy_mode: Literal[
+            "MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+        ] = "MANUAL_CONFIRM",
     ) -> ControlledAutoRuntimeStateV1:
         return self._replace(
             runtime_mode="PILOT",
@@ -130,7 +135,7 @@ class ControlledAutoRuntimeStateStore:
             controlled_store_auto_enabled=False,
             ai_cs_store_id=None,
             platform_store_id=None,
-            policy_mode="MANUAL_CONFIRM",
+            policy_mode=policy_mode,
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
             kill_switch_enabled=kill_switch_enabled,
@@ -147,6 +152,9 @@ class ControlledAutoRuntimeStateStore:
         whitelist_revision: str,
         operator: str,
         reason: str,
+        policy_mode: Literal[
+            "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+        ] = "AUTO_LOW_RISK",
     ) -> ControlledAutoRuntimeStateV1:
         return self._replace(
             runtime_mode="PRODUCTION_AUTO",
@@ -155,7 +163,7 @@ class ControlledAutoRuntimeStateStore:
             controlled_store_auto_enabled=True,
             ai_cs_store_id=ai_cs_store_id,
             platform_store_id=platform_store_id,
-            policy_mode="AUTO_LOW_RISK",
+            policy_mode=policy_mode,
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
             kill_switch_enabled=False,
@@ -319,8 +327,8 @@ def evaluate_send_safety(
             reasons.append("PRODUCTION_AI_CS_STORE_MISMATCH")
         if observed_platform_store_id != state.platform_store_id:
             reasons.append("PRODUCTION_PLATFORM_STORE_MISMATCH")
-        if state.policy_mode != "AUTO_LOW_RISK":
-            reasons.append("PRODUCTION_POLICY_NOT_AUTO_LOW_RISK")
+        if state.policy_mode not in {"AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"}:
+            reasons.append("PRODUCTION_POLICY_NOT_AUTO_ENABLED")
         if state.kill_switch_enabled:
             reasons.append("PRODUCTION_KILL_SWITCH_ENABLED")
     if not state.per_message_grant_enforced:

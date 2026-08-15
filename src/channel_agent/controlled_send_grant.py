@@ -7,13 +7,23 @@ import sqlite3
 import unicodedata
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 
 class ControlledSendGrantError(RuntimeError):
     """Fail-closed boundary for the independent TEST_ONLY send path."""
+
+
+type AutoPolicyMode = Literal["AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"]
+type AutoAuthorizationBasis = Literal[
+    "EXACT_APPROVED_REPLY",
+    "QUALITY_GATED_LOW_RISK",
+    "STORE_APPROVED_KNOWLEDGE",
+    "STORE_APPROVED_FIXED_REPLY",
+    "STORE_APPROVED_FALLBACK",
+]
 
 
 class ControlledSendGrantV1(BaseModel):
@@ -149,7 +159,7 @@ def normalized_question_sha256(value: str) -> str:
 
 
 class ControlledAutoPolicyGrantV1(BaseModel):
-    """One single-use AUTO_LOW_RISK authorization for one current Decision."""
+    """One single-use AUTO authorization for one current Decision."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
@@ -172,7 +182,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
     normalized_question_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     product_id: str | None = Field(default=None, max_length=255)
     sku_id: str | None = Field(default=None, max_length=255)
-    policy_mode: Literal["AUTO_LOW_RISK"] = "AUTO_LOW_RISK"
+    policy_mode: AutoPolicyMode = "AUTO_LOW_RISK"
     policy_revision: int = Field(ge=1)
     whitelist_revision: str = Field(min_length=1, max_length=160)
     knowledge_scope_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -180,9 +190,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
         default=None,
         pattern=r"^[a-f0-9]{64}$",
     )
-    authorization_basis: Literal[
-        "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
-    ] = "EXACT_APPROVED_REPLY"
+    authorization_basis: AutoAuthorizationBasis = "EXACT_APPROVED_REPLY"
     deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT"
     nonce: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     issued_at: AwareDatetime
@@ -208,14 +216,23 @@ class ControlledAutoPolicyGrantV1(BaseModel):
                     self.platform_store_id,
                     self.reply_evidence_bundle_sha256,
                     self.nonce,
-                    self.product_id,
                 )
             ):
                 raise ValueError(
-                    "quality-gated AUTO requires double Store identity, product, Evidence, and nonce"
+                    "governed AUTO requires double Store identity, Evidence, and nonce"
                 )
+            if self.authorization_basis in {
+                "QUALITY_GATED_LOW_RISK",
+                "STORE_APPROVED_KNOWLEDGE",
+            } and not self.product_id:
+                raise ValueError("knowledge-backed AUTO requires product")
             if self.deployment_scope == "PRODUCTION_AUTO" and self.test_only:
                 raise ValueError("production AUTO grant cannot claim test_only=true")
+        if (
+            self.policy_mode == "AUTO_ALL_MESSAGES_V1"
+            and self.authorization_basis == "EXACT_APPROVED_REPLY"
+        ):
+            raise ValueError("all-message AUTO requires a governed per-message basis")
         return self
 
     @classmethod
@@ -240,9 +257,8 @@ class ControlledAutoPolicyGrantV1(BaseModel):
         knowledge_scope_sha256: str,
         issued_at: datetime,
         reply_evidence_bundle_sha256: str | None = None,
-        authorization_basis: Literal[
-            "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
-        ] = "EXACT_APPROVED_REPLY",
+        authorization_basis: AutoAuthorizationBasis = "EXACT_APPROVED_REPLY",
+        policy_mode: AutoPolicyMode = "AUTO_LOW_RISK",
         deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT",
         nonce: str | None = None,
     ) -> ControlledAutoPolicyGrantV1:
@@ -252,7 +268,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
         approved_hash = approved_reply_sha256 or reply_hash
         issued_nonce = nonce or (
             secrets.token_hex(32)
-            if authorization_basis == "QUALITY_GATED_LOW_RISK"
+            if authorization_basis != "EXACT_APPROVED_REPLY"
             else None
         )
         material = json.dumps(
@@ -274,6 +290,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
                 knowledge_scope_sha256,
                 reply_evidence_bundle_sha256,
                 authorization_basis,
+                policy_mode,
                 deployment_scope,
                 issued_nonce,
                 issued.isoformat(),
@@ -302,6 +319,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
             knowledge_scope_sha256=knowledge_scope_sha256,
             reply_evidence_bundle_sha256=reply_evidence_bundle_sha256,
             authorization_basis=authorization_basis,
+            policy_mode=policy_mode,
             deployment_scope=deployment_scope,
             nonce=issued_nonce,
             issued_at=issued,
@@ -343,7 +361,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
             raise ControlledSendGrantError("controlled auto target or reply hash changed")
 
 
-ControlledSendGrant: TypeAlias = ControlledSendGrantV1 | ControlledAutoPolicyGrantV1
+type ControlledSendGrant = ControlledSendGrantV1 | ControlledAutoPolicyGrantV1
 
 
 class ControlledPilotSendWindowV1(BaseModel):
@@ -370,9 +388,8 @@ class ControlledPilotSendWindowV1(BaseModel):
         default=None,
         pattern=r"^[a-f0-9]{64}$",
     )
-    authorization_basis: Literal[
-        "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
-    ] = "EXACT_APPROVED_REPLY"
+    authorization_basis: AutoAuthorizationBasis = "EXACT_APPROVED_REPLY"
+    policy_mode: AutoPolicyMode = "AUTO_LOW_RISK"
     deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT"
     issued_at: AwareDatetime
     expires_at: AwareDatetime
@@ -384,7 +401,7 @@ class ControlledPilotSendWindowV1(BaseModel):
             raise ValueError("controlled Pilot window expiry is invalid")
         if self.expires_at - self.issued_at > timedelta(minutes=5):
             raise ValueError("controlled Pilot window TTL cannot exceed five minutes")
-        if self.authorization_basis == "QUALITY_GATED_LOW_RISK" and not all(
+        if self.authorization_basis != "EXACT_APPROVED_REPLY" and not all(
             (
                 self.ai_cs_store_id,
                 self.platform_store_id,
@@ -392,7 +409,7 @@ class ControlledPilotSendWindowV1(BaseModel):
             )
         ):
             raise ValueError(
-                "quality-gated AUTO window requires double Store identity and Evidence"
+                "governed AUTO window requires double Store identity and Evidence"
             )
         return self
 
@@ -415,9 +432,8 @@ class ControlledPilotSendWindowV1(BaseModel):
         knowledge_scope_sha256: str,
         issued_at: datetime,
         reply_evidence_bundle_sha256: str | None = None,
-        authorization_basis: Literal[
-            "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
-        ] = "EXACT_APPROVED_REPLY",
+        authorization_basis: AutoAuthorizationBasis = "EXACT_APPROVED_REPLY",
+        policy_mode: AutoPolicyMode = "AUTO_LOW_RISK",
         deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT",
     ) -> ControlledPilotSendWindowV1:
         issued = issued_at.astimezone(UTC)
@@ -440,6 +456,7 @@ class ControlledPilotSendWindowV1(BaseModel):
                 knowledge_scope_sha256,
                 reply_evidence_bundle_sha256,
                 authorization_basis,
+                policy_mode,
                 deployment_scope,
                 issued.isoformat(),
             ],
@@ -464,6 +481,7 @@ class ControlledPilotSendWindowV1(BaseModel):
             knowledge_scope_sha256=knowledge_scope_sha256,
             reply_evidence_bundle_sha256=reply_evidence_bundle_sha256,
             authorization_basis=authorization_basis,
+            policy_mode=policy_mode,
             deployment_scope=deployment_scope,
             issued_at=issued,
             expires_at=issued + timedelta(minutes=5),
@@ -588,6 +606,7 @@ class ControlledPilotSendWindowStore:
             or grant.whitelist_revision != window.whitelist_revision
             or grant.knowledge_scope_sha256 != window.knowledge_scope_sha256
             or grant.authorization_basis != window.authorization_basis
+            or grant.policy_mode != window.policy_mode
             or grant.deployment_scope != window.deployment_scope
             or grant.ai_cs_store_id != window.ai_cs_store_id
             or grant.platform_store_id != window.platform_store_id

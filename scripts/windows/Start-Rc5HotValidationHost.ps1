@@ -95,7 +95,8 @@ $env:CHANNEL_ENGINE_GATEWAY_BASE_URL = $GatewayBaseUrl.TrimEnd('/')
 $env:CHANNEL_ENGINE_GATEWAY_ENVIRONMENT = 'mock'
 $env:CHANNEL_ENGINE_GATEWAY_CLIENT_ID = 'channel-engine'
 $env:CHANNEL_ENGINE_GATEWAY_KEY_ID = 'gateway-key-v1'
-$env:CHANNEL_ENGINE_GATEWAY_TIMEOUT_SECONDS = '30'
+$env:CHANNEL_ENGINE_GATEWAY_TIMEOUT_SECONDS = '18'
+$env:CHANNEL_ENGINE_AUTO_POLICY_MODE = 'AUTO_ALL_MESSAGES_V1'
 
 $process = Start-Process -FilePath $python -ArgumentList @(
     (Join-Path $repoRoot 'scripts\run_channel_engine_production_host.py'),
@@ -146,6 +147,7 @@ $configSnapshot = [ordered]@{
     observation_stage = $env:CHANNEL_ENGINE_OBSERVATION_STAGE
     gateway_base_url = $env:CHANNEL_ENGINE_GATEWAY_BASE_URL
     gateway_environment = $env:CHANNEL_ENGINE_GATEWAY_ENVIRONMENT
+    auto_policy_mode = $env:CHANNEL_ENGINE_AUTO_POLICY_MODE
     gateway_key_reference_sha256 = if (Test-Path -LiteralPath $GatewayKeyReference -PathType Leaf) { (Get-FileHash -LiteralPath $GatewayKeyReference -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null }
     real_send_enabled = $false
 }

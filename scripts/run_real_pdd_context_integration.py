@@ -78,6 +78,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--gateway-client-id", default="channel-engine")
     parser.add_argument("--gateway-key-id", default="gateway-key-v1")
+    parser.add_argument(
+        "--ai-cs-tenant-id",
+        default=os.getenv("AI_CS_CATALOG_TENANT_ID"),
+        help="Verified AI-CS catalog tenant for the active Store binding.",
+    )
+    parser.add_argument(
+        "--auto-policy-mode",
+        choices=("MANUAL_CONFIRM", "AUTO_ALL_MESSAGES_V1"),
+        default=os.getenv("CHANNEL_ENGINE_AUTO_POLICY_MODE", "AUTO_ALL_MESSAGES_V1"),
+    )
     parser.add_argument("--poll-seconds", type=float, default=1.0)
     parser.add_argument("--exit-after-reply", action="store_true")
     parser.add_argument(
@@ -364,11 +374,7 @@ def _reply_feed(
         "answer": package.reply_content,
         "requestId": package.request_id,
         "decisionId": package.decision_id,
-        "action": (
-            "CONTROLLED_ANSWER"
-            if package.action == "SUGGEST_REPLY"
-            else "REFUSE"
-        ),
+        "action": package.ai_cs_action,
         "riskLevel": package.risk_level.value,
         "citations": citations,
         "warnings": list(package.warnings),
@@ -454,7 +460,15 @@ def _build_gateway(args: argparse.Namespace) -> ProductionGatewayClient:
     )
 
 
-def _build_assistant(data_root: Path, observer, gateway):
+def _build_assistant(
+    data_root: Path,
+    observer,
+    gateway,
+    *,
+    catalog_tenant_id: str,
+    catalog_store_code: str,
+    auto_first_response_enabled: bool,
+):
     assistant_root = data_root / "runtime" / "real-pdd-assistant"
     database_url = f"sqlite:///{(assistant_root / 'channel-engine.sqlite3').as_posix()}"
     engine, session_factory = create_engine_and_session(database_url)
@@ -469,7 +483,12 @@ def _build_assistant(data_root: Path, observer, gateway):
         processing_lease=timedelta(minutes=2),
         clock=lambda: datetime.now(UTC),
     )
-    provider = LivePDDContextProvider(observer, buffer)
+    provider = LivePDDContextProvider(
+        observer,
+        buffer,
+        catalog_tenant_id=catalog_tenant_id,
+        catalog_store_code=catalog_store_code,
+    )
     collector = CustomerContextCollector(
         provider,
         provider,
@@ -485,6 +504,7 @@ def _build_assistant(data_root: Path, observer, gateway):
             uow_factory,
             gateway,
             clock=lambda: datetime.now(UTC),
+            auto_first_response_enabled=auto_first_response_enabled,
         ),
         None,
         None,
@@ -530,14 +550,26 @@ def _run_loop(
     data_root: Path,
     observer,
     checkpoint: SQLitePDDWorkspaceCheckpoint,
+    catalog_store_code: str,
 ) -> int:
+    if not args.ai_cs_tenant_id or not args.ai_cs_tenant_id.strip():
+        raise RuntimeError("verified AI-CS catalog tenant is required")
+    if not catalog_store_code or not catalog_store_code.strip():
+        raise RuntimeError("verified AI-CS Store binding is required")
     gateway = _build_gateway(args)
     health = gateway.health_check()
     if health.status is not GatewayHealthStatus.HEALTHY or not health.real_ai_cs_connected:
         gateway.close()
         raise RuntimeError("signed AI-CS Gateway health is not ready")
     assistant_root, engine, buffer, runtime = _build_assistant(
-        data_root, observer, gateway
+        data_root,
+        observer,
+        gateway,
+        catalog_tenant_id=args.ai_cs_tenant_id.strip(),
+        catalog_store_code=catalog_store_code.strip(),
+        auto_first_response_enabled=(
+            args.auto_policy_mode == "AUTO_ALL_MESSAGES_V1"
+        ),
     )
     if args.requeue_turn_id:
         buffer.requeue_manual_intervention(args.requeue_turn_id)
@@ -601,7 +633,7 @@ def _run_loop(
                     snapshot,
                     package,
                     policy_mode=(
-                        "AUTO_LOW_RISK"
+                        auto_state.policy_mode
                         if (
                             auto_state.controlled_pilot_send_enabled
                             or auto_state.controlled_store_auto_enabled
@@ -765,6 +797,7 @@ def main(argv: list[str] | None = None) -> int:
             data_root=data_root,
             observer=observer,
             checkpoint=checkpoint,
+            catalog_store_code=_config.store_reference,
         )
     except Exception as exc:
         if isinstance(exc, AICSGatewayRequestFailed):

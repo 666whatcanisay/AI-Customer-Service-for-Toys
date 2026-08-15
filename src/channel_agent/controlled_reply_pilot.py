@@ -22,6 +22,8 @@ from .assistant_bridge import (
 )
 from .binding import atomic_write_bytes
 from .controlled_send_grant import (
+    AutoAuthorizationBasis,
+    AutoPolicyMode,
     ControlledAutoPolicyGrantV1,
     ControlledPilotSendWindowStore,
     ControlledPilotSendWindowV1,
@@ -58,7 +60,9 @@ class ReplyPilotCandidateV1(_PilotModel):
     approved_reply_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     product_id: str | None = Field(default=None, max_length=255)
     sku_id: str | None = Field(default=None, max_length=255)
-    policy_mode: Literal["MANUAL_CONFIRM", "AUTO_LOW_RISK"]
+    policy_mode: Literal[
+        "MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+    ]
     policy_revision: int = Field(ge=1)
     whitelist_revision: str = Field(min_length=1, max_length=160)
     knowledge_scope_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -67,8 +71,11 @@ class ReplyPilotCandidateV1(_PilotModel):
         pattern=r"^[a-f0-9]{64}$",
     )
     quality_status: Literal["PASS"] = "PASS"
-    risk_level: Literal["LOW"] = "LOW"
-    action: Literal["DIRECT_ANSWER"] = "DIRECT_ANSWER"
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"] = "LOW"
+    action: Literal["DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY"] = (
+        "DIRECT_ANSWER"
+    )
+    authorization_basis: AutoAuthorizationBasis = "QUALITY_GATED_LOW_RISK"
 
     def digest(self) -> str:
         canonical = json.dumps(
@@ -406,13 +413,14 @@ class ControlledReplyPilotOrchestrator:
         whitelist_revision: str,
         deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"],
         expected_decision_id: str | None = None,
+        policy_mode: AutoPolicyMode = "AUTO_LOW_RISK",
     ) -> ApprovedReplyResponse:
         """Authorize the current quality-gated reply once; never a Store wildcard."""
 
         current = self._current_candidate(
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
-            expected_policy_mode="AUTO_LOW_RISK",
+            expected_policy_mode=policy_mode,
         )
         candidate = current.candidate
         if (
@@ -450,7 +458,8 @@ class ControlledReplyPilotOrchestrator:
             reply_evidence_bundle_sha256=(
                 candidate.reply_evidence_bundle_sha256
             ),
-            authorization_basis="QUALITY_GATED_LOW_RISK",
+            authorization_basis=candidate.authorization_basis,
+            policy_mode=policy_mode,
             deployment_scope=deployment_scope,
             issued_at=now,
         )
@@ -475,7 +484,8 @@ class ControlledReplyPilotOrchestrator:
             reply_evidence_bundle_sha256=(
                 candidate.reply_evidence_bundle_sha256
             ),
-            authorization_basis="QUALITY_GATED_LOW_RISK",
+            authorization_basis=candidate.authorization_basis,
+            policy_mode=policy_mode,
             deployment_scope=deployment_scope,
             issued_at=now,
         )
@@ -501,11 +511,12 @@ class ControlledReplyPilotOrchestrator:
         *,
         policy_revision: int,
         whitelist_revision: str,
+        policy_mode: AutoPolicyMode = "AUTO_LOW_RISK",
     ) -> ReplyPilotCandidateV1 | None:
         current = self._candidate_if_available(
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
-            expected_policy_mode="AUTO_LOW_RISK",
+            expected_policy_mode=policy_mode,
         )
         return current.candidate if current is not None else None
 
@@ -521,7 +532,9 @@ class ControlledReplyPilotOrchestrator:
         *,
         policy_revision: int,
         whitelist_revision: str,
-        expected_policy_mode: Literal["MANUAL_CONFIRM", "AUTO_LOW_RISK"],
+        expected_policy_mode: Literal[
+            "MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+        ],
     ) -> _CurrentCandidate:
         current = self._candidate_if_available(
             policy_revision=policy_revision,
@@ -540,7 +553,9 @@ class ControlledReplyPilotOrchestrator:
         *,
         policy_revision: int,
         whitelist_revision: str,
-        expected_policy_mode: Literal["MANUAL_CONFIRM", "AUTO_LOW_RISK"],
+        expected_policy_mode: Literal[
+            "MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+        ],
     ) -> _CurrentCandidate | None:
         try:
             feed = json.loads(self.feed_path.read_text(encoding="utf-8"))
@@ -590,17 +605,34 @@ class ControlledReplyPilotOrchestrator:
         policy_mode = str(reply.get("policyMode") or "").upper()
         if not policy_mode:
             policy_mode = expected_policy_mode
+        low_risk_eligible = (
+            package.ai_cs_action == "DIRECT_ANSWER"
+            and package.risk_level.value == "LOW"
+            and not package.required_fields
+        )
+        all_messages_eligible = (
+            package.ai_cs_action
+            in {"DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY"}
+            and package.risk_level.value in {"LOW", "MEDIUM", "HIGH"}
+            and (
+                not package.required_fields
+                or package.ai_cs_action == "ASK_CLARIFY"
+            )
+            and package.evidence_bundle_sha256 is not None
+        )
         if (
             quality != "PASS"
             or policy_mode != expected_policy_mode
             or package.action != "SUGGEST_REPLY"
-            or package.ai_cs_action != "DIRECT_ANSWER"
-            or package.risk_level.value != "LOW"
-            or bool(package.required_fields)
             or not reply_text
+            or not (
+                all_messages_eligible
+                if expected_policy_mode == "AUTO_ALL_MESSAGES_V1"
+                else low_risk_eligible
+            )
         ):
             raise ControlledReplyPilotError(
-                "the AI package is not an eligible low-risk direct answer",
+                "the AI package is not eligible for the active AUTO policy",
                 error_code="PILOT_QUALITY_GATE_BLOCKED",
             )
         ai_cs_store_id: str | None = None
@@ -634,6 +666,13 @@ class ControlledReplyPilotOrchestrator:
             whitelist_revision=whitelist_revision,
             knowledge_scope_sha256=knowledge_scope_sha256(package),
             reply_evidence_bundle_sha256=package.evidence_bundle_sha256,
+            risk_level=package.risk_level.value,
+            action=package.ai_cs_action,
+            authorization_basis=(
+                package.auto_authorization_basis
+                if expected_policy_mode == "AUTO_ALL_MESSAGES_V1"
+                else "QUALITY_GATED_LOW_RISK"
+            ),
         )
         return _CurrentCandidate(
             candidate=candidate,

@@ -25,8 +25,8 @@ from channel_engine.gateway import (
 from channel_engine.pdd_adapter import PDDPrivacyFilteredMessage
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
-from .control_store import AgentControlStore
 from .assistant_projection import AssistantProjectionReconciler
+from .control_store import AgentControlStore
 from .observation_pipeline import AgentObservationContextProvider
 from .observation_worker import AgentObservationWorker
 
@@ -159,7 +159,15 @@ def build_host_assistant_composition(
             clock=clock,
             visible_history_provider=provider,
         ),
-        AICustomerReplyService(uow_factory, gateway, clock=clock),
+        AICustomerReplyService(
+            uow_factory,
+            gateway,
+            clock=clock,
+            auto_first_response_enabled=(
+                source.get("CHANNEL_ENGINE_AUTO_POLICY_MODE", "").strip().upper()
+                == "AUTO_ALL_MESSAGES_V1"
+            ),
+        ),
         None,
         None,
         uow_factory,

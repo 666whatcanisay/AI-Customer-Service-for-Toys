@@ -92,6 +92,7 @@ class PageContext(CustomerAssistantModel):
         default="CHANNEL-AGENT-PILOT", min_length=1, max_length=100
     )
     catalog_platform: str = Field(default="pdd", min_length=1, max_length=40)
+    catalog_store_code: str | None = Field(default=None, min_length=1, max_length=100)
     store_name: str | None = Field(default=None, min_length=1, max_length=128)
     conversation_id: str = Field(min_length=1, max_length=255)
     state: ContextPageState
@@ -127,7 +128,7 @@ class BufferedCustomerMessage(CustomerAssistantModel):
         content: str,
         timestamp: datetime,
         received_at: datetime,
-    ) -> "BufferedCustomerMessage":
+    ) -> BufferedCustomerMessage:
         customer_reference = "sha256:" + hashlib.sha256(
             json.dumps(
                 [store_id, conversation_id],
@@ -176,7 +177,7 @@ class ConversationTurn(CustomerAssistantModel):
     closed_at: AwareDatetime
 
     @model_validator(mode="after")
-    def validate_alignment(self) -> "ConversationTurn":
+    def validate_alignment(self) -> ConversationTurn:
         ordered = tuple(
             sorted(
                 self.messages,
@@ -220,7 +221,7 @@ class CustomerContext(CustomerAssistantModel):
     contains_direct_customer_identity: Literal[False] = False
 
     @model_validator(mode="after")
-    def validate_scope(self) -> "CustomerContext":
+    def validate_scope(self) -> CustomerContext:
         if (
             self.page.store_id != self.store_id
             or self.page.conversation_id != self.conversation_id
@@ -280,7 +281,7 @@ class CustomerContext(CustomerAssistantModel):
             "ai_cs_scope": {
                 "tenant_id": self.page.catalog_tenant_id,
                 "platform": canonical_catalog_platform(self.page.catalog_platform),
-                "store_code": self.store_id,
+                "store_code": self.page.catalog_store_code or self.store_id,
                 "product_id": product_reference,
                 "sku_id": self.page.product.sku_reference,
             },
@@ -340,13 +341,19 @@ class AIReplyPackage(CustomerAssistantModel):
         default=None,
         pattern=r"^[a-f0-9]{64}$",
     )
+    auto_authorization_basis: Literal[
+        "QUALITY_GATED_LOW_RISK",
+        "STORE_APPROVED_KNOWLEDGE",
+        "STORE_APPROVED_FIXED_REPLY",
+        "STORE_APPROVED_FALLBACK",
+    ] = "QUALITY_GATED_LOW_RISK"
     requires_human_approval: Literal[True] = True
     state: Literal["WAITING_APPROVAL", "MANUAL_INTERVENTION"] = "WAITING_APPROVAL"
     gateway_version: str = Field(min_length=1, max_length=128)
     generated_at: AwareDatetime
 
     @model_validator(mode="after")
-    def validate_action_content(self) -> "AIReplyPackage":
+    def validate_action_content(self) -> AIReplyPackage:
         if self.action == "SUGGEST_REPLY" and self.reply_content is None:
             raise ValueError("SUGGEST_REPLY requires reply content")
         if self.action == "NO_ACTION" and self.reply_content is not None:

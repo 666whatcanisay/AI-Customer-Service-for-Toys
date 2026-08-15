@@ -35,6 +35,13 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--policy-revision", type=int, required=True)
         command.add_argument("--whitelist-revision", required=True)
 
+    def add_auto_policy_mode(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--policy-mode",
+            choices=("AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"),
+            default="AUTO_ALL_MESSAGES_V1",
+        )
+
     preview_manual = subparsers.add_parser("preview-manual")
     add_policy_arguments(preview_manual)
 
@@ -56,10 +63,12 @@ def _parser() -> argparse.ArgumentParser:
 
     arm_pilot = subparsers.add_parser("arm-general-auto-pilot")
     add_policy_arguments(arm_pilot)
+    add_auto_policy_mode(arm_pilot)
     arm_pilot.add_argument("--operator-reference", required=True)
 
     general_auto = subparsers.add_parser("send-general-auto-once")
     add_policy_arguments(general_auto)
+    add_auto_policy_mode(general_auto)
     general_auto.add_argument("--operator-reference", required=True)
     general_auto.add_argument(
         "--deployment-scope",
@@ -74,6 +83,7 @@ def _parser() -> argparse.ArgumentParser:
 
     activate = subparsers.add_parser("activate-production-auto")
     add_policy_arguments(activate)
+    add_auto_policy_mode(activate)
     activate.add_argument("--operator-reference", required=True)
     activate.add_argument("--ai-cs-store-id", required=True)
     activate.add_argument("--platform-store-id", required=True)
@@ -253,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
                 kill_switch_enabled=False,
                 policy_revision=args.policy_revision,
                 whitelist_revision=args.whitelist_revision,
+                policy_mode=args.policy_mode,
             )
             _print(state.model_dump(mode="json"))
             return 0
@@ -263,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
                 policy_revision=args.policy_revision,
                 whitelist_revision=args.whitelist_revision,
                 deployment_scope=args.deployment_scope,
+                policy_mode=args.policy_mode,
             )
             _print(response.model_dump(mode="json"))
             return 0 if response.outcome == "SUCCESS" else 4
@@ -297,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
                 whitelist_revision=args.whitelist_revision,
                 operator=args.operator_reference,
                 reason=args.reason,
+                policy_mode=args.policy_mode,
             )
             _print(state.model_dump(mode="json"))
             return 0
@@ -320,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
                     candidate = orchestrator.current_general_auto_candidate(
                         policy_revision=state.policy_revision,
                         whitelist_revision=state.whitelist_revision,
+                        policy_mode=state.policy_mode,
                     )
                 except ControlledReplyPilotError as exc:
                     if exc.error_code == "PILOT_QUALITY_GATE_BLOCKED":
@@ -339,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                         whitelist_revision=state.whitelist_revision,
                         deployment_scope="PRODUCTION_AUTO",
                         expected_decision_id=candidate.decision_id,
+                        policy_mode=state.policy_mode,
                     )
                 except Exception:
                     ledger.finish(

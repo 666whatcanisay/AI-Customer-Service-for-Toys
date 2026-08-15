@@ -520,7 +520,7 @@ class ApprovedReplyService:
                 error_code="KNOWLEDGE_SCOPE_MISMATCH",
                 status_code=409,
             )
-        if grant.authorization_basis == "QUALITY_GATED_LOW_RISK" and (
+        if grant.authorization_basis != "EXACT_APPROVED_REPLY" and (
             package.evidence_bundle_sha256 is None
             or package.evidence_bundle_sha256
             != grant.reply_evidence_bundle_sha256
@@ -535,18 +535,45 @@ class ApprovedReplyService:
         ).upper()
         policy_mode = str(feed_reply.get("policyMode") or grant.policy_mode).upper()
         action = str(feed_reply.get("action") or "").upper()
+        low_risk_eligible = (
+            package.ai_cs_action == "DIRECT_ANSWER"
+            and package.risk_level.value == "LOW"
+            and not package.required_fields
+            and grant.authorization_basis in {
+                "EXACT_APPROVED_REPLY",
+                "QUALITY_GATED_LOW_RISK",
+            }
+        )
+        all_messages_eligible = (
+            package.ai_cs_action
+            in {"DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY"}
+            and package.risk_level.value in {"LOW", "MEDIUM", "HIGH"}
+            and (
+                not package.required_fields
+                or package.ai_cs_action == "ASK_CLARIFY"
+            )
+            and grant.authorization_basis
+            in {
+                "STORE_APPROVED_KNOWLEDGE",
+                "STORE_APPROVED_FIXED_REPLY",
+                "STORE_APPROVED_FALLBACK",
+            }
+            and package.auto_authorization_basis == grant.authorization_basis
+        )
         if (
             package.action != "SUGGEST_REPLY"
-            or package.ai_cs_action != "DIRECT_ANSWER"
-            or package.risk_level.value != "LOW"
             or package.state != "WAITING_APPROVAL"
             or quality_status != "PASS"
-            or policy_mode != "AUTO_LOW_RISK"
-            or action not in {"CONTROLLED_ANSWER", "DIRECT_ANSWER"}
-            or bool(package.required_fields)
+            or policy_mode != grant.policy_mode
+            or action not in {"CONTROLLED_ANSWER", "DIRECT_ANSWER", "ASK_CLARIFY"}
+            or not (
+                all_messages_eligible
+                if grant.policy_mode == "AUTO_ALL_MESSAGES_V1"
+                else low_risk_eligible
+            )
         ):
             raise ApprovedReplyBridgeError(
-                "the AI package is not eligible for the low-risk AUTO Pilot",
+                "the AI package is not eligible for the active AUTO policy",
                 error_code="AUTO_POLICY_QUALITY_GATE_BLOCKED",
                 status_code=409,
             )
@@ -563,6 +590,7 @@ class ApprovedReplyService:
                     or not state.controlled_store_auto_enabled
                     or state.controlled_pilot_send_enabled
                     or state.kill_switch_enabled
+                    or state.policy_mode != grant.policy_mode
                 ):
                     raise ApprovedReplyBridgeError(
                         "production AUTO runtime is not atomically enabled",

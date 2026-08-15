@@ -37,6 +37,7 @@ PDD_WORKSPACE_URL = "https://mms.pinduoduo.com/chat-merchant/index.html#/"
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _MESSAGE_TIMESTAMP = re.compile(r"(?:^|_)(\d{13})(?:$|_)")
+_PDD_PRODUCT_ID = re.compile(r"^\d{6,32}$")
 
 
 class PDDWorkspaceError(RuntimeError):
@@ -154,7 +155,20 @@ class FixedReadOnlyPDDWorkspaceEvaluator:
   const root = document.querySelector(s.message_container);
   const scope = document.querySelector(s.conversation_marker);
   const oneLine = (value, limit) => String(value || '').replace(/\\s+/g, ' ').trim().slice(0, limit);
+  const stableHash = (value) => {{
+    let first = 0xdeadbeef ^ value.length;
+    let second = 0x41c6ce57 ^ value.length;
+    for (let index = 0; index < value.length; index += 1) {{
+      const code = value.charCodeAt(index);
+      first = Math.imul(first ^ code, 2654435761);
+      second = Math.imul(second ^ code, 1597334677);
+    }}
+    first = Math.imul(first ^ (first >>> 16), 2246822507) ^ Math.imul(second ^ (second >>> 13), 3266489909);
+    second = Math.imul(second ^ (second >>> 16), 2246822507) ^ Math.imul(first ^ (first >>> 13), 3266489909);
+    return (second >>> 0).toString(16).padStart(8, '0') + (first >>> 0).toString(16).padStart(8, '0');
+  }};
   const messages = [];
+  const fallbackOccurrences = new Map();
   if (root) {{
     const nodes = Array.from(root.querySelectorAll(s.message_item)).slice(-100);
     for (let index = 0; index < nodes.length; index += 1) {{
@@ -165,15 +179,52 @@ class FixedReadOnlyPDDWorkspaceEvaluator:
       const box = node.querySelector(s.content);
       const text = oneLine(box ? box.innerText : '', 8000);
       if (!text) continue;
+      const vm = node.__vue__ || {{}};
+      const vmMessage = vm.msg || (vm.$props || {{}}).msg || (vm.$data || {{}}).msg || {{}};
+      const sourceCandidates = [
+        node.id,
+        node.getAttribute('data-message-id'),
+        node.getAttribute('data-msg-id'),
+        node.getAttribute('data-id'),
+        node.getAttribute('msgid'),
+        vmMessage.message_id,
+        vmMessage.msg_id,
+        vmMessage.msgId,
+        vmMessage.id,
+        vmMessage.trace_id,
+        vmMessage.sequence
+      ];
+      let sourceId = '';
+      for (const candidate of sourceCandidates) {{
+        sourceId = oneLine(candidate, 256);
+        if (sourceId) break;
+      }}
+      if (!sourceId) {{
+        const timeNode = node.querySelector('.msg-time,.message-time,.time');
+        const fallbackMaterial = `${{customer ? 'customer' : 'operator'}}\\u0000${{oneLine(timeNode ? timeNode.innerText : '', 128)}}\\u0000${{text}}`;
+        const occurrence = fallbackOccurrences.get(fallbackMaterial) || 0;
+        fallbackOccurrences.set(fallbackMaterial, occurrence + 1);
+        sourceId = `fallback-${{stableHash(fallbackMaterial)}}-${{occurrence}}`;
+      }}
       messages.push({{
-        source_id: oneLine(node.id || `visible-${{index}}`, 256),
+        source_id: sourceId,
         role: customer ? 'customer' : 'operator',
         content: text
       }});
     }}
   }}
-  const product = document.querySelector(s.product_card);
-  const productName = oneLine(product ? ((product.querySelector('p') || product).innerText) : '', 512);
+  const productCards = Array.from(document.querySelectorAll(s.product_card));
+  const product = productCards.length ? productCards[productCards.length - 1] : null;
+  const commonCard = product ? product.closest('.commonCard') : null;
+  const goodsInfo = commonCard && commonCard.__vue__ && commonCard.__vue__.$props
+    ? (((commonCard.__vue__.$props.msg || {{}}).info || {{}}).goods_info || {{}})
+    : {{}};
+  const productIdCandidate = oneLine(goodsInfo.goods_id, 96);
+  const productId = /^\\d{{6,32}}$/.test(productIdCandidate) ? productIdCandidate : '';
+  const productName = oneLine(
+    goodsInfo.goods_name || (product ? ((product.querySelector('p') || product).innerText) : ''),
+    512
+  );
   const order = document.querySelector(s.order_card);
   const orderText = order ? String(order.innerText || '') : '';
   const orderStatus = statusWords.find((word) => orderText.includes(word)) || '';
@@ -186,6 +237,7 @@ class FixedReadOnlyPDDWorkspaceEvaluator:
     current_uid: scope ? oneLine(scope.getAttribute('currentuid'), 128) : '',
     message_container_present: Boolean(root),
     reply_input_present: Boolean(document.querySelector(s.reply_input_forbidden_marker)),
+    product_id: productId,
     product_name: productName,
     order_status: oneLine(orderStatus, 128),
     sku_name: oneLine(skuLine.replace(/^(规格|SKU|商品规格)[:：]\\s*/i, ''), 512),
@@ -351,6 +403,10 @@ class ExistingPDDWorkspaceObserver:
         product_name = self._filtered_business_text(
             raw.get("product_name"), store_id, conversation_id, now
         )
+        raw_product_id = self._safe_label(raw.get("product_id"), "")
+        product_id = (
+            raw_product_id if _PDD_PRODUCT_ID.fullmatch(raw_product_id) else None
+        )
         sku_name = self._filtered_business_text(
             raw.get("sku_name"), store_id, conversation_id, now
         )
@@ -367,9 +423,12 @@ class ExistingPDDWorkspaceObserver:
             customer_reference=customer_reference,
             product=ProductContext(
                 product_reference=(
-                    "pdd-product:" + self._digest(product_name)
-                    if product_name
-                    else None
+                    product_id
+                    or (
+                        "pdd-product:" + self._digest(product_name)
+                        if product_name
+                        else None
+                    )
                 ),
                 product_name=product_name,
                 sku_reference=(
@@ -609,9 +668,14 @@ class LivePDDContextProvider:
         self,
         observer: ExistingPDDWorkspaceObserver,
         buffer: SQLiteConversationBuffer,
+        *,
+        catalog_tenant_id: str = "CHANNEL-AGENT-PILOT",
+        catalog_store_code: str | None = None,
     ) -> None:
         self._observer = observer
         self._buffer = buffer
+        self._catalog_tenant_id = catalog_tenant_id
+        self._catalog_store_code = catalog_store_code
 
     def _current(self, store_id: str, conversation_id: str) -> PDDWorkspaceSnapshot:
         snapshot = self._observer.latest_snapshot or self._observer.capture()
@@ -626,6 +690,8 @@ class LivePDDContextProvider:
         snapshot = self._current(store_id, conversation_id)
         return PageContext(
             store_id=store_id,
+            catalog_tenant_id=self._catalog_tenant_id,
+            catalog_store_code=self._catalog_store_code,
             store_name=snapshot.store_name,
             conversation_id=conversation_id,
             state=ContextPageState.CUSTOMER_SERVICE,

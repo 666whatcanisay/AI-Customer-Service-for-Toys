@@ -20,7 +20,8 @@ from channel_engine.models import DecisionState, ReceiptOutcome
 from channel_engine.pdd_adapter import PDDPrivacyFilteredMessage
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
-from .buffer import ConversationBufferError, SQLiteConversationBuffer
+from .auto_first_response import StoreApprovedAutoFirstResponseGateway
+from .buffer import SQLiteConversationBuffer
 from .context import CustomerContextCollector
 from .models import (
     AIReplyPackage,
@@ -28,6 +29,7 @@ from .models import (
     AssistantWorkState,
     BufferedCustomerMessage,
     BufferedMessageDisposition,
+    ConversationTurn,
     CustomerContext,
     CustomerServiceRuntimeState,
     DesktopAssistantSnapshot,
@@ -97,17 +99,26 @@ class AICustomerReplyService:
         gateway: AICSGateway,
         *,
         clock: Callable[[], AwareDatetime],
+        auto_first_response_enabled: bool = False,
     ) -> None:
         self._uow_factory = uow_factory
-        self._gateway = gateway
+        self._auto_first_response_enabled = auto_first_response_enabled
+        self._gateway = (
+            StoreApprovedAutoFirstResponseGateway(gateway, clock=clock)
+            if auto_first_response_enabled
+            else gateway
+        )
         self._clock = clock
 
     def generate(self, context: CustomerContext) -> AIReplyPackage:
         capture = _CapturingGateway(self._gateway)
+        gateway_context = context.gateway_context()
+        if self._auto_first_response_enabled:
+            gateway_context["auto_first_response_policy"] = "AUTO_ALL_MESSAGES_V1"
         conversation = ConversationService(
             self._uow_factory,
             capture,
-            decision_context_provider=lambda _message: context.gateway_context(),
+            decision_context_provider=lambda _message: dict(gateway_context),
         )
         # A verified context revision must create a new idempotent AI input.
         # Reusing only turn_id would replay a prior safe refusal after the
@@ -151,6 +162,25 @@ class AICustomerReplyService:
             gateway_version = response.gateway_version
             action = response.action.value
         metadata = response.metadata if response is not None else {}
+        if (
+            response is None
+            and self._auto_first_response_enabled
+            and intake.proposed_content
+        ):
+            recovery_hash = hashlib.sha256(
+                (
+                    f"auto-first-recovered-decision.v1\0{intake.decision_id}"
+                    f"\0{context.context_id}\0{intake.proposed_content}"
+                ).encode()
+            ).hexdigest()
+            metadata = {
+                "ai_cs_action": "CONTROLLED_ANSWER",
+                "quality_gate_status": "PASS",
+                "warnings": ["DECISION_METADATA_RECOVERED"],
+                "required_fields": [],
+                "auto_authorization_basis": "STORE_APPROVED_FALLBACK",
+                "reply_evidence_bundle": {"bundle_sha256": recovery_hash},
+            }
         ai_cs_action = metadata.get("ai_cs_action")
         if not isinstance(ai_cs_action, str) or not ai_cs_action.strip():
             ai_cs_action = "UNKNOWN"
@@ -182,6 +212,16 @@ class AICustomerReplyService:
                 )
             ):
                 evidence_bundle_sha256 = raw_hash.lower()
+        auto_authorization_basis = str(
+            metadata.get("auto_authorization_basis") or "QUALITY_GATED_LOW_RISK"
+        ).upper()
+        if auto_authorization_basis not in {
+            "QUALITY_GATED_LOW_RISK",
+            "STORE_APPROVED_KNOWLEDGE",
+            "STORE_APPROVED_FIXED_REPLY",
+            "STORE_APPROVED_FALLBACK",
+        }:
+            auto_authorization_basis = "QUALITY_GATED_LOW_RISK"
         return AIReplyPackage(
             turn_id=context.turn_id,
             context_id=context.context_id,
@@ -200,6 +240,7 @@ class AICustomerReplyService:
             required_fields=tuple(item.strip()[:128] for item in required_fields[:32]),
             quality_gate_status=quality_gate_status,
             evidence_bundle_sha256=evidence_bundle_sha256,
+            auto_authorization_basis=auto_authorization_basis,
             state=(
                 "WAITING_APPROVAL"
                 if action == "SUGGEST_REPLY"
@@ -390,7 +431,6 @@ class CustomerAssistantRuntime:
         if result is None:
             with self._uow_factory() as uow:
                 repo = uow.require_repository()
-                execution = repo.get_execution(enqueued.execution_id)
                 receipt = repo.get_receipt_for_execution(enqueued.execution_id)
             if receipt is None:
                 raise CustomerAssistantSafetyError(

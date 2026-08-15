@@ -249,7 +249,9 @@ class AgentAssistantSnapshot(ControlV2Model):
     ai_cs_action: str = Field(default="UNKNOWN", min_length=1, max_length=64)
     warnings: tuple[str, ...] = Field(default=(), max_length=32)
     required_fields: tuple[str, ...] = Field(default=(), max_length=32)
-    policy_mode: Literal["MANUAL_CONFIRM", "AUTO_LOW_RISK"] = "MANUAL_CONFIRM"
+    policy_mode: Literal[
+        "MANUAL_CONFIRM", "AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"
+    ] = "MANUAL_CONFIRM"
     quality_status: Literal["PASS", "BLOCKED"] = "PASS"
     preparation_id: str | None = Field(default=None, max_length=160)
     trace_id: str | None = Field(default=None, pattern=r"^trace:[a-f0-9]{64}$")
