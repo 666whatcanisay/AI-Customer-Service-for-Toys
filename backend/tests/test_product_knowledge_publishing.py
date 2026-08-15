@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 
+from app.service.product_knowledge_publisher import _structured_units
+
 
 def publication_payload(*, fingerprint: str, document: str, key: str = "publish-one"):
     return {
@@ -213,3 +215,57 @@ def test_reviewed_approximate_fields_are_published_as_separate_controlled_facts(
     ).json()["data"]
     assert direct["action"] == "DIRECT_ANSWER"
     assert direct["risk_level"] == "LOW"
+
+
+def test_structured_publication_preserves_product_sku_faq_and_safety_units():
+    document = json.dumps(
+        {
+            "schema_version": "c-product-knowledge-document.v1",
+            "reviewed_answer_controls": {
+                "particle_count": {
+                    "controlled_answer_kind": "REVIEWED_APPROXIMATE_FACT"
+                }
+            },
+            "product": {"particle_count": "约500颗", "package_type": "彩盒"},
+            "skus": [{"sku_id": "SKU-PINK", "sku_name": "粉白款"}],
+            "faqs": [
+                {
+                    "question": "多少颗？",
+                    "recommended_reply": "约500颗，具体以实际清点为准。",
+                    "answer_action": "CONTROLLED_ANSWER",
+                    "risk_level": "MEDIUM",
+                    "sku_id": None,
+                }
+            ],
+            "safety_rules": [
+                {
+                    "scenario": "小颗粒误吞",
+                    "risk_level": "HIGH",
+                    "content": {
+                        "fixed_instruction": "儿童使用时建议成人陪同。",
+                        "allowed_action": "CONTROLLED_ANSWER",
+                    },
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    units = _structured_units(document)
+
+    assert units is not None
+    assert {unit["knowledge_type"] for unit in units} == {
+        "PRODUCT_FACT",
+        "SKU_FACT",
+        "FAQ",
+        "SAFETY_RULE",
+    }
+    approximate = next(
+        unit for unit in units if unit["content"].startswith("particle_count:")
+    )
+    assert approximate["answer_action"] == "CONTROLLED_ANSWER"
+    assert approximate["risk_level"] == "MEDIUM"
+    assert any(
+        unit["knowledge_type"] == "SKU_FACT" and unit["sku_id"] == "SKU-PINK"
+        for unit in units
+    )

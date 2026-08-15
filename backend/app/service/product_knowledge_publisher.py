@@ -17,10 +17,19 @@ _NON_FACT_PRODUCT_FIELDS = {
     "common_customer_questions",
     "recommended_answer_direction",
 }
+_ANSWER_ACTIONS = {
+    "DIRECT_ANSWER",
+    "CONTROLLED_ANSWER",
+    "ASK_CLARIFY",
+    "REQUIRE_LOOKUP",
+    "TRANSFER_HUMAN",
+    "REFUSE",
+}
+_RISK_LEVELS = {"LOW", "MEDIUM", "HIGH"}
 
 
 def _structured_units(document: str) -> list[dict[str, str]] | None:
-    """Project a governed canonical document into independently controlled facts."""
+    """Project every governed canonical section into independently scoped facts."""
 
     try:
         payload = json.loads(document)
@@ -31,12 +40,38 @@ def _structured_units(document: str) -> list[dict[str, str]] | None:
         or payload.get("schema_version") != "c-product-knowledge-document.v1"
     ):
         return None
-    controls = payload.get("reviewed_answer_controls")
+    controls = payload.get("reviewed_answer_controls") or {}
     product = payload.get("product")
-    if not isinstance(controls, dict) or not controls or not isinstance(product, dict):
+    if not isinstance(controls, dict) or not isinstance(product, dict):
         return None
 
     units: list[dict[str, str]] = []
+
+    def add_unit(
+        *,
+        content: str,
+        knowledge_type: str,
+        sku_id: str = "",
+        answer_action: str = "DIRECT_ANSWER",
+        risk_level: str = "LOW",
+        controlled_answer_kind: str = "",
+    ) -> None:
+        content = content.strip()
+        if not content:
+            return
+        units.append(
+            {
+                "content": content,
+                "knowledge_type": knowledge_type,
+                "sku_id": sku_id.strip(),
+                "answer_action": (
+                    answer_action if answer_action in _ANSWER_ACTIONS else "CONTROLLED_ANSWER"
+                ),
+                "risk_level": risk_level if risk_level in _RISK_LEVELS else "MEDIUM",
+                "controlled_answer_kind": controlled_answer_kind,
+            }
+        )
+
     for field_name, value in product.items():
         if field_name in _NON_FACT_PRODUCT_FIELDS or value in (None, "", []):
             continue
@@ -46,17 +81,74 @@ def _structured_units(document: str) -> list[dict[str, str]] | None:
             control.get("controlled_answer_kind") if isinstance(control, dict) else None
         )
         is_reviewed_approximate = controlled_kind == "REVIEWED_APPROXIMATE_FACT"
-        units.append(
-            {
-                "content": f"{field_name}: {serialized_value}",
-                "knowledge_type": "PRODUCT_FACT",
-                "sku_id": "",
-                "answer_action": (
-                    "CONTROLLED_ANSWER" if is_reviewed_approximate else "DIRECT_ANSWER"
+        add_unit(
+            content=f"{field_name}: {serialized_value}",
+            knowledge_type="PRODUCT_FACT",
+            answer_action=(
+                "CONTROLLED_ANSWER" if is_reviewed_approximate else "DIRECT_ANSWER"
+            ),
+            risk_level="MEDIUM" if is_reviewed_approximate else "LOW",
+            controlled_answer_kind=controlled_kind or "",
+        )
+
+    skus = payload.get("skus") or []
+    if not isinstance(skus, list):
+        return None
+    for sku in skus:
+        if not isinstance(sku, dict):
+            return None
+        sku_id = str(sku.get("sku_id") or "").strip()
+        if not sku_id:
+            continue
+        for field_name, value in sku.items():
+            if field_name == "sku_id" or value in (None, "", []):
+                continue
+            add_unit(
+                content=(
+                    f"sku_id: {sku_id}\n{field_name}: "
+                    f"{json.dumps(value, ensure_ascii=False, sort_keys=True)}"
                 ),
-                "risk_level": "MEDIUM" if is_reviewed_approximate else "LOW",
-                "controlled_answer_kind": controlled_kind or "",
-            }
+                knowledge_type="SKU_FACT",
+                sku_id=sku_id,
+            )
+
+    faqs = payload.get("faqs") or []
+    if not isinstance(faqs, list):
+        return None
+    for faq in faqs:
+        if not isinstance(faq, dict):
+            return None
+        question = str(faq.get("question") or "").strip()
+        reply = str(faq.get("recommended_reply") or "").strip()
+        if not question or not reply:
+            continue
+        add_unit(
+            content=f"question: {question}\nrecommended_reply: {reply}",
+            knowledge_type="FAQ",
+            sku_id=str(faq.get("sku_id") or ""),
+            answer_action=str(faq.get("answer_action") or "CONTROLLED_ANSWER"),
+            risk_level=str(faq.get("risk_level") or "MEDIUM"),
+        )
+
+    safety_rules = payload.get("safety_rules") or []
+    if not isinstance(safety_rules, list):
+        return None
+    for rule in safety_rules:
+        if not isinstance(rule, dict):
+            return None
+        scenario = str(rule.get("scenario") or "").strip()
+        content = rule.get("content")
+        if not scenario or not isinstance(content, dict):
+            continue
+        allowed_action = str(content.get("allowed_action") or "CONTROLLED_ANSWER")
+        add_unit(
+            content=(
+                f"scenario: {scenario}\npolicy: "
+                f"{json.dumps(content, ensure_ascii=False, sort_keys=True)}"
+            ),
+            knowledge_type="SAFETY_RULE",
+            answer_action=allowed_action,
+            risk_level=str(rule.get("risk_level") or "HIGH"),
         )
     return units or None
 
@@ -113,9 +205,7 @@ class ProductKnowledgePublisher:
         for index, chunk in enumerate(chunks):
             unit = structured_units[index] if structured_units is not None else None
             chunk_id = hashlib.sha256(
-                f"{request.product_id}\n{request.knowledge_fingerprint}\n{index}\n{chunk}".encode(
-                    "utf-8"
-                )
+                f"{request.product_id}\n{request.knowledge_fingerprint}\n{index}\n{chunk}".encode()
             ).hexdigest()
             ids.append(chunk_id)
             documents.append(f"{request.product_name}\n{chunk}")
@@ -156,7 +246,6 @@ class ProductKnowledgePublisher:
         verified = self.vector_store.get_records(
             _where(request), include_embeddings=True
         )
-        verified_ids = verified.get("ids") or []
         verified_metadata = verified.get("metadatas") or []
         embeddings = verified.get("embeddings")
         new_indexes = [

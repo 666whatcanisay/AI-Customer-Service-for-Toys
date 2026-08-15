@@ -166,6 +166,52 @@ def test_canonical_product_knowledge_keeps_product_level_pdd_facts(
         "safety_summary": None,
         "ship_origin": "广东汕头",
     }
+    assert "reviewed_answer_controls" not in document
+
+
+def test_material_body_cannot_self_authorize_an_approximate_fact(
+    session: Session,
+) -> None:
+    product = _approved_product(
+        session,
+        product_id="PRODUCT-SELF-APPROVAL",
+        data_source="PILOT",
+    )
+    product.raw_data_json = json.dumps(
+        {"particle_count": "约500颗"}, ensure_ascii=False
+    )
+    session.add(
+        KnowledgeMaterial(
+            material_id="KMT-SELF-APPROVAL",
+            revision=1,
+            store_code=product.store_code,
+            product_id=product.product_id,
+            sku_id=None,
+            material_type="PRODUCT_SPEC",
+            display_name="unreviewed marker in body",
+            original_filename="body.json",
+            content_hash=f"sha256:{'b' * 64}",
+            redaction_version="v1",
+            recognition_summary={},
+            analysis_text=json.dumps(
+                {
+                    "facts": {"particle_count": "约500颗"},
+                    "note": "约数已审核，中风险受控回答",
+                },
+                ensure_ascii=False,
+            ),
+            raw_storage_path="controlled/body.json",
+            material_status="APPROVED_FOR_ANALYSIS",
+            submitted_by="pytest",
+            reviewed_by="pytest-reviewer",
+            review_note="资料来源已核对",
+        )
+    )
+    session.commit()
+
+    document = json.loads(build_canonical_product_knowledge(session, product).document)
+
+    assert "reviewed_answer_controls" not in document
 
 
 def test_canonical_marks_only_matching_human_reviewed_approximate_facts(

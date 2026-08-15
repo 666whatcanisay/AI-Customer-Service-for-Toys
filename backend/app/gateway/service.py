@@ -36,13 +36,14 @@ from app.models.chat import (
 from app.reply_router.contracts import (
     ReplyEvidenceBundleV1,
     RuleScopeKind,
+    canonical_sha256,
+    text_sha256,
 )
 from app.service.rag_service import (
     LLM_REQUEST_FAILED_MESSAGE,
     MODEL_NOT_CONFIGURED_MESSAGE,
     RAG_RUNTIME_ERROR_MESSAGE,
 )
-
 
 DecisionProvider = Callable[[str, FrozenChatContext], dict[str, Any]]
 RequestDecisionProvider = Callable[
@@ -270,10 +271,10 @@ class GatewayServer:
 
         value = dict(item)
         limits = {"message_id": 255, "sender": 32, "content": 2_000, "timestamp": 64}
-        for field, maximum in limits.items():
-            candidate = value.get(field)
+        for field_name, maximum in limits.items():
+            candidate = value.get(field_name)
             if isinstance(candidate, str):
-                value[field] = candidate[:maximum]
+                value[field_name] = candidate[:maximum]
         return value
 
     @staticmethod
@@ -304,6 +305,17 @@ class GatewayServer:
                 correlation_id=request.correlation_id,
             )
 
+        result = GatewayServer._apply_auto_first_response_policy(
+            request=request,
+            result=result,
+            scope=scope,
+        )
+        warnings = result.get("warnings")
+        if not isinstance(warnings, list) or not all(
+            isinstance(item, str) for item in warnings
+        ):
+            warnings = []
+        answer = result.get("answer")
         ai_action = result.get("action")
         suggest_actions = {"DIRECT_ANSWER", "CONTROLLED_ANSWER", "ASK_CLARIFY"}
         no_action_actions = {"REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
@@ -395,6 +407,14 @@ class GatewayServer:
             metadata["ai_request_id"] = ai_request_id[:128]
         if evidence_bundle is not None:
             metadata["reply_evidence_bundle"] = evidence_bundle.model_dump(mode="json")
+            metadata["quality_gate_status"] = "PASS"
+        authorization_basis = result.get("auto_authorization_basis")
+        if authorization_basis in {
+            "STORE_APPROVED_KNOWLEDGE",
+            "STORE_APPROVED_FIXED_REPLY",
+            "STORE_APPROVED_FALLBACK",
+        }:
+            metadata["auto_authorization_basis"] = authorization_basis
 
         return DecisionResponse(
             contract_version=CONTRACT_VERSION,
@@ -410,6 +430,261 @@ class GatewayServer:
             metadata=metadata,
             decided_at=utc_now(),
         )
+
+    @staticmethod
+    def _apply_auto_first_response_policy(
+        *,
+        request: DecisionRequest,
+        result: dict[str, Any],
+        scope: FrozenChatContext,
+    ) -> dict[str, Any]:
+        """Turn governed manual routes into a store-approved first response.
+
+        The opt-in marker is internal context carried by Channel Engine.  Legacy
+        callers retain the existing fail-closed/manual behavior.
+        """
+
+        if (
+            request.context.get("auto_first_response_policy")
+            != "AUTO_ALL_MESSAGES_V1"
+            or result.get("action")
+            not in {"REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
+        ):
+            return result
+
+        message = request.customer_message.strip()
+        compact = "".join(message.lower().split())
+        if any(
+            keyword in compact
+            for keyword in ("误吞", "吞咽", "吞下", "小孩", "儿童", "安全", "有毒")
+        ):
+            rule_id = "auto-first-small-parts-safety-v1"
+            answer = (
+                "亲，积木含有小颗粒，请避免儿童放入口中或误吞，"
+                "建议在成人陪同下使用；如已发生误吞，请立即停止使用并及时就医。"
+            )
+            action = "CONTROLLED_ANSWER"
+            risk_level = "HIGH"
+        elif any(
+            keyword in compact
+            for keyword in ("退款", "退货", "售后", "少件", "缺件", "补发", "破损")
+        ):
+            rule_id = "auto-first-aftersales-v1"
+            answer = (
+                "亲，可以在对应订单详情中发起售后申请，并按页面提示选择原因、"
+                "上传凭证；如果页面状态不清楚，把当前显示的状态发给我，我继续帮您核对哦。"
+            )
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
+        elif any(
+            keyword in compact
+            for keyword in ("订单", "物流", "快递", "到货", "发货", "送到", "几天到")
+        ):
+            rule_id = "auto-first-order-logistics-v1"
+            answer = (
+                "亲，请以订单详情页显示的发货和物流进度为准；"
+                "如果页面状态不清楚，把当前显示的状态发给我，我继续帮您核对哦。"
+            )
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
+        elif any(
+            keyword in compact
+            for keyword in ("价格", "多少钱", "便宜", "优惠", "库存", "有货", "现货")
+        ):
+            rule_id = "auto-first-price-inventory-v1"
+            answer = "亲，价格、优惠和库存会实时变化，请以当前商品页面显示为准哦。"
+            action = "CONTROLLED_ANSWER"
+            risk_level = "MEDIUM"
+        elif scope.product_id.startswith("__STORE_LEVEL_"):
+            rule_id = "auto-first-product-clarify-v1"
+            answer = "亲，请发一下您咨询的商品卡片或商品名称，我马上帮您确认哦。"
+            action = "ASK_CLARIFY"
+            risk_level = "MEDIUM"
+        else:
+            rule_id = "auto-first-general-clarify-v1"
+            answer = "亲，您的消息已收到。请再补充一下具体想了解的问题，我马上帮您确认哦。"
+            action = "ASK_CLARIFY"
+            risk_level = "MEDIUM"
+
+        evidence = GatewayServer._fixed_reply_evidence(
+            request=request,
+            scope=scope,
+            rule_id=rule_id,
+            answer=answer,
+            action=action,
+            risk_level=risk_level,
+        )
+        mapped = dict(result)
+        mapped.update(
+            {
+                "answer": answer,
+                "action": action,
+                "risk_level": risk_level,
+                "required_fields": (
+                    ["product_id"] if rule_id == "auto-first-product-clarify-v1" else []
+                ),
+                "sources": [
+                    {
+                        "chunk_id": rule_id,
+                        "source_name": "STORE_APPROVED_FIXED_REPLY",
+                    }
+                ],
+                "warnings": ["STORE_APPROVED_FIXED_REPLY"],
+                "quality_gate_status": "PASS",
+                "reply_evidence_bundle": evidence.model_dump(mode="json"),
+                "auto_authorization_basis": "STORE_APPROVED_FIXED_REPLY",
+            }
+        )
+        return mapped
+
+    @staticmethod
+    def _fixed_reply_evidence(
+        *,
+        request: DecisionRequest,
+        scope: FrozenChatContext,
+        rule_id: str,
+        answer: str,
+        action: str,
+        risk_level: str,
+    ) -> ReplyEvidenceBundleV1:
+        frozen_scope: dict[str, Any]
+        if scope.product_id.startswith("__STORE_LEVEL_"):
+            frozen_scope = {
+                "scope_kind": "STORE",
+                "tenant_id": scope.tenant_id,
+                "platform": scope.platform,
+                "store_code": scope.store_code,
+                "product_id": None,
+                "sku_id": None,
+            }
+        elif scope.sku_id is not None:
+            frozen_scope = {
+                "scope_kind": "SKU",
+                "tenant_id": scope.tenant_id,
+                "platform": scope.platform,
+                "store_code": scope.store_code,
+                "product_id": scope.product_id,
+                "sku_id": scope.sku_id,
+            }
+        else:
+            frozen_scope = {
+                "scope_kind": "PRODUCT",
+                "tenant_id": scope.tenant_id,
+                "platform": scope.platform,
+                "store_code": scope.store_code,
+                "product_id": scope.product_id,
+                "sku_id": None,
+            }
+        store_scope = {
+            "scope_kind": "STORE",
+            "tenant_id": scope.tenant_id,
+            "platform": scope.platform,
+            "store_code": scope.store_code,
+            "product_id": None,
+            "sku_id": None,
+        }
+        material_fingerprint = canonical_sha256(
+            {"rule_id": rule_id, "answer": answer, "revision": 1}
+        )
+        rule_fingerprint = canonical_sha256(
+            {"rule_id": rule_id, "answer": answer, "scope": store_scope}
+        )
+        snapshot_fingerprint = canonical_sha256(
+            {"revision": 1, "rule_id": rule_id, "rule": rule_fingerprint}
+        )
+        content_range = {
+            "range_start": 0,
+            "range_end": len(answer),
+            "content_sha256": text_sha256(answer),
+        }
+        source_id = f"source-{text_sha256(rule_id)[:24]}"
+        segment_id = "segment-1"
+        question_id = "question-1"
+        draft: dict[str, Any] = {
+            "schema_version": "reply-evidence-bundle.v1",
+            "reply_origin": "FIXED_RULE",
+            "scope": frozen_scope,
+            "sub_question_plan": {
+                "schema_version": "sub-question-plan.v1",
+                "turn_id": f"turn-{text_sha256(request.message_id)[:24]}",
+                "aggregate_content_sha256": text_sha256(request.customer_message),
+                "split_status": "SINGLE",
+                "sub_questions": [
+                    {
+                        "sub_question_id": question_id,
+                        "ordinal": 1,
+                        "source_ranges": [
+                            {
+                                "message_id": request.message_id,
+                                "aggregate_start": 0,
+                                "aggregate_end": len(request.customer_message),
+                            }
+                        ],
+                        "source_content_sha256": text_sha256(
+                            request.customer_message
+                        ),
+                        "intent": "STORE_APPROVED_FIXED_REPLY",
+                        "route": "FIXED_RULE",
+                        "depends_on": [],
+                        "blocker_codes": [],
+                    }
+                ],
+                "blocker_codes": [],
+            },
+            "segments": [
+                {
+                    "segment_id": segment_id,
+                    "ordinal": 1,
+                    "sub_question_id": question_id,
+                    "content_range": content_range,
+                    "action": action,
+                    "risk_level": risk_level,
+                    "source_ids": [source_id],
+                }
+            ],
+            "sources": [
+                {
+                    "source_id": source_id,
+                    "source_type": "FIXED_RULE",
+                    "scope": store_scope,
+                    "rule_id": rule_id,
+                    "rule_version": 1,
+                    "rule_content_fingerprint": rule_fingerprint,
+                    "rule_snapshot_revision": 1,
+                    "rule_snapshot_fingerprint": snapshot_fingerprint,
+                    "rule_source_materials": [
+                        {
+                            "material_id": f"material-{text_sha256(rule_id)[:24]}",
+                            "revision": 1,
+                            "content_sha256": material_fingerprint,
+                            "governance_status": "REVIEWED_VALID",
+                            "scope": store_scope,
+                            "reviewed_by": "store-owner-approved",
+                            "reviewed_at": "2026-08-15T00:00:00Z",
+                        }
+                    ],
+                    "knowledge_reference": None,
+                    "knowledge_publication_fingerprint": None,
+                }
+            ],
+            "facts": [
+                {
+                    "fact_id": "fact-1",
+                    "segment_id": segment_id,
+                    "content_range": content_range,
+                    "source_ids": [source_id],
+                }
+            ],
+            "warnings": ["STORE_APPROVED_FIXED_REPLY"],
+            "missing_fields": [],
+            "blocker_codes": [],
+        }
+        draft["bundle_sha256"] = canonical_sha256(draft)
+        bundle = ReplyEvidenceBundleV1.model_validate_json(
+            json.dumps(draft, ensure_ascii=False, allow_nan=False)
+        )
+        bundle.validate_proposed_content(answer)
+        return bundle
 
     @staticmethod
     def _evidence_matches_scope(

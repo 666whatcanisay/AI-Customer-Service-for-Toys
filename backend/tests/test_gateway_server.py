@@ -9,10 +9,8 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import pytest
 import httpx
-from fastapi.testclient import TestClient
-
+import pytest
 from app.config.settings import Settings
 from app.gateway.auth import canonical_signing_text
 from app.gateway.contract import (
@@ -22,8 +20,8 @@ from app.gateway.contract import (
     HEALTH_PATH,
     MAX_DECISION_BODY_BYTES,
 )
-from app.gateway.service import GatewayRuntimeConfig, GatewayServer
 from app.gateway.lan_proxy import GatewayLanProxyConfig, create_gateway_lan_proxy_app
+from app.gateway.service import GatewayRuntimeConfig, GatewayServer
 from app.gateway.store import DecisionClaimState, GatewayStateStore
 from app.main import create_app
 from app.reply_router.contracts import (
@@ -31,7 +29,7 @@ from app.reply_router.contracts import (
     canonical_sha256,
     text_sha256,
 )
-
+from fastapi.testclient import TestClient
 
 CLIENT_ID = "channel-engine"
 KEY_ID = "gateway-key-v1"
@@ -449,6 +447,64 @@ def test_gateway_maps_all_existing_ai_actions_without_executing(
     assert response.json()["action"] == gateway_action
     assert (response.json()["proposed_content"] is not None) is has_content
     assert response.json()["requires_approval"] is True
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_fragment", "expected_risk"),
+    [
+        ("这个多少钱，还有库存吗？", "商品页面显示", "MEDIUM"),
+        ("我的订单什么时候到？", "订单详情页", "MEDIUM"),
+        ("我要退款怎么办？", "发起售后申请", "MEDIUM"),
+        ("孩子误吞小颗粒怎么办？", "及时就医", "HIGH"),
+    ],
+)
+def test_auto_all_messages_maps_manual_routes_to_governed_fixed_reply(
+    gateway_harness,
+    message: str,
+    expected_fragment: str,
+    expected_risk: str,
+) -> None:
+    client, install, _ = gateway_harness
+    install(lambda question, context: _result("REQUIRE_LOOKUP"))
+    payload = _request_payload(
+        request_id=f"request-auto-{text_sha256(message)[:12]}",
+        idempotency_key=f"decision-auto-{text_sha256(message)[:12]}",
+        customer_message=message,
+    )
+    payload["context"]["auto_first_response_policy"] = "AUTO_ALL_MESSAGES_V1"
+
+    response = _post_decision(client, payload)
+
+    assert response.status_code == 200
+    decision = response.json()
+    assert decision["action"] == "SUGGEST_REPLY"
+    assert expected_fragment in decision["proposed_content"]
+    assert decision["risk_level"] == expected_risk
+    assert decision["metadata"]["ai_cs_action"] == "CONTROLLED_ANSWER"
+    assert (
+        decision["metadata"]["auto_authorization_basis"]
+        == "STORE_APPROVED_FIXED_REPLY"
+    )
+    evidence = ReplyEvidenceBundleV1.model_validate_json(
+        json.dumps(
+            decision["metadata"]["reply_evidence_bundle"],
+            ensure_ascii=False,
+        )
+    )
+    evidence.validate_proposed_content(decision["proposed_content"])
+
+
+def test_auto_all_messages_marker_is_required_for_fixed_reply_override(
+    gateway_harness,
+) -> None:
+    client, install, _ = gateway_harness
+    install(lambda question, context: _result("REQUIRE_LOOKUP"))
+
+    response = _post_decision(client, _request_payload(customer_message="还有库存吗？"))
+
+    assert response.status_code == 200
+    assert response.json()["action"] == "NO_ACTION"
+    assert response.json()["proposed_content"] is None
 
 
 def test_gateway_rejects_anonymous_invalid_signature_stale_timestamp_and_nonce_replay(

@@ -117,11 +117,9 @@ def _reviewed_approximate_controls(
         if not isinstance(body, dict):
             continue
 
-        review_text = " ".join(
-            value
-            for value in (material.review_note, material.analysis_text)
-            if isinstance(value, str)
-        )
+        # Only the human review decision may authorize production use of an
+        # approximate fact.  The uploaded body is evidence, not self-approval.
+        review_text = material.review_note or ""
         if not _REVIEWED_APPROXIMATE_RE.search(review_text):
             continue
 
@@ -217,7 +215,6 @@ def build_canonical_product_knowledge(
         "store_code": product.store_code,
         "product_id": product.product_id,
         "product_name": product.product_name_display or product.product_name_official,
-        "reviewed_answer_controls": reviewed_controls,
         "product": {
             "age_min": product.age_min,
             "age_max": product.age_max,
@@ -274,6 +271,10 @@ def build_canonical_product_knowledge(
             for rule in safety_rules
         ],
     }
+    # Keep fingerprints stable for products that have no reviewed approximate
+    # controls.  An empty governance extension must not force a global resync.
+    if reviewed_controls:
+        canonical["reviewed_answer_controls"] = reviewed_controls
     serialized = json.dumps(
         canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
