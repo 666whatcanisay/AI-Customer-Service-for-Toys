@@ -368,10 +368,12 @@ def test_decision_ledger_never_reclaims_after_success_or_failure(tmp_path) -> No
     ledger.finish(
         "decision-1", outcome="SUCCESS", receipt_id="receipt-1", now=NOW
     )
+    assert ledger.successful_receipt("decision-1") == "receipt-1"
     assert ledger.claim_once("decision-1", now=NOW + timedelta(seconds=1)) is False
 
     assert ledger.claim_once("decision-2", now=NOW) is True
     ledger.finish("decision-2", outcome="UNKNOWN", receipt_id=None, now=NOW)
+    assert ledger.successful_receipt("decision-2") is None
     assert ledger.claim_once("decision-2", now=NOW + timedelta(seconds=1)) is False
 
 

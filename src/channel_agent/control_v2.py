@@ -246,6 +246,11 @@ class AgentAssistantSnapshot(ControlV2Model):
     # Internal UI projection only. This reuses CustomerContext facts and does
     # not change the Gateway or ExecutionPreparation wire contracts.
     product_context: dict[str, Any] | None = None
+    # Privacy-filtered history from the selected PDD conversation.  This is an
+    # optional desktop projection field so older Host snapshots remain valid.
+    # It lets the assistant show operator replies without turning them back
+    # into customer input or changing the Observation/Gateway contracts.
+    visible_history: tuple[dict[str, Any], ...] = Field(default=(), max_length=20)
     ai_cs_action: str = Field(default="UNKNOWN", min_length=1, max_length=64)
     warnings: tuple[str, ...] = Field(default=(), max_length=32)
     required_fields: tuple[str, ...] = Field(default=(), max_length=32)

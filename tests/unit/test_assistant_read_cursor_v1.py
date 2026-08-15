@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -85,3 +86,90 @@ def test_desktop_feed_uses_verified_customer_message_id_and_keeps_old_snapshot_c
     assert restored.customer_message_id is None
     legacy = DesktopAssistantServer._snapshot_feed(restored.model_dump(mode="json"))
     assert legacy["reply"]["messageId"] == "turn-1"
+
+
+def test_desktop_feed_projects_customer_and_operator_history_in_time_order() -> None:
+    snapshot = _snapshot(customer_message_id="customer-message-1").model_copy(
+        update={
+            "ai_cs_action": "DIRECT_ANSWER",
+            "visible_history": (
+                {
+                    "message_id": "customer-message-1",
+                    "sender": "CUSTOMER",
+                    "content": "这个商品拼好后有多大？",
+                    "timestamp": "2026-08-15T07:20:00+00:00",
+                    "privacy_filtered": True,
+                },
+                {
+                    "message_id": "operator-message-1",
+                    "sender": "OPERATOR",
+                    "content": "亲，这款拼好后约20cm左右哦。",
+                    "timestamp": "2026-08-15T07:20:08+00:00",
+                    "privacy_filtered": True,
+                },
+            ),
+        }
+    )
+
+    conversation = DesktopAssistantServer._snapshot_feed(
+        snapshot.model_dump(mode="json")
+    )["conversations"][0]
+
+    assert [item["senderRole"] for item in conversation["messages"]] == [
+        "CUSTOMER",
+        "AGENT",
+    ]
+    assert conversation["messages"][1]["messageId"] == "operator-message-1"
+    assert conversation["attentionLevel"] == "NONE"
+    assert conversation["requiresHuman"] is False
+
+
+def test_desktop_feed_marks_explicit_human_transfer_red() -> None:
+    snapshot = _snapshot().model_copy(
+        update={
+            "status": "MANUAL_INTERVENTION",
+            "ai_cs_action": "TRANSFER_HUMAN",
+        }
+    )
+
+    conversation = DesktopAssistantServer._snapshot_feed(
+        snapshot.model_dump(mode="json")
+    )["conversations"][0]
+
+    assert conversation["requiresHuman"] is True
+    assert conversation["attentionLevel"] == "HUMAN_REQUIRED"
+
+
+def test_successful_auto_reply_is_shown_as_outbound_and_not_waiting(tmp_path: Path) -> None:
+    journal = AssistantEventJournal(tmp_path / "assistant-events.sqlite3")
+    snapshot = _snapshot(customer_message_id="message-1")
+    journal.update_snapshots((snapshot,))
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir()
+    (runtime_dir / "controlled-auto-successes.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "controlled-auto-successes.v1",
+                "items": [
+                    {
+                        "decision_id": "decision-1",
+                        "conversation_id": "conversation-1",
+                        "receipt_id": "receipt-1",
+                        "sent_at": (
+                            snapshot.updated_at + timedelta(seconds=1)
+                        ).isoformat(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    conversation = DesktopAssistantServer(
+        data_root=tmp_path, event_journal=journal
+    ).assistant_feed()["conversations"][0]
+
+    assert conversation["attentionLevel"] == "NONE"
+    assert conversation["processingStage"] == "AUTO_REPLIED"
+    assert conversation["autoReplyReceiptId"] == "receipt-1"
+    assert conversation["messages"][-1]["senderRole"] == "AGENT"

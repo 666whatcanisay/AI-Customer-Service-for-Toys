@@ -725,7 +725,71 @@ class DesktopAssistantServer:
         running = bool(controlled["auto_reply_running"])
         safety["autoReply"] = running
         safety["realSend"] = running
+        successes = self._successful_auto_replies()
+        for conversation in feed.get("conversations", []):
+            if not isinstance(conversation, dict):
+                continue
+            reply = conversation.get("reply")
+            decision_id = reply.get("decisionId") if isinstance(reply, dict) else None
+            success = successes.get(str(decision_id)) if decision_id else None
+            if success is not None and isinstance(reply, dict):
+                messages = conversation.setdefault("messages", [])
+                receipt_id = str(success["receipt_id"])
+                reply_answer = str(reply.get("answer") or "").strip()
+                operator_reply_already_visible = isinstance(messages, list) and any(
+                    isinstance(item, dict)
+                    and item.get("senderRole") == "AGENT"
+                    and str(item.get("content") or "").strip() == reply_answer
+                    for item in messages
+                )
+                if isinstance(messages, list) and not operator_reply_already_visible and not any(
+                    isinstance(item, dict)
+                    and item.get("messageId") == f"auto-receipt:{receipt_id}"
+                    for item in messages
+                ):
+                    messages.append({
+                        "messageId": f"auto-receipt:{receipt_id}",
+                        "conversationId": conversation.get("conversationId"),
+                        "customerLabel": "AI 客服",
+                        "content": reply.get("answer"),
+                        "receivedAt": success["sent_at"],
+                        "source": "CHANNEL_AGENT",
+                        "senderRole": "AGENT",
+                        "deliveryState": "SENT",
+                    })
+                    messages.sort(
+                        key=lambda item: (
+                            str(item.get("receivedAt") or ""),
+                            str(item.get("messageId") or ""),
+                        )
+                    )
+                conversation["state"] = "AUTO_REPLIED"
+                conversation["processingStage"] = "AUTO_REPLIED"
+                conversation["attentionLevel"] = "NONE"
+                conversation["autoReplyReceiptId"] = receipt_id
+                conversation["unreadCount"] = 0
         return feed
+
+    def _successful_auto_replies(self) -> dict[str, dict[str, str]]:
+        value = self._read_json(
+            self.data_root / "runtime" / "controlled-auto-successes.json"
+        )
+        if value.get("schema_version") != "controlled-auto-successes.v1":
+            return {}
+        items = value.get("items")
+        if not isinstance(items, list):
+            return {}
+        result: dict[str, dict[str, str]] = {}
+        for item in items[-100:]:
+            if not isinstance(item, dict):
+                continue
+            required = ("decision_id", "conversation_id", "receipt_id", "sent_at")
+            if not all(isinstance(item.get(key), str) and item[key] for key in required):
+                continue
+            result[str(item["decision_id"])] = {
+                key: str(item[key]) for key in required
+            }
+        return result
 
     def _with_read_state(self, feed: dict[str, Any]) -> dict[str, Any]:
         read_revision = getattr(self.event_journal, "read_revision", None)
@@ -828,7 +892,7 @@ class DesktopAssistantServer:
                 "decisionId": decision_id,
                 "answer": reply_content,
                 "requestId": snapshot.get("request_id"),
-                "action": "CONTROLLED_ANSWER",
+                "action": str(snapshot.get("ai_cs_action") or "CONTROLLED_ANSWER"),
                 "riskLevel": snapshot["risk_level"],
                 "citations": citations,
                 "warnings": ["发送前必须人工核对店铺、会话、客户与回复内容"],
@@ -840,6 +904,54 @@ class DesktopAssistantServer:
                 "traceId": snapshot.get("trace_id"),
                 "productContext": product_context,
             }
+        messages: list[dict[str, Any]] = []
+        for item in snapshot.get("visible_history") or []:
+            if not isinstance(item, dict):
+                continue
+            sender = str(item.get("sender") or "").upper()
+            message_id = str(item.get("message_id") or "")
+            content = item.get("content")
+            received_at = str(item.get("timestamp") or "")
+            if (
+                sender not in {"CUSTOMER", "OPERATOR"}
+                or not message_id
+                or not isinstance(content, str)
+                or not content.strip()
+                or not received_at
+            ):
+                continue
+            messages.append({
+                "messageId": message_id,
+                "conversationId": conversation_id,
+                "customerLabel": customer_label if sender == "CUSTOMER" else "商家客服",
+                "content": content,
+                "receivedAt": received_at,
+                "source": "CHANNEL_AGENT",
+                "senderRole": "CUSTOMER" if sender == "CUSTOMER" else "AGENT",
+            })
+        if not any(item["messageId"] == customer_message_id for item in messages):
+            messages.append({
+                "messageId": customer_message_id,
+                "conversationId": conversation_id,
+                "customerLabel": customer_label,
+                "content": snapshot["current_question"],
+                "receivedAt": updated_at,
+                "source": "CHANNEL_AGENT",
+                "senderRole": "CUSTOMER",
+            })
+        messages.sort(key=lambda item: (item["receivedAt"], item["messageId"]))
+        ai_cs_action = str(snapshot.get("ai_cs_action") or "UNKNOWN").upper()
+        requires_human = bool(
+            snapshot.get("status") == "MANUAL_INTERVENTION"
+            or snapshot.get("quality_status") == "BLOCKED"
+            or ai_cs_action in {"TRANSFER_HUMAN", "REQUIRE_LOOKUP", "REFUSE"}
+        )
+        latest_sender = messages[-1].get("senderRole") if messages else None
+        attention_level = (
+            "HUMAN_REQUIRED"
+            if requires_human
+            else ("UNANSWERED" if latest_sender == "CUSTOMER" else "NONE")
+        )
         return {
             "schemaVersion": "channel-agent-workspace-feed.v2",
             "source": "CHANNEL_AGENT_HOST_SNAPSHOT",
@@ -859,18 +971,10 @@ class DesktopAssistantServer:
                     "policyMode": snapshot.get("policy_mode"),
                     "preparationId": snapshot.get("preparation_id"),
                     "traceId": snapshot.get("trace_id"),
+                    "requiresHuman": requires_human,
+                    "attentionLevel": attention_level,
                     "productContext": product_context,
-                    "messages": [
-                        {
-                            "messageId": customer_message_id,
-                            "conversationId": conversation_id,
-                            "customerLabel": customer_label,
-                            "content": snapshot["current_question"],
-                            "receivedAt": updated_at,
-                            "source": "CHANNEL_AGENT",
-                            "senderRole": "CUSTOMER",
-                        }
-                    ],
+                    "messages": messages,
                 }
             ],
             "reply": reply,

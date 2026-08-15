@@ -382,6 +382,68 @@ def _renew_observer_if_needed(data_root: Path) -> None:
     )
 
 
+def _record_auto_reply_success(
+    data_root: Path,
+    *,
+    decision_id: str,
+    conversation_id: str,
+    receipt_id: str,
+) -> None:
+    """Publish a privacy-minimal success index for the desktop projection.
+
+    Reply text remains in the existing Host snapshot.  The local index only
+    proves that this exact Decision reached a terminal successful Receipt, so
+    the UI can stop presenting an already-sent reply as waiting for a human.
+    """
+
+    path = data_root / "runtime" / "controlled-auto-successes.json"
+    records: list[dict[str, str]] = []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if (
+            isinstance(payload, dict)
+            and payload.get("schema_version") == "controlled-auto-successes.v1"
+            and isinstance(payload.get("items"), list)
+        ):
+            for item in payload["items"]:
+                if (
+                    isinstance(item, dict)
+                    and item.get("decision_id") == decision_id
+                    and item.get("conversation_id") == conversation_id
+                    and item.get("receipt_id") == receipt_id
+                ):
+                    return
+            records = [
+                item
+                for item in payload["items"]
+                if isinstance(item, dict)
+                and isinstance(item.get("decision_id"), str)
+                and item.get("decision_id") != decision_id
+            ]
+    except (OSError, UnicodeError, ValueError, json.JSONDecodeError):
+        records = []
+    records.append(
+        {
+            "decision_id": decision_id,
+            "conversation_id": conversation_id,
+            "receipt_id": receipt_id,
+            "sent_at": datetime.now(UTC).isoformat(),
+        }
+    )
+    atomic_write_bytes(
+        path,
+        (json.dumps(
+            {
+                "schema_version": "controlled-auto-successes.v1",
+                "items": records[-100:],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ) + "\n").encode("utf-8"),
+    )
+
+
 def _print(value: object) -> None:
     print(json.dumps(value, ensure_ascii=False, indent=2, default=str))
 
@@ -620,10 +682,23 @@ def main(argv: list[str] | None = None) -> int:
                         time.sleep(max(args.poll_seconds, 0.1))
                         continue
                     raise
-                if candidate is None or not ledger.claim_once(
+                if candidate is None:
+                    time.sleep(max(args.poll_seconds, 0.1))
+                    continue
+                if not ledger.claim_once(
                     candidate.decision_id,
                     now=datetime.now(UTC),
                 ):
+                    existing_receipt = ledger.successful_receipt(
+                        candidate.decision_id
+                    )
+                    if existing_receipt is not None:
+                        _record_auto_reply_success(
+                            data_root,
+                            decision_id=candidate.decision_id,
+                            conversation_id=candidate.conversation_id,
+                            receipt_id=existing_receipt,
+                        )
                     time.sleep(max(args.poll_seconds, 0.1))
                     continue
                 try:
@@ -681,6 +756,12 @@ def main(argv: list[str] | None = None) -> int:
                         }
                     )
                     return 4
+                _record_auto_reply_success(
+                    data_root,
+                    decision_id=candidate.decision_id,
+                    conversation_id=candidate.conversation_id,
+                    receipt_id=response.receipt_id,
+                )
                 successes += 1
                 if args.exit_after_successes and successes >= args.exit_after_successes:
                     _print({"status": "COMPLETED", "successes": successes})

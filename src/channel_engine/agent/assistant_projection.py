@@ -93,6 +93,20 @@ def build_assistant_snapshot(
         product_context=(
             context.page.product.model_dump(mode="json") if context is not None else None
         ),
+        visible_history=(
+            tuple(
+                {
+                    "message_id": item.external_message_id,
+                    "sender": item.sender.upper(),
+                    "content": item.content,
+                    "timestamp": item.timestamp.isoformat(),
+                    "privacy_filtered": item.privacy_filtered,
+                }
+                for item in context.visible_conversation_history[-20:]
+            )
+            if context is not None
+            else ()
+        ),
         updated_at=now.astimezone(UTC),
         expires_at=now.astimezone(UTC) + timedelta(minutes=30),
     )

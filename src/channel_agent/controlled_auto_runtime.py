@@ -317,6 +317,17 @@ class ControlledAutoDecisionLedger:
         if changed != 1:
             raise ControlledAutoRuntimeError("AUTO Decision is not claimable")
 
+    def successful_receipt(self, decision_id: str) -> str | None:
+        """Return the terminal successful Receipt without reopening the claim."""
+
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT receipt_id FROM controlled_auto_decisions "
+                "WHERE decision_id=? AND state='TERMINAL' AND outcome='SUCCESS'",
+                (decision_id,),
+            ).fetchone()
+        return None if row is None or row[0] is None else str(row[0])
+
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=5.0, isolation_level=None)
 
