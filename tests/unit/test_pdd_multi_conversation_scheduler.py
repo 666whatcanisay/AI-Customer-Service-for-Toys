@@ -421,15 +421,25 @@ class Resolver:
 
 class Evaluator:
     def __init__(self, trigger_result=None) -> None:
-        self.trigger_result = trigger_result or {"triggered": True, "error_code": None}
+        self.trigger_result = trigger_result or {
+            "triggered": True,
+            "error_code": None,
+            "x": 120.0,
+            "y": 240.0,
+        }
         self.expressions: list[str] = []
+        self.clicks: list[tuple[float, float]] = []
 
     def evaluate(self, target, expression):
         del target
         self.expressions.append(expression)
-        if "targets[0].click()" in expression:
+        if "scrollIntoView" in expression:
             return self.trigger_result
         return "1234567890"
+
+    def dispatch_mouse_click(self, target, *, x, y):
+        del target
+        self.clicks.append((x, y))
 
 
 SELECTORS = {
@@ -464,12 +474,14 @@ def test_navigation_port_is_single_purpose_and_checks_human_input() -> None:
     )
 
     expression = evaluator.expressions[0]
-    assert "targets[0].click()" in expression
+    assert "scrollIntoView" in expression
+    assert "targets[0].click()" not in expression
     assert "inputText.length > 0" in expression
     assert "input.isComposing === true" in expression
     assert "document.activeElement === input" not in expression
     assert ".value =" not in expression
     assert "dispatchEvent" not in expression
+    assert evaluator.clicks == [(120.0, 240.0)]
 
     # The selector is always resolved from the already identity-verified row.
     # This keeps the real ``.chat-detail`` click target row-local and prevents
@@ -493,6 +505,7 @@ def test_navigation_port_fails_closed_when_human_input_is_active() -> None:
         )
     assert raised.value.error_code == "PDD_NAVIGATION_HUMAN_INPUT_ACTIVE"
     assert raised.value.manual_review is False
+    assert evaluator.clicks == []
 
 
 def test_human_input_pause_keeps_capture_pending_for_automatic_resume(tmp_path) -> None:

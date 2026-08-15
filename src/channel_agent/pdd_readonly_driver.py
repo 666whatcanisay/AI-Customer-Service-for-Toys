@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -325,6 +326,81 @@ class ReadOnlyCDPEvaluator:
             raise
         except (OSError, ValueError, json.JSONDecodeError, websocket.WebSocketException) as exc:
             raise PDDReadOnlyDriverError("PDD read-only CDP channel is unavailable") from exc
+        finally:
+            if connection is not None:
+                connection.close()
+
+    def dispatch_mouse_click(
+        self,
+        target: PDDCDPPageTarget,
+        *,
+        x: float,
+        y: float,
+    ) -> None:
+        """Dispatch one trusted click for the separately guarded navigation port."""
+
+        if (
+            not math.isfinite(x)
+            or not math.isfinite(y)
+            or x < 0
+            or y < 0
+            or x > 100_000
+            or y > 100_000
+        ):
+            raise PDDReadOnlyDriverError("PDD navigation coordinates are invalid")
+        with self._lock:
+            self._sequence += 1
+            pressed_id = self._sequence
+            self._sequence += 1
+            released_id = self._sequence
+        connection = None
+        try:
+            connection = websocket.create_connection(
+                target.websocket_url,
+                timeout=self._timeout,
+                suppress_origin=True,
+                http_proxy_host=None,
+            )
+            for command_id, event_type in (
+                (pressed_id, "mousePressed"),
+                (released_id, "mouseReleased"),
+            ):
+                connection.send(
+                    json.dumps(
+                        {
+                            "id": command_id,
+                            "method": "Input.dispatchMouseEvent",
+                            "params": {
+                                "type": event_type,
+                                "x": x,
+                                "y": y,
+                                "button": "left",
+                                "clickCount": 1,
+                            },
+                        },
+                        separators=(",", ":"),
+                    )
+                )
+                while True:
+                    raw = connection.recv()
+                    if not isinstance(raw, str) or len(raw.encode("utf-8")) > _MAX_CDP_BYTES:
+                        raise PDDReadOnlyDriverError(
+                            "PDD navigation response exceeded its safety boundary"
+                        )
+                    response = json.loads(raw)
+                    if not isinstance(response, dict) or response.get("id") != command_id:
+                        continue
+                    if "error" in response:
+                        raise PDDReadOnlyDriverError(
+                            "Edge rejected the PDD navigation input event"
+                        )
+                    break
+        except PDDReadOnlyDriverError:
+            raise
+        except (OSError, ValueError, json.JSONDecodeError, websocket.WebSocketException) as exc:
+            raise PDDReadOnlyDriverError(
+                "PDD navigation CDP channel is unavailable"
+            ) from exc
         finally:
             if connection is not None:
                 connection.close()

@@ -18,6 +18,14 @@ from .pdd_observer import (
 class PDDNavigationEvaluator(Protocol):
     def evaluate(self, target: PDDCDPPageTarget, expression: str) -> object: ...
 
+    def dispatch_mouse_click(
+        self,
+        target: PDDCDPPageTarget,
+        *,
+        x: float,
+        y: float,
+    ) -> None: ...
+
 
 class WebSocketPDDConversationNavigationPort:
     """One narrowly-scoped CDP click port for verified conversation rows.
@@ -101,8 +109,14 @@ class WebSocketPDDConversationNavigationPort:
   if (attention.length > 1) return reject('PDD_NAVIGATION_ATTENTION_AMBIGUOUS');
   const targets = nodes(row, 'conversation_select_target');
   if (targets.length !== 1) return reject('PDD_NAVIGATION_CLICK_TARGET_AMBIGUOUS');
-  targets[0].click();
-  return {{triggered:true,error_code:null}};
+  targets[0].scrollIntoView({{block:'nearest',inline:'nearest'}});
+  const rect = targets[0].getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  if (rect.width <= 0 || rect.height <= 0 || x < 0 || y < 0 || x > innerWidth || y > innerHeight) {{
+    return reject('PDD_NAVIGATION_TARGET_NOT_VISIBLE');
+  }}
+  return {{triggered:true,error_code:null,x,y}};
 }})()
 """.strip()
         with self._lock:
@@ -123,6 +137,15 @@ class WebSocketPDDConversationNavigationPort:
                         "PDD_NAVIGATION_HUMAN_INPUT_ACTIVE",
                     },
                 )
+            x = value.get("x")
+            y = value.get("y")
+            if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+                raise PDDConversationNavigationError(
+                    "PDD conversation navigation target coordinates are invalid",
+                    error_code="PDD_NAVIGATION_TARGET_NOT_VISIBLE",
+                    manual_review=False,
+                )
+            self._evaluator.dispatch_mouse_click(target, x=float(x), y=float(y))
             deadline = time.monotonic() + self._timeout
             while time.monotonic() < deadline:
                 if self._active_conversation_id() == summary.conversation_id:
