@@ -372,6 +372,69 @@ def test_preview_change_navigates_exact_row_when_pdd_attention_marker_is_missing
     ]
 
 
+def test_preview_only_operator_tail_is_rebaselined_without_manual_review(tmp_path) -> None:
+    first = summary(
+        "conversation-a",
+        sequence=1,
+        position=0,
+        attention=PDDReplyAttentionState.NONE,
+        attention_seconds=None,
+    ).model_copy(
+        update={
+            "latest_sequence": None,
+            "latest_message_id": "preview-sha256:" + "1" * 64,
+        }
+    )
+    second = first.model_copy(
+        update={"latest_message_id": "preview-sha256:" + "2" * 64}
+    )
+    operator_snapshot = PDDWorkspaceSnapshot(
+        store_id="store-1",
+        platform_store_id="328616090",
+        conversation_id=second.conversation_id,
+        customer_reference=customer_reference(second.conversation_id),
+        page_fingerprint=FINGERPRINT,
+        selector_evidence_hash=DIGEST,
+        page_state="CUSTOMER_SERVICE_RUNNING",
+        messages=(
+            PDDWorkspaceMessage(
+                external_message_id="conversation-a-operator-1",
+                sender="OPERATOR",
+                content="already replied",
+                timestamp=NOW,
+                sequence=1,
+            ),
+        ),
+        captured_at=NOW,
+    )
+    driver = NavigableDriver([second], {second.conversation_id: operator_snapshot})
+    observer, _, capture_store, forwarded = build_observer(tmp_path, driver)
+    capture_store.observe_attention(
+        store_id=first.store_id,
+        platform_store_id=first.platform_store_id,
+        conversation_id=first.conversation_id,
+        attention_state=first.attention_state,
+        attention_verified=False,
+        attention_seconds=None,
+        attention_evidence_hash=None,
+        page_position=first.page_position,
+        latest_sequence=None,
+        latest_message_id=first.latest_message_id,
+    )
+
+    result = observer.scan_once()
+
+    assert result.observations_forwarded == 0
+    assert result.manual_review_required == 0
+    assert forwarded == []
+    assert driver.navigated == ["conversation-a"]
+    record = capture_store.get("store-1", "328616090", "conversation-a")
+    assert record is not None
+    assert record.state is PDDConversationCaptureState.COMPLETED
+    assert record.last_error_code is None
+    assert record.latest_message_id == second.latest_message_id
+
+
 def test_unstable_target_returns_durable_task_to_pending(tmp_path) -> None:
     item = summary("conversation-a", sequence=1, position=0)
     driver = UnstableNavigableDriver(

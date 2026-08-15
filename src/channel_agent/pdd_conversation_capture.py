@@ -190,6 +190,24 @@ class DurablePDDConversationCaptureStore:
                     and row[4] is not None
                     and latest_message_id != str(row[4])
                 )
+                preview_identity_upgraded = (
+                    latest_message_id is not None
+                    and row[4] is not None
+                    and str(row[4]).startswith("sha256:")
+                    and latest_message_id.startswith("preview-sha256:")
+                )
+                if preview_identity_upgraded:
+                    message_changed = False
+                    if (
+                        not present
+                        and state
+                        in {
+                            PDDConversationCaptureState.PENDING,
+                            PDDConversationCaptureState.NAVIGATING,
+                            PDDConversationCaptureState.MANUAL_REVIEW,
+                        }
+                    ):
+                        state = PDDConversationCaptureState.COMPLETED
                 previous_attention_state = PDDReplyAttentionState(str(row[5]))
                 previous_attention_seconds = (
                     None if row[6] is None else int(row[6])
@@ -219,6 +237,7 @@ class DurablePDDConversationCaptureStore:
                     SET state = ?, attention_state = ?, attention_present = ?,
                         attention_seconds = ?, attention_evidence_hash = ?,
                         page_position = ?, last_observed_at = ?,
+                        latest_message_id = CASE WHEN ? THEN ? ELSE latest_message_id END,
                         last_error_code = CASE WHEN ? THEN NULL ELSE last_error_code END
                     WHERE store_id = ? AND platform_store_id = ? AND conversation_id = ?
                     """,
@@ -230,12 +249,51 @@ class DurablePDDConversationCaptureStore:
                         attention_evidence_hash,
                         page_position,
                         now.isoformat(),
+                        1 if preview_identity_upgraded else 0,
+                        latest_message_id,
                         1 if state is PDDConversationCaptureState.PENDING else 0,
                         *scope,
                     ),
                 )
             connection.commit()
         return self.get(store_id, platform_store_id, conversation_id)
+
+    def mark_preview_baseline(
+        self,
+        *,
+        store_id: str,
+        platform_store_id: str | None,
+        conversation_id: str,
+        latest_message_id: str | None,
+    ) -> PDDConversationCaptureRecord:
+        """Complete a preview-only task that contained no new customer message."""
+
+        now = self._clock().astimezone(UTC).isoformat()
+        scope = (store_id, platform_store_id or "", conversation_id)
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE pdd_conversation_captures
+                SET state = ?,
+                    latest_message_id = COALESCE(?, latest_message_id),
+                    last_observed_at = ?, last_error_code = NULL
+                WHERE store_id = ? AND platform_store_id = ? AND conversation_id = ?
+                """,
+                (
+                    PDDConversationCaptureState.COMPLETED.value,
+                    latest_message_id,
+                    now,
+                    *scope,
+                ),
+            )
+            if cursor.rowcount != 1:
+                connection.rollback()
+                raise KeyError("PDD conversation capture task does not exist")
+            connection.commit()
+        record = self.get(store_id, platform_store_id, conversation_id)
+        if record is None:
+            raise KeyError("PDD conversation capture task disappeared")
+        return record
 
     def pending(self, *, limit: int = 20) -> tuple[PDDConversationCaptureRecord, ...]:
         bounded = max(1, min(limit, 20))

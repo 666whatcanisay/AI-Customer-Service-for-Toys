@@ -167,6 +167,34 @@ def test_preview_change_schedules_exact_conversation_when_attention_is_missing(
     assert [item.conversation_id for item in store.pending()] == ["conversation-a"]
 
 
+def test_preview_identity_upgrade_rebaselines_without_scheduling_history(tmp_path) -> None:
+    store = DurablePDDConversationCaptureStore(
+        tmp_path / "spool.sqlite3", clock=lambda: NOW
+    )
+    observe(
+        store,
+        "conversation-a",
+        state=PDDReplyAttentionState.NONE,
+        seconds=None,
+        sequence=None,
+        message_id="sha256:" + "a" * 64,
+    )
+
+    upgraded = observe(
+        store,
+        "conversation-a",
+        state=PDDReplyAttentionState.NONE,
+        seconds=None,
+        sequence=None,
+        message_id="preview-sha256:" + "b" * 64,
+    )
+
+    assert upgraded is not None
+    assert upgraded.state is PDDConversationCaptureState.COMPLETED
+    assert upgraded.latest_message_id == "preview-sha256:" + "b" * 64
+    assert store.pending() == ()
+
+
 def test_countdown_reset_reopens_same_conversation_without_row_message_id(
     tmp_path,
 ) -> None:

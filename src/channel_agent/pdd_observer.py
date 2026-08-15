@@ -390,9 +390,29 @@ class PDDMessageObserver:
                         "write_operations": 0,
                     },
                 )
+            preview_only_schedule = (
+                is_scheduled
+                and capture_record is not None
+                and not capture_record.attention_present
+            )
             if is_scheduled and not any(
                 item.sender == "CUSTOMER" for item in snapshot.messages
             ):
+                # A privacy-safe preview hash can change because the visible row
+                # switched to an operator/system tail.  That is a useful new
+                # baseline, not evidence that a customer message needs review.
+                if (
+                    preview_only_schedule
+                    and not unknown
+                    and self._capture_store is not None
+                ):
+                    self._capture_store.mark_preview_baseline(
+                        store_id=summary.store_id,
+                        platform_store_id=summary.platform_store_id,
+                        conversation_id=summary.conversation_id,
+                        latest_message_id=summary.latest_message_id,
+                    )
+                    continue
                 if self._capture_store is not None:
                     self._capture_store.mark_failure(
                         store_id=summary.store_id,
@@ -412,6 +432,17 @@ class PDDMessageObserver:
                 )
                 continue
             if not pending:
+                # No customer message newer than the preview task's first
+                # observation means this row change was not an inbound message.
+                # Complete it as a baseline so it cannot keep driving navigation.
+                if preview_only_schedule and self._capture_store is not None:
+                    self._capture_store.mark_preview_baseline(
+                        store_id=summary.store_id,
+                        platform_store_id=summary.platform_store_id,
+                        conversation_id=summary.conversation_id,
+                        latest_message_id=summary.latest_message_id,
+                    )
+                    continue
                 # Once this conversation has entered the durable flow, only a
                 # Host ACK may advance its cursor. Re-reading a handled operator
                 # tail is safer than inventing an acknowledgement locally.

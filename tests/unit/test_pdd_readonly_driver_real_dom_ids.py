@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from channel_agent.pdd_conversation_capture import PDDReplyAttentionState
 from channel_agent.pdd_page_port import ReplayPDDPageReadPort, load_pdd_replay_fixture
 from channel_agent.pdd_readonly_driver import (
     EvidenceBackedPDDReadOnlyDriver,
     PDDDOMBinding,
     PDDObserverEvidence,
-    _reply_attention,
     _read_expression,
+    _reply_attention,
     build_replay_observer_evidence,
 )
-from channel_agent.pdd_conversation_capture import PDDReplyAttentionState
-
 
 FIXTURE = (
     Path(__file__).resolve().parents[2]
@@ -234,7 +233,8 @@ def test_scan_expression_hashes_preview_without_returning_plaintext() -> None:
     )
 
     assert "latest_message_preview" in expression
-    assert "'sha256:' + sha256([conversationId, lastActivity, preview]" in expression
+    assert "'preview-sha256:' + sha256([conversationId, preview]" in expression
+    assert "[conversationId, lastActivity, preview]" not in expression
     assert "latest_message_id: latestMessageId" in expression
 
 

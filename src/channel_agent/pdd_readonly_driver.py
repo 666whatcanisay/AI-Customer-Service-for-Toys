@@ -771,7 +771,7 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
       const preview = one(row,'latest_message_preview');
       const latestMessageId = sequenceLike(rawSequence)
         ? rawSequence
-        : (preview ? 'sha256:' + sha256([conversationId, lastActivity, preview].join('\n')) : null);
+        : (preview ? 'preview-sha256:' + sha256([conversationId, preview].join('\n')) : null);
       return {{
         conversation_id: conversationId,
         customer_reference: one(row,'customer_reference'),
