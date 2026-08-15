@@ -511,6 +511,103 @@ def test_auto_all_messages_marker_is_required_for_fixed_reply_override(
     assert response.json()["proposed_content"] is None
 
 
+def test_product_card_follow_up_reuses_recent_customer_intent(
+    gateway_harness,
+) -> None:
+    client, install, _ = gateway_harness
+    captured: list[str] = []
+
+    def provider(question, context):
+        del context
+        captured.append(question)
+        return {
+            **_result("CONTROLLED_ANSWER"),
+            "answer": "亲，这款积木拼好后约20cm左右哦。",
+            "risk_level": "MEDIUM",
+        }
+
+    install(provider)
+    payload = _request_payload(
+        customer_message="这款呢",
+        message_id="message-follow-up",
+        request_id="request-context-follow-up",
+        idempotency_key="decision-context-follow-up",
+        requested_at="2026-08-15T09:35:12Z",
+    )
+    payload["context"]["visible_conversation_history"] = [
+        {
+            "message_id": "message-size-question",
+            "sender": "CUSTOMER",
+            "content": "这款积木拼装后有多大？",
+            "timestamp": "2026-08-15T09:34:34Z",
+        },
+        {
+            "message_id": "message-follow-up",
+            "sender": "CUSTOMER",
+            "content": "这款呢",
+            "timestamp": "2026-08-15T09:35:11Z",
+        },
+    ]
+
+    response = _post_decision(client, payload)
+
+    assert response.status_code == 200
+    assert captured == ["这款积木拼装后有多大？"]
+    assert response.json()["proposed_content"] == "亲，这款积木拼好后约20cm左右哦。"
+
+
+@pytest.mark.parametrize(
+    ("product_id", "sender", "previous_at"),
+    [
+        ("__STORE_LEVEL_UNRESOLVED__", "CUSTOMER", "2026-08-15T09:34:34Z"),
+        ("PRODUCT-SYNTHETIC", "OPERATOR", "2026-08-15T09:34:34Z"),
+        ("PRODUCT-SYNTHETIC", "CUSTOMER", "2026-08-15T09:20:00Z"),
+    ],
+)
+def test_product_card_follow_up_does_not_cross_scope_time_or_operator_boundary(
+    gateway_harness,
+    product_id: str,
+    sender: str,
+    previous_at: str,
+) -> None:
+    client, install, _ = gateway_harness
+    captured: list[str] = []
+
+    def provider(question, context):
+        del context
+        captured.append(question)
+        return _result()
+
+    install(provider)
+    payload = _request_payload(
+        customer_message="这款呢",
+        message_id="message-boundary-follow-up",
+        request_id=f"request-boundary-{sender.lower()}-{product_id[-8:]}",
+        idempotency_key=f"decision-boundary-{sender.lower()}-{product_id[-8:]}",
+        requested_at="2026-08-15T09:35:12Z",
+    )
+    payload["context"]["ai_cs_scope"]["product_id"] = product_id
+    payload["context"]["visible_conversation_history"] = [
+        {
+            "message_id": "message-previous",
+            "sender": sender,
+            "content": "这款积木拼装后有多大？",
+            "timestamp": previous_at,
+        },
+        {
+            "message_id": "message-boundary-follow-up",
+            "sender": "CUSTOMER",
+            "content": "这款呢",
+            "timestamp": "2026-08-15T09:35:11Z",
+        },
+    ]
+
+    response = _post_decision(client, payload)
+
+    assert response.status_code == 200
+    assert captured == ["这款呢"]
+
+
 def test_gateway_rejects_anonymous_invalid_signature_stale_timestamp_and_nonce_replay(
     gateway_harness,
 ) -> None:

@@ -5,7 +5,7 @@ import json
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -178,10 +178,19 @@ class GatewayServer:
 
         try:
             scope = self._scope_from(request)
+            decision_message = self._resolve_contextual_customer_message(
+                request=request,
+                scope=scope,
+            )
             result = (
-                self._request_decision_provider(request, scope)
+                self._request_decision_provider(
+                    request.model_copy(
+                        update={"customer_message": decision_message}
+                    ),
+                    scope,
+                )
                 if self._request_decision_provider is not None
-                else self._decision_provider(request.customer_message, scope)
+                else self._decision_provider(decision_message, scope)
             )
             response = self._map_response(request, result, scope)
             response_json = response.model_dump_json()
@@ -216,6 +225,101 @@ class GatewayServer:
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
             ) from exc
+
+    @staticmethod
+    def _resolve_contextual_customer_message(
+        *,
+        request: DecisionRequest,
+        scope: FrozenChatContext,
+    ) -> str:
+        """Resolve a short product-card follow-up to the immediately prior intent.
+
+        The resolution is deliberately narrow: it only applies when the current
+        product is verified, the immediately preceding customer message carries
+        a supported intent, and both messages are within five minutes.  It never
+        searches older turns past an operator/system boundary.
+        """
+
+        message = request.customer_message.strip()
+        compact = "".join(message.lower().split())
+        if compact not in {
+            "这款呢",
+            "这个呢",
+            "那这款呢",
+            "那这个呢",
+            "这一个呢",
+            "这个商品呢",
+        }:
+            return message
+        if scope.product_id.startswith("__STORE_LEVEL_"):
+            return message
+
+        current_skipped = False
+        for entry in reversed(scope.recent_conversation):
+            candidate = entry.content.strip()
+            if not current_skipped and (
+                entry.message_id == request.message_id or candidate == message
+            ):
+                current_skipped = True
+                continue
+            if entry.sender and entry.sender.upper() not in {
+                "CUSTOMER",
+                "BUYER",
+                "USER",
+            }:
+                return message
+            try:
+                timestamp = datetime.fromisoformat(
+                    entry.timestamp.replace("Z", "+00:00")
+                )
+                age_seconds = (
+                    request.requested_at.astimezone(timezone.utc)
+                    - timestamp.astimezone(timezone.utc)
+                ).total_seconds()
+            except ValueError:
+                return message
+            if not 0 <= age_seconds <= 300:
+                return message
+
+            previous = "".join(candidate.lower().split())
+            supported_intent = any(
+                keyword in previous
+                for keyword in (
+                    "拼好后有多大",
+                    "拼装后有多大",
+                    "拼起来多大",
+                    "成品尺寸",
+                    "商品尺寸",
+                    "长宽高",
+                    "颗粒",
+                    "材质",
+                    "包装",
+                    "彩盒",
+                    "礼盒",
+                    "价格",
+                    "多少钱",
+                    "优惠",
+                    "库存",
+                    "有货",
+                    "现货",
+                    "订单",
+                    "物流",
+                    "快递",
+                    "到货",
+                    "发货",
+                    "退款",
+                    "退货",
+                    "售后",
+                    "少件",
+                    "缺件",
+                    "破损",
+                    "误吞",
+                    "吞咽",
+                    "安全",
+                )
+            )
+            return candidate if supported_intent else message
+        return message
 
     @staticmethod
     def _scope_from(request: DecisionRequest) -> FrozenChatContext:
