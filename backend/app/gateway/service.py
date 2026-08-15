@@ -551,14 +551,46 @@ class GatewayServer:
         if (
             request.context.get("auto_first_response_policy")
             != "AUTO_ALL_MESSAGES_V1"
-            or result.get("action")
-            not in {"REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
         ):
             return result
 
         message = request.customer_message.strip()
         compact = "".join(message.lower().split())
-        if any(
+        product_contact_only = (
+            (
+                compact.startswith(("http://", "https://"))
+                and any(
+                    domain in compact
+                    for domain in ("yangkeduo.com", "pinduoduo.com")
+                )
+            )
+            or (
+                any(
+                    marker in compact
+                    for marker in ("商品id:", "商品id：", "查看商品规格")
+                )
+                and not any(
+                    marker in compact
+                    for marker in (
+                        "多少", "多大", "怎么", "什么", "哪", "吗", "呢",
+                        "？", "退款", "售后", "订单", "物流",
+                    )
+                )
+            )
+        )
+        if (
+            not product_contact_only
+            and result.get("action")
+            not in {"REQUIRE_LOOKUP", "TRANSFER_HUMAN", "REFUSE"}
+        ):
+            return result
+
+        if product_contact_only:
+            rule_id = "auto-first-product-contact-greeting-v1"
+            answer = "您好，请问需要什么帮助吗？"
+            action = "DIRECT_ANSWER"
+            risk_level = "LOW"
+        elif any(
             keyword in compact
             for keyword in ("误吞", "吞咽", "吞下", "小孩", "儿童", "安全", "有毒")
         ):

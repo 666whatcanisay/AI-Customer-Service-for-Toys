@@ -450,16 +450,28 @@ def test_gateway_maps_all_existing_ai_actions_without_executing(
 
 
 @pytest.mark.parametrize(
-    ("message", "expected_fragment", "expected_risk"),
+    ("message", "expected_fragment", "expected_risk", "expected_action"),
     [
-        ("这个多少钱，还有库存吗？", "商品页面显示", "MEDIUM"),
-        ("我的订单什么时候到？", "订单详情页", "MEDIUM"),
-        ("我要退款怎么办？", "发起售后申请", "MEDIUM"),
-        ("孩子误吞小颗粒怎么办？", "及时就医", "HIGH"),
-        ("这款积木拼好后有多大？", "详情页和所选规格标注", "MEDIUM"),
-        ("这款积木一共有多少颗粒？", "标注的颗粒数量", "MEDIUM"),
-        ("这个商品主要是什么材质？", "对应规格的材质说明", "MEDIUM"),
-        ("这个商品是什么包装？", "所选规格的包装说明", "MEDIUM"),
+        (
+            "https://mobile.yangkeduo.com/goods.html?goods_id=982904528556",
+            "您好，请问需要什么帮助吗？",
+            "LOW",
+            "DIRECT_ANSWER",
+        ),
+        (
+            "商品ID：982904528556 兼容乐高粉白布加迪威龙积木 ￥14/2人团 查看商品规格",
+            "您好，请问需要什么帮助吗？",
+            "LOW",
+            "DIRECT_ANSWER",
+        ),
+        ("这个多少钱，还有库存吗？", "商品页面显示", "MEDIUM", "CONTROLLED_ANSWER"),
+        ("我的订单什么时候到？", "订单详情页", "MEDIUM", "CONTROLLED_ANSWER"),
+        ("我要退款怎么办？", "发起售后申请", "MEDIUM", "CONTROLLED_ANSWER"),
+        ("孩子误吞小颗粒怎么办？", "及时就医", "HIGH", "CONTROLLED_ANSWER"),
+        ("这款积木拼好后有多大？", "详情页和所选规格标注", "MEDIUM", "CONTROLLED_ANSWER"),
+        ("这款积木一共有多少颗粒？", "标注的颗粒数量", "MEDIUM", "CONTROLLED_ANSWER"),
+        ("这个商品主要是什么材质？", "对应规格的材质说明", "MEDIUM", "CONTROLLED_ANSWER"),
+        ("这个商品是什么包装？", "所选规格的包装说明", "MEDIUM", "CONTROLLED_ANSWER"),
     ],
 )
 def test_auto_all_messages_maps_manual_routes_to_governed_fixed_reply(
@@ -467,6 +479,7 @@ def test_auto_all_messages_maps_manual_routes_to_governed_fixed_reply(
     message: str,
     expected_fragment: str,
     expected_risk: str,
+    expected_action: str,
 ) -> None:
     client, install, _ = gateway_harness
     install(lambda question, context: _result("REQUIRE_LOOKUP"))
@@ -484,7 +497,7 @@ def test_auto_all_messages_maps_manual_routes_to_governed_fixed_reply(
     assert decision["action"] == "SUGGEST_REPLY"
     assert expected_fragment in decision["proposed_content"]
     assert decision["risk_level"] == expected_risk
-    assert decision["metadata"]["ai_cs_action"] == "CONTROLLED_ANSWER"
+    assert decision["metadata"]["ai_cs_action"] == expected_action
     assert (
         decision["metadata"]["auto_authorization_basis"]
         == "STORE_APPROVED_FIXED_REPLY"
