@@ -56,3 +56,18 @@ def test_failed_request_always_releases_inflight_slot() -> None:
 
     with limiter.acquire("user-1", "store-a"):
         pass
+
+
+def test_expired_inactive_buckets_are_pruned() -> None:
+    now = [100.0]
+    limiter = ReplyDebugRateLimiter(window_seconds=60, clock=lambda: now[0])
+
+    with limiter.acquire("old-user", "old-store"):
+        pass
+    assert ("old-user", "old-store") in limiter._attempts
+
+    now[0] = 161.0
+    with limiter.acquire("new-user", "new-store"):
+        pass
+
+    assert ("old-user", "old-store") not in limiter._attempts

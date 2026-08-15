@@ -23,6 +23,47 @@ const draft: ReplyDraft = {
 }
 
 describe('ReplyAssistantPanel prepared-state recovery', () => {
+  it('shows one useful empty state before a conversation is selected', () => {
+    const wrapper = mount(ReplyAssistantPanel, {
+      props: {
+        conversation: null, draft: null, stores: [], products: [], skus: [], selectedStoreId: 8,
+        selectedProductId: '', selectedSkuId: '', contextLoading: false, contextError: '',
+        contextStatus: '店铺已自动加载', busy: false, actionBusy: false, actionError: '',
+        agentStatus: 'ONLINE', canGenerateReply: true, canSubmitFeedback: true,
+        feedbackBusy: false, feedbackReceiptId: ''
+      }
+    })
+
+    expect(wrapper.get('[data-testid="assistant-empty-state"]').text()).toContain('从左侧选择一条待处理会话')
+    expect(wrapper.find('[data-testid="workspace-context"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="draft-card"]').exists()).toBe(false)
+  })
+
+  it('keeps desktop product context compact and removes the duplicated store selector', async () => {
+    const wrapper = mount(ReplyAssistantPanel, {
+      props: {
+        conversation, draft, stores: [{
+          storeId: 8, tenantId: 'tenant-1', storeCode: 'STORE-1', storeName: '演示店铺',
+          platform: 'pdd', isDefault: true
+        }],
+        products: [{ productId: 'product-1', displayName: '创意积木' }], skus: [],
+        selectedStoreId: 8, selectedProductId: 'product-1', selectedSkuId: '',
+        contextLoading: false, contextError: '', contextStatus: '上下文已自动识别',
+        busy: false, actionBusy: false, actionError: '', agentStatus: 'ONLINE',
+        canGenerateReply: true, canSubmitFeedback: true, feedbackBusy: false,
+        feedbackReceiptId: '', showStoreSelector: false
+      }
+    })
+
+    const toggle = wrapper.get('[data-testid="context-toggle"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(toggle.text()).toContain('创意积木')
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.findAll('[data-testid="workspace-context"] select')).toHaveLength(2)
+    expect(wrapper.get('[data-testid="workspace-context"]').text()).not.toContain('演示店铺')
+  })
+
   it('hides review and regeneration controls whenever preparation already exists', () => {
     const wrapper = mount(ReplyAssistantPanel, {
       props: {

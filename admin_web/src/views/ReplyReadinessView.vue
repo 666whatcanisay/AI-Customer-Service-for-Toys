@@ -162,6 +162,9 @@ const visibleItems = computed(() => {
     .sort((left, right) => RISK_ORDER[right.effective_risk] - RISK_ORDER[left.effective_risk]
       || itemQuestion(left).localeCompare(itemQuestion(right), 'zh-CN'))
 })
+const hasActiveFilters = computed(() => Boolean(
+  questionSearch.value || categoryFilter.value || actionFilter.value || riskFilter.value,
+))
 const comparisonGroups = computed(() => {
   const groups: Record<ComparisonGroup, ReplyReadinessRunComparison['changed_items']> = {
     WORSE: [], IMPROVED: [], ANSWER_CHANGED: [], OTHER: [],
@@ -188,6 +191,13 @@ function actionLabel(value: ReplyReadinessAction): string {
 
 function originLabel(value: string): string {
   return ORIGIN_LABELS[value] || '其他来源'
+}
+
+function clearResultFilters(): void {
+  questionSearch.value = ''
+  categoryFilter.value = ''
+  actionFilter.value = ''
+  riskFilter.value = ''
 }
 
 function categoryLabel(value: string): string {
@@ -681,7 +691,7 @@ onBeforeUnmount(() => {
     <div class="page-header">
       <div>
         <p class="eyebrow">PDD 回答优化</p>
-        <h1>商品风险调整池</h1>
+        <h1>商品回答风险池</h1>
         <p>既可以运行36题风险池，也可以按当前正式知识和规则调试一条真实问法。</p>
       </div>
       <RouterLink class="button secondary" to="/knowledge-review">知识审核队列</RouterLink>
@@ -690,12 +700,15 @@ onBeforeUnmount(() => {
     <section class="safety-banner" aria-label="隔离评测安全边界">
       <strong>只读评测，不会发送</strong>
       <span>不发布知识、不写正式向量库、不写会话或运行账本、不授予自动发送权。</span>
-      <code>production_usable=false · allow_auto_send=false</code>
+      <span class="safety-flags" aria-label="不可用于生产且禁止自动发送">
+        <b>不可用于生产</b><b>禁止自动发送</b>
+        <code>production_usable=false · allow_auto_send=false</code>
+      </span>
     </section>
 
-    <nav class="workspace-tabs" aria-label="回答工作台模式">
-      <button type="button" :class="{ active: activeTab === 'POOL' }" :aria-pressed="activeTab === 'POOL'" @click="selectTab('POOL')">36题风险池</button>
-      <button type="button" :class="{ active: activeTab === 'DEBUG' }" :aria-pressed="activeTab === 'DEBUG'" @click="selectTab('DEBUG')">单条消息调试</button>
+    <nav class="workspace-tabs" aria-label="回答工作台模式" role="tablist">
+      <button id="reply-pool-tab" type="button" role="tab" aria-controls="reply-pool-panel" :class="{ active: activeTab === 'POOL' }" :aria-selected="activeTab === 'POOL'" @click="selectTab('POOL')">36题风险池</button>
+      <button id="reply-debug-tab" type="button" role="tab" aria-controls="reply-debug-panel" :class="{ active: activeTab === 'DEBUG' }" :aria-selected="activeTab === 'DEBUG'" @click="selectTab('DEBUG')">单条消息调试</button>
     </nav>
 
     <p v-if="routeNotice" class="notice" role="status">{{ routeNotice }}</p>
@@ -750,7 +763,7 @@ onBeforeUnmount(() => {
     </section>
 
     <template v-if="activeTab === 'POOL' && questionSet && scope.product_id">
-      <section class="card run-card" aria-labelledby="run-heading">
+      <section id="reply-pool-panel" class="card run-card" role="tabpanel" aria-labelledby="reply-pool-tab run-heading">
         <div class="section-title">
           <div><span class="step">2</span><div><h2 id="run-heading">选择评测结果</h2><p>只展示当前商品与SKU范围完全一致的历史。</p></div></div>
         </div>
@@ -808,9 +821,13 @@ onBeforeUnmount(() => {
           <label>问题分类<select v-model="categoryFilter"><option value="">全部分类</option><option v-for="category in categoryOptions" :key="category" :value="category">{{ categoryLabel(category) }}</option></select></label>
           <label>处理方式<select v-model="actionFilter"><option value="">全部方式</option><option v-for="[value, label] in actionOptions" :key="value" :value="value">{{ label }}</option></select></label>
           <label>风险<select v-model="riskFilter"><option value="">全部风险</option><option value="LOW">低风险</option><option value="MEDIUM">中风险</option><option value="HIGH">高风险</option></select></label>
+          <button v-if="hasActiveFilters" class="button secondary clear-filters" type="button" @click="clearResultFilters">清除筛选</button>
         </div>
 
-        <p v-if="visibleItems.length === 0" class="empty-state">没有符合当前筛选的问题。可以清空筛选后继续查看。</p>
+        <div v-if="visibleItems.length === 0" class="empty-state">
+          <p>没有符合当前筛选的问题。</p>
+          <button v-if="hasActiveFilters" class="button secondary" type="button" @click="clearResultFilters">清除全部筛选</button>
+        </div>
         <div v-else class="desktop-results table-wrap">
           <table class="data-table">
             <caption>当前商品范围的逐题回答风险</caption>
@@ -880,7 +897,7 @@ onBeforeUnmount(() => {
       </section>
     </template>
 
-    <section v-else-if="activeTab === 'DEBUG' && scope.product_id" class="card debug-card" aria-labelledby="debug-heading">
+    <section v-else-if="activeTab === 'DEBUG' && scope.product_id" id="reply-debug-panel" class="card debug-card" role="tabpanel" aria-labelledby="reply-debug-tab debug-heading">
       <div class="section-title">
         <div><span class="step">2</span><div><h2 id="debug-heading">模拟一条客户消息</h2><p>使用当前正式ReplyRouter、已发布固定规则、Published RAG、Quality Gate与Evidence。</p></div></div>
       </div>
@@ -938,21 +955,22 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .eyebrow { margin: 0 0 6px; color: #2b5fcc; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.safety-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #edd18d; border-radius: 12px; color: #6d4d08; background: #fff9e8; }
-.safety-banner strong { color: #5d4104; }.safety-banner span { flex: 1; }.safety-banner code { color: #7b5a12; font-size: 11px; }
+.safety-banner { display: grid; grid-template-columns: auto minmax(260px, 1fr) auto; align-items: center; gap: 8px 14px; margin-bottom: 18px; padding: 13px 16px; border: 1px solid #edd18d; border-radius: 12px; color: #6d4d08; background: #fff9e8; }
+.safety-banner strong { color: #5d4104; }.safety-flags { display: grid; grid-template-columns: repeat(2, max-content); justify-content: end; gap: 4px 6px; }.safety-flags b { padding: 4px 7px; border-radius: 999px; color: #754f00; background: #f8e7b6; font-size: 11px; }.safety-banner code { grid-column: 1 / -1; color: #7b5a12; font-size: 11px; text-align: right; }
 .workspace-tabs { display: flex; gap: 8px; margin: 0 0 18px; padding: 5px; width: max-content; border: 1px solid #d8e2ef; border-radius: 12px; background: #f6f8fb; }.workspace-tabs button { min-height: 38px; padding: 8px 16px; border: 0; border-radius: 8px; color: #526279; background: transparent; font: inherit; font-weight: 800; cursor: pointer; }.workspace-tabs button.active { color: #fff; background: #315f9f; box-shadow: 0 4px 12px rgb(49 95 159 / 20%); }.workspace-tabs button:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }
 .scope-card, .run-card { margin-bottom: 18px; }.section-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }.section-title > div { display: flex; align-items: center; gap: 11px; }.section-title h2, .section-title p { margin: 0; }.section-title h2 { color: #172554; font-size: 19px; }.section-title p { margin-top: 4px; color: #64748b; font-size: 13px; }.step { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 10px; color: #fff; background: #315f9f; font-size: 13px; font-weight: 800; }.scope-chip, .result-count { padding: 6px 10px; border-radius: 999px; color: #2d5a93; background: #edf4ff; font-size: 12px; font-weight: 700; }
 .scope-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }.source-badge { padding: 6px 9px; border-radius: 999px; color: #385675; background: #edf2f7; font-size: 12px; font-weight: 800; }.source-badge.initial_import { color: #17633a; background: #e8f7ee; }.source-badge.pilot { color: #285493; background: #edf4ff; }.source-badge.test { color: #8a4d00; background: #fff2da; }.source-warning { margin: 12px 0 0; padding: 10px 12px; border: 1px solid #edcf8d; border-radius: 8px; color: #7c4c05; background: #fff9e8; font-size: 13px; }
 .controls, .run-toolbar, .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }.controls label, .run-toolbar label, .filters label { display: grid; min-width: 190px; gap: 6px; color: #526279; font-size: 13px; }.controls label { flex: 1 1 210px; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #cbd7e6; border-radius: 8px; background: #fff; font: inherit; }.controls select:focus-visible, .run-toolbar select:focus-visible, .filters select:focus-visible, .filters input:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }.run-button { margin-top: 15px; }.inline-status { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; color: #385675; background: #f1f6fc; font-size: 13px; }.inline-status.success { color: #226346; background: #edf8f2; }
+.clear-filters { min-height: 42px; }
 .aggregation-note { margin: 12px 0 0; color: #526279; font-size: 13px; line-height: 1.55; }
 .run-technical { margin-top: 10px; color: #64748b; font-size: 12px; }.run-technical summary { width: max-content; cursor: pointer; color: #3e5f86; font-weight: 700; }.run-technical dl { display: grid; gap: 5px; margin: 9px 0 0; }.run-technical dl div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }.run-technical dt { color: #718096; }.run-technical dd { overflow-wrap: anywhere; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }.summary-card { display: grid; gap: 5px; padding: 16px; border: 1px solid #dce5f1; border-left-width: 4px; border-radius: 11px; text-align: left; background: #fff; cursor: pointer; }.summary-card:hover, .summary-card.active { box-shadow: 0 8px 20px rgb(30 52 86 / 12%); transform: translateY(-1px); }.summary-card:focus-visible { outline: 3px solid rgb(59 130 246 / 28%); }.summary-card span, .summary-card small { color: #64748b; font-size: 13px; }.summary-card strong { color: #172554; font-size: 28px; }.summary-card.low { border-left-color: #2f8f5b; }.summary-card.medium { border-left-color: #d5962e; }.summary-card.high { border-left-color: #c74b4b; }
 .result-card { padding: 0; overflow: hidden; }.result-title { padding: 20px 20px 0; }.filters { padding: 0 20px 18px; border-bottom: 1px solid #e3e9f1; }.filters .search-field { flex: 1 1 240px; }.table-wrap { overflow: auto; }.data-table caption { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); }.data-table td { min-width: 130px; line-height: 1.5; }.data-table td:first-child { min-width: 190px; }.data-table .answer-cell { min-width: 260px; }.data-table small { display: block; margin-top: 5px; color: #64748b; }.risk-pill { display: inline-flex; width: max-content; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; }.risk-pill.low { color: #17633a; background: #e8f7ee; }.risk-pill.medium { color: #8a4d00; background: #fff2da; }.risk-pill.high { color: #9b2929; background: #fff0f0; }.text-button { padding: 5px 8px; border: 0; color: #285493; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }.text-button:hover { text-decoration: underline; }.detail-row td { padding: 0 16px 18px; background: #f8fafc; }.business-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 18px; padding: 14px 0; }.business-detail p { margin: 0; }.technical-details { border-top: 1px solid #dce5ef; padding-top: 11px; color: #586a82; }.technical-details summary { cursor: pointer; font-weight: 700; }.technical-details dl { display: grid; gap: 8px; }.technical-details dl div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }.technical-details dt { color: #718096; }.technical-details dd { overflow-wrap: anywhere; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .row-actions { white-space: nowrap; }.text-link { display: inline-block; padding: 5px 8px; color: #285493; font-weight: 700; text-decoration: none; }.text-link:hover { text-decoration: underline; }
-.empty-state { margin: 20px; padding: 24px; border: 1px dashed #b9c9de; border-radius: 12px; color: #526279; text-align: center; background: #f8fbff; }.empty-state.standalone { margin: 0 0 18px; }.mobile-results { display: none; }.question-card { padding: 16px; border-top: 1px solid #e3e9f1; }.question-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }.question-heading strong, .question-heading small { display: block; }.question-heading small { margin-top: 4px; color: #64748b; }.question-card p { line-height: 1.55; }.mobile-action { color: #315f9f; font-weight: 700; }.gap-text { color: #7c4c05; }.question-card details { color: #586a82; }.question-card summary { cursor: pointer; font-weight: 700; }.question-card code { overflow-wrap: anywhere; font-size: 11px; }
+.empty-state { margin: 20px; padding: 24px; border: 1px dashed #b9c9de; border-radius: 12px; color: #526279; text-align: center; background: #f8fbff; }.empty-state p { margin: 0 0 12px; }.empty-state p:last-child { margin-bottom: 0; }.empty-state.standalone { margin: 0 0 18px; }.mobile-results { display: none; }.question-card { padding: 16px; border-top: 1px solid #e3e9f1; }.question-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }.question-heading strong, .question-heading small { display: block; }.question-heading small { margin-top: 4px; color: #64748b; }.question-card p { line-height: 1.55; }.mobile-action { color: #315f9f; font-weight: 700; }.gap-text { color: #7c4c05; }.question-card details { color: #586a82; }.question-card summary { cursor: pointer; font-weight: 700; }.question-card code { overflow-wrap: anywhere; font-size: 11px; }
 .comparison { margin-top: 18px; }.comparison-group { margin-top: 16px; padding: 14px; border-left: 4px solid #8ca0b8; border-radius: 9px; background: #f8fafc; }.comparison-group.worse { border-color: #c74b4b; background: #fff7f7; }.comparison-group.improved { border-color: #2f8f5b; background: #f3fbf6; }.comparison-group.answer_changed { border-color: #3f72b5; background: #f5f9ff; }.comparison-group h3 { margin: 0 0 10px; font-size: 15px; }.comparison-group article { padding: 10px 0; border-top: 1px solid rgb(120 140 165 / 20%); }.comparison-group article p { margin: 4px 0 0; color: #526279; font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }.actions > div { flex: 1 1 260px; }.actions p { margin: 4px 0 0; color: #64748b; font-size: 13px; }.sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
 .debug-card { margin-bottom: 18px; }.debug-message { display: grid; gap: 7px; color: #526279; font-size: 13px; font-weight: 700; }.debug-message textarea { min-height: 128px; padding: 12px; border: 1px solid #cbd7e6; border-radius: 10px; resize: vertical; font: inherit; line-height: 1.6; }.debug-message textarea:focus-visible { outline: 3px solid rgb(59 130 246 / 24%); border-color: #4f7fc1; }.debug-message small { justify-self: end; color: #718096; font-weight: 400; }.debug-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }.debug-actions span { color: #64748b; font-size: 13px; }.debug-result { margin-top: 18px; padding: 18px; border: 1px solid #d9e4f1; border-radius: 12px; background: #f8fbff; }.debug-result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }.debug-result-heading h3 { margin: 0; color: #172554; }.debug-business { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 18px 0; }.debug-business div:first-child { grid-column: 1 / -1; }.debug-business dt { color: #64748b; font-size: 12px; }.debug-business dd { margin: 4px 0 0; color: #263b55; line-height: 1.6; }.version-summary, .debug-comparison { padding: 10px 12px; border-radius: 8px; color: #385675; background: #edf4ff; font-size: 13px; }.debug-comparison { background: #f1f5f9; }.debug-technical { margin-top: 16px; }.debug-technical dl div { grid-template-columns: 130px minmax(0, 1fr); }
 @media (max-width: 900px) { .summary-grid { grid-template-columns: 1fr; }.business-detail { grid-template-columns: 1fr; }.section-title { align-items: flex-start; }.scope-chip { max-width: 45%; } }
-@media (max-width: 680px) { .desktop-results { display: none; }.mobile-results { display: block; }.section-title { display: grid; }.section-title > div { align-items: flex-start; }.scope-chip { max-width: 100%; width: max-content; }.controls label, .run-toolbar label, .filters label { width: 100%; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; }.run-button { width: 100%; }.safety-banner { align-items: flex-start; flex-direction: column; }.workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }.result-count { margin-left: 41px; }.actions { align-items: stretch; flex-direction: column; }.actions .button { width: 100%; }.debug-business { grid-template-columns: 1fr; }.debug-business div:first-child { grid-column: auto; }.debug-actions { align-items: stretch; flex-direction: column; }.debug-actions .button { width: 100%; } }
+@media (max-width: 680px) { .desktop-results { display: none; }.mobile-results { display: block; }.section-title { display: grid; }.section-title > div { align-items: flex-start; }.scope-chip { max-width: 100%; width: max-content; }.controls label, .run-toolbar label, .filters label { width: 100%; }.controls select, .run-toolbar select, .filters select, .filters input { width: 100%; }.run-button { width: 100%; }.safety-banner { grid-template-columns: 1fr; align-items: flex-start; }.safety-flags { justify-content: start; }.safety-banner code { text-align: left; }.workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }.result-count { margin-left: 41px; }.actions { align-items: stretch; flex-direction: column; }.actions .button { width: 100%; }.debug-business { grid-template-columns: 1fr; }.debug-business div:first-child { grid-column: auto; }.debug-actions { align-items: stretch; flex-direction: column; }.debug-actions .button { width: 100%; } }
 </style>

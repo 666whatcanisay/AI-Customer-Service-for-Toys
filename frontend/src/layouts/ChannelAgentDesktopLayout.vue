@@ -3,41 +3,13 @@
     <header class="agent-desktop-bar">
       <div class="brand">
         <span class="brand-mark">AI</span>
-        <div><strong>AI 客服助手</strong><small>Channel Agent 桌面端</small></div>
+        <div><strong>AI 客服助手</strong><small>客服工作台</small></div>
       </div>
 
-      <div class="runtime-summary" aria-label="客户端运行状态">
-        <span :class="statusClass(agentStatus)"><i />Agent {{ statusLabel(agentStatus) }}</span>
-        <span :class="statusClass(browserStatus)"><i />PDD {{ pddLabel }}</span>
-        <span
-          :class="realMessageObservationEnabled ? 'healthy' : 'attention'"
-          data-testid="message-source-status"
-        ><i />{{ messageSourceLabel }}</span>
-        <button
-          v-if="canOpenPddWindow"
-          type="button"
-          class="pdd-launch"
-          :disabled="openingPdd"
-          data-testid="open-pdd-window"
-          @click="openPddWindow"
-        >{{ openingPdd ? '正在启动…' : '启动 PDD 专属窗口' }}</button>
-        <button
-          v-if="canRefreshPddWorkspace"
-          type="button"
-          class="pdd-launch"
-          :disabled="refreshingPdd"
-          data-testid="refresh-pdd-workspace"
-          @click="refreshPddWorkspace"
-        >{{ refreshingPdd ? '正在识别…' : '我已进入客服工作台，重新识别' }}</button>
-        <button
-          v-if="canRestartPddObserver"
-          type="button"
-          class="pdd-launch"
-          :disabled="restartingObserver || !realMessageObservationEnabled"
-          data-testid="restart-pdd-observer"
-          @click="restartPddObserver"
-        >{{ observerRestartLabel }}</button>
-        <span :class="activeStore ? 'healthy' : 'attention'" data-testid="active-store-status"><i />{{ storeLabel }}</span>
+      <div class="runtime-summary" aria-label="客服工作台摘要">
+        <span class="overall-status" :class="overallStatus.tone" data-testid="overall-runtime-status">
+          <i />{{ overallStatus.label }}
+        </span>
         <select
           v-if="storeOptions.length > 1"
           v-model="selectedStore"
@@ -53,32 +25,121 @@
             :disabled="!store.pddBinding"
           >{{ store.label }}</option>
         </select>
+        <span v-else class="store-summary" :class="activeStore ? 'healthy' : 'attention'" data-testid="active-store-status">
+          {{ activeStore?.label ?? '店铺待绑定' }}
+        </span>
+        <span class="pending-summary" data-testid="pending-conversation-count">
+          待处理 <strong>{{ pendingConversationCount }}</strong>
+        </span>
       </div>
 
       <div class="operator">
-        <div><small>当前客服</small><strong>{{ auth.user.value?.display_name ?? '未登录' }}</strong></div>
-        <button type="button" :disabled="loading" @click="refresh">刷新状态</button>
-        <button type="button" class="danger" @click="requestStop">安全退出</button>
+        <button type="button" class="detail-button" data-testid="open-runtime-details" @click="openRuntimeDetails">
+          运行详情
+        </button>
+        <div class="more-wrap">
+          <button
+            type="button"
+            class="more-button"
+            aria-label="更多操作"
+            :aria-expanded="moreMenuOpen"
+            data-testid="desktop-more-menu"
+            @click="moreMenuOpen = !moreMenuOpen"
+          >•••</button>
+          <div v-if="moreMenuOpen" class="more-menu" role="menu">
+            <div class="operator-identity"><small>当前客服</small><strong>{{ auth.user.value?.display_name ?? '未登录' }}</strong></div>
+            <button type="button" role="menuitem" :disabled="loading" @click="refreshFromMenu">刷新状态</button>
+            <button type="button" role="menuitem" class="danger" @click="requestStopFromMenu">安全退出</button>
+          </div>
+        </div>
       </div>
     </header>
 
-    <div v-if="canRefreshPddWorkspace" class="pdd-workspace-guide" data-testid="pdd-workspace-guide">
-      <strong>客服工作台地址</strong>
-      <span>扫码后若停在商家首页，请在当前 PDD 专属 Edge 中新建标签页并输入：</span>
-      <code>{{ PDD_CUSTOMER_SERVICE_URL }}</code>
-    </div>
-
-    <div v-if="error" class="agent-warning" role="status">
-      本地 Agent 暂时无法连接。AI 建议仍不会自动发送，请从 Windows 托盘检查 Agent 状态。
-    </div>
-    <div v-else class="safety-strip">
-      <strong>人工确认模式</strong>
-      <span>AI 只生成建议；只有客服明确确认后，Agent 才允许执行发送。</span>
+    <div v-if="actionAlert" class="action-alert" :class="actionAlert.tone" role="status" data-testid="runtime-action-alert">
+      <div>
+        <strong>{{ actionAlert.title }}</strong>
+        <span>{{ actionAlert.impact }}</span>
+      </div>
+      <button
+        v-if="actionAlert.action"
+        type="button"
+        :disabled="runtimeActionBusy"
+        :data-testid="actionAlert.testId"
+        @click="runAlertAction"
+      >{{ runtimeActionBusy ? '处理中…' : actionAlert.actionLabel }}</button>
+      <button v-if="actionAlert.showCopyUrl" type="button" @click="copyPddUrl">复制工作台地址</button>
+      <button type="button" class="subtle" @click="openRuntimeDetails">查看详情</button>
     </div>
 
     <main class="agent-desktop-content">
       <RouterView />
     </main>
+
+    <div v-if="runtimeDetailsOpen" class="runtime-drawer-backdrop" data-testid="runtime-details-drawer" @click.self="runtimeDetailsOpen = false">
+      <aside class="runtime-drawer" aria-label="运行详情">
+        <header>
+          <div><small>运行诊断</small><h2>运行详情</h2></div>
+          <button type="button" aria-label="关闭运行详情" data-testid="close-runtime-details" @click="runtimeDetailsOpen = false">×</button>
+        </header>
+
+        <section class="detail-section">
+          <div class="section-heading"><strong>当前运行</strong><button type="button" :disabled="loading || runtimeDetailsLoading" @click="refreshRuntimeDetails">刷新</button></div>
+          <dl class="detail-grid">
+            <div><dt>总体状态</dt><dd :class="overallStatus.tone">{{ overallStatus.label }}</dd></div>
+            <div><dt>Agent</dt><dd>{{ statusLabel(agentStatus) }}</dd></div>
+            <div><dt>PDD</dt><dd>{{ pddLabel }}</dd></div>
+            <div data-testid="message-source-status"><dt>消息读取</dt><dd>{{ messageSourceLabel }}</dd></div>
+            <div><dt>当前客服</dt><dd>{{ auth.user.value?.display_name ?? '未登录' }}</dd></div>
+            <div><dt>当前店铺</dt><dd>{{ activeStore?.label ?? '未绑定' }}</dd></div>
+          </dl>
+        </section>
+
+        <section class="detail-section">
+          <strong>客服连接程序</strong>
+          <dl class="detail-grid">
+            <div><dt>关联状态</dt><dd>{{ desktopAssociationLabel }}</dd></div>
+            <div><dt>当前设备</dt><dd>{{ desktopAgentStatus?.agent?.deviceName || desktopAgentStatus?.agent?.deviceId || '未关联' }}</dd></div>
+            <div><dt>程序版本</dt><dd>{{ desktopAgentStatus?.agent?.agentVersion || bootstrap?.agent.version || '—' }}</dd></div>
+            <div><dt>最后心跳</dt><dd>{{ desktopHeartbeatLabel }}</dd></div>
+            <div><dt>Agent编号</dt><dd>{{ desktopAgentStatus?.agent?.agentId || bootstrap?.binding.agent_id || '—' }}</dd></div>
+            <div><dt>设备编号</dt><dd>{{ desktopAgentStatus?.agent?.deviceId || bootstrap?.binding.device_id || '—' }}</dd></div>
+          </dl>
+          <p v-if="runtimeDetailsError" class="detail-error">{{ runtimeDetailsError }}</p>
+        </section>
+
+        <section class="detail-section">
+          <strong>回复与发送安全</strong>
+          <label class="policy-control">
+            <span>回复策略</span>
+            <select
+              :value="replyPolicy?.mode ?? 'MANUAL_CONFIRM'"
+              :disabled="replyPolicyBusy || !activeStoreNumericId || !canManageReplyPolicy"
+              data-testid="reply-policy-mode"
+              @change="changeReplyPolicy"
+            >
+              <option value="MANUAL_CONFIRM">MANUAL_CONFIRM（人工确认）</option>
+              <option value="AUTO_LOW_RISK">AUTO_LOW_RISK（仅低风险自动准备）</option>
+            </select>
+          </label>
+          <div class="safety-facts">
+            <span>人工确认 {{ bootstrap?.safety.manual_approval === true ? '已启用' : '状态未知' }}</span>
+            <strong>REAL_SEND = {{ bootstrap?.safety.real_send_enabled === true ? 'ON' : 'OFF' }}</strong>
+          </div>
+          <p v-if="replyPolicyError" class="detail-error">{{ replyPolicyError }}</p>
+          <small>人工确认只生成执行准备；真实发送是否允许，以当前安全门禁事实为准。</small>
+        </section>
+
+        <section class="detail-section">
+          <strong>PDD 工作台</strong>
+          <div class="workspace-url"><code>{{ PDD_CUSTOMER_SERVICE_URL }}</code><button type="button" @click="copyPddUrl">复制地址</button></div>
+          <div class="drawer-actions">
+            <button v-if="canOpenPddWindow" type="button" :disabled="openingPdd" @click="openPddWindow">启动专属窗口</button>
+            <button v-if="canRefreshPddWorkspace" type="button" :disabled="refreshingPdd" @click="refreshPddWorkspace">重新识别工作台</button>
+            <button v-if="canRestartPddObserver" type="button" :disabled="restartingObserver || !realMessageObservationEnabled" data-testid="restart-pdd-observer" @click="restartPddObserver">{{ observerRestartLabel }}</button>
+          </div>
+        </section>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -86,7 +147,15 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterView } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { storeToRefs } from 'pinia'
 import { useAuthSession } from '@/auth/authSession'
+import { desktopAgentClient } from '@/api/desktopAgentClient'
+import type { DesktopAgentStatus } from '@/api/desktopAgentTypes'
+import {
+  offlineReplyControlClient,
+  type ReplyPolicy,
+  type ReplyPolicyMode
+} from '@/api/offlineReplyControlClient'
 import {
   fetchChannelAgentBootstrap,
   requestChannelAgentPddObserverRestart,
@@ -96,8 +165,11 @@ import {
   selectChannelAgentActiveStore,
   type ChannelAgentBootstrap
 } from '@/api/channelAgentDesktopClient'
+import { useHumanLoopWorkspaceStore } from '@/stores/humanLoopWorkspace'
 
 const auth = useAuthSession()
+const workspace = useHumanLoopWorkspaceStore()
+const { conversationCounts } = storeToRefs(workspace)
 const bootstrap = ref<ChannelAgentBootstrap | null>(null)
 const loading = ref(false)
 const error = ref(false)
@@ -106,6 +178,14 @@ const openingPdd = ref(false)
 const refreshingPdd = ref(false)
 const restartingObserver = ref(false)
 const selectedStore = ref('')
+const moreMenuOpen = ref(false)
+const runtimeDetailsOpen = ref(false)
+const runtimeDetailsLoading = ref(false)
+const runtimeDetailsError = ref('')
+const desktopAgentStatus = ref<DesktopAgentStatus | null>(null)
+const replyPolicy = ref<ReplyPolicy | null>(null)
+const replyPolicyBusy = ref(false)
+const replyPolicyError = ref('')
 const PDD_CUSTOMER_SERVICE_URL = 'https://mms.pinduoduo.com/chat-merchant/index.html#'
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -163,9 +243,119 @@ const storeOptions = computed(() => authorizedStores.value.map((storeCode) => {
 const activeStore = computed(() => storeOptions.value.find((item) =>
   item.storeCode === bootstrap.value?.binding.active_store_id
 ) ?? null)
-const storeLabel = computed(() => activeStore.value
-  ? `当前店铺 ${activeStore.value.label}`
-  : authorizedStores.value.length ? '请选择当前工作店铺' : '店铺待绑定')
+const activeStoreRecord = computed(() => auth.user.value?.stores.find(
+  (store) => store.store_code === bootstrap.value?.binding.active_store_id
+) ?? null)
+const activeStoreNumericId = computed(() => activeStoreRecord.value?.store_id ?? activeStoreRecord.value?.id ?? null)
+const canManageReplyPolicy = computed(() => auth.hasPermission('customer_service.manage'))
+const pendingConversationCount = computed(() => (
+  conversationCounts.value.NEW
+  + conversationCounts.value.PROCESSING
+  + conversationCounts.value.WAITING_REPLY
+))
+const storeMismatch = computed(() => Boolean(
+  bootstrap.value?.binding.active_store_id
+  && bootstrap.value?.binding.observed_store_id
+  && bootstrap.value.binding.active_store_id !== bootstrap.value.binding.observed_store_id
+))
+
+type RuntimeAction = 'REFRESH' | 'OPEN_PDD' | 'REFRESH_WORKSPACE' | 'RESTART_OBSERVER'
+type RuntimeAlert = {
+  title: string
+  impact: string
+  tone: 'warning' | 'danger' | 'info'
+  action: RuntimeAction | null
+  actionLabel: string
+  testId?: string
+  showCopyUrl?: boolean
+}
+
+const actionAlert = computed<RuntimeAlert | null>(() => {
+  if (error.value) return {
+    title: 'Agent 连接失败', impact: '暂时无法确认实时运行状态；AI 不会自动发送。',
+    tone: 'danger', action: 'REFRESH', actionLabel: '重新连接'
+  }
+  if (!activeStore.value) return {
+    title: '店铺尚未确认', impact: '无法安全接收或处理店铺会话。',
+    tone: 'danger', action: null, actionLabel: ''
+  }
+  if (storeMismatch.value) return {
+    title: '页面店铺与当前店铺不一致', impact: '消息读取已暂停，请先核对当前 PDD 页面。',
+    tone: 'danger', action: 'REFRESH_WORKSPACE', actionLabel: '重新识别', testId: 'refresh-pdd-workspace'
+  }
+  if (!['ONLINE', 'RUNNING', 'READY', 'OPENED'].includes(agentStatus.value)) return {
+    title: 'Agent 运行状态异常', impact: '实时会话能力可能不可用，请刷新后检查。',
+    tone: 'danger', action: 'REFRESH', actionLabel: '刷新状态'
+  }
+  if (canOpenPddWindow.value) return {
+    title: 'PDD 专属窗口未启动', impact: '当前不会接收真实客户消息。',
+    tone: 'warning', action: 'OPEN_PDD', actionLabel: '启动 PDD 窗口', testId: 'open-pdd-window'
+  }
+  if (['FAILED', 'STOPPED', 'DEGRADED'].includes(browserStatus.value)) return {
+    title: 'PDD 专属窗口状态异常', impact: '当前不会可靠读取客户消息。',
+    tone: 'danger', action: 'REFRESH', actionLabel: '刷新状态'
+  }
+  const login = bootstrap.value?.browser.pdd_login_state
+  if (login === 'WAITING_QR_SCAN' || login === 'PDD_LOGIN_PAGE') return {
+    title: '等待扫码登录', impact: '请在 PDD 专属 Edge 中完成扫码，系统不会代替登录。',
+    tone: 'warning', action: null, actionLabel: ''
+  }
+  if (login !== 'CUSTOMER_SERVICE_READY' && canRefreshPddWorkspace.value) return {
+    title: '尚未识别客服工作台', impact: '当前不会读取会话；请打开客服页面后重新识别。',
+    tone: 'warning', action: 'REFRESH_WORKSPACE', actionLabel: '重新识别',
+    testId: 'refresh-pdd-workspace', showCopyUrl: true
+  }
+  if (login !== 'CUSTOMER_SERVICE_READY') return {
+    title: 'PDD 登录或页面状态异常', impact: '当前不会读取真实客户消息，请检查专属窗口。',
+    tone: 'danger', action: 'REFRESH', actionLabel: '刷新状态'
+  }
+  if (canRestartPddObserver.value && realMessageObservationEnabled.value) return {
+    title: '只读观察会话已结束', impact: '新客户消息暂时不会进入工作台。',
+    tone: 'warning', action: 'RESTART_OBSERVER', actionLabel: '恢复只读观察', testId: 'restart-pdd-observer'
+  }
+  if (!realMessageObservationEnabled.value) return {
+    title: '当前未读取真实消息',
+    impact: bootstrap.value?.browser.message_source === 'OFFLINE_REPLAY'
+      ? '当前为离线回放，不会接收真实客户消息。'
+      : '请在运行详情中检查消息读取配置。',
+    tone: 'info', action: null, actionLabel: ''
+  }
+  return null
+})
+
+const overallStatus = computed(() => {
+  if (error.value || ['FAILED', 'STOPPED'].includes(agentStatus.value)) {
+    return { label: '离线', tone: 'offline' }
+  }
+  if (actionAlert.value) return { label: '需处理', tone: 'attention' }
+  return { label: '就绪', tone: 'healthy' }
+})
+
+const runtimeActionBusy = computed(() => (
+  loading.value || openingPdd.value || refreshingPdd.value || restartingObserver.value
+))
+
+const desktopAssociationLabel = computed(() => {
+  if (runtimeDetailsLoading.value && !desktopAgentStatus.value) return '检查中'
+  const state = desktopAgentStatus.value?.associationState
+  if (!state) return runtimeDetailsError.value ? '检查失败' : '未检查'
+  if (state !== 'READY') return {
+    BINDING_REQUIRED: '待绑定', ACTIVATION_REQUIRED: '待激活', STORE_MISMATCH: '店铺不匹配',
+    MULTIPLE_MATCHES: '多设备冲突', DISABLED: '已停用'
+  }[state] ?? '状态异常'
+  return { ONLINE: '设备在线', DEGRADED: '连接降级', OFFLINE: '设备离线' }[
+    desktopAgentStatus.value?.agent?.onlineStatus ?? 'OFFLINE'
+  ]
+})
+
+const desktopHeartbeatLabel = computed(() => {
+  const value = desktopAgentStatus.value?.agent?.lastHeartbeat
+  if (!value) return '尚无心跳'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? '时间无效'
+    : parsed.toLocaleString('zh-CN', { hour12: false })
+})
 
 function statusLabel(value: string) {
   const labels: Record<string, string> = {
@@ -174,10 +364,6 @@ function statusLabel(value: string) {
     FAILED: '异常', STOPPED: '已停止'
   }
   return labels[value] ?? '待连接'
-}
-
-function statusClass(value: string) {
-  return ['ONLINE', 'RUNNING', 'READY', 'OPENED'].includes(value) ? 'healthy' : 'attention'
 }
 
 async function refresh() {
@@ -191,6 +377,99 @@ async function refresh() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadRuntimeSupplementals() {
+  if (!activeStoreNumericId.value) return
+  runtimeDetailsLoading.value = true
+  runtimeDetailsError.value = ''
+  replyPolicyError.value = ''
+  const [desktopResult, policyResult] = await Promise.allSettled([
+    desktopAgentClient.getStatus(activeStoreNumericId.value),
+    offlineReplyControlClient.getPolicy(activeStoreNumericId.value)
+  ])
+  if (desktopResult.status === 'fulfilled') desktopAgentStatus.value = desktopResult.value
+  else runtimeDetailsError.value = desktopResult.reason instanceof Error
+    ? desktopResult.reason.message
+    : '客服连接程序状态检查失败。'
+  if (policyResult.status === 'fulfilled') replyPolicy.value = policyResult.value
+  else replyPolicyError.value = policyResult.reason instanceof Error
+    ? policyResult.reason.message
+    : '回复策略暂时不可用。'
+  runtimeDetailsLoading.value = false
+}
+
+function openRuntimeDetails() {
+  moreMenuOpen.value = false
+  runtimeDetailsOpen.value = true
+  void loadRuntimeSupplementals()
+}
+
+async function refreshRuntimeDetails() {
+  await refresh()
+  await loadRuntimeSupplementals()
+}
+
+async function changeReplyPolicy(event: Event) {
+  const select = event.target as HTMLSelectElement
+  const mode = select.value as ReplyPolicyMode
+  if (!activeStoreNumericId.value || mode === replyPolicy.value?.mode) return
+  const confirmed = window.confirm(
+    mode === 'AUTO_LOW_RISK'
+      ? '确认启用 AUTO_LOW_RISK？仅通过质量门的低风险回复会自动进入执行准备，真实发送仍保持关闭。'
+      : '确认切换回 MANUAL_CONFIRM？此后每条回复都必须人工确认后才能进入执行准备。'
+  )
+  if (!confirmed) {
+    select.value = replyPolicy.value?.mode ?? 'MANUAL_CONFIRM'
+    return
+  }
+  replyPolicyBusy.value = true
+  replyPolicyError.value = ''
+  try {
+    replyPolicy.value = await offlineReplyControlClient.setPolicy({
+      storeId: activeStoreNumericId.value,
+      mode,
+      expectedRevision: replyPolicy.value?.revision ?? null
+    })
+    ElMessage.success(`回复策略已切换为 ${mode}；真实发送状态未改变。`)
+  } catch (policyError) {
+    replyPolicyError.value = policyError instanceof Error ? policyError.message : '回复策略切换失败。'
+    select.value = replyPolicy.value?.mode ?? 'MANUAL_CONFIRM'
+  } finally {
+    replyPolicyBusy.value = false
+  }
+}
+
+async function copyPddUrl() {
+  try {
+    await navigator.clipboard.writeText(PDD_CUSTOMER_SERVICE_URL)
+    ElMessage.success('客服工作台地址已复制')
+  } catch {
+    ElMessage.warning('无法自动复制，请在运行详情中手动选择地址。')
+  }
+}
+
+async function runAlertAction() {
+  if (actionAlert.value?.action === 'OPEN_PDD') return openPddWindow()
+  if (actionAlert.value?.action === 'REFRESH_WORKSPACE') return refreshPddWorkspace()
+  if (actionAlert.value?.action === 'RESTART_OBSERVER') return restartPddObserver()
+  await refresh()
+}
+
+function refreshFromMenu() {
+  moreMenuOpen.value = false
+  void refresh()
+}
+
+function requestStopFromMenu() {
+  moreMenuOpen.value = false
+  void requestStop()
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  if (runtimeDetailsOpen.value) runtimeDetailsOpen.value = false
+  else moreMenuOpen.value = false
 }
 
 async function openPddWindow() {
@@ -269,6 +548,9 @@ async function confirmStoreSelection() {
   try {
     await selectChannelAgentActiveStore(target)
     await refresh()
+    desktopAgentStatus.value = null
+    replyPolicy.value = null
+    if (runtimeDetailsOpen.value) await loadRuntimeSupplementals()
     ElMessage.success('当前工作店铺已切换')
   } catch {
     selectedStore.value = previous
@@ -293,24 +575,25 @@ async function requestStop() {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
   void refresh()
   refreshTimer = setInterval(() => void refresh(), 5000)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
   if (refreshTimer) clearInterval(refreshTimer)
 })
 </script>
 
 <style scoped>
-.agent-desktop-shell{display:grid;grid-template-rows:auto auto minmax(0,1fr);height:100vh;min-height:640px;background:#edf4ef;color:#153529;overflow:hidden}
-.agent-desktop-bar{display:flex;align-items:center;gap:24px;min-height:70px;padding:10px 20px;border-bottom:1px solid #cfe0d6;background:#fff}
-.brand{display:flex;align-items:center;gap:10px;min-width:230px}.brand-mark{display:grid;width:40px;height:40px;place-items:center;border-radius:12px;background:linear-gradient(135deg,#2f8b61,#72d7bd);color:#fff;font-weight:900}.brand strong,.brand small{display:block}.brand small{margin-top:2px;color:#72877c;font-size:11px}
-.runtime-summary{display:flex;align-items:center;gap:14px;margin-left:auto}.runtime-summary span{display:flex;align-items:center;gap:6px;color:#667b70;font-size:12px}.runtime-summary i{width:8px;height:8px;border-radius:50%;background:#d99b2b}.runtime-summary .healthy i{background:#29a875}.runtime-summary .attention{color:#9a6300}
-.runtime-summary select{max-width:190px;padding:7px 28px 7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:12px}
-.runtime-summary .pdd-launch{padding:6px 10px;border:1px solid #d6a331;border-radius:8px;background:#fff8e7;color:#8b5c00;font-size:12px;cursor:pointer;white-space:nowrap}.runtime-summary .pdd-launch:disabled{cursor:wait;opacity:.65}
-.operator{display:flex;align-items:center;gap:10px;padding-left:18px;border-left:1px solid #dce8e0}.operator small,.operator strong{display:block}.operator small{color:#788b81;font-size:10px}.operator strong{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.operator button{padding:7px 10px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;cursor:pointer}.operator .danger{border-color:#e2b8b2;color:#a13c30}
-.pdd-workspace-guide{display:flex;align-items:center;gap:8px;padding:6px 20px;border-bottom:1px solid #cfe0d6;background:#f4faf6;color:#48695a;font-size:12px}.pdd-workspace-guide strong{color:#245a43;white-space:nowrap}.pdd-workspace-guide code{padding:3px 7px;border:1px solid #c6d9ce;border-radius:6px;background:#fff;color:#175f43;user-select:all}
-.safety-strip,.agent-warning{padding:8px 20px;border-bottom:1px solid #e6d5a7;background:#fff8e7;color:#77510a;font-size:12px}.safety-strip strong{margin-right:10px;padding:2px 7px;border-radius:999px;background:#e79c1b;color:#fff}.agent-warning{border-color:#efc5c0;background:#fff0ee;color:#943a30}
-.agent-desktop-content{min-width:0;min-height:0;padding:12px;overflow:auto}
-@media(max-width:900px){.agent-desktop-bar{gap:10px;padding:8px 12px}.brand{min-width:0}.runtime-summary span:last-child{display:none}.operator>div{display:none}}
+.agent-desktop-shell{display:flex;flex-direction:column;height:100vh;min-height:560px;background:#edf4ef;color:#153529;overflow:hidden}
+.agent-desktop-bar{z-index:20;display:flex;align-items:center;gap:18px;min-height:56px;padding:7px 14px;border-bottom:1px solid #cfe0d6;background:#fff}
+.brand{display:flex;flex:0 0 auto;align-items:center;gap:9px}.brand-mark{display:grid;width:34px;height:34px;place-items:center;border-radius:10px;background:linear-gradient(135deg,#2f8b61,#72d7bd);color:#fff;font-size:13px;font-weight:900}.brand strong,.brand small{display:block}.brand strong{font-size:14px}.brand small{margin-top:1px;color:#72877c;font-size:9px}
+.runtime-summary{display:flex;min-width:0;align-items:center;gap:9px;margin-left:auto}.runtime-summary span{display:flex;align-items:center;gap:6px;color:#587064;font-size:10px;white-space:nowrap}.runtime-summary i{width:8px;height:8px;border-radius:50%;background:#d99b2b}.runtime-summary .healthy i{background:#29a875}.runtime-summary .offline{color:#a13c30}.runtime-summary .offline i{background:#c8584b}.runtime-summary .attention{color:#936108}.overall-status{padding:6px 8px;border-radius:999px;background:#edf3ef;font-weight:900}.overall-status.healthy{color:#25704e;background:#dff2e5}.overall-status.attention{color:#8b5c00;background:#fff1ca}.overall-status.offline{color:#9b382f;background:#ffebe8}
+.runtime-summary select{width:min(220px,24vw);padding:7px 28px 7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:10px}.store-summary{max-width:240px;overflow:hidden;text-overflow:ellipsis}.pending-summary{padding:6px 8px;border-radius:8px;background:#f1f7f3}.pending-summary strong{color:#206744;font-size:12px}
+.operator{display:flex;flex:0 0 auto;align-items:center;gap:7px;padding-left:12px;border-left:1px solid #dce8e0}.operator button,.action-alert button,.section-heading button,.workspace-url button,.drawer-actions button{padding:7px 9px;border:1px solid #bcd2c5;border-radius:8px;background:#fff;color:#245a43;font-size:10px;cursor:pointer}.operator button:disabled,.action-alert button:disabled,.runtime-drawer button:disabled{cursor:wait;opacity:.55}.more-wrap{position:relative}.operator .more-button{width:34px;padding:7px 0;font-weight:900;letter-spacing:.08em}.more-menu{position:absolute;top:42px;right:0;z-index:50;display:grid;width:170px;padding:7px;border:1px solid #cadcd0;border-radius:11px;background:#fff;box-shadow:0 16px 45px rgb(28 62 41 / 18%)}.more-menu .operator-identity{display:grid;gap:2px;padding:7px 8px 9px;border-bottom:1px solid #e3ece6}.operator-identity small{color:#788b81;font-size:8px}.operator-identity strong{overflow:hidden;text-overflow:ellipsis;font-size:10px;white-space:nowrap}.more-menu button{margin-top:5px;text-align:left}.more-menu .danger{border-color:#e2b8b2;color:#a13c30;background:#fff7f6}
+.action-alert{display:flex;align-items:center;gap:9px;min-height:38px;padding:5px 14px;border-bottom:1px solid #e3c57e;background:#fff7e3;color:#79520e}.action-alert>div{display:flex;min-width:0;align-items:center;gap:8px;margin-right:auto}.action-alert strong{font-size:11px;white-space:nowrap}.action-alert span{overflow:hidden;font-size:10px;text-overflow:ellipsis;white-space:nowrap}.action-alert.danger{border-color:#e7b7b2;background:#fff0ee;color:#943a30}.action-alert.info{border-color:#b9d2df;background:#eef7fb;color:#356b87}.action-alert .subtle{border-color:transparent;background:transparent}
+.agent-desktop-content{min-width:0;min-height:0;flex:1;padding:8px;overflow:hidden}
+.runtime-drawer-backdrop{position:fixed;inset:0;z-index:2000;display:flex;justify-content:flex-end;background:rgb(23 45 31 / 38%);backdrop-filter:blur(2px)}.runtime-drawer{box-sizing:border-box;width:min(440px,94vw);height:100%;padding:16px;overflow:auto;background:#f8fcf9;box-shadow:-20px 0 60px rgb(20 55 35 / 24%)}.runtime-drawer>header{display:flex;align-items:flex-start;justify-content:space-between;padding:2px 2px 14px;border-bottom:1px solid #d4e2d8}.runtime-drawer>header small{color:#4c8065;font-size:9px;font-weight:900;letter-spacing:.12em}.runtime-drawer>header h2{margin:4px 0 0;font-size:20px}.runtime-drawer>header button{width:32px;height:32px;border:1px solid #cadcd0;border-radius:9px;background:#fff;color:#597065;font-size:20px;cursor:pointer}.detail-section{display:grid;gap:10px;margin-top:13px;padding:13px;border:1px solid #c9ddcd;border-radius:12px;background:#fff}.detail-section>strong,.section-heading strong{font-size:12px}.section-heading{display:flex;align-items:center;justify-content:space-between}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}.detail-grid div{min-width:0;padding:8px;border-radius:8px;background:#f1f7f3}.detail-grid dt{color:#73867a;font-size:8px}.detail-grid dd{margin:4px 0 0;overflow:hidden;color:#284b38;font-size:10px;font-weight:800;text-overflow:ellipsis;white-space:nowrap}.detail-grid dd.healthy{color:#25704e}.detail-grid dd.attention{color:#8b5c00}.detail-grid dd.offline{color:#a13c30}.policy-control{display:grid;gap:5px;color:#61766a;font-size:9px}.policy-control select{padding:8px;border:1px solid #bed3c4;border-radius:8px;background:#fff;color:#245a43;font-size:10px}.safety-facts{display:flex;align-items:center;justify-content:space-between;gap:8px}.safety-facts span{color:#446151;font-size:9px}.safety-facts strong{padding:5px 8px;border-radius:999px;color:#963d46;background:#fff0f1;font-size:9px}.detail-section>small{color:#6d8175;font-size:8px;line-height:1.5}.detail-error{margin:0;color:#aa4650;font-size:9px}.workspace-url{display:flex;gap:7px;align-items:center}.workspace-url code{min-width:0;flex:1;padding:8px;overflow:hidden;border-radius:7px;background:#eff6f1;color:#256345;font-size:9px;text-overflow:ellipsis;white-space:nowrap;user-select:all}.drawer-actions{display:flex;flex-wrap:wrap;gap:7px}
+@media(max-width:900px){.agent-desktop-bar{gap:8px;padding:7px 9px}.brand small{display:none}.runtime-summary{gap:6px}.runtime-summary select{width:170px}.pending-summary{display:none}.operator{padding-left:6px}.detail-button{font-size:0}.detail-button::after{content:'详情';font-size:10px}.action-alert span{display:none}}
 </style>

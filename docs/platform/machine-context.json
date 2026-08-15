@@ -4,10 +4,26 @@
   "project_name": "AI-CS C-line knowledge governance and operations platform",
   "line": "C",
   "version": "AI-CS V1.0.0",
-  "current_task": "AI-CS Minimal Architecture Fix and Source Freeze V1",
-  "current_stage": "C source identity targets unique head 0023, controlled migration resolves head dynamically, debug calls are process-limited and Admin rejects late cross-scope responses. Formal Runtime remains 0019 and untouched.",
-  "current_gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY; formal Runtime 0019 unchanged; REAL_PDD_* remains NOT_VERIFIED",
-  "status": "ai_cs_minimal_arch_fix_ready_source_only",
+  "current_task": "8423 Reply Governance Availability V1",
+  "current_stage": "C/Admin candidate and R027 database backup are validated; clean-candidate 8420-8423 deployment and browser acceptance remain.",
+  "current_gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING; REAL_PDD_* remains NOT_VERIFIED",
+  "status": "ai_cs_8423_reply_governance_deployment_pending",
+  "reply_governance_8423_v1": {
+    "gate": "CANDIDATE_VALIDATED / AI_CS_8423_REPLY_GOVERNANCE_DEPLOYMENT_PENDING",
+    "navigation": "Simple mode shows reply-readiness and knowledge-editor; advanced mode has no duplicate; both require knowledge.manage",
+    "database": "R027 is already 0023_reply_readiness_v1; online backup integrity ok and required readiness tables present",
+    "tests": "C 216; Admin 40 files/114 plus typecheck/build; A real 36-question evaluator and synthetic C-to-A HTTP PASS",
+    "deployment": "8420-8423 only; 18443/60801, Engine, PDD Profile and real send excluded",
+    "report": "docs/control/AI-CS-8423-Reply-Governance-Availability-V1-Report.md"
+  },
+  "architecture_ui_closure_v1": {
+    "gate": "PASS / AI_CS_ARCHITECTURE_UI_CLOSURE_READY / SOURCE_ONLY",
+    "architecture": "strict/order-independent extension merge plus process-local expired-key reclamation",
+    "ui": "clearable filters, semantic tabs, responsive safety state, collapsed mobile navigation and non-overlapping topbar",
+    "tests": "C 216; Admin 38 files/110 tests plus typecheck/build; isolated HTTP 36/36 and published debug smoke PASS",
+    "runtime": "synthetic ports 19080/19081/15174 and temporary SQLite/Edge profile only; formal assets untouched",
+    "report": "docs/control/AI-CS-Architecture-UI-Closure-Fix-V1-Report.md"
+  },
   "minimal_arch_fix_v1": {
     "gate": "PASS / AI_CS_MINIMAL_ARCH_FIX_READY / SOURCE_ONLY",
     "database": "source head 0023_reply_readiness_v1; isolated 0019-to-0023 identity/binding test passed; no formal migration",

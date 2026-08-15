@@ -38,6 +38,7 @@ class ReplyDebugRateLimiter:
         key = (user_id, store_code)
         now = self.clock()
         with self._lock:
+            self._prune_expired_locked(now)
             attempts = self._attempts[key]
             cutoff = now - self.window_seconds
             while attempts and attempts[0] <= cutoff:
@@ -56,3 +57,15 @@ class ReplyDebugRateLimiter:
         finally:
             with self._lock:
                 self._inflight.discard(key)
+
+    def _prune_expired_locked(self, now: float) -> None:
+        """Drop inactive buckets once their complete attempt window has expired."""
+        cutoff = now - self.window_seconds
+        expired_keys: list[tuple[str, str]] = []
+        for key, attempts in self._attempts.items():
+            while attempts and attempts[0] <= cutoff:
+                attempts.popleft()
+            if not attempts and key not in self._inflight:
+                expired_keys.append(key)
+        for key in expired_keys:
+            del self._attempts[key]

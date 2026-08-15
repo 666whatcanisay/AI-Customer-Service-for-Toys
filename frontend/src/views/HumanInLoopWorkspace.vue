@@ -1,6 +1,8 @@
 <template>
   <div class="desktop-workspace-shell" data-testid="human-loop-workspace">
     <DesktopAgentStatusPanel
+      v-if="showDesktopAgentPanel"
+      :mode="desktopAgentBindingRequired ? 'full' : desktopMode ? 'alert' : 'full'"
       :user-name="auth.user.value?.display_name ?? ''"
       :store-name="selectedStore?.storeName ?? ''"
       :status="desktopAgentStatus"
@@ -14,27 +16,7 @@
       @bind="requestDesktopBinding"
       @clear-grant="clearDesktopBindingGrant"
     />
-    <section v-if="desktopMode" class="offline-policy-panel" data-testid="offline-policy-panel">
-      <div>
-        <strong>离线回复策略</strong>
-        <span>可切换人工确认或低风险自动准备；真实 PDD 发送始终关闭。</span>
-      </div>
-      <label>
-        <span>当前模式</span>
-        <select
-          :value="replyPolicy?.mode ?? 'MANUAL_CONFIRM'"
-          :disabled="replyPolicyBusy || !selectedStoreId || !canManageReplyPolicy"
-          data-testid="reply-policy-mode"
-          @change="changeReplyPolicy"
-        >
-          <option value="MANUAL_CONFIRM">MANUAL_CONFIRM（人工确认）</option>
-          <option value="AUTO_LOW_RISK">AUTO_LOW_RISK（仅低风险自动准备）</option>
-        </select>
-      </label>
-      <b>REAL_SEND = OFF</b>
-      <small v-if="replyPolicyError">{{ replyPolicyError }}</small>
-    </section>
-    <div class="human-loop-workspace-grid">
+    <div class="human-loop-workspace-grid" :class="{ 'decision-expanded': decisionExpanded }">
     <ConversationCenter
       :conversations="conversations"
       :active-conversation-id="activeConversationId"
@@ -64,6 +46,7 @@
       :can-submit-feedback="canSubmitFeedback"
       :feedback-busy="feedbackBusy"
       :feedback-receipt-id="feedbackReceiptId"
+      :show-store-selector="!desktopMode"
       @select-store="selectStore"
       @select-product="selectProduct"
       @select-sku="selectSku"
@@ -81,6 +64,11 @@
       :conversation="activeConversation"
       :receipt-id="interactionReceiptId"
       :feedback-receipt-id="feedbackReceiptId"
+      :collapsed="!decisionExpanded"
+      :action-busy="actionBusy"
+      :can-confirm="canSubmitFeedback"
+      @toggle="decisionExpanded = !decisionExpanded"
+      @confirm="acceptDraft"
       @complete="completeConversation"
       @reopen="reopenConversation"
     />
@@ -95,11 +83,7 @@ import { storeToRefs } from 'pinia'
 
 import { aiInteractionEventClient, createAiInteractionEventIdempotencyKey } from '@/api/aiInteractionEventClient'
 import { aiResponseFeedbackClient, createAiResponseFeedbackIdempotencyKey } from '@/api/aiResponseFeedbackClient'
-import {
-  offlineReplyControlClient,
-  type ReplyPolicy,
-  type ReplyPolicyMode
-} from '@/api/offlineReplyControlClient'
+import { offlineReplyControlClient } from '@/api/offlineReplyControlClient'
 import type { AiResponseFeedbackType } from '@/api/aiResponseFeedbackTypes'
 import { ragClient } from '@/api/ragClient'
 import type { AdoptionType } from '@/api/ragTypes'
@@ -152,9 +136,7 @@ const desktopAgentErrorKind = ref('')
 const desktopAgentLoading = ref(false)
 const desktopBindingBusy = ref(false)
 const desktopBindingGrant = ref<DesktopBindingGrant | null>(null)
-const replyPolicy = ref<ReplyPolicy | null>(null)
-const replyPolicyBusy = ref(false)
-const replyPolicyError = ref('')
+const decisionExpanded = ref(false)
 let desktopStatusTimer: ReturnType<typeof setInterval> | null = null
 let desktopBindingGrantTimer: ReturnType<typeof setTimeout> | null = null
 let channelFeedTimer: ReturnType<typeof setInterval> | null = null
@@ -172,7 +154,19 @@ const contextStatus = computed(() => {
 })
 const canGenerateReply = computed(() => auth.hasPermission('ai.reply'))
 const canSubmitFeedback = computed(() => auth.hasPermission('feedback.submit'))
-const canManageReplyPolicy = computed(() => auth.hasPermission('customer_service.manage'))
+const desktopAgentBindingRequired = computed(() => (
+  desktopAgentStatus.value?.associationState === 'BINDING_REQUIRED'
+))
+const desktopAgentNeedsAttention = computed(() => Boolean(
+  desktopAgentError.value
+  || (desktopAgentStatus.value && (
+    desktopAgentStatus.value.associationState !== 'READY'
+    || desktopAgentStatus.value.agent?.onlineStatus !== 'ONLINE'
+  ))
+))
+const showDesktopAgentPanel = computed(() => (
+  !desktopMode || desktopAgentBindingRequired.value || desktopAgentNeedsAttention.value
+))
 
 const resetResolution = (): void => {
   resolution.value = null
@@ -194,7 +188,6 @@ const loadWorkspaceContext = async (): Promise<void> => {
     if (!selectedStoreId.value) contextError.value = '请先完成默认客服店铺选择。'
     if (selectedStoreId.value) {
       await loadDesktopAgentStatus()
-      await loadReplyPolicy()
     }
   } catch (error) {
     contextError.value = error instanceof Error ? error.message : '店铺上下文暂时不可用。'
@@ -220,50 +213,6 @@ async function loadDesktopAgentStatus(): Promise<void> {
     desktopAgentErrorKind.value = error instanceof DesktopAgentClientError ? error.kind : 'unknown'
   } finally {
     if (requestSequence === desktopStatusRequestSequence) desktopAgentLoading.value = false
-  }
-}
-
-async function loadReplyPolicy(): Promise<void> {
-  if (!desktopMode || !selectedStoreId.value) return
-  replyPolicyBusy.value = true
-  replyPolicyError.value = ''
-  try {
-    replyPolicy.value = await offlineReplyControlClient.getPolicy(selectedStoreId.value)
-  } catch (error) {
-    replyPolicy.value = null
-    replyPolicyError.value = error instanceof Error ? error.message : '回复策略暂时不可用。'
-  } finally {
-    replyPolicyBusy.value = false
-  }
-}
-
-const changeReplyPolicy = async (event: Event): Promise<void> => {
-  const select = event.target as HTMLSelectElement
-  const mode = select.value as ReplyPolicyMode
-  if (!selectedStoreId.value || mode === replyPolicy.value?.mode) return
-  const confirmed = window.confirm(
-    mode === 'AUTO_LOW_RISK'
-      ? '确认启用 AUTO_LOW_RISK？仅通过质量门的低风险回复会自动进入 EXECUTION_PREPARED，真实发送仍关闭。'
-      : '确认切换回 MANUAL_CONFIRM？此后每条回复都必须人工确认后才能进入执行准备。'
-  )
-  if (!confirmed) {
-    select.value = replyPolicy.value?.mode ?? 'MANUAL_CONFIRM'
-    return
-  }
-  replyPolicyBusy.value = true
-  replyPolicyError.value = ''
-  try {
-    replyPolicy.value = await offlineReplyControlClient.setPolicy({
-      storeId: selectedStoreId.value,
-      mode,
-      expectedRevision: replyPolicy.value?.revision ?? null
-    })
-    ElMessage.success(`回复策略已切换为 ${mode}；真实发送保持关闭。`)
-  } catch (error) {
-    replyPolicyError.value = error instanceof Error ? error.message : '回复策略切换失败。'
-    select.value = replyPolicy.value?.mode ?? 'MANUAL_CONFIRM'
-  } finally {
-    replyPolicyBusy.value = false
   }
 }
 
@@ -323,7 +272,6 @@ const selectStore = async (storeId: number): Promise<void> => {
     resetResolution()
     desktopBindingGrant.value = null
     await loadDesktopAgentStatus()
-    await loadReplyPolicy()
   } catch {
     contextError.value = '店铺切换失败，请稍后重试；如持续失败，请联系管理员。'
   } finally {
@@ -851,36 +799,39 @@ onBeforeUnmount(() => {
   --workspace-warning-soft: #fff4d9;
   --workspace-danger: #b44b55;
   --workspace-danger-soft: #fff0f1;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  min-width: 980px;
-  padding: 10px;
-  border-radius: 18px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 15px;
   background: var(--workspace-canvas);
+  overflow: hidden;
 }
-
-.offline-policy-panel { display: flex; align-items: center; gap: 14px; padding: 9px 12px; border: 1px solid var(--workspace-border-strong); border-radius: 12px; color: var(--workspace-text); background: #f7fcf8; }
-.offline-policy-panel > div { display: grid; gap: 2px; margin-right: auto; }.offline-policy-panel strong { font-size: 11px; }.offline-policy-panel span, .offline-policy-panel small { color: var(--workspace-text-soft); font-size: 9px; }.offline-policy-panel label { display: flex; align-items: center; gap: 7px; }.offline-policy-panel select { padding: 6px 8px; border: 1px solid var(--workspace-border); border-radius: 7px; color: var(--workspace-text); background: #fff; font-size: 9px; }.offline-policy-panel b { padding: 5px 8px; border-radius: 999px; color: #8b3b44; background: var(--workspace-danger-soft); font-size: 8px; }.offline-policy-panel small { color: var(--workspace-danger); }
 
 .human-loop-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(580px, 1fr) minmax(210px, 250px);
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) 118px;
+  flex: 1;
   width: 100%;
-  min-width: 980px;
-  height: calc(100vh - 154px);
-  min-height: 600px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--workspace-border);
   border-radius: 15px;
   background: var(--workspace-panel);
   box-shadow: 0 18px 45px rgb(51 91 61 / 12%);
+  transition: grid-template-columns 180ms ease;
 }
+.human-loop-workspace-grid.decision-expanded { grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(260px, 290px); }
 
 @media (max-width: 1280px) {
-  .desktop-workspace-shell { min-width: 940px; padding: 8px; }
   .human-loop-workspace-grid {
-    grid-template-columns: 220px minmax(500px, 1fr) 210px;
-    min-width: 940px;
+    grid-template-columns: 205px minmax(0, 1fr) 108px;
   }
+  .human-loop-workspace-grid.decision-expanded { grid-template-columns: 205px minmax(0, 1fr) 270px; }
 }
 </style>

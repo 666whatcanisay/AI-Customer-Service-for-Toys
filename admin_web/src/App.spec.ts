@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
   getAdminOverview: vi.fn(),
@@ -11,6 +11,13 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('./api/client', () => apiMocks)
 
 import App from './App.vue'
+import { adminSessionTestControl, type AuthUser } from './auth/session'
+
+const adminUser: AuthUser = {
+  id: 'admin-1', username: 'admin', display_name: '超级管理员', status: 'ACTIVE',
+  roles: ['ADMIN'], permissions: ['knowledge.manage', 'user.manage'], stores: [],
+  all_store_access: true, created_at: '2026-08-15T00:00:00Z', updated_at: '2026-08-15T00:00:00Z',
+}
 
 const createTestRouter = () => createRouter({
   history: createMemoryHistory(),
@@ -18,13 +25,14 @@ const createTestRouter = () => createRouter({
     '/overview', '/knowledge-center', '/knowledge-editor', '/knowledge-review', '/knowledge-gaps', '/reply-readiness', '/import-center', '/store-management', '/customer-operations', '/experience-cases', '/ai-feedback-optimization-pool', '/ai-issues', '/suggestions',
     '/stores', '/products', '/faqs', '/safety-rules', '/sources', '/conflicts',
     '/ai-capabilities', '/ai-optimization-pool', '/knowledge-materials', '/knowledge-quality-pool',
-    '/system-status', '/imports', '/test-data-packages'
+    '/system-status', '/user-management', '/imports', '/test-data-packages'
   ].map((path) => ({ path, component: { template: '<div>运营页面内容</div>' } }))
 })
 
 describe('App product shell', () => {
   beforeEach(() => {
     localStorage.clear()
+    adminSessionTestControl.setUser(adminUser)
     apiMocks.getAdminOverview.mockResolvedValue({ test_data_mode: true, production_usable: false })
     apiMocks.getHealth.mockResolvedValue({ status: 'ok', service: 'platform', version: '0.1.0', request_id: 'request-1' })
     apiMocks.getAiControlCenterOverview.mockResolvedValue({
@@ -32,7 +40,9 @@ describe('App product shell', () => {
     })
   })
 
-  it('defaults to six simple navigation entries and only reveals technical details on demand', async () => {
+  afterEach(() => { adminSessionTestControl.reset() })
+
+  it('shows the answer risk pool and knowledge editor directly in simple mode', async () => {
     const router = createTestRouter()
     await router.push('/overview')
     await router.isReady()
@@ -40,16 +50,17 @@ describe('App product shell', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('AI客服平台')
-    expect(wrapper.findAll('[data-testid="simple-navigation-item"]')).toHaveLength(6)
+    expect(wrapper.findAll('[data-testid="simple-navigation-item"]')).toHaveLength(8)
     expect(wrapper.text()).toContain('运营工作台')
     expect(wrapper.text()).toContain('商品')
     expect(wrapper.text()).toContain('知识')
+    expect(wrapper.text()).toContain('商品回答风险池')
+    expect(wrapper.text()).toContain('知识编辑器')
     expect(wrapper.text()).toContain('导入')
     expect(wrapper.text()).toContain('客服运营')
     expect(wrapper.text()).toContain('AI状态')
     expect(wrapper.find('[data-testid="advanced-navigation-label"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(0)
-    expect(wrapper.text()).not.toContain('手工补充知识')
     expect(wrapper.text()).not.toContain('资料上传与审核')
     expect(wrapper.text()).not.toContain('后续能力')
     expect(wrapper.get('[data-testid="navigation-mode-simple"]').attributes('aria-pressed')).toBe('true')
@@ -79,16 +90,15 @@ describe('App product shell', () => {
 
     await wrapper.get('[data-testid="navigation-mode-advanced"]').trigger('click')
 
-    expect(wrapper.findAll('[data-testid="simple-navigation-item"]')).toHaveLength(6)
-    expect(wrapper.findAll('[data-testid="advanced-navigation-group"]')).toHaveLength(4)
-    expect(wrapper.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(11)
+    expect(wrapper.findAll('[data-testid="simple-navigation-item"]')).toHaveLength(8)
+    expect(wrapper.findAll('[data-testid="advanced-navigation-group"]')).toHaveLength(3)
+    expect(wrapper.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(9)
     expect(wrapper.get('[data-testid="advanced-navigation-label"]').text()).toBe('高级功能')
     expect(wrapper.text()).toContain('知识治理')
-    expect(wrapper.text()).toContain('PDD 回答治理')
-    expect(wrapper.text()).toContain('商品风险调整池')
+    expect(wrapper.text()).toContain('商品回答风险池')
     expect(wrapper.text()).toContain('运营复盘')
     expect(wrapper.text()).toContain('系统诊断')
-    expect(wrapper.text()).toContain('手工补充知识')
+    expect(wrapper.text()).toContain('知识编辑器')
     expect(wrapper.text()).toContain('资料上传与审核')
     expect(wrapper.text()).toContain('知识审核队列')
     expect(wrapper.text()).toContain('知识缺口')
@@ -105,6 +115,48 @@ describe('App product shell', () => {
     const restored = mount(App, { global: { plugins: [router] } })
     await flushPromises()
     expect(restored.get('[data-testid="navigation-mode-advanced"]').attributes('aria-pressed')).toBe('true')
-    expect(restored.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(11)
+    expect(restored.findAll('[data-testid="advanced-navigation-item"]')).toHaveLength(9)
+    expect(restored.findAll('a[href="/reply-readiness"]')).toHaveLength(1)
+    expect(restored.findAll('a[href="/knowledge-editor"]')).toHaveLength(1)
+  })
+
+  it('hides knowledge governance shortcuts when the account lacks knowledge.manage', async () => {
+    adminSessionTestControl.setUser({
+      ...adminUser,
+      id: 'customer-service-1',
+      username: 'customer-service',
+      display_name: '客服',
+      roles: ['CUSTOMER_SERVICE'],
+      permissions: ['workspace.access'],
+      all_store_access: false,
+    })
+    const router = createTestRouter()
+    await router.push('/overview')
+    await router.isReady()
+    const wrapper = mount(App, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="simple-navigation-item"]')).toHaveLength(6)
+    expect(wrapper.text()).not.toContain('商品回答风险池')
+    expect(wrapper.text()).not.toContain('知识编辑器')
+  })
+
+  it('collapses the mobile navigation after route changes', async () => {
+    const router = createTestRouter()
+    await router.push('/overview')
+    await router.isReady()
+    const wrapper = mount(App, { global: { plugins: [router] } })
+    await flushPromises()
+
+    const toggle = wrapper.get('.mobile-navigation-toggle')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('.product-sidebar').classes()).toContain('mobile-open')
+
+    await router.push('/knowledge-center')
+    await flushPromises()
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.get('.product-sidebar').classes()).not.toContain('mobile-open')
   })
 })

@@ -474,7 +474,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="page">
     <div class="page-header">
-      <div><p class="eyebrow">商品知识补充</p><h1>{{ revisionMode ? '创建知识新修订' : '手工补充知识' }}</h1><p>只填写已核实事实；保存后进入人工审核，不会自动发布或发送。</p></div>
+      <div><p class="eyebrow">商品知识补充</p><h1>{{ revisionMode ? '创建知识新修订' : '知识编辑器' }}</h1><p>只填写已核实事实；保存后进入人工审核，不会自动发布或发送。</p></div>
       <RouterLink class="button secondary" :to="{ path: '/knowledge-review', query: { store: scope.store_code, product: scope.product_id } }">查看审核队列</RouterLink>
     </div>
 

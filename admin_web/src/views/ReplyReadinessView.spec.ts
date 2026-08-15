@@ -135,7 +135,7 @@ describe('ReplyReadinessView', () => {
   it('presents operational conclusions first and requests exact product scope', async () => {
     const wrapper = await mountView()
 
-    expect(wrapper.text()).toContain('商品风险调整池')
+    expect(wrapper.text()).toContain('商品回答风险池')
     expect(wrapper.text()).toContain('production_usable=false')
     expect(wrapper.text()).toContain('allow_auto_send=false')
     expect(wrapper.text()).toContain('可直接回答')
@@ -160,6 +160,11 @@ describe('ReplyReadinessView', () => {
     await wrapper.get('.summary-card.high').trigger('click')
     expect(wrapper.findAll('.desktop-results tbody > tr').filter((item) => !item.classes().includes('detail-row'))).toHaveLength(1)
     expect(wrapper.text()).toContain('显示 1 / 2 题')
+
+    await wrapper.get('.clear-filters').trigger('click')
+    expect(wrapper.text()).toContain('显示 2 / 2 题')
+    expect(wrapper.find('.workspace-tabs').attributes('role')).toBe('tablist')
+    expect(wrapper.find('#reply-pool-tab').attributes('aria-selected')).toBe('true')
   })
 
   it('clears product results and loads only the selected SKU history', async () => {

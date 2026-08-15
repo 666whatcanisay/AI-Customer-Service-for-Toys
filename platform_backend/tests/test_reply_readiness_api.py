@@ -591,6 +591,81 @@ def test_extension_cannot_lower_global_policy_floor(client: TestClient, session:
     assert response.json()["error"]["code"] == "REPLY_READINESS_EXTENSION_RELAXED"
 
 
+def test_multiple_extensions_merge_monotonically(client: TestClient, session: Session) -> None:
+    _seed(session)
+    question_set = client.get(
+        "/api/v1/admin/reply-readiness/question-set",
+        params={"store_code": "STORE-READINESS", "product_id": "PRODUCT-READINESS"},
+    ).json()
+    greeting = next(
+        item for item in question_set["questions"] if item["question_id"] == "PDD-GREETING"
+    )
+    stricter = {
+        **greeting,
+        "aliases": [*greeting["aliases"], "在吗"],
+        "policy_risk_floor": "HIGH",
+        "expected_action": "TRANSFER_HUMAN",
+        "required_fact_keys": ["material"],
+        "requires_realtime_lookup": True,
+        "prohibited_claims": ["保证立即回复"],
+    }
+    later_but_weaker = {
+        **greeting,
+        "aliases": [*greeting["aliases"], "有人吗"],
+        "policy_risk_floor": "MEDIUM",
+        "expected_action": "CONTROLLED_ANSWER",
+        "required_fact_keys": ["finished_size"],
+        "requires_realtime_lookup": False,
+        "prohibited_claims": ["保证随时在线"],
+    }
+    for extension_id, question in (
+        ("RQX-STRICT-FIRST", stricter),
+        ("RQX-WEAKER-LATER", later_but_weaker),
+    ):
+        created = client.post(
+            "/api/v1/admin/reply-readiness/question-set-extensions",
+            json={
+                "extension_id": extension_id,
+                "scope_kind": "PRODUCT",
+                "store_code": "STORE-READINESS",
+                "product_id": "PRODUCT-READINESS",
+                "questions": [question],
+                "change_reason": "synthetic monotonic merge regression",
+            },
+        )
+        assert created.status_code == 201, created.text
+
+    effective = client.get(
+        "/api/v1/admin/reply-readiness/question-set",
+        params={"store_code": "STORE-READINESS", "product_id": "PRODUCT-READINESS"},
+    ).json()
+    merged = next(
+        item for item in effective["questions"] if item["question_id"] == "PDD-GREETING"
+    )
+    assert merged["policy_risk_floor"] == "HIGH"
+    assert merged["expected_action"] == "TRANSFER_HUMAN"
+    assert merged["requires_realtime_lookup"] is True
+    assert set(merged["required_fact_keys"]) == {"material", "finished_size"}
+    assert set(merged["prohibited_claims"]) == {"保证立即回复", "保证随时在线"}
+    assert {"在吗", "有人吗"}.issubset(merged["aliases"])
+
+    conflicting = client.post(
+        "/api/v1/admin/reply-readiness/question-set-extensions",
+        json={
+            "extension_id": "RQX-CONFLICTING-SEMANTICS",
+            "scope_kind": "PRODUCT",
+            "store_code": "STORE-READINESS",
+            "product_id": "PRODUCT-READINESS",
+            "questions": [{**later_but_weaker, "canonical_question": "这个商品有库存吗"}],
+            "change_reason": "synthetic question identity collision",
+        },
+    )
+    assert conflicting.status_code == 422, conflicting.text
+    assert conflicting.json()["error"]["code"] == (
+        "REPLY_READINESS_EXTENSION_QUESTION_ID_CONFLICT"
+    )
+
+
 def test_sku_evidence_cannot_be_used_for_product_scope(client: TestClient, session: Session) -> None:
     _seed(session)
     response = client.post(

@@ -11,31 +11,53 @@
       </div>
     </header>
 
+    <section v-if="!conversation" class="assistant-empty-state" data-testid="assistant-empty-state">
+      <span>当前没有打开的会话</span>
+      <strong>从左侧选择一条待处理会话</strong>
+      <p>选择后将在这里查看客户消息、商品上下文和 AI 回复建议。</p>
+    </section>
+
+    <template v-else>
     <section class="context-bar" data-testid="workspace-context">
-      <label>
-        <span>店铺</span>
-        <select :value="selectedStoreId ?? ''" :disabled="contextLoading" @change="emitSelect('store', $event)">
-          <option value="">选择店铺</option>
-          <option v-for="store in stores" :key="store.storeId" :value="store.storeId">{{ store.storeName }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ products.length > 1 ? '商品（请确认）' : '商品（自动识别）' }}</span>
-        <select :value="selectedProductId" :disabled="contextLoading || !selectedStoreId || products.length < 2" @change="emitSelect('product', $event)">
-          <option value="">等待识别</option>
-          <option v-for="product in products" :key="product.productId" :value="product.productId">{{ product.displayName }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ skus.length > 1 ? 'SKU（请确认）' : 'SKU（自动识别）' }}</span>
-        <select :value="selectedSkuId" :disabled="contextLoading || !selectedProductId || skus.length < 2" @change="emitSelect('sku', $event)">
-          <option value="">无需 SKU / 等待识别</option>
-          <option v-for="sku in skus" :key="sku.skuId" :value="sku.skuId">{{ sku.displayName }}</option>
-        </select>
-      </label>
-      <div class="context-health" :class="{ warning: Boolean(contextError) }">
-        <span>{{ contextLoading ? '识别中' : contextError ? '需要处理' : contextStatus }}</span>
-        <small>{{ contextError || '店铺自动加载；商品与 SKU 由消息识别，歧义时人工确认。' }}</small>
+      <button
+        type="button"
+        class="context-summary"
+        :aria-expanded="contextDetailsVisible"
+        data-testid="context-toggle"
+        @click="contextExpanded = !contextExpanded"
+      >
+        <span>商品上下文</span>
+        <strong>{{ selectedProductLabel }}</strong>
+        <small>{{ selectedSkuLabel }}</small>
+        <b :class="{ warning: Boolean(contextError) }">{{ contextLoading ? '识别中' : contextError ? '需要处理' : contextStatus }}</b>
+        <i>{{ contextDetailsVisible ? '收起' : '详情' }}</i>
+      </button>
+      <div v-show="contextDetailsVisible" class="context-fields" :class="{ 'without-store': !showStoreSelector }">
+        <label v-if="showStoreSelector">
+          <span>店铺</span>
+          <select :value="selectedStoreId ?? ''" :disabled="contextLoading" @change="emitSelect('store', $event)">
+            <option value="">选择店铺</option>
+            <option v-for="store in stores" :key="store.storeId" :value="store.storeId">{{ store.storeName }}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{ products.length > 1 ? '商品（请确认）' : '商品（自动识别）' }}</span>
+          <select :value="selectedProductId" :disabled="contextLoading || !selectedStoreId || products.length < 2" @change="emitSelect('product', $event)">
+            <option value="">等待识别</option>
+            <option v-for="product in products" :key="product.productId" :value="product.productId">{{ product.displayName }}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{ skus.length > 1 ? 'SKU（请确认）' : 'SKU（自动识别）' }}</span>
+          <select :value="selectedSkuId" :disabled="contextLoading || !selectedProductId || skus.length < 2" @change="emitSelect('sku', $event)">
+            <option value="">无需 SKU / 等待识别</option>
+            <option v-for="sku in skus" :key="sku.skuId" :value="sku.skuId">{{ sku.displayName }}</option>
+          </select>
+        </label>
+        <div class="context-health" :class="{ warning: Boolean(contextError) }">
+          <span>{{ contextLoading ? '识别中' : contextError ? '需要处理' : contextStatus }}</span>
+          <small>{{ contextError || '商品与 SKU 由消息识别，歧义时人工确认。' }}</small>
+        </div>
       </div>
     </section>
 
@@ -230,6 +252,7 @@
         </div>
       </Teleport>
     </section>
+    </template>
   </main>
 </template>
 
@@ -246,7 +269,7 @@ import {
 } from '@/workspace/customerSession'
 import type { ChannelMessageSource } from '@/workspace/channelMessageAdapter'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   conversation: WorkspaceConversation | null
   draft: ReplyDraft | null
   stores: WorkspaceStoreContext[]
@@ -266,7 +289,10 @@ const props = defineProps<{
   canSubmitFeedback: boolean
   feedbackBusy: boolean
   feedbackReceiptId: string
-}>()
+  showStoreSelector?: boolean
+}>(), {
+  showStoreSelector: true
+})
 
 const emit = defineEmits<{
   selectStore: [value: number]
@@ -286,6 +312,19 @@ const feedbackMode = ref<'REJECT' | 'ISSUE' | null>(null)
 const feedbackType = ref<AiResponseFeedbackType>('FACT_ERROR')
 const feedbackNote = ref('')
 const evidenceOpen = ref(false)
+const contextExpanded = ref(false)
+const contextNeedsAttention = computed(() => Boolean(
+  props.contextError || props.products.length > 1 || props.skus.length > 1
+))
+const contextDetailsVisible = computed(() => contextExpanded.value || contextNeedsAttention.value)
+const selectedProductLabel = computed(() => (
+  props.products.find((item) => item.productId === props.selectedProductId)?.displayName
+  ?? (props.contextLoading ? '正在识别商品' : '商品等待识别')
+))
+const selectedSkuLabel = computed(() => (
+  props.skus.find((item) => item.skuId === props.selectedSkuId)?.displayName
+  ?? (props.selectedProductId ? '商品级问题 / SKU待识别' : '选择商品后确认SKU')
+))
 const displayCitations = computed(() => {
   const seen = new Set<string>()
   return (props.draft?.citations ?? []).filter((citation) => {
@@ -384,6 +423,7 @@ watch(() => props.feedbackReceiptId, (value, previous) => {
 })
 watch(() => props.draft?.messageId, () => {
   evidenceOpen.value = false
+  contextExpanded.value = false
 })
 
 const sourceLabel = (source: ChannelMessageSource): string => {
@@ -424,11 +464,14 @@ const sourceKind = (citation: RagCitation): { code: string; label: string } => {
 .mode-stack span, .mode-stack strong { padding: 6px 8px; border-radius: 7px; font-size: 9px; letter-spacing: .05em; }
 .mode-stack span { border: 1px solid #9cbfb0; color: #356a50; background: #f7fcf8; }
 .mode-stack strong { background: var(--workspace-accent-soft); color: var(--workspace-accent-strong); }
-.context-bar { display: grid; grid-template-columns: 1fr 1.25fr 1fr 1.2fr; gap: 9px; padding: 11px; border: 1px solid var(--workspace-border); border-radius: 12px; background: #fbfefb; box-shadow: 0 5px 15px rgb(48 95 61 / 6%); }
-.context-bar label { display: grid; gap: 5px; min-width: 0; }
-.context-bar label > span, .context-health > span { color: var(--workspace-text-soft); font-size: 9px; font-weight: 800; }
-.context-bar select { min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--workspace-border); border-radius: 8px; outline: none; color: var(--workspace-text); background: #fff; font-size: 10px; }
-.context-bar select:focus { border-color: var(--workspace-accent); box-shadow: 0 0 0 3px rgb(47 125 87 / 9%); }
+.assistant-empty-state{display:grid;min-height:calc(100% - 58px);place-content:center;padding:30px;text-align:center}.assistant-empty-state span{color:var(--workspace-accent);font-size:9px;font-weight:900;letter-spacing:.1em}.assistant-empty-state strong{margin-top:8px;color:var(--workspace-text);font-size:16px}.assistant-empty-state p{margin:8px 0 0;color:var(--workspace-muted);font-size:10px}
+.context-bar { overflow:hidden;border: 1px solid var(--workspace-border); border-radius: 12px; background: #fbfefb; box-shadow: 0 5px 15px rgb(48 95 61 / 6%); }
+.context-summary{display:grid;grid-template-columns:auto minmax(120px,1fr) minmax(120px,.8fr) auto auto;gap:9px;align-items:center;width:100%;padding:9px 11px;border:0;color:inherit;background:transparent;text-align:left;cursor:pointer}.context-summary:hover{background:#f2f8f3}.context-summary>span{color:var(--workspace-accent);font-size:8px;font-weight:900;letter-spacing:.08em}.context-summary>strong{overflow:hidden;color:var(--workspace-text);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.context-summary>small{overflow:hidden;color:var(--workspace-muted);font-size:9px;text-overflow:ellipsis;white-space:nowrap}.context-summary>b{padding:4px 7px;border-radius:999px;color:var(--workspace-accent-strong);background:var(--workspace-accent-soft);font-size:8px;white-space:nowrap}.context-summary>b.warning{color:var(--workspace-warning);background:var(--workspace-warning-soft)}.context-summary>i{color:var(--workspace-muted);font-size:9px;font-style:normal}
+.context-fields{display:grid;grid-template-columns:1fr 1.25fr 1fr 1.2fr;gap:9px;padding:10px;border-top:1px solid var(--workspace-border);background:#f8fcf9}.context-fields.without-store{grid-template-columns:1.25fr 1fr 1.2fr}
+.context-fields label { display: grid; gap: 5px; min-width: 0; }
+.context-fields label > span, .context-health > span { color: var(--workspace-text-soft); font-size: 9px; font-weight: 800; }
+.context-fields select { min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--workspace-border); border-radius: 8px; outline: none; color: var(--workspace-text); background: #fff; font-size: 10px; }
+.context-fields select:focus { border-color: var(--workspace-accent); box-shadow: 0 0 0 3px rgb(47 125 87 / 9%); }
 .context-health { display: grid; align-content: center; gap: 4px; padding: 0 6px; }
 .context-health > span { color: var(--workspace-accent); }
 .context-health small { color: var(--workspace-muted); font-size: 9px; line-height: 1.4; }
@@ -505,5 +548,5 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .evidence-grid p { margin: 6px 0 9px; color: var(--workspace-text-soft); font-size: 9px; line-height: 1.5; }
 .evidence-empty { padding: 28px 18px; color: var(--workspace-muted); font-size: 10px; text-align: center; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 1120px) { .context-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }.evidence-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1120px) { .context-summary{grid-template-columns:auto minmax(100px,1fr) auto auto}.context-summary>small{display:none}.context-fields,.context-fields.without-store{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence-grid { grid-template-columns: 1fr; } }
 </style>
