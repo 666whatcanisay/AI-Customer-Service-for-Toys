@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from http.cookiejar import CookieJar
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -543,6 +544,90 @@ def test_pdd_refresh_and_observer_restart_require_local_human_intent(
         assert second["status"] == "ALREADY_REQUESTED"
         assert first["real_send_enabled"] is False
         assert (tmp_path / "runtime" / "pdd-observer-restart.request").is_file()
+    finally:
+        server.stop()
+
+
+def test_desktop_projects_and_toggles_authoritative_controlled_auto(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(parents=True)
+    (runtime / "channel-agent-state.json").write_text(
+        json.dumps({
+            "identity_status": "ACTIVE",
+            "pdd_login_state": "CUSTOMER_SERVICE_READY",
+            "observer_status": "OBSERVING",
+            "active_store_id": "c-store-1",
+            "pdd_store_id": "328616090",
+        }),
+        encoding="utf-8",
+    )
+    (runtime / "controlled-auto-public-status.json").write_text(
+        json.dumps({
+            "schema_version": "controlled-auto-public-status.v1",
+            "runtime_mode": "PRODUCTION_AUTO",
+            "production_real_send_enabled": True,
+            "controlled_store_auto_enabled": True,
+            "policy_mode": "AUTO_ALL_MESSAGES_V1",
+            "kill_switch_enabled": False,
+            "ai_cs_store_id": "c-store-1",
+            "platform_store_id": "328616090",
+            "state_revision": 9,
+            "state_reason": "USER_ENABLED",
+            "runner_active": True,
+            "control_error_code": None,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }),
+        encoding="utf-8",
+    )
+    server = DesktopAssistantServer(data_root=tmp_path)
+    try:
+        server.start()
+        opener, origin, csrf = _authenticated_client(server)
+        with opener.open(f"{origin}/local-api/v1/bootstrap", timeout=2) as response:  # noqa: S310
+            bootstrap = json.loads(response.read().decode("utf-8"))
+        assert bootstrap["safety"]["auto_reply"] is True
+        assert bootstrap["safety"]["real_send_enabled"] is True
+        assert bootstrap["safety"]["controlled_auto"]["control_available"] is True
+
+        blocked = Request(
+            f"{origin}/local-api/v1/runtime/controlled-auto-toggle",
+            data=b'{"target_enabled":false}',
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+            },
+        )
+        with pytest.raises(HTTPError) as forbidden:
+            opener.open(blocked, timeout=2)  # noqa: S310
+        assert forbidden.value.code == 403
+
+        request = Request(
+            f"{origin}/local-api/v1/runtime/controlled-auto-toggle",
+            data=b'{"target_enabled":false}',
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-Channel-Agent-CSRF": csrf,
+                "X-Channel-Agent-Intent": "HUMAN_CONFIRMED_CONTROLLED_AUTO_TOGGLE",
+            },
+        )
+        with opener.open(request, timeout=2) as response:  # noqa: S310
+            result = json.loads(response.read().decode("utf-8"))
+        assert result == {
+            "schema_version": "controlled-auto-toggle-response.v1",
+            "status": "TOGGLE_REQUESTED",
+            "target_enabled": False,
+        }
+        queued = json.loads(
+            (runtime / "controlled-auto-toggle.request").read_text(encoding="utf-8")
+        )
+        assert queued["target_enabled"] is False
+        assert queued["human_intent"] is True
     finally:
         server.stop()
 

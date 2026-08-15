@@ -171,6 +171,33 @@ class ControlledAutoRuntimeStateStore:
             reason=reason,
         )
 
+    def pause_production_auto(
+        self, *, operator: str, reason: str
+    ) -> ControlledAutoRuntimeStateV1:
+        """Pause Store AUTO while retaining the last verified resume scope.
+
+        This is deliberately different from an automatic safety shutdown.  A
+        human pause keeps the double-Store binding and policy revision so the
+        same local operator can resume it after the live page identities are
+        checked again.  Sender authorization remains impossible while paused.
+        """
+
+        current = self.load()
+        return self._replace(
+            runtime_mode="PILOT",
+            production_real_send_enabled=False,
+            controlled_pilot_send_enabled=False,
+            controlled_store_auto_enabled=False,
+            ai_cs_store_id=current.ai_cs_store_id,
+            platform_store_id=current.platform_store_id,
+            policy_mode=current.policy_mode,
+            policy_revision=current.policy_revision,
+            whitelist_revision=current.whitelist_revision,
+            kill_switch_enabled=True,
+            changed_by=operator,
+            reason=reason,
+        )
+
     def enable_kill_switch(
         self, *, operator: str, reason: str
     ) -> ControlledAutoRuntimeStateV1:

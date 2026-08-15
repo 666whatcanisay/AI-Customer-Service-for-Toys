@@ -293,6 +293,32 @@ def test_runtime_mode_governance_and_kill_switch_are_mode_aware(tmp_path) -> Non
     assert stopped.controlled_store_auto_enabled is False
 
 
+def test_human_pause_retains_verified_scope_for_explicit_resume(tmp_path) -> None:
+    store = ControlledAutoRuntimeStateStore(tmp_path / "runtime.sqlite3")
+    active = store.activate_production_auto(
+        ai_cs_store_id=AI_CS_STORE,
+        platform_store_id=PLATFORM_STORE,
+        policy_revision=5,
+        whitelist_revision="single-store-auto-all-v1",
+        operator="tester",
+        reason="explicit production activation",
+        policy_mode="AUTO_ALL_MESSAGES_V1",
+    )
+
+    paused = store.pause_production_auto(
+        operator="tester", reason="desktop pause"
+    )
+
+    assert active.runtime_mode == "PRODUCTION_AUTO"
+    assert paused.runtime_mode == "PILOT"
+    assert paused.production_real_send_enabled is False
+    assert paused.controlled_store_auto_enabled is False
+    assert paused.kill_switch_enabled is True
+    assert paused.ai_cs_store_id == AI_CS_STORE
+    assert paused.platform_store_id == PLATFORM_STORE
+    assert paused.policy_mode == "AUTO_ALL_MESSAGES_V1"
+
+
 def test_governance_blocks_inconsistent_constructed_modes() -> None:
     pilot_with_production = ControlledAutoRuntimeStateV1.model_construct(
         revision=1,

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 from channel_agent.controlled_auto_runtime import (
     ControlledAutoDecisionLedger,
+    ControlledAutoRuntimeStateV1,
     ControlledAutoRuntimeStateStore,
 )
 from channel_agent.binding import atomic_write_bytes
@@ -228,6 +230,158 @@ def _current_store_identity(data_root: Path) -> tuple[str, str]:
     return ai_cs_store_id.strip(), platform_store_id.strip()
 
 
+def _public_status_path(data_root: Path) -> Path:
+    return data_root / "runtime" / "controlled-auto-public-status.json"
+
+
+def _toggle_request_path(data_root: Path) -> Path:
+    return data_root / "runtime" / "controlled-auto-toggle.request"
+
+
+def _publish_public_status(
+    data_root: Path,
+    state: ControlledAutoRuntimeStateV1,
+    *,
+    runner_active: bool,
+    control_error_code: str | None = None,
+) -> None:
+    atomic_write_bytes(
+        _public_status_path(data_root),
+        json.dumps(
+            {
+                "schema_version": "controlled-auto-public-status.v1",
+                "runtime_mode": state.runtime_mode,
+                "production_real_send_enabled": (
+                    state.production_real_send_enabled
+                ),
+                "controlled_store_auto_enabled": (
+                    state.controlled_store_auto_enabled
+                ),
+                "policy_mode": state.policy_mode,
+                "kill_switch_enabled": state.kill_switch_enabled,
+                "ai_cs_store_id": state.ai_cs_store_id,
+                "platform_store_id": state.platform_store_id,
+                "state_revision": state.revision,
+                "state_reason": state.reason,
+                "runner_active": runner_active,
+                "runner_pid": os.getpid(),
+                "control_error_code": control_error_code,
+                "updated_at": datetime.now(UTC).isoformat(),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8"),
+    )
+
+
+def _consume_desktop_toggle(
+    data_root: Path,
+    runtime_store: ControlledAutoRuntimeStateStore,
+) -> tuple[ControlledAutoRuntimeStateV1, str | None]:
+    request_path = _toggle_request_path(data_root)
+    state = runtime_store.load()
+    if not request_path.is_file():
+        return state, None
+    error_code: str | None = None
+    try:
+        payload = json.loads(request_path.read_text(encoding="utf-8"))
+        requested_at = datetime.fromisoformat(str(payload["requested_at"]))
+        if requested_at.tzinfo is None:
+            raise ValueError("toggle time must be timezone-aware")
+        if (datetime.now(UTC) - requested_at.astimezone(UTC)).total_seconds() > 120:
+            raise ControlledReplyPilotError(
+                "desktop AUTO toggle expired",
+                error_code="AUTO_TOGGLE_EXPIRED",
+            )
+        if payload.get("schema_version") != "controlled-auto-toggle-request.v1":
+            raise ValueError("toggle schema is invalid")
+        if payload.get("human_intent") is not True:
+            raise ValueError("toggle requires human intent")
+        target_enabled = payload.get("target_enabled")
+        if not isinstance(target_enabled, bool):
+            raise ValueError("toggle target is invalid")
+        operator = str(payload.get("operator_reference") or "desktop-local-operator")
+        if target_enabled:
+            agent_state = json.loads(
+                (data_root / "runtime" / "channel-agent-state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            if (
+                agent_state.get("identity_status") != "ACTIVE"
+                or agent_state.get("pdd_login_state") != "CUSTOMER_SERVICE_READY"
+                or agent_state.get("observer_status") != "OBSERVING"
+            ):
+                raise ControlledReplyPilotError(
+                    "live PDD runtime is not ready for AUTO",
+                    error_code="AUTO_RUNTIME_NOT_READY",
+                )
+            observed = _current_store_identity(data_root)
+            frozen = (state.ai_cs_store_id, state.platform_store_id)
+            if None in frozen or observed != frozen:
+                raise ControlledReplyPilotError(
+                    "live double Store identity does not match paused AUTO scope",
+                    error_code="AUTO_STORE_SCOPE_MISMATCH",
+                )
+            if state.policy_mode not in {"AUTO_LOW_RISK", "AUTO_ALL_MESSAGES_V1"}:
+                raise ControlledReplyPilotError(
+                    "paused AUTO policy is not resumable",
+                    error_code="AUTO_POLICY_NOT_RESUMABLE",
+                )
+            state = runtime_store.activate_production_auto(
+                ai_cs_store_id=observed[0],
+                platform_store_id=observed[1],
+                policy_revision=state.policy_revision,
+                whitelist_revision=state.whitelist_revision,
+                operator=operator[:160],
+                reason="USER_RESUMED_PRODUCTION_AUTO_FROM_DESKTOP",
+                policy_mode=state.policy_mode,
+            )
+        else:
+            state = runtime_store.pause_production_auto(
+                operator=operator[:160],
+                reason="USER_PAUSED_PRODUCTION_AUTO_FROM_DESKTOP",
+            )
+    except ControlledReplyPilotError as exc:
+        error_code = exc.error_code
+        state = runtime_store.load()
+    except (KeyError, OSError, UnicodeError, ValueError, json.JSONDecodeError):
+        error_code = "AUTO_TOGGLE_REQUEST_INVALID"
+        state = runtime_store.load()
+    finally:
+        request_path.unlink(missing_ok=True)
+    return state, error_code
+
+
+def _renew_observer_if_needed(data_root: Path) -> None:
+    state_path = data_root / "runtime" / "channel-agent-state.json"
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return
+    if (
+        state.get("pdd_login_state") != "CUSTOMER_SERVICE_READY"
+        or state.get("observer_status") != "SESSION_LIMIT_REACHED"
+    ):
+        return
+    request_path = data_root / "runtime" / "pdd-observer-restart.request"
+    if request_path.exists():
+        return
+    atomic_write_bytes(
+        request_path,
+        (json.dumps(
+            {
+                "schema_version": "channel-agent-pdd-observer-restart-request.v1",
+                "requested_at": datetime.now(UTC).isoformat(),
+                "human_intent": True,
+                "reason": "PRODUCTION_AUTO_OBSERVER_SESSION_RENEWAL",
+            },
+            separators=(",", ":"),
+        ) + "\n").encode("utf-8"),
+    )
+
+
 def _print(value: object) -> None:
     print(json.dumps(value, ensure_ascii=False, indent=2, default=str))
 
@@ -418,15 +572,27 @@ def main(argv: list[str] | None = None) -> int:
             )
             successes = 0
             while True:
-                state = runtime_store.load()
+                state, control_error = _consume_desktop_toggle(
+                    data_root, runtime_store
+                )
+                _publish_public_status(
+                    data_root,
+                    state,
+                    runner_active=True,
+                    control_error_code=control_error,
+                )
                 if (
                     state.runtime_mode != "PRODUCTION_AUTO"
                     or not state.production_real_send_enabled
                     or not state.controlled_store_auto_enabled
                     or state.kill_switch_enabled
                 ):
-                    _print({"status": "STOPPED", "reason": "PRODUCTION_AUTO_DISABLED"})
-                    return 0
+                    # The local desktop toggle pauses authorization, not the
+                    # process that owns the toggle mailbox.  Staying alive is
+                    # what makes a later explicit resume independent of Codex.
+                    time.sleep(max(args.poll_seconds, 0.1))
+                    continue
+                _renew_observer_if_needed(data_root)
                 # The formal Windows Agent persists new Decisions in the
                 # shared durable buffer.  Refresh the small bridge feed from
                 # that source on every production poll so unattended AUTO is
@@ -480,6 +646,12 @@ def main(argv: list[str] | None = None) -> int:
                         operator="automatic-safety-controller",
                         reason="PRODUCTION_AUTO_SEND_PATH_FAILED",
                     )
+                    _publish_public_status(
+                        data_root,
+                        runtime_store.load(),
+                        runner_active=True,
+                        control_error_code="PRODUCTION_AUTO_SEND_PATH_FAILED",
+                    )
                     raise
                 ledger.finish(
                     candidate.decision_id,
@@ -491,6 +663,15 @@ def main(argv: list[str] | None = None) -> int:
                     runtime_store.fail_closed_after_terminal(
                         outcome=response.outcome,
                         reason=response.error_code or "PRODUCTION_AUTO_SEND_NOT_CONFIRMED",
+                    )
+                    _publish_public_status(
+                        data_root,
+                        runtime_store.load(),
+                        runner_active=True,
+                        control_error_code=(
+                            response.error_code
+                            or "PRODUCTION_AUTO_SEND_NOT_CONFIRMED"
+                        ),
                     )
                     _print(
                         {

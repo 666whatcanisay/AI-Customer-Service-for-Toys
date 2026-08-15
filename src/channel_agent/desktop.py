@@ -345,6 +345,7 @@ class DesktopAssistantServer:
         state = self._read_json(
             self.data_root / "runtime" / "channel-agent-state.json"
         )
+        controlled_auto = self._controlled_auto_status()
         secure_control_ready = False
         config = None
         try:
@@ -439,10 +440,116 @@ class DesktopAssistantServer:
             ),
             "safety": {
                 "manual_approval": True,
-                "auto_reply": False,
-                "real_send_enabled": False,
-                "real_platform_activation_allowed": False,
+                "auto_reply": controlled_auto["auto_reply_running"],
+                "real_send_enabled": controlled_auto["auto_reply_running"],
+                "real_platform_activation_allowed": controlled_auto[
+                    "control_available"
+                ],
+                "controlled_auto": controlled_auto,
             },
+        }
+
+    def _controlled_auto_status(self) -> dict[str, Any]:
+        default = {
+            "runtime_mode": "PILOT",
+            "production_real_send_enabled": False,
+            "controlled_store_auto_enabled": False,
+            "policy_mode": "MANUAL_CONFIRM",
+            "kill_switch_enabled": True,
+            "ai_cs_store_id": None,
+            "platform_store_id": None,
+            "state_revision": None,
+            "state_reason": "CONTROLLED_AUTO_STATUS_UNAVAILABLE",
+            "runner_active": False,
+            "control_available": False,
+            "auto_reply_running": False,
+            "control_error_code": None,
+            "updated_at": None,
+        }
+        value = self._read_json(
+            self.data_root / "runtime" / "controlled-auto-public-status.json"
+        )
+        if value.get("schema_version") != "controlled-auto-public-status.v1":
+            return default
+        try:
+            updated_at = datetime.fromisoformat(str(value["updated_at"]))
+            age_seconds = (
+                datetime.now(UTC) - updated_at.astimezone(UTC)
+            ).total_seconds()
+            fresh = (
+                updated_at.tzinfo is not None
+                and 0.0 <= age_seconds <= 10.0
+            )
+        except (KeyError, TypeError, ValueError):
+            fresh = False
+        running = bool(
+            fresh
+            and value.get("runner_active") is True
+            and value.get("runtime_mode") == "PRODUCTION_AUTO"
+            and value.get("production_real_send_enabled") is True
+            and value.get("controlled_store_auto_enabled") is True
+            and value.get("kill_switch_enabled") is False
+        )
+        return {
+            **default,
+            **{
+                key: value.get(key, default[key])
+                for key in default
+                if key not in {"control_available", "auto_reply_running"}
+            },
+            "control_available": bool(fresh and value.get("runner_active") is True),
+            "auto_reply_running": running,
+        }
+
+    def request_controlled_auto_toggle(
+        self, *, target_enabled: bool
+    ) -> tuple[int, dict[str, Any]]:
+        """Queue one human AUTO pause/resume for the durable production owner."""
+
+        status = self._controlled_auto_status()
+        if not status["control_available"]:
+            return HTTPStatus.SERVICE_UNAVAILABLE, {
+                "error": {"code": "CONTROLLED_AUTO_RUNNER_UNAVAILABLE"}
+            }
+        state = self._read_json(
+            self.data_root / "runtime" / "channel-agent-state.json"
+        )
+        if target_enabled and (
+            state.get("identity_status") != "ACTIVE"
+            or state.get("pdd_login_state") != "CUSTOMER_SERVICE_READY"
+            or state.get("observer_status") != "OBSERVING"
+            or state.get("active_store_id") != status.get("ai_cs_store_id")
+            or state.get("pdd_store_id") != status.get("platform_store_id")
+        ):
+            return HTTPStatus.CONFLICT, {
+                "error": {"code": "CONTROLLED_AUTO_LIVE_SCOPE_NOT_READY"}
+            }
+        request_path = (
+            self.data_root / "runtime" / "controlled-auto-toggle.request"
+        )
+        with self._lock:
+            if request_path.exists():
+                return HTTPStatus.CONFLICT, {
+                    "error": {"code": "CONTROLLED_AUTO_TOGGLE_ALREADY_PENDING"}
+                }
+            atomic_write_bytes(
+                request_path,
+                json.dumps(
+                    {
+                        "schema_version": "controlled-auto-toggle-request.v1",
+                        "target_enabled": target_enabled,
+                        "operator_reference": "desktop-local-operator",
+                        "human_intent": True,
+                        "requested_at": datetime.now(UTC).isoformat(),
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8"),
+            )
+        return HTTPStatus.ACCEPTED, {
+            "schema_version": "controlled-auto-toggle-response.v1",
+            "status": "TOGGLE_REQUESTED",
+            "target_enabled": target_enabled,
         }
 
     def launch_pdd_workspace(self) -> tuple[int, dict[str, Any]]:
@@ -567,13 +674,17 @@ class DesktopAssistantServer:
         snapshots_reader = getattr(self.event_journal, "assistant_snapshots", None)
         snapshots = snapshots_reader() if callable(snapshots_reader) else ()
         if snapshots:
-            return self._with_read_state(self._snapshots_feed(
-                tuple(item.model_dump(mode="json") for item in snapshots)
-            ))
+            return self._with_controlled_auto_state(
+                self._with_read_state(self._snapshots_feed(
+                    tuple(item.model_dump(mode="json") for item in snapshots)
+                ))
+            )
         snapshot = self.event_journal.assistant_snapshot()
         if snapshot is not None:
-            return self._with_read_state(
-                self._snapshot_feed(snapshot.model_dump(mode="json"))
+            return self._with_controlled_auto_state(
+                self._with_read_state(
+                    self._snapshot_feed(snapshot.model_dump(mode="json"))
+                )
             )
         value = self._read_json(
             self.data_root
@@ -582,8 +693,8 @@ class DesktopAssistantServer:
             / "assistant-feed.json"
         )
         if value:
-            return value
-        return {
+            return self._with_controlled_auto_state(value)
+        return self._with_controlled_auto_state({
             # Keep the empty runtime feed on the exact same contract as the
             # real PDD observer and the synthetic adapter.  The desktop UI
             # intentionally validates every safety fact before it will render
@@ -603,7 +714,18 @@ class DesktopAssistantServer:
                 "receiptCount": 0,
                 "sendCount": 0,
             },
-        }
+        })
+
+    def _with_controlled_auto_state(self, feed: dict[str, Any]) -> dict[str, Any]:
+        controlled = self._controlled_auto_status()
+        safety = feed.setdefault("safety", {})
+        if not isinstance(safety, dict):
+            safety = {}
+            feed["safety"] = safety
+        running = bool(controlled["auto_reply_running"])
+        safety["autoReply"] = running
+        safety["realSend"] = running
+        return feed
 
     def _with_read_state(self, feed: dict[str, Any]) -> dict[str, Any]:
         read_revision = getattr(self.event_journal, "read_revision", None)
@@ -1497,6 +1619,32 @@ class _DesktopHandler(BaseHTTPRequestHandler):
             self._discard_request_body()
             self.server.runtime.request_safe_stop()
             self._json(HTTPStatus.ACCEPTED, {"status": "STOPPING"})
+            return
+        if path == "/local-api/v1/runtime/controlled-auto-toggle":
+            if (
+                self.headers.get("X-Channel-Agent-Intent")
+                != "HUMAN_CONFIRMED_CONTROLLED_AUTO_TOGGLE"
+            ):
+                self._discard_request_body()
+                self._json(
+                    HTTPStatus.FORBIDDEN,
+                    {"error": {"code": "HUMAN_CONFIRMATION_REQUIRED"}},
+                )
+                return
+            try:
+                payload = self._request_json()
+                target_enabled = payload.get("target_enabled")
+                if not isinstance(target_enabled, bool):
+                    raise DesktopAssistantError("AUTO toggle target is invalid")
+                status, response = self.server.runtime.request_controlled_auto_toggle(
+                    target_enabled=target_enabled
+                )
+                self._json(status, response)
+            except DesktopAssistantError:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": {"code": "INVALID_REQUEST"}},
+                )
             return
         if path == "/local-api/v1/browser/pdd/open":
             self._discard_request_body()
