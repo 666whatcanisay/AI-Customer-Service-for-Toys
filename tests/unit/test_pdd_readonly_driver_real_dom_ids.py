@@ -149,6 +149,19 @@ def test_selector_reader_can_read_an_attribute_from_the_message_row_itself() -> 
     assert "nodes.push(scope)" in expression
 
 
+def test_capture_prefers_latest_verified_product_card_vue_identity() -> None:
+    expression = _read_expression(
+        '{"selectors":{"product_card":{"selector":".commonCard .good-content","required":false,"maximum_matches":100},"message_item":{"selector":"li.onemsg","required":true,"maximum_matches":500}},"probes":[],"path":"/chat-merchant/index.html"}',
+        capture=True,
+    )
+
+    assert "productCards[productCards.length - 1]" in expression
+    assert "(vm.$props || vm._props || {})" in expression
+    assert ".info || {}).goods_info" in expression
+    assert "/^\\d{6,32}$/.test(cardProductId)" in expression
+    assert "product_name:cardProductName || pick('product_name')" in expression
+
+
 def test_real_dom_ids_normalize_and_preserve_epoch_ordering() -> None:
     fixture = load_pdd_replay_fixture(FIXTURE)
     evidence = build_replay_observer_evidence(fixture)

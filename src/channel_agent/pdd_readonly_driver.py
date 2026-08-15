@@ -111,6 +111,7 @@ class PDDObserverEvidence(_StrictModel):
                 "store_name",
                 "product_id",
                 "product_name",
+                "product_card",
                 "sku_id",
                 "sku_name",
                 "product_attributes",
@@ -710,9 +711,28 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
   const rows = Array.from(document.querySelectorAll(item.selector));
   if (rows.length > item.maximum_matches) throw new Error('message boundary');
   const pick = (name) => one(document,name);
+  const productCardBinding = cfg.selectors.product_card;
+  let cardGoodsInfo = {{}};
+  if (productCardBinding) {{
+    const productCards = Array.from(document.querySelectorAll(productCardBinding.selector));
+    if (productCards.length > productCardBinding.maximum_matches) throw new Error('product card boundary');
+    const productCard = productCards.length ? productCards[productCards.length - 1] : null;
+    const commonCard = productCard ? productCard.closest('.commonCard') : null;
+    const vm = commonCard && commonCard.__vue__;
+    const props = vm ? (vm.$props || vm._props || {{}}) : {{}};
+    cardGoodsInfo = ((((props.msg || {{}}).info || {{}}).goods_info) || {{}});
+  }}
+  const cardProductId = String(cardGoodsInfo.goods_id || '').trim();
+  const cardProductName = String(cardGoodsInfo.goods_name || '').trim();
   return {{fingerprint, active_conversation_id: pick('active_conversation_id'), customer_reference: pick('customer_reference'),
     store_name: pick('store_name'),
-    product: {{product_id:pick('product_id'),product_name:pick('product_name'),sku_id:pick('sku_id'),sku_name:pick('sku_name'),attributes_text:pick('product_attributes')}},
+    product: {{
+      product_id:/^\d{{6,32}}$/.test(cardProductId) ? cardProductId : pick('product_id'),
+      product_name:cardProductName || pick('product_name'),
+      sku_id:pick('sku_id'),
+      sku_name:pick('sku_name'),
+      attributes_text:pick('product_attributes')
+    }},
     order: {{order_reference:pick('order_reference'),order_status:pick('order_status'),logistics_status:pick('logistics_status'),aftersales_status:pick('aftersales_status')}},
     messages: rows.map((row) => ({{message_id:one(row,'message_id'),role:one(row,'message_role'),content:one(row,'message_content'),timestamp:one(row,'message_timestamp'),sequence:one(row,'message_sequence')}}))}};
 }})()
