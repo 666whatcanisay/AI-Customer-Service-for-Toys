@@ -253,13 +253,21 @@ const pendingConversationCount = computed(() => (
   + conversationCounts.value.PROCESSING
   + conversationCounts.value.WAITING_REPLY
 ))
-const storeMismatch = computed(() => Boolean(
-  bootstrap.value?.binding.active_store_id
-  && bootstrap.value?.binding.observed_store_id
-  && bootstrap.value.binding.active_store_id !== bootstrap.value.binding.observed_store_id
-))
+const observedStoreOption = computed(() => {
+  const observedPlatformStoreId = bootstrap.value?.binding.observed_store_id
+  if (!observedPlatformStoreId) return null
+  const matches = storeOptions.value.filter((item) =>
+    item.pddBinding?.platform_store_id === observedPlatformStoreId
+  )
+  return matches.length === 1 ? matches[0] : null
+})
+const storeMismatch = computed(() => {
+  const observedPlatformStoreId = bootstrap.value?.binding.observed_store_id
+  if (!activeStore.value || !observedPlatformStoreId) return false
+  return activeStore.value.pddBinding?.platform_store_id !== observedPlatformStoreId
+})
 
-type RuntimeAction = 'REFRESH' | 'OPEN_PDD' | 'REFRESH_WORKSPACE' | 'RESTART_OBSERVER'
+type RuntimeAction = 'REFRESH' | 'OPEN_PDD' | 'REFRESH_WORKSPACE' | 'RESTART_OBSERVER' | 'CONFIRM_STORE'
 type RuntimeAlert = {
   title: string
   impact: string
@@ -281,7 +289,7 @@ const actionAlert = computed<RuntimeAlert | null>(() => {
   }
   if (storeMismatch.value) return {
     title: '页面店铺与当前店铺不一致', impact: '消息读取已暂停，请先核对当前 PDD 页面。',
-    tone: 'danger', action: 'REFRESH_WORKSPACE', actionLabel: '重新识别', testId: 'refresh-pdd-workspace'
+    tone: 'danger', action: 'CONFIRM_STORE', actionLabel: '人工确认', testId: 'confirm-observed-store'
   }
   if (!['ONLINE', 'RUNNING', 'READY', 'OPENED'].includes(agentStatus.value)) return {
     title: 'Agent 运行状态异常', impact: '实时会话能力可能不可用，请刷新后检查。',
@@ -453,7 +461,36 @@ async function runAlertAction() {
   if (actionAlert.value?.action === 'OPEN_PDD') return openPddWindow()
   if (actionAlert.value?.action === 'REFRESH_WORKSPACE') return refreshPddWorkspace()
   if (actionAlert.value?.action === 'RESTART_OBSERVER') return restartPddObserver()
+  if (actionAlert.value?.action === 'CONFIRM_STORE') return confirmObservedStore()
   await refresh()
+}
+
+async function confirmObservedStore() {
+  const target = observedStoreOption.value
+  const observedPlatformStoreId = bootstrap.value?.binding.observed_store_id
+  if (!target || !observedPlatformStoreId) {
+    ElMessage.error('页面店铺号无法唯一对应到已授权店铺，不能人工放行。')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `页面识别到 PDD 店铺号 ${observedPlatformStoreId}，对应“${target.label}”。请确认当前客服页面确实属于该店铺。`,
+      '人工确认页面店铺',
+      { confirmButtonText: '确认正确', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  switchingStore.value = true
+  try {
+    await selectChannelAgentActiveStore(target.storeCode)
+    await refresh()
+    ElMessage.success('已按 PDD 店铺号与 AI-CS 店铺绑定完成确认。')
+  } catch {
+    ElMessage.error('人工确认被安全策略拒绝，请重新识别页面后再试。')
+  } finally {
+    switchingStore.value = false
+  }
 }
 
 function refreshFromMenu() {

@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessageBox } from 'element-plus'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -93,7 +93,7 @@ describe('ChannelAgentDesktopLayout', () => {
       binding: {
         authorized_store_ids: ['store-ref:1', 'store-ref:2'],
         active_store_id: 'store-ref:1',
-        observed_store_id: 'store-ref:1',
+        observed_store_id: '328616090',
         store_reference: 'store-ref:1'
       },
       safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
@@ -128,7 +128,7 @@ describe('ChannelAgentDesktopLayout', () => {
       binding: {
         authorized_store_ids: ['store-ref:1'],
         active_store_id: 'store-ref:1',
-        observed_store_id: 'store-ref:1',
+        observed_store_id: '328616090',
         store_reference: 'store-ref:1'
       },
       safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
@@ -211,7 +211,7 @@ describe('ChannelAgentDesktopLayout', () => {
       binding: {
         authorized_store_ids: ['store-ref:1'],
         active_store_id: 'store-ref:1',
-        observed_store_id: 'store-ref:1',
+        observed_store_id: '328616090',
         store_reference: 'store-ref:1'
       },
       safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
@@ -250,7 +250,7 @@ describe('ChannelAgentDesktopLayout', () => {
       binding: {
         authorized_store_ids: ['store-ref:1'],
         active_store_id: 'store-ref:1',
-        observed_store_id: 'store-ref:1',
+        observed_store_id: '328616090',
         store_reference: 'store-ref:1'
       },
       safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
@@ -270,6 +270,45 @@ describe('ChannelAgentDesktopLayout', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="message-source-status"]').text()).toContain('真实消息读取 已启用')
     expect(wrapper.get('[data-testid="overall-runtime-status"]').text()).toContain('就绪')
+    wrapper.unmount()
+  })
+
+  it('compares PDD store ids and lets the operator confirm a unique authorized mapping', async () => {
+    desktopMocks.bootstrap.mockResolvedValue({
+      schema_version: '1.0',
+      agent: { process_status: 'RUNNING', runtime_status: 'ONLINE', version: '1.4.0', node_id: 'agent-1' },
+      browser: {
+        status: 'READY',
+        pdd_login_state: 'CUSTOMER_SERVICE_READY',
+        message_source: 'REAL_PDD',
+        real_pdd_message_observation_enabled: true
+      },
+      binding: {
+        authorized_store_ids: ['store-ref:1', 'store-ref:2'],
+        active_store_id: 'store-ref:2',
+        observed_store_id: '328616090',
+        store_reference: 'store-ref:1'
+      },
+      safety: { manual_approval: true, auto_reply: false, real_send_enabled: false }
+    })
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue({ action: 'confirm' } as never)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(ChannelAgentDesktopLayout, {
+      global: { plugins: [createPinia(), router, ElementPlus] }
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="runtime-action-alert"]').text()).toContain('页面店铺与当前店铺不一致')
+    await wrapper.get('[data-testid="confirm-observed-store"]').trigger('click')
+    await flushPromises()
+
+    expect(desktopMocks.selectStore).toHaveBeenCalledOnce()
+    expect(desktopMocks.selectStore).toHaveBeenCalledWith('store-ref:1')
     wrapper.unmount()
   })
 })
