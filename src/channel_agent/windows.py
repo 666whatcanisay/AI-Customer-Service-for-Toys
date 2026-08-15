@@ -44,12 +44,13 @@ from .observation_runtime import (
     PersistOnlyObservationForwarder,
 )
 from .observation_stages import ObservationStage
+from .pdd_conversation_capture import DurablePDDConversationCaptureStore
 from .pdd_login import (
     PDDLoginObservation,
     PDDLoginObservationAdapter,
+    PDDLoginObservationError,
     PDDLoginState,
 )
-from .pdd_conversation_capture import DurablePDDConversationCaptureStore
 from .pdd_observer import PDDMessageObserver, PDDObserverRunner
 from .pdd_page_port import ReplayPDDPageReadPort, load_pdd_replay_fixture
 from .pdd_readonly_driver import (
@@ -311,9 +312,13 @@ class WindowsAgentHost:
         observer: ObserveOnlyRuntimeComponent | None = None
         observer_init_failed = False
         observer_error: dict[str, str | None] = {"code": None}
+        pdd_poll_error: dict[str, str | None] = {"code": None}
 
         def record_observer_error(code: str) -> None:
             observer_error["code"] = code[:120]
+
+        def reported_observer_error() -> str | None:
+            return observer_error["code"] or pdd_poll_error["code"]
         self._save_snapshot(
             runtime.snapshot(),
             WindowsClientProcessStatus.STARTING,
@@ -341,8 +346,19 @@ class WindowsAgentHost:
                 except BrowserControlError:
                     browser_state = browser.browser_status()
             if pdd_login is not None:
-                pdd_observation = pdd_login.launch()
-                browser_state = browser.browser_status()
+                try:
+                    pdd_observation = pdd_login.launch()
+                    pdd_poll_error["code"] = None
+                except (PDDLoginObservationError, BrowserControlError) as exc:
+                    # A transient CDP/session-file read must not terminate the
+                    # desktop Agent and close the operator's authenticated Edge.
+                    # Keep the browser alive and retry from the normal poll loop.
+                    pdd_poll_error["code"] = (
+                        "PDD_LOGIN_POLL_" + type(exc).__name__.upper()
+                    )[:120]
+                    browser_state = browser.browser_status()
+                else:
+                    browser_state = browser.browser_status()
             if config.message_observation_enabled:
                 observer, observer_init_failed = self._start_observer_if_ready(
                     config=config,
@@ -370,7 +386,7 @@ class WindowsAgentHost:
                     config, observer, pdd_observation,
                     initialization_failed=observer_init_failed,
                 ),
-                observer_error_code=observer_error["code"],
+                observer_error_code=reported_observer_error(),
             )
             next_pdd_observation = 0.0
             while not stop_event.wait(self._poll_interval):
@@ -423,7 +439,15 @@ class WindowsAgentHost:
                     except BrowserControlError:
                         browser_state = browser.browser_status()
                 if pdd_login is not None and time.monotonic() >= next_pdd_observation:
-                    pdd_observation = pdd_login.observe()
+                    try:
+                        pdd_observation = pdd_login.observe()
+                        pdd_poll_error["code"] = None
+                    except (PDDLoginObservationError, BrowserControlError) as exc:
+                        # Preserve the last known-good observation and browser.
+                        # The next two-second poll is allowed to recover naturally.
+                        pdd_poll_error["code"] = (
+                            "PDD_LOGIN_POLL_" + type(exc).__name__.upper()
+                        )[:120]
                     browser_state = browser.browser_status()
                     next_pdd_observation = time.monotonic() + 2.0
                 if config.message_observation_enabled:
@@ -453,7 +477,7 @@ class WindowsAgentHost:
                         config, observer, pdd_observation,
                         initialization_failed=observer_init_failed,
                     ),
-                    observer_error_code=observer_error["code"],
+                    observer_error_code=reported_observer_error(),
                 )
             if observer is not None:
                 observer.close()
@@ -488,7 +512,7 @@ class WindowsAgentHost:
                 message_observation_enabled=config.message_observation_enabled,
                 observer_mode=config.observer_mode,
                 observer_status="STOPPED",
-                observer_error_code=observer_error["code"],
+                observer_error_code=reported_observer_error(),
             )
             return 4 if browser_stop_failed else 0
         except Exception as exc:
@@ -516,7 +540,7 @@ class WindowsAgentHost:
                 message_observation_enabled=config.message_observation_enabled,
                 observer_mode=config.observer_mode,
                 observer_status="FAILED",
-                observer_error_code=(observer_error["code"] or type(exc).__name__.upper()),
+                observer_error_code=(reported_observer_error() or type(exc).__name__.upper()),
             )
             return 4
         finally:

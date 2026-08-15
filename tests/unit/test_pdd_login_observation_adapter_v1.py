@@ -4,7 +4,7 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 
 import pytest
 from pydantic import ValidationError
@@ -19,12 +19,14 @@ from channel_agent.pdd_login import (
     PDDCDPPageTarget,
     PDDLoginObservation,
     PDDLoginObservationAdapter,
+    PDDLoginReadError,
+    PDDLoginSessionReference,
+    PDDLoginSessionStore,
     PDDLoginState,
     _is_identity_observation_path,
 )
 from channel_agent.runtime import AgentRuntimeSnapshot
 from channel_agent.windows import WindowsAgentHost, WindowsClientProcessStatus
-
 
 NOW = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 LOGIN_URL = "https://mms.pinduoduo.com/login/"
@@ -38,6 +40,68 @@ class AdvancingClock:
     def __call__(self) -> datetime:
         self.value += timedelta(seconds=1)
         return self.value
+
+
+def test_session_store_concurrent_writes_use_distinct_temporary_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "runtime" / "pdd-login" / "session.json"
+    stores = (PDDLoginSessionStore(path), PDDLoginSessionStore(path))
+    values = (
+        PDDLoginSessionReference(
+            browser_id="browser:one",
+            agent_id="agent-pdd-observe",
+            login_state=PDDLoginState.WAITING_QR_SCAN,
+            observed_at=NOW,
+            reason_code="PDD_WAITING_FOR_HUMAN_QR_SCAN",
+        ),
+        PDDLoginSessionReference(
+            browser_id="browser:two",
+            agent_id="agent-pdd-observe",
+            login_state=PDDLoginState.CUSTOMER_SERVICE_READY,
+            observed_at=NOW + timedelta(seconds=1),
+            reason_code="PDD_CUSTOMER_SERVICE_READY",
+        ),
+    )
+    original_write_bytes = Path.write_bytes
+    measurement_lock = Lock()
+    active_writers = 0
+    max_active_writers = 0
+
+    def synchronized_write(candidate: Path, payload: bytes) -> int:
+        nonlocal active_writers, max_active_writers
+        if candidate.parent != path.parent or not candidate.name.endswith(".tmp"):
+            return original_write_bytes(candidate, payload)
+        with measurement_lock:
+            active_writers += 1
+            max_active_writers = max(max_active_writers, active_writers)
+        try:
+            time.sleep(0.03)
+            return original_write_bytes(candidate, payload)
+        finally:
+            with measurement_lock:
+                active_writers -= 1
+
+    monkeypatch.setattr(Path, "write_bytes", synchronized_write)
+    errors: list[Exception] = []
+
+    def save(index: int) -> None:
+        try:
+            stores[index].save(values[index])
+        except PDDLoginReadError as exc:  # pragma: no cover - assertion reports it
+            errors.append(exc)
+
+    workers = [Thread(target=save, args=(index,)) for index in range(2)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(timeout=3)
+
+    assert errors == []
+    assert not any(worker.is_alive() for worker in workers)
+    assert max_active_writers == 1
+    assert PDDLoginSessionStore(path).load() in values
+    assert list(path.parent.glob(".*.tmp")) == []
 
 
 class FakeBrowser:
@@ -545,6 +609,18 @@ class FakeHostPDDLogin:
         self.closed = True
 
 
+class TransientFailingHostPDDLogin(FakeHostPDDLogin):
+    def __init__(self, browser: FakeBrowser) -> None:
+        super().__init__(browser)
+        self.observe_calls = 0
+
+    def observe(self) -> PDDLoginObservation:
+        self.observe_calls += 1
+        if self.observe_calls == 1:
+            raise PDDLoginReadError("transient session persistence race")
+        return self.observation
+
+
 def test_windows_host_exposes_pdd_login_state_without_store_values(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
     config_path = data_root / "config" / "agent.json"
@@ -597,3 +673,52 @@ def test_windows_host_exposes_pdd_login_state_without_store_values(tmp_path: Pat
     assert "cookie" not in serialized
     assert "password" not in serialized
     assert "token" not in serialized
+
+
+def test_windows_host_keeps_agent_and_edge_alive_after_transient_login_poll_error(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    config_path = data_root / "config" / "agent.json"
+    config_path.parent.mkdir(parents=True)
+    config = ChannelAgentConfig(
+        server_url="https://channel-engine.example",
+        agent_id="agent-pdd-host",
+        device_id="device-pdd-host",
+        browser_enabled=True,
+        pdd_login_observation_enabled=True,
+        pdd_login_url=LOGIN_URL,
+        pdd_customer_service_url=CUSTOMER_SERVICE_URL,
+        heartbeat_interval_seconds=0.05,
+    )
+    config_path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
+    browser = FakeBrowser(data_root, config.agent_id)
+    pdd = TransientFailingHostPDDLogin(browser)
+    host = WindowsAgentHost(
+        config_path,
+        data_root,
+        runtime_factory=lambda value, **_kwargs: FakeRuntime(value),  # type: ignore[arg-type]
+        browser_factory=lambda _value, _root: browser,  # type: ignore[arg-type]
+        pdd_login_factory=lambda _value, _root, _browser: pdd,  # type: ignore[arg-type]
+        clock=lambda: NOW,
+        poll_interval_seconds=0.02,
+    )
+    stop = Event()
+    result: list[int] = []
+    worker = Thread(target=lambda: result.append(host.run(stop)))
+    worker.start()
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline and pdd.observe_calls < 2:
+        time.sleep(0.02)
+
+    try:
+        assert pdd.observe_calls >= 2
+        assert worker.is_alive()
+        assert browser.closed is False
+        assert host.state_store.load().process_status is WindowsClientProcessStatus.RUNNING
+    finally:
+        stop.set()
+        host.request_stop()
+        worker.join(timeout=2)
+    assert result == [0]
+    assert browser.closed is True

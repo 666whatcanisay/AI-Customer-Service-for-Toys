@@ -35,6 +35,7 @@ _MAX_CDP_BYTES = 1_048_576
 _STORE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_SESSION_WRITE_LOCK = RLock()
 
 
 class PDDLoginObservationError(RuntimeError):
@@ -175,14 +176,24 @@ class PDDLoginSessionStore:
 
     def save(self, value: PDDLoginSessionReference) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        # The desktop refresh endpoint and the background observer may persist the
+        # same session at the same time. A shared ``.tmp`` name lets one writer
+        # replace the other writer's temporary file, which used to surface as a
+        # fatal PDDLoginReadError and shut down the whole Agent (including Edge).
+        temporary = self.path.with_name(
+            f".{self.path.name}.{uuid.uuid4().hex}.tmp"
+        )
         payload = value.model_dump_json(indent=2).encode("utf-8") + b"\n"
-        try:
-            temporary.write_bytes(payload)
-            os.replace(temporary, self.path)
-        except OSError as exc:
-            temporary.unlink(missing_ok=True)
-            raise PDDLoginReadError("PDD login session reference cannot be saved") from exc
+        with _SESSION_WRITE_LOCK:
+            try:
+                temporary.write_bytes(payload)
+                os.replace(temporary, self.path)
+            except OSError as exc:
+                raise PDDLoginReadError(
+                    "PDD login session reference cannot be saved"
+                ) from exc
+            finally:
+                temporary.unlink(missing_ok=True)
 
 
 @runtime_checkable
