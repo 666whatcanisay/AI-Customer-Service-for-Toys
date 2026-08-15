@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -98,11 +99,22 @@ class _ActiveEvidenceBackedSnapshotProvider:
             except PDDConversationNotActive:
                 continue
             self._active_conversation_id = summary.conversation_id
+            # Host buffering intentionally derives the privacy-safe customer
+            # reference from the formal Store + conversation identity. Use the
+            # same canonical value at the send boundary; the page-local hash is
+            # not the public Observation/Decision identity.
+            customer_reference = "sha256:" + hashlib.sha256(
+                json.dumps(
+                    [snapshot.store_id, snapshot.conversation_id],
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
             return SimpleNamespace(
                 store_id=snapshot.store_id,
                 platform_store_id=snapshot.platform_store_id,
                 conversation_id=snapshot.conversation_id,
-                customer_reference=snapshot.customer_reference,
+                customer_reference=customer_reference,
                 product=SimpleNamespace(
                     product_reference=snapshot.product.product_id,
                     product_name=snapshot.product.product_name,
