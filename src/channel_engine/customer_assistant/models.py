@@ -335,6 +335,11 @@ class AIReplyPackage(CustomerAssistantModel):
     ai_cs_action: str = Field(default="UNKNOWN", min_length=1, max_length=64)
     warnings: tuple[str, ...] = Field(default=(), max_length=32)
     required_fields: tuple[str, ...] = Field(default=(), max_length=32)
+    quality_gate_status: Literal["PASS", "BLOCKED", "UNKNOWN"] = "UNKNOWN"
+    evidence_bundle_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[a-f0-9]{64}$",
+    )
     requires_human_approval: Literal[True] = True
     state: Literal["WAITING_APPROVAL", "MANUAL_INTERVENTION"] = "WAITING_APPROVAL"
     gateway_version: str = Field(min_length=1, max_length=128)

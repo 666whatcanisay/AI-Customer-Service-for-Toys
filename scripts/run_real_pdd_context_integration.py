@@ -13,6 +13,7 @@ from channel_agent.binding import atomic_write_bytes
 from channel_agent.browser import ChannelAgentBrowserManager
 from channel_agent.client import ChannelEngineClient
 from channel_agent.config import load_agent_config
+from channel_agent.controlled_auto_runtime import ControlledAutoRuntimeStateStore
 from channel_agent.logger import SafeAgentLogger
 from channel_agent.pdd_login import EdgePDDTargetResolver
 from channel_agent.pdd_workspace import (
@@ -255,6 +256,8 @@ def _workspace_feed(
     snapshot,
     *,
     reply: dict[str, object] | None,
+    production_real_send_enabled: bool = False,
+    controlled_store_auto_enabled: bool = False,
 ) -> dict[str, object]:
     customer_messages = [
         item for item in snapshot.visible_history if item.sender == "customer"
@@ -265,8 +268,8 @@ def _workspace_feed(
         "updatedAt": datetime.now(UTC).isoformat(),
         "safety": {
             "readOnly": True,
-            "autoReply": False,
-            "realSend": False,
+            "autoReply": controlled_store_auto_enabled,
+            "realSend": production_real_send_enabled,
             "browserWriteOperations": 0,
             "executionCount": 0,
             "receiptCount": 0,
@@ -306,7 +309,12 @@ def _workspace_feed(
     }
 
 
-def _reply_feed(snapshot, package) -> dict[str, object]:
+def _reply_feed(
+    snapshot,
+    package,
+    *,
+    policy_mode: str = "MANUAL_CONFIRM",
+) -> dict[str, object]:
     customer_messages = [
         item for item in snapshot.visible_history if item.sender == "customer"
     ]
@@ -363,12 +371,11 @@ def _reply_feed(snapshot, package) -> dict[str, object]:
         ),
         "riskLevel": package.risk_level.value,
         "citations": citations,
-        "warnings": (
-            ["SUGGESTION_ONLY", "AUTO_SEND_DISABLED"]
-            if package.action == "SUGGEST_REPLY"
-            else ["KNOWLEDGE_NOT_PUBLISHED"]
-        ),
-        "requiredFields": [],
+        "warnings": list(package.warnings),
+        "requiredFields": list(package.required_fields),
+        "qualityStatus": package.quality_gate_status,
+        "policyMode": policy_mode,
+        "evidenceBundleSha256": package.evidence_bundle_sha256,
         "state": package.state,
     }
 
@@ -539,6 +546,9 @@ def _run_loop(
     evidence_path = assistant_root / "first-live-message-evidence.json"
     feed_path = assistant_root / "assistant-feed.json"
     event_path = assistant_root / "assistant-events.jsonl"
+    auto_runtime_store = ControlledAutoRuntimeStateStore(
+        assistant_root / "controlled-auto-runtime.sqlite3"
+    )
     _atomic_json(
         status_path,
         _safety_status(
@@ -548,12 +558,19 @@ def _run_loop(
     try:
         while True:
             snapshot = observer.capture()
+            auto_state = auto_runtime_store.load()
             pending = checkpoint.pending_customer_messages(snapshot)
             _atomic_json(
                 feed_path,
                 _workspace_feed(
                     snapshot,
                     reply=(None if pending else _existing_feed_reply(feed_path)),
+                    production_real_send_enabled=(
+                        auto_state.production_real_send_enabled
+                    ),
+                    controlled_store_auto_enabled=(
+                        auto_state.controlled_store_auto_enabled
+                    ),
                 ),
             )
             for message in pending:
@@ -580,10 +597,30 @@ def _run_loop(
                 )
             package = runtime.generate_ready_reply()
             if package is not None:
-                reply = _reply_feed(snapshot, package)
+                reply = _reply_feed(
+                    snapshot,
+                    package,
+                    policy_mode=(
+                        "AUTO_LOW_RISK"
+                        if (
+                            auto_state.controlled_pilot_send_enabled
+                            or auto_state.controlled_store_auto_enabled
+                        )
+                        else "MANUAL_CONFIRM"
+                    ),
+                )
                 _atomic_json(
                     feed_path,
-                    _workspace_feed(snapshot, reply=reply),
+                    _workspace_feed(
+                        snapshot,
+                        reply=reply,
+                        production_real_send_enabled=(
+                            auto_state.production_real_send_enabled
+                        ),
+                        controlled_store_auto_enabled=(
+                            auto_state.controlled_store_auto_enabled
+                        ),
+                    ),
                 )
                 _append_runtime_event(
                     event_path,

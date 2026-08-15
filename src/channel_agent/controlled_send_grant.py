@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import secrets
 import sqlite3
 import unicodedata
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,8 @@ class ControlledSendGrantV1(BaseModel):
     schema_version: Literal["controlled-send-grant.v1"] = "controlled-send-grant.v1"
     grant_id: str = Field(pattern=r"^controlled-send-grant:[a-f0-9]{64}$")
     store_id: str = Field(min_length=1, max_length=160)
+    ai_cs_store_id: str | None = Field(default=None, min_length=1, max_length=160)
+    platform_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     test_buyer_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     conversation_id: str = Field(min_length=1, max_length=255)
     customer_message_id: str = Field(min_length=1, max_length=255)
@@ -51,6 +54,8 @@ class ControlledSendGrantV1(BaseModel):
         cls,
         *,
         store_id: str,
+        ai_cs_store_id: str | None = None,
+        platform_store_id: str | None = None,
         test_buyer_hash: str,
         conversation_id: str,
         customer_message_id: str,
@@ -75,6 +80,8 @@ class ControlledSendGrantV1(BaseModel):
         # Preserve the original manual-grant identity when no Pilot window is used.
         if pilot_window_id is not None:
             material_items.append(pilot_window_id)
+        if ai_cs_store_id is not None or platform_store_id is not None:
+            material_items.extend([ai_cs_store_id, platform_store_id])
         material = json.dumps(
             material_items,
             ensure_ascii=False,
@@ -84,6 +91,8 @@ class ControlledSendGrantV1(BaseModel):
             grant_id="controlled-send-grant:"
             + hashlib.sha256(material.encode("utf-8")).hexdigest(),
             store_id=store_id,
+            ai_cs_store_id=ai_cs_store_id,
+            platform_store_id=platform_store_id,
             test_buyer_hash=test_buyer_hash,
             conversation_id=conversation_id,
             customer_message_id=customer_message_id,
@@ -140,7 +149,7 @@ def normalized_question_sha256(value: str) -> str:
 
 
 class ControlledAutoPolicyGrantV1(BaseModel):
-    """One exact-answer AUTO_LOW_RISK authorization for a controlled Pilot."""
+    """One single-use AUTO_LOW_RISK authorization for one current Decision."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
@@ -152,6 +161,8 @@ class ControlledAutoPolicyGrantV1(BaseModel):
         pattern=r"^controlled-pilot-window:[a-f0-9]{64}$"
     )
     store_id: str = Field(min_length=1, max_length=160)
+    ai_cs_store_id: str | None = Field(default=None, min_length=1, max_length=160)
+    platform_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     test_buyer_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     conversation_id: str = Field(min_length=1, max_length=255)
     customer_message_id: str = Field(min_length=1, max_length=255)
@@ -165,12 +176,21 @@ class ControlledAutoPolicyGrantV1(BaseModel):
     policy_revision: int = Field(ge=1)
     whitelist_revision: str = Field(min_length=1, max_length=160)
     knowledge_scope_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reply_evidence_bundle_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[a-f0-9]{64}$",
+    )
+    authorization_basis: Literal[
+        "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
+    ] = "EXACT_APPROVED_REPLY"
+    deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT"
+    nonce: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     issued_at: AwareDatetime
     expires_at: AwareDatetime
     max_attempts: Literal[1] = 1
     max_successes: Literal[1] = 1
     authorization_kind: Literal["AUTO_POLICY"] = "AUTO_POLICY"
-    test_only: Literal[True] = True
+    test_only: bool = True
 
     @model_validator(mode="after")
     def validate_scope(self) -> ControlledAutoPolicyGrantV1:
@@ -178,8 +198,24 @@ class ControlledAutoPolicyGrantV1(BaseModel):
             raise ValueError("controlled auto grant expiry is invalid")
         if self.expires_at - self.issued_at > timedelta(minutes=5):
             raise ValueError("controlled auto grant TTL cannot exceed five minutes")
-        if self.reply_content_sha256 != self.approved_reply_sha256:
-            raise ValueError("AUTO Pilot reply must exactly match the approved reply")
+        if self.authorization_basis == "EXACT_APPROVED_REPLY":
+            if self.reply_content_sha256 != self.approved_reply_sha256:
+                raise ValueError("AUTO Pilot reply must exactly match the approved reply")
+        else:
+            if not all(
+                (
+                    self.ai_cs_store_id,
+                    self.platform_store_id,
+                    self.reply_evidence_bundle_sha256,
+                    self.nonce,
+                    self.product_id,
+                )
+            ):
+                raise ValueError(
+                    "quality-gated AUTO requires double Store identity, product, Evidence, and nonce"
+                )
+            if self.deployment_scope == "PRODUCTION_AUTO" and self.test_only:
+                raise ValueError("production AUTO grant cannot claim test_only=true")
         return self
 
     @classmethod
@@ -188,27 +224,43 @@ class ControlledAutoPolicyGrantV1(BaseModel):
         *,
         pilot_window_id: str,
         store_id: str,
+        ai_cs_store_id: str | None = None,
+        platform_store_id: str | None = None,
         test_buyer_hash: str,
         conversation_id: str,
         customer_message_id: str,
         decision_id: str,
         question: str,
         reply_content: str,
-        approved_reply_sha256: str,
+        approved_reply_sha256: str | None,
         product_id: str | None,
         sku_id: str | None,
         policy_revision: int,
         whitelist_revision: str,
         knowledge_scope_sha256: str,
         issued_at: datetime,
+        reply_evidence_bundle_sha256: str | None = None,
+        authorization_basis: Literal[
+            "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
+        ] = "EXACT_APPROVED_REPLY",
+        deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT",
+        nonce: str | None = None,
     ) -> ControlledAutoPolicyGrantV1:
         issued = issued_at.astimezone(UTC)
         reply_hash = hashlib.sha256(reply_content.encode("utf-8")).hexdigest()
         question_hash = normalized_question_sha256(question)
+        approved_hash = approved_reply_sha256 or reply_hash
+        issued_nonce = nonce or (
+            secrets.token_hex(32)
+            if authorization_basis == "QUALITY_GATED_LOW_RISK"
+            else None
+        )
         material = json.dumps(
             [
                 pilot_window_id,
                 store_id,
+                ai_cs_store_id,
+                platform_store_id,
                 test_buyer_hash,
                 conversation_id,
                 customer_message_id,
@@ -220,6 +272,10 @@ class ControlledAutoPolicyGrantV1(BaseModel):
                 policy_revision,
                 whitelist_revision,
                 knowledge_scope_sha256,
+                reply_evidence_bundle_sha256,
+                authorization_basis,
+                deployment_scope,
+                issued_nonce,
                 issued.isoformat(),
             ],
             ensure_ascii=False,
@@ -230,20 +286,27 @@ class ControlledAutoPolicyGrantV1(BaseModel):
             + hashlib.sha256(material.encode("utf-8")).hexdigest(),
             pilot_window_id=pilot_window_id,
             store_id=store_id,
+            ai_cs_store_id=ai_cs_store_id,
+            platform_store_id=platform_store_id,
             test_buyer_hash=test_buyer_hash,
             conversation_id=conversation_id,
             customer_message_id=customer_message_id,
             decision_id=decision_id,
             reply_content_sha256=reply_hash,
-            approved_reply_sha256=approved_reply_sha256,
+            approved_reply_sha256=approved_hash,
             normalized_question_sha256=question_hash,
             product_id=product_id,
             sku_id=sku_id,
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
             knowledge_scope_sha256=knowledge_scope_sha256,
+            reply_evidence_bundle_sha256=reply_evidence_bundle_sha256,
+            authorization_basis=authorization_basis,
+            deployment_scope=deployment_scope,
+            nonce=issued_nonce,
             issued_at=issued,
             expires_at=issued + timedelta(minutes=5),
+            test_only=deployment_scope == "PILOT",
         )
 
     def assert_target(
@@ -274,7 +337,7 @@ class ControlledAutoPolicyGrantV1(BaseModel):
             self.conversation_id,
             self.customer_message_id,
             self.decision_id,
-            self.approved_reply_sha256,
+            self.reply_content_sha256,
         )
         if actual != expected:
             raise ControlledSendGrantError("controlled auto target or reply hash changed")
@@ -292,6 +355,8 @@ class ControlledPilotSendWindowV1(BaseModel):
     window_id: str = Field(pattern=r"^controlled-pilot-window:[a-f0-9]{64}$")
     mode: Literal["MANUAL_CONFIRM", "AUTO_POLICY"]
     store_id: str = Field(min_length=1, max_length=160)
+    ai_cs_store_id: str | None = Field(default=None, min_length=1, max_length=160)
+    platform_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     test_buyer_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     conversation_id: str = Field(min_length=1, max_length=255)
     normalized_question_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -301,6 +366,14 @@ class ControlledPilotSendWindowV1(BaseModel):
     policy_revision: int = Field(ge=1)
     whitelist_revision: str = Field(min_length=1, max_length=160)
     knowledge_scope_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reply_evidence_bundle_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[a-f0-9]{64}$",
+    )
+    authorization_basis: Literal[
+        "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
+    ] = "EXACT_APPROVED_REPLY"
+    deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT"
     issued_at: AwareDatetime
     expires_at: AwareDatetime
     max_successes: Literal[1] = 1
@@ -311,6 +384,16 @@ class ControlledPilotSendWindowV1(BaseModel):
             raise ValueError("controlled Pilot window expiry is invalid")
         if self.expires_at - self.issued_at > timedelta(minutes=5):
             raise ValueError("controlled Pilot window TTL cannot exceed five minutes")
+        if self.authorization_basis == "QUALITY_GATED_LOW_RISK" and not all(
+            (
+                self.ai_cs_store_id,
+                self.platform_store_id,
+                self.reply_evidence_bundle_sha256,
+            )
+        ):
+            raise ValueError(
+                "quality-gated AUTO window requires double Store identity and Evidence"
+            )
         return self
 
     @classmethod
@@ -319,6 +402,8 @@ class ControlledPilotSendWindowV1(BaseModel):
         *,
         mode: Literal["MANUAL_CONFIRM", "AUTO_POLICY"],
         store_id: str,
+        ai_cs_store_id: str | None = None,
+        platform_store_id: str | None = None,
         test_buyer_hash: str,
         conversation_id: str,
         question: str,
@@ -329,6 +414,11 @@ class ControlledPilotSendWindowV1(BaseModel):
         whitelist_revision: str,
         knowledge_scope_sha256: str,
         issued_at: datetime,
+        reply_evidence_bundle_sha256: str | None = None,
+        authorization_basis: Literal[
+            "EXACT_APPROVED_REPLY", "QUALITY_GATED_LOW_RISK"
+        ] = "EXACT_APPROVED_REPLY",
+        deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"] = "PILOT",
     ) -> ControlledPilotSendWindowV1:
         issued = issued_at.astimezone(UTC)
         question_hash = normalized_question_sha256(question)
@@ -337,6 +427,8 @@ class ControlledPilotSendWindowV1(BaseModel):
             [
                 mode,
                 store_id,
+                ai_cs_store_id,
+                platform_store_id,
                 test_buyer_hash,
                 conversation_id,
                 question_hash,
@@ -346,6 +438,9 @@ class ControlledPilotSendWindowV1(BaseModel):
                 policy_revision,
                 whitelist_revision,
                 knowledge_scope_sha256,
+                reply_evidence_bundle_sha256,
+                authorization_basis,
+                deployment_scope,
                 issued.isoformat(),
             ],
             ensure_ascii=False,
@@ -356,6 +451,8 @@ class ControlledPilotSendWindowV1(BaseModel):
             + hashlib.sha256(material.encode("utf-8")).hexdigest(),
             mode=mode,
             store_id=store_id,
+            ai_cs_store_id=ai_cs_store_id,
+            platform_store_id=platform_store_id,
             test_buyer_hash=test_buyer_hash,
             conversation_id=conversation_id,
             normalized_question_sha256=question_hash,
@@ -365,6 +462,9 @@ class ControlledPilotSendWindowV1(BaseModel):
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
             knowledge_scope_sha256=knowledge_scope_sha256,
+            reply_evidence_bundle_sha256=reply_evidence_bundle_sha256,
+            authorization_basis=authorization_basis,
+            deployment_scope=deployment_scope,
             issued_at=issued,
             expires_at=issued + timedelta(minutes=5),
         )
@@ -454,6 +554,7 @@ class ControlledPilotSendWindowStore:
         product_id: str | None,
         sku_id: str | None,
         knowledge_scope_sha256: str,
+        reply_evidence_bundle_sha256: str | None = None,
         now: datetime,
     ) -> ControlledPilotSendWindowV1:
         window = self.active(now=now)
@@ -469,6 +570,8 @@ class ControlledPilotSendWindowStore:
         question_hash = normalized_question_sha256(question)
         if (
             grant.store_id != window.store_id
+            or grant.ai_cs_store_id != window.ai_cs_store_id
+            or grant.platform_store_id != window.platform_store_id
             or grant.test_buyer_hash != window.test_buyer_hash
             or grant.conversation_id != window.conversation_id
             or question_hash != window.normalized_question_sha256
@@ -484,6 +587,14 @@ class ControlledPilotSendWindowStore:
             or grant.policy_revision != window.policy_revision
             or grant.whitelist_revision != window.whitelist_revision
             or grant.knowledge_scope_sha256 != window.knowledge_scope_sha256
+            or grant.authorization_basis != window.authorization_basis
+            or grant.deployment_scope != window.deployment_scope
+            or grant.ai_cs_store_id != window.ai_cs_store_id
+            or grant.platform_store_id != window.platform_store_id
+            or grant.reply_evidence_bundle_sha256
+            != window.reply_evidence_bundle_sha256
+            or reply_evidence_bundle_sha256
+            != window.reply_evidence_bundle_sha256
         ):
             raise ControlledSendGrantError("AUTO Pilot policy or allowlist changed")
         return window

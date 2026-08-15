@@ -13,6 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from channel_agent.controlled_auto_runtime import (
+    ControlledAutoRuntimeStateStore,
+    ControlledAutoRuntimeStateV1,
+    evaluate_send_safety,
+)
 from channel_engine.pilot_governance import (
     ActivationValidationResult,
     GateFactsV1,
@@ -27,7 +32,6 @@ from channel_engine.pilot_governance import (
     sha256_file,
     validate_activation,
 )
-
 
 DATABASE_SUFFIXES = {".db", ".sqlite", ".sqlite3"}
 REQUIRED_ACTIVATION_COMPONENTS = {
@@ -344,6 +348,12 @@ def evaluate_preflight(
     real_execution_attempts: int,
     real_sends: int,
     real_receipts: int,
+    send_runtime_state: ControlledAutoRuntimeStateV1 | None = None,
+    observed_ai_cs_store_id: str | None = None,
+    observed_platform_store_id: str | None = None,
+    unknown_automatic_retries: int = 0,
+    concrete_send_requested: bool = False,
+    concrete_send_has_valid_grant: bool = False,
 ) -> dict[str, Any]:
     runtime_reasons = [
         f"{component}:{reason}"
@@ -371,18 +381,36 @@ def evaluate_preflight(
     ]
     storage_health = _check("BLOCKED" if storage_reasons else "PASS", storage_reasons)
 
-    send_reasons: list[str] = []
-    if host_real_send_enabled is not False:
-        send_reasons.append("HOST_REAL_SEND_NOT_PROVEN_DISABLED")
-    if agent_real_send_enabled is not False:
-        send_reasons.append("AGENT_REAL_SEND_NOT_PROVEN_DISABLED")
-    if real_execution_attempts != 0:
-        send_reasons.append("REAL_EXECUTION_ATTEMPT_NONZERO")
-    if real_sends != 0:
-        send_reasons.append("REAL_SEND_NONZERO")
-    if real_receipts != 0:
-        send_reasons.append("REAL_RECEIPT_NONZERO")
-    send_safety = _check("BLOCKED" if send_reasons else "PASS", send_reasons)
+    if send_runtime_state is None:
+        send_reasons: list[str] = []
+        if host_real_send_enabled is not False:
+            send_reasons.append("HOST_REAL_SEND_NOT_PROVEN_DISABLED")
+        if agent_real_send_enabled is not False:
+            send_reasons.append("AGENT_REAL_SEND_NOT_PROVEN_DISABLED")
+        if real_execution_attempts != 0:
+            send_reasons.append("REAL_EXECUTION_ATTEMPT_NONZERO")
+        if real_sends != 0:
+            send_reasons.append("REAL_SEND_NONZERO")
+        if real_receipts != 0:
+            send_reasons.append("REAL_RECEIPT_NONZERO")
+        send_safety = _check("BLOCKED" if send_reasons else "PASS", send_reasons)
+    else:
+        evaluated_send = evaluate_send_safety(
+            send_runtime_state,
+            observed_ai_cs_store_id=observed_ai_cs_store_id,
+            observed_platform_store_id=observed_platform_store_id,
+            real_execution_attempts=real_execution_attempts,
+            terminal_receipts=real_receipts,
+            successful_receipts=real_sends,
+            operator_message_ids=real_sends,
+            unknown_automatic_retries=unknown_automatic_retries,
+            concrete_send_requested=concrete_send_requested,
+            concrete_send_has_valid_grant=concrete_send_has_valid_grant,
+        )
+        send_safety = _check(
+            evaluated_send.status,
+            list(evaluated_send.reason_codes),
+        )
 
     gate_facts_validity = _check("PASS", ["GATE_FACTS_VALID"])
     checks = {
@@ -410,10 +438,17 @@ def evaluate_preflight(
         "derived": {
             "may_enter_read_only_pilot": preflight["status"] == "PASS",
             "ai_cs_production_ready": production_ready,
-            "real_send_enabled": False
-            if send_safety["status"] == "PASS"
-            else None,
-            "real_pdd_operation_authorized": False,
+            "real_send_enabled": (
+                send_runtime_state.production_real_send_enabled
+                if send_runtime_state is not None
+                and send_safety["status"] == "PASS"
+                else False if send_safety["status"] == "PASS" else None
+            ),
+            "real_pdd_operation_authorized": bool(
+                send_runtime_state is not None
+                and send_runtime_state.runtime_mode == "PRODUCTION_AUTO"
+                and send_safety["status"] == "PASS"
+            ),
             "real_pdd_operation_authorization_reason": (
                 "CURRENT_GREEN_UI_HUMAN_ACCEPTANCE_PASS_AND_MANUAL_TRIGGER_REQUIRED"
             ),
@@ -428,6 +463,7 @@ def build_status(
     agent_config_path: Path,
     *,
     rag_internal_service_token: str | None = None,
+    auto_runtime_state_path: Path | None = None,
 ) -> dict[str, Any]:
     facts = load_gate_facts(facts_path)
     catalog = RuntimeCatalogV1.model_validate(_read_json(catalog_path))
@@ -629,6 +665,29 @@ def build_status(
         if host_activation
         else None
     )
+    send_runtime_state = None
+    observed_ai_cs_store_id = None
+    observed_platform_store_id = None
+    if auto_runtime_state_path is not None and auto_runtime_state_path.is_file():
+        send_runtime_state = ControlledAutoRuntimeStateStore(
+            auto_runtime_state_path
+        ).load()
+        try:
+            agent_state = _read_json(
+                agent_config_path.parent.parent / "runtime" / "channel-agent-state.json"
+            )
+        except (OSError, ValueError, json.JSONDecodeError):
+            agent_state = {}
+        raw_ai_cs_store_id = agent_state.get("active_store_id")
+        raw_platform_store_id = agent_state.get("pdd_store_id")
+        observed_ai_cs_store_id = (
+            raw_ai_cs_store_id if isinstance(raw_ai_cs_store_id, str) else None
+        )
+        observed_platform_store_id = (
+            raw_platform_store_id
+            if isinstance(raw_platform_store_id, str)
+            else None
+        )
     evaluation = evaluate_preflight(
         activation_results=activation_results,
         source_identity=source_identity,
@@ -644,6 +703,9 @@ def build_status(
         real_execution_attempts=real_execution_attempts,
         real_sends=real_sends,
         real_receipts=real_receipts,
+        send_runtime_state=send_runtime_state,
+        observed_ai_cs_store_id=observed_ai_cs_store_id,
+        observed_platform_store_id=observed_platform_store_id,
     )
     overall = evaluation["pilot_governance_preflight"]["status"]
     return {
@@ -702,6 +764,7 @@ def main() -> int:
     status_parser.add_argument("--catalog", required=True)
     status_parser.add_argument("--activation", action="append", default=[])
     status_parser.add_argument("--agent-config", required=True)
+    status_parser.add_argument("--auto-runtime-state")
     status_parser.add_argument("--output")
     args = parser.parse_args()
     if args.command == "catalog":
@@ -723,6 +786,11 @@ def main() -> int:
         [Path(item).resolve(strict=True) for item in args.activation],
         Path(args.agent_config).resolve(strict=True),
         rag_internal_service_token=internal_service_token,
+        auto_runtime_state_path=(
+            Path(args.auto_runtime_state).resolve(strict=True)
+            if args.auto_runtime_state
+            else None
+        ),
     )
     if args.output:
         _write_json(Path(args.output).resolve(strict=False), value)

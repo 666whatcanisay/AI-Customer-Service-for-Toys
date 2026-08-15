@@ -22,6 +22,7 @@ from channel_engine.models import ReceiptOutcome
 from channel_engine.policy import ApprovalPolicy
 from channel_engine.storage import SqlAlchemyUnitOfWork
 
+from .controlled_auto_runtime import ControlledAutoRuntimeStateStore
 from .controlled_send_grant import (
     ControlledAutoPolicyGrantV1,
     ControlledPilotSendWindowStore,
@@ -119,6 +120,9 @@ class ApprovedReplyService:
         controlled_send_grant_store: ControlledSendGrantStore,
         controlled_send_enabled: bool,
         controlled_pilot_window_store: ControlledPilotSendWindowStore | None = None,
+        controlled_auto_runtime_store: ControlledAutoRuntimeStateStore | None = None,
+        store_identity_provider: Callable[[], tuple[str, str]] | None = None,
+        require_double_store_identity: bool = False,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.feed_path = Path(feed_path)
@@ -128,6 +132,9 @@ class ApprovedReplyService:
         self._browser_sender = browser_sender
         self._grant_store = controlled_send_grant_store
         self._pilot_windows = controlled_pilot_window_store
+        self._auto_runtime = controlled_auto_runtime_store
+        self._store_identity_provider = store_identity_provider
+        self._require_double_store_identity = require_double_store_identity
         self._enabled = controlled_send_enabled
         self._clock = clock
         self._lock = RLock()
@@ -138,14 +145,29 @@ class ApprovedReplyService:
             if self._pilot_windows is not None
             else None
         )
+        runtime_state = self._auto_runtime.load() if self._auto_runtime else None
         return {
             "service": "channel-agent-approved-reply-bridge",
             "version": "1.1",
             "controlled_send_enabled": self._enabled,
-            "production_real_send_enabled": False,
-            "controlled_pilot_send_enabled": active_window is not None,
+            "runtime_mode": runtime_state.runtime_mode if runtime_state else "PILOT",
+            "production_real_send_enabled": (
+                runtime_state.production_real_send_enabled if runtime_state else False
+            ),
+            "controlled_pilot_send_enabled": (
+                active_window is not None
+                and (
+                    runtime_state is None
+                    or runtime_state.controlled_pilot_send_enabled
+                )
+            ),
+            "controlled_store_auto_enabled": (
+                runtime_state.controlled_store_auto_enabled if runtime_state else False
+            ),
             "controlled_pilot_mode": active_window.mode if active_window else None,
-            "auto_reply_enabled": False,
+            "auto_reply_enabled": (
+                runtime_state.controlled_store_auto_enabled if runtime_state else False
+            ),
             "manual_approval_required": True,
             "edge_lifecycle_owned": False,
         }
@@ -193,6 +215,7 @@ class ApprovedReplyService:
                     error_code="PDD_CONTROLLED_SEND_DISABLED",
                     status_code=403,
                 )
+            self._assert_runtime_mode(grant)
             if request.confirmed_at.astimezone(UTC) < self._clock().astimezone(UTC) - timedelta(minutes=5):
                 raise ApprovedReplyBridgeError(
                     "controlled send authorization expired",
@@ -208,6 +231,7 @@ class ApprovedReplyService:
                 )
 
             feed = self._load_feed()
+            self._assert_feed_send_state(feed=feed, grant=grant)
             reply = feed.get("reply")
             if not isinstance(reply, dict):
                 raise ApprovedReplyBridgeError(
@@ -246,6 +270,7 @@ class ApprovedReplyService:
                     error_code="PDD_SEND_DURABLE_REPLY_MISMATCH",
                     status_code=409,
                 )
+            self._assert_double_store_identity(grant)
 
             snapshot = self._observer.capture()
             confirmation = HumanSendConfirmation(
@@ -296,6 +321,9 @@ class ApprovedReplyService:
                         product_id=context.page.product.product_reference,
                         sku_id=context.page.product.sku_reference,
                         knowledge_scope_sha256=knowledge_scope_sha256(package),
+                        reply_evidence_bundle_sha256=(
+                            package.evidence_bundle_sha256
+                        ),
                         now=self._clock(),
                     )
                 except ControlledSendGrantError as exc:
@@ -336,6 +364,14 @@ class ApprovedReplyService:
                         window_id,
                         reason=f"EXECUTION_{response.outcome}",
                     )
+            if (
+                response.outcome in {"FAILED", "UNKNOWN"}
+                and self._auto_runtime is not None
+            ):
+                self._auto_runtime.fail_closed_after_terminal(
+                    outcome=response.outcome,
+                    reason=response.error_code or "REAL_SEND_TERMINAL_FAILURE",
+                )
             return response
 
     def _execute_same_send_chain(
@@ -375,6 +411,14 @@ class ApprovedReplyService:
             expected_customer_reference=package.customer_reference,
             expected_customer_message_id=request.customer_message_id,
             expected_content=request.reply_text,
+            authorization_kind=grant.authorization_kind,
+            ai_cs_store_id=grant.ai_cs_store_id,
+            platform_store_id=grant.platform_store_id,
+            evidence_bundle_sha256=(
+                grant.reply_evidence_bundle_sha256
+                if isinstance(grant, ControlledAutoPolicyGrantV1)
+                else None
+            ),
         )
         worker = ExecutionWorker(
             self._uow_factory,
@@ -443,13 +487,19 @@ class ApprovedReplyService:
         package,
         grant: ControlledAutoPolicyGrantV1,
     ) -> None:
-        """Fail closed unless the new AI package is the exact approved low-risk answer."""
+        """Fail closed unless the current package matches its single-use AUTO Grant."""
 
         reply_content = package.reply_content or ""
         reply_hash = hashlib.sha256(reply_content.encode("utf-8")).hexdigest()
+        if reply_hash != grant.reply_content_sha256:
+            raise ApprovedReplyBridgeError(
+                "the AUTO reply differs from the authorized current Decision",
+                error_code="REPLY_HASH_MISMATCH",
+                status_code=409,
+            )
         if (
-            reply_hash != grant.reply_content_sha256
-            or reply_hash != grant.approved_reply_sha256
+            grant.authorization_basis == "EXACT_APPROVED_REPLY"
+            and reply_hash != grant.approved_reply_sha256
         ):
             raise ApprovedReplyBridgeError(
                 "the AUTO Pilot reply differs from the human-approved answer",
@@ -470,8 +520,20 @@ class ApprovedReplyService:
                 error_code="KNOWLEDGE_SCOPE_MISMATCH",
                 status_code=409,
             )
-        quality_status = str(feed_reply.get("qualityStatus") or "").upper()
-        policy_mode = str(feed_reply.get("policyMode") or "").upper()
+        if grant.authorization_basis == "QUALITY_GATED_LOW_RISK" and (
+            package.evidence_bundle_sha256 is None
+            or package.evidence_bundle_sha256
+            != grant.reply_evidence_bundle_sha256
+        ):
+            raise ApprovedReplyBridgeError(
+                "the reply Evidence is missing or changed",
+                error_code="REPLY_EVIDENCE_MISMATCH",
+                status_code=409,
+            )
+        quality_status = str(
+            feed_reply.get("qualityStatus") or package.quality_gate_status
+        ).upper()
+        policy_mode = str(feed_reply.get("policyMode") or grant.policy_mode).upper()
         action = str(feed_reply.get("action") or "").upper()
         if (
             package.action != "SUGGEST_REPLY"
@@ -481,12 +543,106 @@ class ApprovedReplyService:
             or quality_status != "PASS"
             or policy_mode != "AUTO_LOW_RISK"
             or action not in {"CONTROLLED_ANSWER", "DIRECT_ANSWER"}
+            or bool(package.required_fields)
         ):
             raise ApprovedReplyBridgeError(
                 "the AI package is not eligible for the low-risk AUTO Pilot",
                 error_code="AUTO_POLICY_QUALITY_GATE_BLOCKED",
                 status_code=409,
             )
+
+    def _assert_runtime_mode(self, grant: ControlledSendGrant) -> None:
+        if self._auto_runtime is None:
+            return
+        state = self._auto_runtime.load()
+        if isinstance(grant, ControlledAutoPolicyGrantV1):
+            if grant.deployment_scope == "PRODUCTION_AUTO":
+                if (
+                    state.runtime_mode != "PRODUCTION_AUTO"
+                    or not state.production_real_send_enabled
+                    or not state.controlled_store_auto_enabled
+                    or state.controlled_pilot_send_enabled
+                    or state.kill_switch_enabled
+                ):
+                    raise ApprovedReplyBridgeError(
+                        "production AUTO runtime is not atomically enabled",
+                        error_code="PRODUCTION_AUTO_RUNTIME_BLOCKED",
+                        status_code=403,
+                    )
+            elif (
+                state.runtime_mode != "PILOT"
+                or not state.controlled_pilot_send_enabled
+                or state.production_real_send_enabled
+            ):
+                raise ApprovedReplyBridgeError(
+                    "AUTO Pilot runtime is not enabled",
+                    error_code="AUTO_PILOT_RUNTIME_BLOCKED",
+                    status_code=403,
+                )
+        elif state.runtime_mode != "PILOT" or state.production_real_send_enabled:
+            raise ApprovedReplyBridgeError(
+                "manual Pilot send is unavailable in the current runtime mode",
+                error_code="MANUAL_PILOT_RUNTIME_BLOCKED",
+                status_code=403,
+            )
+
+    @staticmethod
+    def _assert_feed_send_state(
+        *,
+        feed: dict[str, object],
+        grant: ControlledSendGrant,
+    ) -> None:
+        safety = feed["safety"]
+        assert isinstance(safety, dict)
+        observed = (safety.get("realSend"), safety.get("autoReply"))
+        expected = (
+            (True, True)
+            if isinstance(grant, ControlledAutoPolicyGrantV1)
+            and grant.deployment_scope == "PRODUCTION_AUTO"
+            else (False, False)
+        )
+        if observed != expected:
+            raise ApprovedReplyBridgeError(
+                "feed send state does not match the Grant deployment mode",
+                error_code="PDD_SEND_FEED_RUNTIME_MODE_MISMATCH",
+                status_code=409,
+            )
+
+    def _assert_double_store_identity(self, grant: ControlledSendGrant) -> None:
+        expected = (grant.ai_cs_store_id, grant.platform_store_id)
+        if not self._require_double_store_identity and expected == (None, None):
+            return
+        if None in expected or self._store_identity_provider is None:
+            raise ApprovedReplyBridgeError(
+                "double Store identity is missing",
+                error_code="PDD_SEND_DOUBLE_STORE_IDENTITY_MISSING",
+                status_code=409,
+            )
+        try:
+            observed = self._store_identity_provider()
+        except Exception as exc:
+            raise ApprovedReplyBridgeError(
+                "current Store identity cannot be read",
+                error_code="PDD_SEND_DOUBLE_STORE_IDENTITY_UNAVAILABLE",
+                status_code=503,
+            ) from exc
+        if observed != expected:
+            raise ApprovedReplyBridgeError(
+                "current PDD and AI-CS Store identities do not match the Grant",
+                error_code="PDD_SEND_DOUBLE_STORE_IDENTITY_MISMATCH",
+                status_code=409,
+            )
+        if self._auto_runtime is not None:
+            state = self._auto_runtime.load()
+            if state.runtime_mode == "PRODUCTION_AUTO" and observed != (
+                state.ai_cs_store_id,
+                state.platform_store_id,
+            ):
+                raise ApprovedReplyBridgeError(
+                    "current Store identity does not match production AUTO scope",
+                    error_code="PDD_SEND_PRODUCTION_STORE_SCOPE_MISMATCH",
+                    status_code=409,
+                )
 
     def _close_pilot_window_safely(
         self,
@@ -518,7 +674,12 @@ class ApprovedReplyService:
                 status_code=503,
             )
         safety = value.get("safety")
-        if not isinstance(safety, dict) or safety.get("autoReply") is not False:
+        if (
+            not isinstance(safety, dict)
+            or not isinstance(safety.get("autoReply"), bool)
+            or not isinstance(safety.get("realSend"), bool)
+            or safety.get("autoReply") is not safety.get("realSend")
+        ):
             raise ApprovedReplyBridgeError(
                 "Channel Agent feed safety state is invalid",
                 error_code="PDD_SEND_FEED_SAFETY_INVALID",

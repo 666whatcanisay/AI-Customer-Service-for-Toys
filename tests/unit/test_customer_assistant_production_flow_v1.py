@@ -5,6 +5,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
+from channel_agent.config import AgentConfigError, ChannelAgentConfig, load_agent_config
+from channel_agent.desktop import DesktopAssistantServer
+from channel_engine.agent.assistant_projection import build_assistant_snapshot
 from channel_engine.customer_assistant import (
     AICustomerReplyService,
     BufferedCustomerMessage,
@@ -22,8 +25,11 @@ from channel_engine.customer_assistant import (
     TransactionContext,
     render_customer_assistant,
 )
-from channel_engine.agent.assistant_projection import build_assistant_snapshot
-from channel_engine.execution import ExecutionCoordinator, ExecutionWorker, FakeExecutionAdapter
+from channel_engine.execution import (
+    ExecutionCoordinator,
+    ExecutionWorker,
+    FakeExecutionAdapter,
+)
 from channel_engine.gateway import (
     CONTRACT_VERSION,
     DecisionRequest,
@@ -34,9 +40,6 @@ from channel_engine.models import DecisionAction, ReceiptOutcome
 from channel_engine.pdd_adapter import PDDCapturedMessage, PDDPrivacyFilter
 from channel_engine.policy import ApprovalPolicy
 from channel_engine.storage.orm import ApprovalRow, ExecutionRow, ReceiptRow
-from channel_agent.config import AgentConfigError, ChannelAgentConfig, load_agent_config
-from channel_agent.desktop import DesktopAssistantServer
-
 
 NOW = datetime(2026, 8, 7, 9, 0, tzinfo=timezone.utc)
 
@@ -63,7 +66,9 @@ class SyntheticGateway:
             metadata={
                 "citations": [
                     {"reference": "kb://products/blocks", "title": "积木商品知识"}
-                ]
+                ],
+                "quality_gate_status": "PASS",
+                "reply_evidence_bundle": {"bundle_sha256": "e" * 64},
             },
             decided_at=NOW,
         )
@@ -203,6 +208,8 @@ def test_three_short_messages_are_combined_into_one_customer_context(foundation,
     assert len(context["conversation_history"]) == 3
     assert package.state == "WAITING_APPROVAL"
     assert package.citations[0].reference == "kb://products/blocks"
+    assert package.quality_gate_status == "PASS"
+    assert package.evidence_bundle_sha256 == "e" * 64
     assert buffer.pending_count() == 0
 
     stored = runtime.stored_reply(package.decision_id)

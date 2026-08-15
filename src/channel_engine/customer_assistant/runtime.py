@@ -164,6 +164,24 @@ class AICustomerReplyService:
             isinstance(item, str) and item.strip() for item in required_fields
         ):
             required_fields = []
+        quality_gate_status = str(
+            metadata.get("quality_gate_status") or "UNKNOWN"
+        ).upper()
+        if quality_gate_status not in {"PASS", "BLOCKED"}:
+            quality_gate_status = "UNKNOWN"
+        evidence_bundle_sha256: str | None = None
+        raw_evidence = metadata.get("reply_evidence_bundle")
+        if isinstance(raw_evidence, Mapping):
+            raw_hash = raw_evidence.get("bundle_sha256")
+            if (
+                isinstance(raw_hash, str)
+                and len(raw_hash) == 64
+                and all(
+                    character in "0123456789abcdef"
+                    for character in raw_hash.lower()
+                )
+            ):
+                evidence_bundle_sha256 = raw_hash.lower()
         return AIReplyPackage(
             turn_id=context.turn_id,
             context_id=context.context_id,
@@ -180,6 +198,8 @@ class AICustomerReplyService:
             ai_cs_action=ai_cs_action.strip()[:64],
             warnings=tuple(item.strip()[:128] for item in warnings[:32]),
             required_fields=tuple(item.strip()[:128] for item in required_fields[:32]),
+            quality_gate_status=quality_gate_status,
+            evidence_bundle_sha256=evidence_bundle_sha256,
             state=(
                 "WAITING_APPROVAL"
                 if action == "SUGGEST_REPLY"

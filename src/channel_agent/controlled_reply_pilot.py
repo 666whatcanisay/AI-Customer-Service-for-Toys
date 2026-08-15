@@ -48,6 +48,8 @@ class ReplyPilotCandidateV1(_PilotModel):
         "controlled-reply-pilot-candidate.v1"
     )
     store_id: str = Field(min_length=1, max_length=160)
+    ai_cs_store_id: str | None = Field(default=None, min_length=1, max_length=160)
+    platform_store_id: str | None = Field(default=None, min_length=1, max_length=160)
     test_buyer_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     conversation_id: str = Field(min_length=1, max_length=255)
     customer_message_id: str = Field(min_length=1, max_length=255)
@@ -60,6 +62,10 @@ class ReplyPilotCandidateV1(_PilotModel):
     policy_revision: int = Field(ge=1)
     whitelist_revision: str = Field(min_length=1, max_length=160)
     knowledge_scope_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reply_evidence_bundle_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[a-f0-9]{64}$",
+    )
     quality_status: Literal["PASS"] = "PASS"
     risk_level: Literal["LOW"] = "LOW"
     action: Literal["DIRECT_ANSWER"] = "DIRECT_ANSWER"
@@ -134,6 +140,7 @@ class ControlledReplyPilotOrchestrator:
         pilot_window_store: ControlledPilotSendWindowStore,
         state_root: str | Path,
         post_approved_reply: PostApprovedReply,
+        store_identity_provider: Callable[[], tuple[str, str]] | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.feed_path = Path(feed_path)
@@ -142,6 +149,7 @@ class ControlledReplyPilotOrchestrator:
         self.state_root = Path(state_root)
         self.state_root.mkdir(parents=True, exist_ok=True)
         self._post = post_approved_reply
+        self._store_identity_provider = store_identity_provider
         self._clock = clock
 
     @property
@@ -195,6 +203,8 @@ class ControlledReplyPilotOrchestrator:
         window = ControlledPilotSendWindowV1.issue(
             mode="MANUAL_CONFIRM",
             store_id=current.candidate.store_id,
+            ai_cs_store_id=current.candidate.ai_cs_store_id,
+            platform_store_id=current.candidate.platform_store_id,
             test_buyer_hash=current.candidate.test_buyer_hash,
             conversation_id=current.candidate.conversation_id,
             question=current.question,
@@ -204,11 +214,16 @@ class ControlledReplyPilotOrchestrator:
             policy_revision=current.candidate.policy_revision,
             whitelist_revision=current.candidate.whitelist_revision,
             knowledge_scope_sha256=current.candidate.knowledge_scope_sha256,
+            reply_evidence_bundle_sha256=(
+                current.candidate.reply_evidence_bundle_sha256
+            ),
             issued_at=now,
         )
         self.pilot_windows.arm(window, now=now)
         grant = ControlledSendGrantV1.issue(
             store_id=current.candidate.store_id,
+            ai_cs_store_id=current.candidate.ai_cs_store_id,
+            platform_store_id=current.candidate.platform_store_id,
             test_buyer_hash=current.candidate.test_buyer_hash,
             conversation_id=current.candidate.conversation_id,
             customer_message_id=current.candidate.customer_message_id,
@@ -383,6 +398,117 @@ class ControlledReplyPilotOrchestrator:
             self._close_safely(window.window_id, "AUTO_PILOT_TERMINATED")
             raise
 
+    def send_general_auto_current(
+        self,
+        *,
+        operator_reference: str,
+        policy_revision: int,
+        whitelist_revision: str,
+        deployment_scope: Literal["PILOT", "PRODUCTION_AUTO"],
+        expected_decision_id: str | None = None,
+    ) -> ApprovedReplyResponse:
+        """Authorize the current quality-gated reply once; never a Store wildcard."""
+
+        current = self._current_candidate(
+            policy_revision=policy_revision,
+            whitelist_revision=whitelist_revision,
+            expected_policy_mode="AUTO_LOW_RISK",
+        )
+        candidate = current.candidate
+        if (
+            expected_decision_id is not None
+            and candidate.decision_id != expected_decision_id
+        ):
+            raise ControlledReplyPilotError(
+                "the current AUTO Decision changed before authorization",
+                error_code="GENERAL_AUTO_DECISION_CHANGED",
+            )
+        if (
+            candidate.ai_cs_store_id is None
+            or candidate.platform_store_id is None
+            or candidate.reply_evidence_bundle_sha256 is None
+        ):
+            raise ControlledReplyPilotError(
+                "general AUTO requires double Store identity and Evidence",
+                error_code="GENERAL_AUTO_SCOPE_INCOMPLETE",
+            )
+        now = self._now()
+        window = ControlledPilotSendWindowV1.issue(
+            mode="AUTO_POLICY",
+            store_id=candidate.store_id,
+            ai_cs_store_id=candidate.ai_cs_store_id,
+            platform_store_id=candidate.platform_store_id,
+            test_buyer_hash=candidate.test_buyer_hash,
+            conversation_id=candidate.conversation_id,
+            question=current.question,
+            approved_reply=current.reply_text,
+            product_id=candidate.product_id,
+            sku_id=candidate.sku_id,
+            policy_revision=candidate.policy_revision,
+            whitelist_revision=candidate.whitelist_revision,
+            knowledge_scope_sha256=candidate.knowledge_scope_sha256,
+            reply_evidence_bundle_sha256=(
+                candidate.reply_evidence_bundle_sha256
+            ),
+            authorization_basis="QUALITY_GATED_LOW_RISK",
+            deployment_scope=deployment_scope,
+            issued_at=now,
+        )
+        self.pilot_windows.arm(window, now=now)
+        grant = ControlledAutoPolicyGrantV1.issue(
+            pilot_window_id=window.window_id,
+            store_id=candidate.store_id,
+            ai_cs_store_id=candidate.ai_cs_store_id,
+            platform_store_id=candidate.platform_store_id,
+            test_buyer_hash=candidate.test_buyer_hash,
+            conversation_id=candidate.conversation_id,
+            customer_message_id=candidate.customer_message_id,
+            decision_id=candidate.decision_id,
+            question=current.question,
+            reply_content=current.reply_text,
+            approved_reply_sha256=None,
+            product_id=candidate.product_id,
+            sku_id=candidate.sku_id,
+            policy_revision=candidate.policy_revision,
+            whitelist_revision=candidate.whitelist_revision,
+            knowledge_scope_sha256=candidate.knowledge_scope_sha256,
+            reply_evidence_bundle_sha256=(
+                candidate.reply_evidence_bundle_sha256
+            ),
+            authorization_basis="QUALITY_GATED_LOW_RISK",
+            deployment_scope=deployment_scope,
+            issued_at=now,
+        )
+        request = self._request(
+            current=current,
+            operator_reference=operator_reference,
+            grant=grant,
+            now=now,
+        )
+        try:
+            response = self._post(request, "AUTO_POLICY_PILOT_SEND")
+        except Exception:
+            self._close_safely(window.window_id, "GENERAL_AUTO_POST_FAILED")
+            raise
+        if response.outcome != "SUCCESS" or response.customer_message_sent is not True:
+            self._close_safely(window.window_id, f"GENERAL_AUTO_{response.outcome}")
+            return response
+        self._close_safely(window.window_id, "GENERAL_AUTO_SUCCESS_CONFIRMED")
+        return response
+
+    def current_general_auto_candidate(
+        self,
+        *,
+        policy_revision: int,
+        whitelist_revision: str,
+    ) -> ReplyPilotCandidateV1 | None:
+        current = self._candidate_if_available(
+            policy_revision=policy_revision,
+            whitelist_revision=whitelist_revision,
+            expected_policy_mode="AUTO_LOW_RISK",
+        )
+        return current.candidate if current is not None else None
+
     def revoke(self) -> None:
         active = self.pilot_windows.active(now=self._now())
         if active is not None:
@@ -426,11 +552,20 @@ class ControlledReplyPilotOrchestrator:
         reply = feed.get("reply")
         if (
             not isinstance(safety, dict)
-            or safety.get("realSend") is not False
-            or safety.get("autoReply") is not False
             or not isinstance(reply, dict)
         ):
             return None
+        safety_pair = (safety.get("realSend"), safety.get("autoReply"))
+        allowed_safety_pairs = (
+            {(False, False)}
+            if expected_policy_mode == "MANUAL_CONFIRM"
+            else {(False, False), (True, True)}
+        )
+        if safety_pair not in allowed_safety_pairs:
+            raise ControlledReplyPilotError(
+                "feed send state is inconsistent with the current policy mode",
+                error_code="PILOT_FEED_SEND_STATE_INVALID",
+            )
         decision_id = self._required_string(reply, "decisionId")
         stored = self.buffer.load_reply(decision_id)
         if stored is None:
@@ -449,22 +584,39 @@ class ControlledReplyPilotOrchestrator:
                 "feed and durable AI package disagree",
                 error_code="PILOT_REPLY_PACKAGE_MISMATCH",
             )
-        quality = str(reply.get("qualityStatus") or "").upper()
+        quality = str(
+            reply.get("qualityStatus") or package.quality_gate_status
+        ).upper()
         policy_mode = str(reply.get("policyMode") or "").upper()
+        if not policy_mode:
+            policy_mode = expected_policy_mode
         if (
             quality != "PASS"
             or policy_mode != expected_policy_mode
             or package.action != "SUGGEST_REPLY"
             or package.ai_cs_action != "DIRECT_ANSWER"
             or package.risk_level.value != "LOW"
+            or bool(package.required_fields)
             or not reply_text
         ):
             raise ControlledReplyPilotError(
                 "the AI package is not an eligible low-risk direct answer",
                 error_code="PILOT_QUALITY_GATE_BLOCKED",
             )
+        ai_cs_store_id: str | None = None
+        platform_store_id: str | None = None
+        if self._store_identity_provider is not None:
+            try:
+                ai_cs_store_id, platform_store_id = self._store_identity_provider()
+            except Exception as exc:
+                raise ControlledReplyPilotError(
+                    "current double Store identity is unavailable",
+                    error_code="PILOT_DOUBLE_STORE_IDENTITY_UNAVAILABLE",
+                ) from exc
         candidate = ReplyPilotCandidateV1(
             store_id=package.store_id,
+            ai_cs_store_id=ai_cs_store_id,
+            platform_store_id=platform_store_id,
             test_buyer_hash=package.customer_reference,
             conversation_id=package.conversation_id,
             customer_message_id=customer_message_id,
@@ -481,6 +633,7 @@ class ControlledReplyPilotOrchestrator:
             policy_revision=policy_revision,
             whitelist_revision=whitelist_revision,
             knowledge_scope_sha256=knowledge_scope_sha256(package),
+            reply_evidence_bundle_sha256=package.evidence_bundle_sha256,
         )
         return _CurrentCandidate(
             candidate=candidate,

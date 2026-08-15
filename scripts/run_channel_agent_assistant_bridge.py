@@ -17,12 +17,13 @@ from channel_agent.assistant_bridge import (
     ApprovedReplyRequest,
     ApprovedReplyService,
 )
+from channel_agent.browser import ChannelAgentBrowserManager
+from channel_agent.config import load_agent_config
+from channel_agent.controlled_auto_runtime import ControlledAutoRuntimeStateStore
 from channel_agent.controlled_send_grant import (
     ControlledPilotSendWindowStore,
     ControlledSendGrantStore,
 )
-from channel_agent.browser import ChannelAgentBrowserManager
-from channel_agent.config import load_agent_config
 from channel_agent.logger import SafeAgentLogger
 from channel_agent.pdd_login import EdgePDDTargetResolver
 from channel_agent.pdd_workspace import (
@@ -118,6 +119,24 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
         resolver=resolver,
         action_port=WebSocketPDDWorkspaceActionPort(timeout_seconds=3.0),
     )
+    auto_runtime_store = ControlledAutoRuntimeStateStore(
+        assistant_root / "controlled-auto-runtime.sqlite3"
+    )
+
+    def current_store_identity() -> tuple[str, str]:
+        state_path = data_root / "runtime" / "channel-agent-state.json"
+        value = json.loads(state_path.read_text(encoding="utf-8"))
+        ai_cs_store_id = value.get("active_store_id")
+        platform_store_id = value.get("pdd_store_id")
+        if (
+            not isinstance(ai_cs_store_id, str)
+            or not ai_cs_store_id.strip()
+            or not isinstance(platform_store_id, str)
+            or not platform_store_id.strip()
+        ):
+            raise RuntimeError("current double Store identity is unavailable")
+        return ai_cs_store_id.strip(), platform_store_id.strip()
+
     return (
         ApprovedReplyService(
             feed_path=assistant_root / "assistant-feed.json",
@@ -131,6 +150,9 @@ def _build_service(data_root: Path) -> tuple[ApprovedReplyService, object]:
             controlled_pilot_window_store=ControlledPilotSendWindowStore(
                 assistant_root / "controlled-pilot-send-window.sqlite3"
             ),
+            controlled_auto_runtime_store=auto_runtime_store,
+            store_identity_provider=current_store_identity,
+            require_double_store_identity=True,
             controlled_send_enabled=enabled,
         ),
         engine,
@@ -146,7 +168,7 @@ class _Server(ThreadingHTTPServer):
 class _Handler(BaseHTTPRequestHandler):
     server: _Server
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         if self.path == "/health":
             self._json(HTTPStatus.OK, self.server.service.health())
             return
@@ -169,7 +191,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         if self.path != "/v1/approved-replies":
             self._json(HTTPStatus.NOT_FOUND, {"error_code": "NOT_FOUND"})
             return

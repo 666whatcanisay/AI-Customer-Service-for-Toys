@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
+from channel_agent.controlled_auto_runtime import ControlledAutoRuntimeStateV1
 from channel_engine.pilot_governance import (
     ActivationValidationResult,
     GateFactsV1,
@@ -23,7 +24,6 @@ from scripts.rc5_pilot_governance import (
     _rag_live_snapshot,
     evaluate_preflight,
 )
-
 
 NOW = datetime(2026, 8, 12, 8, 0, tzinfo=UTC)
 SHA_A = "a" * 64
@@ -525,3 +525,55 @@ def test_preflight_blocks_any_real_send_safety_violation(
     )
     assert result["send_safety"]["status"] == "BLOCKED"
     assert result["pilot_governance_preflight"]["status"] == "BLOCKED"
+
+
+def test_preflight_accepts_mode_consistent_production_auto_and_blocks_no_grant() -> None:
+    state = ControlledAutoRuntimeStateV1(
+        revision=2,
+        runtime_mode="PRODUCTION_AUTO",
+        production_real_send_enabled=True,
+        controlled_pilot_send_enabled=False,
+        controlled_store_auto_enabled=True,
+        ai_cs_store_id="c-store-6639df2982014226",
+        platform_store_id="328616090",
+        policy_mode="AUTO_LOW_RISK",
+        policy_revision=4,
+        whitelist_revision="single-store-v1",
+        kill_switch_enabled=False,
+        changed_by="operator",
+        changed_at=NOW,
+        reason="explicit activation",
+    )
+    base = dict(
+        activation_results=_activation_results(),
+        source_identity={
+            "channel_engine": {"working_tree": "CLEAN"},
+            "ai_cs": {"working_tree": "CLEAN"},
+        },
+        storage_statuses={
+            "host": "PASS",
+            "buffer": "PASS",
+            "offline_control": "PASS",
+            "agent_spool": "PASS",
+        },
+        gate_facts=_facts(),
+        host_real_send_enabled=True,
+        agent_real_send_enabled=False,
+        real_execution_attempts=1,
+        real_sends=1,
+        real_receipts=1,
+        send_runtime_state=state,
+        observed_ai_cs_store_id=state.ai_cs_store_id,
+        observed_platform_store_id=state.platform_store_id,
+    )
+    result = evaluate_preflight(**base)
+    assert result["send_safety"]["status"] == "PASS"
+    assert result["derived"]["real_send_enabled"] is True
+
+    blocked = evaluate_preflight(
+        **base,
+        concrete_send_requested=True,
+        concrete_send_has_valid_grant=False,
+    )
+    assert blocked["send_safety"]["status"] == "BLOCKED"
+    assert "CONCRETE_SEND_GRANT_MISSING" in blocked["send_safety"]["reason_codes"]

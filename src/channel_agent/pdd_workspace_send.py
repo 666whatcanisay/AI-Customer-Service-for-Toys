@@ -22,7 +22,6 @@ from channel_engine.browser.selectors import (
     SelectorEvidenceEnvironment,
     SelectorKey,
 )
-
 from channel_engine.channel.execution_boundary import (
     LedgerExecutionAuthorizationService,
 )
@@ -35,11 +34,10 @@ from channel_engine.models import ReceiptOutcome
 
 from .pdd_login import EdgePDDTargetResolver, PDDCDPPageTarget
 from .pdd_workspace import (
-    ExistingPDDWorkspaceObserver,
     PDD_WORKSPACE_URL,
+    ExistingPDDWorkspaceObserver,
     PDDWorkspaceSnapshot,
 )
-
 
 PDD_WORKSPACE_SEND_VERSION = "1.0"
 
@@ -584,6 +582,10 @@ class ControlledPDDWorkspaceExecutionAdapter:
         expected_customer_reference: str,
         expected_customer_message_id: str,
         expected_content: str,
+        authorization_kind: str = "MANUAL_CONFIRM",
+        ai_cs_store_id: str | None = None,
+        platform_store_id: str | None = None,
+        evidence_bundle_sha256: str | None = None,
     ) -> None:
         self._authorization = authorization_service
         self._sender = sender
@@ -592,6 +594,10 @@ class ControlledPDDWorkspaceExecutionAdapter:
         self._customer_reference = expected_customer_reference
         self._message_id = expected_customer_message_id
         self._content = expected_content
+        self._authorization_kind = authorization_kind
+        self._ai_cs_store_id = ai_cs_store_id
+        self._platform_store_id = platform_store_id
+        self._evidence_bundle_sha256 = evidence_bundle_sha256
 
     def execute(self, command: ExecutionCommand) -> ExecutionResult:
         del command
@@ -641,12 +647,16 @@ class ControlledPDDWorkspaceExecutionAdapter:
                 "transport_kind": "REAL_PDD_BROWSER",
                 "simulation_only": False,
                 "selector_contract_version": self._sender.contract.contract_version,
-                "manual_approval": True,
-                "automatic_reply": False,
+                "manual_approval": self._authorization_kind == "MANUAL_CONFIRM",
+                "automatic_reply": self._authorization_kind == "AUTO_POLICY",
                 "automatic_retry_allowed": False,
                 "real_channel_called": result.trigger_may_have_occurred,
                 "customer_message_sent": result.customer_message_sent,
                 "store_id": self._store_id,
+                "ai_cs_store_id": self._ai_cs_store_id,
+                "platform_store_id": self._platform_store_id,
+                "reply_evidence_bundle_sha256": self._evidence_bundle_sha256,
+                "authorization_kind": self._authorization_kind,
                 "conversation_id": self._conversation_id,
                 "refund_performed": False,
                 "order_modified": False,
@@ -654,8 +664,7 @@ class ControlledPDDWorkspaceExecutionAdapter:
             },
         )
 
-    @staticmethod
-    def _failed(error_code: str) -> ExecutionResult:
+    def _failed(self, error_code: str) -> ExecutionResult:
         return ExecutionResult(
             outcome=ReceiptOutcome.FAILED,
             error_code=error_code,
@@ -663,18 +672,22 @@ class ControlledPDDWorkspaceExecutionAdapter:
                 "mode": "PDD_WORKSPACE_CONTROLLED_SEND",
                 "transport_kind": "REAL_PDD_BROWSER",
                 "simulation_only": False,
-                "manual_approval": False,
-                "automatic_reply": False,
+                "manual_approval": self._authorization_kind == "MANUAL_CONFIRM",
+                "automatic_reply": self._authorization_kind == "AUTO_POLICY",
                 "automatic_retry_allowed": False,
                 "real_channel_called": False,
                 "customer_message_sent": False,
+                "store_id": self._store_id,
+                "ai_cs_store_id": self._ai_cs_store_id,
+                "platform_store_id": self._platform_store_id,
+                "reply_evidence_bundle_sha256": self._evidence_bundle_sha256,
+                "authorization_kind": self._authorization_kind,
                 "refund_performed": False,
                 "order_modified": False,
             },
         )
 
-    @staticmethod
-    def _unknown(error_code: str) -> ExecutionResult:
+    def _unknown(self, error_code: str) -> ExecutionResult:
         return ExecutionResult(
             outcome=ReceiptOutcome.UNKNOWN,
             error_code=error_code,
@@ -682,11 +695,16 @@ class ControlledPDDWorkspaceExecutionAdapter:
                 "mode": "PDD_WORKSPACE_CONTROLLED_SEND",
                 "transport_kind": "REAL_PDD_BROWSER",
                 "simulation_only": False,
-                "manual_approval": True,
-                "automatic_reply": False,
+                "manual_approval": self._authorization_kind == "MANUAL_CONFIRM",
+                "automatic_reply": self._authorization_kind == "AUTO_POLICY",
                 "automatic_retry_allowed": False,
                 "real_channel_called": True,
                 "customer_message_sent": False,
+                "store_id": self._store_id,
+                "ai_cs_store_id": self._ai_cs_store_id,
+                "platform_store_id": self._platform_store_id,
+                "reply_evidence_bundle_sha256": self._evidence_bundle_sha256,
+                "authorization_kind": self._authorization_kind,
                 "refund_performed": False,
                 "order_modified": False,
             },
