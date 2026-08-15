@@ -509,6 +509,8 @@ class PDDLoginObservationAdapter:
             if previous is not None and previous.browser_id == browser.browser_id:
                 existing = self.observe()
                 if existing.login_state in {
+                    PDDLoginState.PDD_LOGIN_PAGE,
+                    PDDLoginState.WAITING_QR_SCAN,
                     PDDLoginState.PDD_LOGIN_SUCCESS,
                     PDDLoginState.OPENING_CUSTOMER_SERVICE,
                     PDDLoginState.CUSTOMER_SERVICE_READY,

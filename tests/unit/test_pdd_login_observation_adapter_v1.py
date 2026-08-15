@@ -216,6 +216,24 @@ def test_launch_opens_isolated_browser_and_waits_for_human_qr(tmp_path: Path) ->
         observer.close_resources()
 
 
+def test_relaunch_reuses_existing_waiting_login_tab(tmp_path: Path) -> None:
+    observer, browser, resolver, _evaluator = make_observer(tmp_path)
+    try:
+        observer.launch()
+        first_waiting = observer.observe()
+        resolver.calls = 0
+
+        relaunched = observer.launch()
+
+        assert first_waiting.login_state is PDDLoginState.WAITING_QR_SCAN
+        assert relaunched.login_state is PDDLoginState.WAITING_QR_SCAN
+        assert resolver.calls == 1
+        assert browser.opens == 2
+        assert browser.navigations == [LOGIN_URL]
+    finally:
+        observer.close_resources()
+
+
 def test_relaunch_with_new_browser_session_does_not_probe_stale_login_state(
     tmp_path: Path,
 ) -> None:
