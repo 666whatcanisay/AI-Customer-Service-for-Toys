@@ -42,6 +42,8 @@ export interface WorkspaceConversation {
   policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
   requiresHuman?: boolean
   attentionLevel?: 'HUMAN_REQUIRED' | 'UNANSWERED' | 'NONE'
+  manualReplyConfirmed?: boolean
+  manualReplyConfirmedRevision?: number | null
   autoReplyRunning?: boolean
   autoReplyReceiptId?: string | null
   preparationId?: string | null
@@ -137,6 +139,8 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       policyMode: seed.policyMode,
       requiresHuman: seed.requiresHuman === true,
       attentionLevel: seed.attentionLevel ?? 'UNANSWERED',
+      manualReplyConfirmed: seed.manualReplyConfirmed === true,
+      manualReplyConfirmedRevision: seed.manualReplyConfirmedRevision,
       autoReplyRunning: seed.autoReplyRunning === true,
       autoReplyReceiptId: seed.autoReplyReceiptId,
       preparationId: seed.preparationId,
@@ -169,6 +173,8 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
       policyMode: seed.policyMode,
       requiresHuman: seed.requiresHuman === true,
       attentionLevel: seed.attentionLevel ?? 'UNANSWERED',
+      manualReplyConfirmed: seed.manualReplyConfirmed === true,
+      manualReplyConfirmedRevision: seed.manualReplyConfirmedRevision,
       autoReplyRunning: seed.autoReplyRunning === true,
       autoReplyReceiptId: seed.autoReplyReceiptId,
       preparationId: seed.preparationId,
@@ -219,6 +225,18 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
 
   function setAgentAvailability(online: boolean): void {
     agentAvailable.value = online
+  }
+
+  function markConversationReplied(conversationId: string): void {
+    const conversation = conversations.value.find((item) => item.conversationId === conversationId)
+    if (!conversation) throw new Error('会话不存在')
+    conversation.requiresHuman = false
+    conversation.attentionLevel = 'NONE'
+    conversation.manualReplyConfirmed = true
+    conversation.unreadCount = 0
+    conversation.processingStage = 'MANUALLY_REPLIED_CONFIRMED'
+    conversation.status = 'COMPLETED'
+    if (activeDraft.value?.conversationId === conversationId) archiveActiveDraft()
   }
 
   function beginUnderstanding(): void {
@@ -435,6 +453,7 @@ export const useHumanLoopWorkspaceStore = defineStore('human-loop-workspace', ()
     selectConversation,
     receiveMessage,
     setAgentAvailability,
+    markConversationReplied,
     beginUnderstanding,
     beginGenerating,
     setDraftReady,

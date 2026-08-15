@@ -29,7 +29,8 @@ describe('ConversationCenter', () => {
         conversations: [conversation],
         activeConversationId: conversation.conversationId,
         agentStatus: 'BUSY',
-        conversationCounts: { NEW: 0, PROCESSING: 0, WAITING_REPLY: 1, COMPLETED: 0 }
+        conversationCounts: { NEW: 0, PROCESSING: 0, WAITING_REPLY: 1, COMPLETED: 0 },
+        confirmingConversationId: ''
       }
     })
 
@@ -77,7 +78,8 @@ describe('ConversationCenter attention ordering', () => {
         ],
         activeConversationId: '',
         agentStatus: 'ONLINE',
-        conversationCounts: { NEW: 5, PROCESSING: 0, WAITING_REPLY: 0, COMPLETED: 0 }
+        conversationCounts: { NEW: 5, PROCESSING: 0, WAITING_REPLY: 0, COMPLETED: 0 },
+        confirmingConversationId: ''
       }
     })
 
@@ -91,5 +93,38 @@ describe('ConversationCenter attention ordering', () => {
       ])
     expect(wrapper.get('[data-testid="conversation-red-new"]').classes()).toContain('requires-human')
     expect(wrapper.get('[data-testid="conversation-yellow-new"]').classes()).toContain('awaiting-reply')
+  })
+
+  it('offers an explicit local confirmation for the selected attention card', async () => {
+    const conversation: WorkspaceConversation = {
+      conversationId: 'conversation-attention',
+      customerLabel: '客户 A',
+      unreadCount: 1,
+      source: 'CHANNEL_AGENT',
+      status: 'NEW',
+      attentionLevel: 'UNANSWERED',
+      messages: [{
+        messageId: 'message-1',
+        conversationId: 'conversation-attention',
+        customerLabel: '客户 A',
+        content: '已在 PDD 回复',
+        receivedAt: '2026-08-15T09:00:00Z',
+        source: 'CHANNEL_AGENT',
+        senderRole: 'CUSTOMER',
+        direction: 'INBOUND'
+      }]
+    }
+    const wrapper = mount(ConversationCenter, {
+      props: {
+        conversations: [conversation],
+        activeConversationId: conversation.conversationId,
+        agentStatus: 'ONLINE',
+        conversationCounts: { NEW: 1, PROCESSING: 0, WAITING_REPLY: 0, COMPLETED: 0 },
+        confirmingConversationId: ''
+      }
+    })
+
+    await wrapper.get('[data-testid="confirm-current-replied"]').trigger('click')
+    expect(wrapper.emitted('confirmReplied')).toEqual([[conversation.conversationId]])
   })
 })

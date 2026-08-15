@@ -25,6 +25,8 @@ export interface ChannelConversationSeed {
   policyMode?: 'MANUAL_CONFIRM' | 'AUTO_LOW_RISK' | 'AUTO_ALL_MESSAGES_V1' | null
   requiresHuman?: boolean
   attentionLevel?: 'HUMAN_REQUIRED' | 'UNANSWERED' | 'NONE'
+  manualReplyConfirmed?: boolean
+  manualReplyConfirmedRevision?: number | null
   autoReplyRunning?: boolean
   autoReplyReceiptId?: string | null
   preparationId?: string | null
@@ -83,6 +85,7 @@ export interface ChannelMessageAdapter {
   listConversations(): Promise<ChannelConversationSeed[]>
   latestReply(conversationId?: string): Promise<ChannelAgentReplySeed | null>
   markRead(conversationId: string): Promise<void>
+  markReplied(conversationId: string): Promise<void>
   createManualConversation(customerLabel: string, content: string): Promise<ChannelConversationSeed>
   receiveManualMessage(conversationId: string, content: string): Promise<ChannelMessageEnvelope>
 }
@@ -190,6 +193,23 @@ export class HttpChannelAgentMessageAdapter implements ChannelMessageAdapter {
     if (!response.ok) throw new Error('CHANNEL_AGENT_MARK_READ_FAILED')
   }
 
+  async markReplied(conversationId: string): Promise<void> {
+    const response = await fetch(
+      `/local-api/v1/conversations/${encodeURIComponent(conversationId)}/replied`,
+      {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'X-Channel-Agent-Intent': 'HUMAN_CONFIRMED_CONVERSATION_REPLIED',
+          ...channelAgentLocalSecurityHeaders()
+        }
+      }
+    )
+    if (!response.ok) throw new Error('CHANNEL_AGENT_MARK_REPLIED_FAILED')
+  }
+
   async createManualConversation(): Promise<ChannelConversationSeed> {
     throw new Error('真实 Channel Agent 模式不使用手工模拟客户')
   }
@@ -279,6 +299,16 @@ export class InMemoryChannelMessageAdapter implements ChannelMessageAdapter {
   }
 
   async markRead(): Promise<void> {}
+
+  async markReplied(conversationId: string): Promise<void> {
+    const conversation = this.conversations.find((item) => item.conversationId === conversationId)
+    if (!conversation) throw new Error('会话不存在')
+    conversation.requiresHuman = false
+    conversation.attentionLevel = 'NONE'
+    conversation.unreadCount = 0
+    conversation.manualReplyConfirmed = true
+    conversation.processingStage = 'MANUALLY_REPLIED_CONFIRMED'
+  }
 
   async createManualConversation(
     customerLabel: string,

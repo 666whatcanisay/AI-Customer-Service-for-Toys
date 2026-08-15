@@ -168,6 +168,22 @@ describe('HttpChannelAgentMessageAdapter', () => {
       expect.objectContaining({ method: 'POST', credentials: 'same-origin' })
     )
   })
+
+  it('persists a human replied confirmation through the local desktop endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchMock)
+    await new HttpChannelAgentMessageAdapter().markReplied('conversation/a')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/local-api/v1/conversations/conversation%2Fa/replied',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: expect.objectContaining({
+          'X-Channel-Agent-Intent': 'HUMAN_CONFIRMED_CONVERSATION_REPLIED'
+        })
+      })
+    )
+  })
 })
 
 describe('InMemoryChannelMessageAdapter', () => {

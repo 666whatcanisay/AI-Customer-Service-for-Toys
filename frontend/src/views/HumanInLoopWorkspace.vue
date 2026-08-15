@@ -28,7 +28,9 @@
       :active-conversation-id="activeConversationId"
       :agent-status="agentStatus"
       :conversation-counts="conversationCounts"
+      :confirming-conversation-id="confirmingConversationId"
       @select="selectConversation"
+      @confirm-replied="confirmConversationReplied"
       @availability="setAgentAvailability"
       @manual-message="receiveManualMessage"
     />
@@ -144,6 +146,7 @@ const desktopAgentLoading = ref(false)
 const desktopBindingBusy = ref(false)
 const desktopBindingGrant = ref<DesktopBindingGrant | null>(null)
 const decisionExpanded = ref(false)
+const confirmingConversationId = ref('')
 let desktopStatusTimer: ReturnType<typeof setInterval> | null = null
 let desktopBindingGrantTimer: ReturnType<typeof setTimeout> | null = null
 let channelFeedTimer: ReturnType<typeof setInterval> | null = null
@@ -335,6 +338,21 @@ const selectConversation = (conversationId: string): void => {
   actionError.value = ''
   resetResolution()
   void persistConversationRead(conversationId)
+}
+
+const confirmConversationReplied = async (conversationId: string): Promise<void> => {
+  if (confirmingConversationId.value) return
+  confirmingConversationId.value = conversationId
+  actionError.value = ''
+  try {
+    await channelAdapter.markReplied(conversationId)
+    workspace.markConversationReplied(conversationId)
+    ElMessage.success('已确认该会话完成回复；收到新消息后会重新进入待处理队列')
+  } catch (error) {
+    actionError.value = error instanceof Error ? error.message : '确认已回复失败，请稍后重试。'
+  } finally {
+    confirmingConversationId.value = ''
+  }
 }
 
 const setAgentAvailability = (online: boolean): void => {
@@ -704,6 +722,8 @@ const syncChannelAgentFeed = async (): Promise<void> => {
         existing.policyMode = seed.policyMode
         existing.requiresHuman = seed.requiresHuman === true
         existing.attentionLevel = seed.attentionLevel ?? 'UNANSWERED'
+        existing.manualReplyConfirmed = seed.manualReplyConfirmed === true
+        existing.manualReplyConfirmedRevision = seed.manualReplyConfirmedRevision
         existing.autoReplyRunning = seed.autoReplyRunning === true
         existing.autoReplyReceiptId = seed.autoReplyReceiptId
         existing.preparationId = seed.preparationId

@@ -39,6 +39,16 @@
           {{ CONVERSATION_STATUS_LABELS[status] }}（{{ conversationCounts[status] }}）
         </option>
       </select>
+      <button
+        v-if="activeConversationAttention !== 'NONE'"
+        type="button"
+        class="confirm-current-replied"
+        :disabled="confirmingConversationId === activeConversationId"
+        data-testid="confirm-current-replied"
+        @click="$emit('confirmReplied', activeConversationId)"
+      >
+        {{ confirmingConversationId === activeConversationId ? '确认中…' : '确认当前已回复' }}
+      </button>
     </section>
 
     <div class="conversation-list">
@@ -135,10 +145,12 @@ const props = defineProps<{
   activeConversationId: string
   agentStatus: AgentStatus
   conversationCounts: Record<ConversationStatus, number>
+  confirmingConversationId: string
 }>()
 
 const emit = defineEmits<{
   select: [conversationId: string]
+  confirmReplied: [conversationId: string]
   availability: [online: boolean]
   manualMessage: [payload: { conversationId: string | null; customerLabel: string; content: string }]
 }>()
@@ -147,6 +159,11 @@ const statusFilter = ref<'ALL' | ConversationStatus>('ALL')
 const intakeMode = ref<'APPEND' | 'NEW'>(props.activeConversationId ? 'APPEND' : 'NEW')
 const customerLabel = ref('')
 const manualMessage = ref('')
+
+const activeConversationAttention = computed(() => (
+  props.conversations.find((item) => item.conversationId === props.activeConversationId)
+    ?.attentionLevel ?? 'NONE'
+))
 
 const latestMessageTime = (conversation: WorkspaceConversation): number => {
   const value = conversation.messages.at(-1)?.receivedAt
@@ -203,6 +220,7 @@ const processingStageLabel = (stage: string): string => ({
   WAITING_APPROVAL: '等待确认',
   WAITING_CONFIRMATION: '待确认',
   EXECUTION_PREPARED: '执行已准备',
+  MANUALLY_REPLIED_CONFIRMED: '已确认回复',
   FAILED: '处理异常'
 }[stage] ?? stage)
 
@@ -223,7 +241,7 @@ header h2 { margin: 0; color: var(--workspace-text); font-size: 18px; }
 .agent-status.status-busy { border-color: #dfbd71; color: #8b6117; background: var(--workspace-warning-soft); }.agent-status.status-offline { border-color: #ccd4ce; color: #6e7a72; background: #f1f3f1; }
 .presence-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 12px 8px; }.presence-controls button, .intake-mode button { padding: 7px; border: 1px solid var(--workspace-border); border-radius: 7px; color: var(--workspace-text-soft); background: #fff; font-size: 9px; cursor: pointer; }.presence-controls button.active, .intake-mode button.active { border-color: var(--workspace-accent); color: var(--workspace-accent-strong); background: var(--workspace-accent-soft); }.presence-controls small { grid-column: 1 / -1; color: var(--workspace-muted); font-size: 8px; text-align: center; }
 .source-notice { display: grid; gap: 3px; margin: 0 12px 8px; padding: 9px 10px; border: 1px solid #b7d3bd; border-radius: 10px; background: #e8f5eb; }.source-notice strong { color: var(--workspace-accent-strong); font-size: 10px; }.source-notice span { color: var(--workspace-text-soft); font-size: 9px; line-height: 1.45; }
-.queue-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 12px 8px; }.queue-toolbar label { color: var(--workspace-text-soft); font-size: 9px; font-weight: 800; }.queue-toolbar select { flex: 1; min-width: 0; padding: 6px 7px; border: 1px solid var(--workspace-border); border-radius: 7px; color: var(--workspace-text); background: #fff; font-size: 9px; }
+.queue-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 12px 8px; }.queue-toolbar label { color: var(--workspace-text-soft); font-size: 9px; font-weight: 800; }.queue-toolbar select { flex: 1; min-width: 0; padding: 6px 7px; border: 1px solid var(--workspace-border); border-radius: 7px; color: var(--workspace-text); background: #fff; font-size: 9px; }.confirm-current-replied { flex: 0 0 100%; padding: 6px 8px; border: 1px solid #2f7d57; border-radius: 7px; color: #236545; background: #e8f5eb; font-size: 9px; font-weight: 800; cursor: pointer; }.confirm-current-replied:hover { background: #dcefe1; }.confirm-current-replied:disabled { opacity: .55; cursor: wait; }
 .conversation-list { min-height: 0; padding: 0 8px; overflow-x: hidden; overflow-y: auto; }.conversation-item { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 7px; width: 100%; margin-bottom: 4px; padding: 7px 8px; border: 1px solid transparent; border-radius: 9px; color: inherit; background: transparent; text-align: left; cursor: pointer; }.conversation-item:hover { background: #eaf5ec; }.conversation-item.active { border-color: var(--workspace-border-strong); background: linear-gradient(135deg, #dcefe1, #edf8ef); box-shadow: 0 4px 12px rgb(47 125 87 / 8%); }
 .conversation-item.requires-human { border-color: #df9b9f; background: #fff0f0; }.conversation-item.requires-human.active { border-color: #c95b64; background: #ffe2e4; box-shadow: 0 4px 13px rgb(175 55 65 / 13%); }.conversation-item.awaiting-reply { border-color: #dfbd71; background: #fff7df; }.conversation-item.awaiting-reply.active { border-color: #c89429; background: #ffefbd; box-shadow: 0 4px 13px rgb(157 109 24 / 12%); }
 .avatar { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: #cde5d3; color: var(--workspace-accent-strong); font-size: 9px; font-weight: 900; }.conversation-copy { display: grid; min-width: 0; gap: 3px; }.conversation-title { display: flex; min-width: 0; justify-content: space-between; gap: 6px; }.conversation-title strong { overflow: hidden; color: var(--workspace-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.conversation-title time { flex: 0 0 auto; color: var(--workspace-muted); font-size: 8px; }.message-preview { overflow: hidden; color: var(--workspace-text-soft); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.conversation-meta { display: flex; min-width: 0; align-items: center; gap: 4px; }.conversation-meta em { overflow: hidden; margin-right: auto; color: var(--workspace-muted); font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }.processing-stage { overflow: hidden; max-width: 88px; padding: 2px 5px; border-radius: 999px; color: #315e45; background: #e4efe7; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }.conversation-meta b { padding: 2px 5px; border-radius: 999px; color: #356b50; background: #dcefe1; font-size: 8px; white-space: nowrap; }.conversation-meta b.conversation-waiting_reply { color: #8d6117; background: #fff0ca; }.conversation-meta b.conversation-completed { color: #2e7151; background: #d9eee0; }.conversation-meta i { display: grid; min-width: 17px; height: 17px; place-items: center; border-radius: 999px; color: #fff; background: var(--workspace-accent); font-size: 8px; font-style: normal; }.conversation-empty { margin: 8px; padding: 14px; border: 1px dashed var(--workspace-border-strong); border-radius: 10px; color: var(--workspace-muted); background: rgb(255 255 255 / 55%); font-size: 9px; line-height: 1.5; text-align: center; }
