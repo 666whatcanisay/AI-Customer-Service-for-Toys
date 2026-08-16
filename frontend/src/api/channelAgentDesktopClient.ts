@@ -47,6 +47,12 @@ export type ChannelAgentBootstrap = {
       runner_active: boolean
       control_available: boolean
       auto_reply_running: boolean
+      desired_auto_reply_enabled?: boolean
+      supervisor_active?: boolean
+      supervisor_state?: 'UNAVAILABLE' | 'STARTING' | 'WAITING_FOR_CURRENT_PDD_CONVERSATION' | 'RECOVERING_AUTO_COMPONENTS' | 'READY' | 'STOPPED'
+      components?: Record<string, boolean>
+      observation_scope?: 'CURRENT_ACTIVE_CONVERSATION_ONLY'
+      automatic_navigation_enabled?: false
       control_error_code: string | null
       updated_at: string | null
     }

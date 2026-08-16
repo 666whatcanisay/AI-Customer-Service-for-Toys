@@ -194,8 +194,55 @@ describe('ChannelAgentDesktopLayout', () => {
     )
     expect(wrapper.get('[data-testid="runtime-details-drawer"]').text()).toContain('CS-PC-01')
     expect(wrapper.get('[data-testid="runtime-details-drawer"]').text()).toContain('REAL_SEND = OFF')
+    expect(wrapper.get('[data-testid="controlled-auto-scope"]').text()).toContain('仅当前人工打开的 PDD 会话')
+    expect(wrapper.get('[data-testid="controlled-auto-scope"]').text()).toContain('不会自动点击、滚动或切换买家列表')
     expect(wrapper.text()).not.toContain('知识管理')
     expect(wrapper.text()).not.toContain('系统管理')
+    wrapper.unmount()
+  })
+
+  it('shows desired AUTO as waiting instead of claiming it is already running', async () => {
+    desktopMocks.bootstrap.mockResolvedValue({
+      schema_version: '1.0',
+      agent: { process_status: 'RUNNING', runtime_status: 'ONLINE', version: '1.4.0', node_id: 'agent-1' },
+      browser: {
+        status: 'OPENED', pdd_login_state: 'PDD_LOGIN_PAGE',
+        message_source: 'REAL_PDD', real_pdd_message_observation_enabled: true
+      },
+      binding: {
+        authorized_store_ids: ['store-ref:1'], active_store_id: 'store-ref:1',
+        observed_store_id: null, store_reference: 'store-ref:1'
+      },
+      safety: {
+        manual_approval: true, auto_reply: false, real_send_enabled: false,
+        controlled_auto: {
+          runtime_mode: 'PRODUCTION_AUTO', production_real_send_enabled: true,
+          controlled_store_auto_enabled: true, policy_mode: 'AUTO_ALL_MESSAGES_V1',
+          kill_switch_enabled: false, ai_cs_store_id: 'store-ref:1',
+          platform_store_id: '328616090', state_revision: 4, state_reason: 'ACTIVE',
+          runner_active: false, control_available: false, auto_reply_running: false,
+          desired_auto_reply_enabled: true, supervisor_active: true,
+          supervisor_state: 'WAITING_FOR_CURRENT_PDD_CONVERSATION',
+          observation_scope: 'CURRENT_ACTIVE_CONVERSATION_ONLY',
+          automatic_navigation_enabled: false,
+          control_error_code: null, updated_at: '2026-08-16T08:00:00Z'
+        }
+      }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(ChannelAgentDesktopLayout, {
+      global: { plugins: [createPinia(), router, ElementPlus] }
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('等待当前会话')
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').attributes('title')).toContain('不会自动切换其他买家会话')
+    expect(wrapper.get('[data-testid="controlled-auto-repair"]').text()).toContain('一键修复')
     wrapper.unmount()
   })
 
@@ -258,14 +305,16 @@ describe('ChannelAgentDesktopLayout', () => {
       global: { plugins: [createPinia(), router, ElementPlus] }
     })
     await flushPromises()
-    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复运行中')
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('当前会话自动回复中')
+    await wrapper.get('[data-testid="open-runtime-details"]').trigger('click')
+    expect(wrapper.get('[data-testid="runtime-details-drawer"]').text()).toContain('REAL_SEND = ON')
 
     await wrapper.get('[data-testid="controlled-auto-toggle"]').trigger('click')
     await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
 
     expect(desktopMocks.toggleAuto).toHaveBeenCalledWith(false)
-    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复已暂停')
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('当前会话自动回复已暂停')
     wrapper.unmount()
     vi.useRealTimers()
   })
@@ -332,8 +381,8 @@ describe('ChannelAgentDesktopLayout', () => {
     await flushPromises()
 
     expect(desktopMocks.repairAuto).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('[data-testid="controlled-auto-repair"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('自动回复已暂停')
+    expect(wrapper.find('[data-testid="controlled-auto-repair"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="controlled-auto-toggle"]').text()).toContain('当前会话自动回复已暂停')
     wrapper.unmount()
     vi.useRealTimers()
   })

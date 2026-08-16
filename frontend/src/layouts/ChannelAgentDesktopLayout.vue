@@ -20,7 +20,7 @@
             <i />{{ autoToggleBusy ? '切换中…' : autoControlLabel }}
           </button>
           <button
-            v-if="autoRepairNeeded"
+            v-if="autoRepairNeeded || !autoReplyRunning"
             type="button"
             class="auto-repair-button"
             :disabled="autoRepairBusy"
@@ -148,9 +148,14 @@
               <option value="AUTO_LOW_RISK">AUTO_LOW_RISK（仅低风险自动准备）</option>
             </select>
           </label>
+          <div class="controlled-policy-fact" data-testid="controlled-auto-scope">
+            <span>自动回复范围</span>
+            <strong>仅当前人工打开的 PDD 会话</strong>
+            <small>不会自动点击、滚动或切换买家列表；切换会话后只观察新打开的当前会话。</small>
+          </div>
           <div class="safety-facts">
             <span>{{ autoReplyRunning ? '逐消息自动授权已启用' : '新消息自动授权已暂停' }}</span>
-            <strong>REAL_SEND = {{ bootstrap?.safety.real_send_enabled === true ? 'ON' : 'OFF' }}</strong>
+            <strong>REAL_SEND = {{ realSendEnabled ? 'ON' : 'OFF' }}</strong>
           </div>
           <p v-if="controlledAuto?.control_error_code" class="detail-error">{{ controlledAuto.control_error_code }}</p>
           <p v-if="replyPolicyError" class="detail-error">{{ replyPolicyError }}</p>
@@ -224,7 +229,17 @@ let refreshTimer: ReturnType<typeof setInterval> | undefined
 const agentStatus = computed(() => bootstrap.value?.agent.runtime_status ?? 'CONNECTING')
 const controlledAuto = computed(() => bootstrap.value?.safety.controlled_auto ?? null)
 const autoReplyRunning = computed(() => controlledAuto.value?.auto_reply_running === true)
-const realSendEnabled = computed(() => bootstrap.value?.safety.real_send_enabled === true)
+const autoReplyDesired = computed(() => controlledAuto.value?.desired_auto_reply_enabled === true)
+const realSendEnabled = computed(() => (
+  bootstrap.value?.safety.real_send_enabled === true
+  || (
+    autoReplyRunning.value
+    && controlledAuto.value?.runtime_mode === 'PRODUCTION_AUTO'
+    && controlledAuto.value?.production_real_send_enabled === true
+    && controlledAuto.value?.controlled_store_auto_enabled === true
+    && controlledAuto.value?.kill_switch_enabled === false
+  )
+))
 provide('channelAgentRealSendEnabled', realSendEnabled)
 const autoControlAvailable = computed(() => controlledAuto.value?.control_available === true)
 const autoRepairNeeded = computed(() => {
@@ -236,14 +251,20 @@ const autoRepairNeeded = computed(() => {
     || !['AUTO_LOW_RISK', 'AUTO_ALL_MESSAGES_V1'].includes(runtime.policy_mode)
 })
 const autoControlLabel = computed(() => {
-  if (!autoControlAvailable.value) return '自动回复不可用'
-  return autoReplyRunning.value ? '自动回复运行中' : '自动回复已暂停'
+  if (autoReplyRunning.value) return '当前会话自动回复中'
+  if (autoControlAvailable.value) return '当前会话自动回复已暂停'
+  if (controlledAuto.value?.supervisor_active) {
+    if (controlledAuto.value.supervisor_state === 'WAITING_FOR_CURRENT_PDD_CONVERSATION') return '等待当前会话'
+    if (controlledAuto.value.supervisor_state === 'RECOVERING_AUTO_COMPONENTS') return '当前会话AUTO恢复中'
+    if (controlledAuto.value.supervisor_state === 'STARTING') return '自动回复启动中'
+  }
+  return autoReplyDesired.value ? '当前会话AUTO待修复' : '自动回复待启动'
 })
 const autoControlTitle = computed(() => {
-  if (!autoControlAvailable.value) return '自动回复运行程序当前不可用'
+  if (!autoControlAvailable.value) return '当前页AUTO尚未就绪；不会自动切换其他买家会话'
   return autoReplyRunning.value
-    ? '点击暂停新消息的自动回复与真实发送'
-    : '点击重新核对当前店铺和工作台后恢复自动回复'
+    ? '点击暂停当前人工打开会话的新消息自动回复与真实发送'
+    : '点击核对当前店铺和当前会话后恢复自动回复；不会跳转其他会话'
 })
 const browserStatus = computed(() => bootstrap.value?.browser.status ?? 'STOPPED')
 const realMessageObservationEnabled = computed(() => (
@@ -400,7 +421,7 @@ const runtimeActionBusy = computed(() => (
 ))
 
 async function repairControlledAuto() {
-  if (autoRepairBusy.value || !autoRepairNeeded.value) return
+  if (autoRepairBusy.value) return
   autoRepairBusy.value = true
   try {
     await requestChannelAgentControlledAutoRepair()
