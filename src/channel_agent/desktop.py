@@ -463,14 +463,67 @@ class DesktopAssistantServer:
             "runner_active": False,
             "control_available": False,
             "auto_reply_running": False,
+            "desired_auto_reply_enabled": False,
+            "supervisor_active": False,
+            "supervisor_state": "UNAVAILABLE",
+            "components": {},
+            "observation_scope": "CURRENT_ACTIVE_CONVERSATION_ONLY",
+            "automatic_navigation_enabled": False,
             "control_error_code": None,
             "updated_at": None,
+        }
+        supervisor = self._read_json(
+            self.data_root
+            / "runtime"
+            / "current-page-production-supervisor.json"
+        )
+        supervisor_fresh = False
+        if (
+            supervisor.get("schema_version")
+            == "current-page-auto-production-status.v1"
+        ):
+            try:
+                supervisor_updated_at = datetime.fromisoformat(
+                    str(supervisor["updated_at"])
+                )
+                supervisor_age_seconds = (
+                    datetime.now(UTC)
+                    - supervisor_updated_at.astimezone(UTC)
+                ).total_seconds()
+                supervisor_fresh = bool(
+                    supervisor_updated_at.tzinfo is not None
+                    and 0.0 <= supervisor_age_seconds <= 15.0
+                )
+            except (KeyError, TypeError, ValueError):
+                supervisor_fresh = False
+        supervisor_status = {
+            "desired_auto_reply_enabled": bool(
+                supervisor_fresh
+                and supervisor.get("desired_auto_reply_enabled") is True
+            ),
+            "supervisor_active": bool(
+                supervisor_fresh
+                and supervisor.get("supervisor_active") is True
+            ),
+            "supervisor_state": (
+                str(supervisor.get("supervisor_state") or "UNAVAILABLE")
+                if supervisor_fresh
+                else "UNAVAILABLE"
+            ),
+            "components": (
+                supervisor.get("components")
+                if supervisor_fresh
+                and isinstance(supervisor.get("components"), dict)
+                else {}
+            ),
+            "observation_scope": "CURRENT_ACTIVE_CONVERSATION_ONLY",
+            "automatic_navigation_enabled": False,
         }
         value = self._read_json(
             self.data_root / "runtime" / "controlled-auto-public-status.json"
         )
         if value.get("schema_version") != "controlled-auto-public-status.v1":
-            return default
+            return {**default, **supervisor_status}
         try:
             updated_at = datetime.fromisoformat(str(value["updated_at"]))
             age_seconds = (
@@ -495,10 +548,22 @@ class DesktopAssistantServer:
             **{
                 key: value.get(key, default[key])
                 for key in default
-                if key not in {"control_available", "auto_reply_running"}
+                if key
+                not in {
+                    "control_available",
+                    "auto_reply_running",
+                    "control_error_code",
+                    *supervisor_status,
+                }
             },
+            **supervisor_status,
             "control_available": bool(fresh and value.get("runner_active") is True),
             "auto_reply_running": running,
+            # A process-old failure must not survive a reboot in the UI.  The
+            # supervisor state explains recovery until the live Runner starts.
+            "control_error_code": (
+                value.get("control_error_code") if fresh else None
+            ),
         }
 
     def request_controlled_auto_toggle(

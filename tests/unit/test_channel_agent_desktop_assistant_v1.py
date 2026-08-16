@@ -693,6 +693,65 @@ def test_desktop_projects_and_toggles_authoritative_controlled_auto(
         server.stop()
 
 
+def test_desktop_separates_desired_auto_from_effective_runtime_after_reboot(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(parents=True)
+    stale = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+    (runtime / "controlled-auto-public-status.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "controlled-auto-public-status.v1",
+                "runtime_mode": "PRODUCTION_AUTO",
+                "production_real_send_enabled": True,
+                "controlled_store_auto_enabled": True,
+                "policy_mode": "AUTO_ALL_MESSAGES_V1",
+                "kill_switch_enabled": False,
+                "ai_cs_store_id": "c-store-1",
+                "platform_store_id": "328616090",
+                "runner_active": True,
+                "control_error_code": "PROCESS_OLD_FAILURE",
+                "updated_at": stale,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (runtime / "current-page-production-supervisor.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "current-page-auto-production-status.v1",
+                "supervisor_active": True,
+                "supervisor_state": "WAITING_FOR_CURRENT_PDD_CONVERSATION",
+                "desired_auto_reply_enabled": True,
+                "observation_scope": "CURRENT_ACTIVE_CONVERSATION_ONLY",
+                "automatic_navigation_enabled": False,
+                "components": {
+                    "agent": True,
+                    "ai_gateway": True,
+                    "ai_platform": True,
+                    "host": True,
+                    "bridge": False,
+                    "runner": False,
+                },
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = DesktopAssistantServer(data_root=tmp_path)._controlled_auto_status()
+
+    assert status["desired_auto_reply_enabled"] is True
+    assert status["auto_reply_running"] is False
+    assert status["control_available"] is False
+    assert status["supervisor_active"] is True
+    assert status["supervisor_state"] == "WAITING_FOR_CURRENT_PDD_CONVERSATION"
+    assert status["observation_scope"] == "CURRENT_ACTIVE_CONVERSATION_ONLY"
+    assert status["automatic_navigation_enabled"] is False
+    assert status["control_error_code"] is None
+
+
 def test_desktop_queues_human_controlled_auto_repair_for_live_store(
     tmp_path: Path,
 ) -> None:
