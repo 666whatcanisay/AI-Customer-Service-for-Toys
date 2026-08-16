@@ -217,12 +217,16 @@ def _decision_context(inbound) -> dict[str, object]:
 @pytest.fixture(scope="module")
 def real_ai_cs_server(tmp_path_factory: pytest.TempPathFactory):
     project_root = Path(__file__).resolve().parents[2]
-    ai_cs_root = project_root.parent / "AI-CS"
+    monorepo_root = project_root.parent
+    if (monorepo_root / "backend" / "app").is_dir():
+        ai_cs_root = monorepo_root
+    else:
+        ai_cs_root = monorepo_root / "AI-CS"
     backend_path = ai_cs_root / "backend"
     python_executable = backend_path / ".venv" / "Scripts" / "python.exe"
     harness = project_root / "tests" / "support" / "ai_cs_gateway_server_harness.py"
     if not python_executable.exists() or not (backend_path / "app").exists():
-        pytest.fail("sibling AI-CS Gateway Server runtime is required for controlled E2E")
+        pytest.fail("AI-CS Gateway Server runtime is required for controlled E2E")
 
     port = _free_loopback_port()
     runtime_path = tmp_path_factory.mktemp("controlled-ai-cs-server")

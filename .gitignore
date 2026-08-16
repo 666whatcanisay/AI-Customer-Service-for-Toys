@@ -72,3 +72,24 @@ desktop.ini
 # Local Windows OPS runtime state, logs, databases, and generated config
 /.runtime/
 /tests/e2e/test-results/
+
+# Browser automation and captured production evidence
+playwright-report/
+test-results/
+evidence/
+screenshots/
+*.har
+*.webm
+*.trace.zip
+
+# Local vector/database variants and SQLite journals
+chroma/
+chroma_db/
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Local ML checkpoints
+*.pt
+*.pth
+*.ckpt

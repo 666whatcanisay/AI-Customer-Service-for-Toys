@@ -176,6 +176,7 @@ def test_windows_entry_and_example_config_remain_foundation_only() -> None:
         "pdd_login_observation_enabled",
         "pdd_login_url",
         "pdd_customer_service_url",
+        "pdd_conversation_navigation_enabled",
             "customer_assistant_enabled",
             "message_observation_enabled",
             "observation_stage",
@@ -194,3 +195,4 @@ def test_windows_entry_and_example_config_remain_foundation_only() -> None:
     for forbidden in ("cookie", "password", "plaintext_token", "send_message"):
         assert forbidden not in serialized
     assert payload["pdd_login_observation_enabled"] is False
+    assert payload["pdd_conversation_navigation_enabled"] is False

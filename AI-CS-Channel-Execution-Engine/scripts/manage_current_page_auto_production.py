@@ -17,7 +17,30 @@ from channel_agent.binding import atomic_write_bytes
 from channel_agent.current_page_production import CurrentPageProductionConfig
 
 ROOT = Path(__file__).resolve().parents[1]
-AI_CS_ROOT = ROOT.parent / "AI-CS"
+
+
+def _is_ai_cs_root(path: Path) -> bool:
+    required = (
+        "backend",
+        "platform_backend",
+        "frontend",
+        "contracts",
+        "scripts/windows/common_ai_customer_service.ps1",
+    )
+    return all((path / item).exists() for item in required)
+
+
+def _default_ai_cs_root() -> Path:
+    monorepo_root = ROOT.parent.resolve()
+    if _is_ai_cs_root(monorepo_root):
+        return monorepo_root
+    legacy_sibling = (ROOT.parent / "AI-CS").resolve()
+    if _is_ai_cs_root(legacy_sibling):
+        return legacy_sibling
+    return monorepo_root
+
+
+AI_CS_ROOT = _default_ai_cs_root()
 CATALOG_STORE_ID = "c-store-6639df2982014226"
 CATALOG_TENANT_ID = "c-tenant-6639df2982014226be2f5164ba642a72"
 
@@ -91,6 +114,38 @@ def _gateway_key_reference(ai_cs_root: Path) -> Path:
     return candidates[0]
 
 
+def _ai_cs_config_path(ai_cs_root: Path) -> Path:
+    candidates = (
+        ai_cs_root / ".runtime/phase-e/config/green-standard.local.ps1",
+        ai_cs_root / ".runtime/r027-ux-acceptance-data-v1/ux-acceptance.local.ps1",
+        ai_cs_root / "scripts/windows/config.local.ps1",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise RuntimeError("CURRENT_PAGE_AI_CS_CONFIG_NOT_FOUND")
+
+
+def _assistant_root() -> Path:
+    preferred = ROOT / ".runtime/current-page-production/host-offline-runtime"
+    if preferred.is_dir():
+        return preferred.resolve()
+    legacy = (
+        ROOT
+        / ".runtime/rc5-hotstart-validation/20260811-233205/host-offline-runtime"
+    )
+    if legacy.is_dir():
+        return legacy.resolve()
+    candidates = sorted(
+        (ROOT / ".runtime").glob("**/host-offline-runtime"),
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+    if candidates:
+        return candidates[0].resolve()
+    raise RuntimeError("CURRENT_PAGE_ASSISTANT_RUNTIME_NOT_FOUND")
+
+
 def _build_config(
     *,
     ai_cs_root: Path,
@@ -102,12 +157,7 @@ def _build_config(
     return CurrentPageProductionConfig(
         ce_root=ROOT,
         ai_cs_root=ai_cs_root,
-        ai_cs_config_path=(
-            ai_cs_root
-            / ".runtime"
-            / "r027-ux-acceptance-data-v1"
-            / "ux-acceptance.local.ps1"
-        ),
+        ai_cs_config_path=_ai_cs_config_path(ai_cs_root),
         data_root=data_root,
         python_executable=Path(sys.executable).resolve(),
         agent_executable=(
@@ -118,13 +168,7 @@ def _build_config(
             / "ChannelAgent.exe"
         ),
         engine_database_path=ROOT / ".runtime" / "channel-engine.sqlite3",
-        assistant_root=(
-            ROOT
-            / ".runtime"
-            / "rc5-hotstart-validation"
-            / "20260811-233205"
-            / "host-offline-runtime"
-        ),
+        assistant_root=_assistant_root(),
         host_evidence_root=ROOT / ".runtime" / "current-page-production",
         gateway_key_reference=_gateway_key_reference(ai_cs_root),
         send_selector_contract=(

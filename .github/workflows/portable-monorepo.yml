@@ -1,0 +1,79 @@
+name: Portable Monorepo
+
+on:
+  push:
+    branches:
+      - codex/portable-monorepo-v1
+      - release/full-project-v1
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-layout:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout into a path with spaces
+        uses: actions/checkout@v4
+        with:
+          path: project with spaces
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: project with spaces/frontend/package-lock.json
+      - name: Install pnpm
+        shell: pwsh
+        run: npm install --global pnpm@11
+      - name: Repository doctor
+        shell: powershell
+        working-directory: project with spaces
+        run: .\scripts\windows\Doctor-PortableProject.ps1
+      - name: AI-CS portable root tests
+        shell: powershell
+        working-directory: project with spaces
+        run: .\scripts\windows\tests\Test-OpsRuntimeEntryAlignment.ps1
+      - name: AI-CE portable root tests
+        shell: powershell
+        working-directory: project with spaces
+        run: .\AI-CS-Channel-Execution-Engine\scripts\windows\tests\Test-PortableRepositoryLayout.ps1
+
+  channel-engine:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: AI-CS-Channel-Execution-Engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install AI-CE
+        run: python -m pip install -e ".[dev]"
+      - name: Portable path regression
+        run: python -m pytest tests/unit/test_portable_monorepo_paths.py tests/unit/test_current_page_production_supervisor_v1.py
+
+  forbidden-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject private runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden=$(git ls-files | grep -Ei '(^|/)(\.env($|\.)|\.runtime/|node_modules/|\.venv/|secrets/|credentials/)|\.(sqlite3?|db|pem|p12|har|trace\.zip)$' | grep -Ev '^docs/.*/evidence/' || true)
+          allowed=$(printf '%s\n' "$forbidden" | grep -Ev '(^|/)\.env\.example$|test.*credential|credential.*test|(^|/)tests?/' || true)
+          if [ -n "$allowed" ]; then
+            echo "Forbidden tracked assets:"
+            echo "$allowed"
+            exit 1
+          fi

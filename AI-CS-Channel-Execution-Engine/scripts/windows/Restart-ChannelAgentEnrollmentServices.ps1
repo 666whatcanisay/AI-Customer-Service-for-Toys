@@ -7,9 +7,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-if (-not $AiCsRoot) {
-    $AiCsRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot '..\AI-CS'))
-}
+. (Join-Path $PSScriptRoot 'Resolve-AiCsRepositoryRoot.ps1')
+$AiCsRoot = Resolve-AiCsRepositoryRoot $repoRoot $AiCsRoot
 
 $common = Join-Path $AiCsRoot 'scripts\windows\common_ai_customer_service.ps1'
 $configPath = Join-Path $AiCsRoot '.runtime\r027-ux-acceptance-data-v1\ux-acceptance.local.ps1'

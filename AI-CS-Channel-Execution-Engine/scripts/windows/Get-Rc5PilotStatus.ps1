@@ -1,5 +1,6 @@
 [CmdletBinding()]
 param(
+    [string]$AiCsRoot,
     [string]$EngineDatabasePath,
     [string]$PlatformDatabasePath,
     [string]$PlatformBindingPath,
@@ -13,7 +14,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$aiCsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot '..\AI-CS'))
+. (Join-Path $PSScriptRoot 'Resolve-AiCsRepositoryRoot.ps1')
+$aiCsRoot = Resolve-AiCsRepositoryRoot $repoRoot $AiCsRoot
 $python = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $governanceScript = Join-Path $repoRoot 'scripts\rc5_pilot_governance.py'
 $governanceRoot = Join-Path $repoRoot '.runtime\rc5-pilot-governance'

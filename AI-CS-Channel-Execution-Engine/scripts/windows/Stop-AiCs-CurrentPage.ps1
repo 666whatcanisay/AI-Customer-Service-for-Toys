@@ -1,12 +1,18 @@
 [CmdletBinding()]
-param()
+param([string]$AiCsRoot)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$aiCsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot '..\AI-CS'))
+. (Join-Path $PSScriptRoot 'Resolve-AiCsRepositoryRoot.ps1')
+$aiCsRoot = Resolve-AiCsRepositoryRoot $repoRoot $AiCsRoot
 $python = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $manager = Join-Path $repoRoot 'scripts\manage_current_page_auto_production.py'
-$config = Join-Path $aiCsRoot '.runtime\r027-ux-acceptance-data-v1\ux-acceptance.local.ps1'
+$configCandidates = @(
+    (Join-Path $aiCsRoot '.runtime\phase-e\config\green-standard.local.ps1'),
+    (Join-Path $aiCsRoot '.runtime\r027-ux-acceptance-data-v1\ux-acceptance.local.ps1'),
+    (Join-Path $aiCsRoot 'scripts\windows\config.local.ps1')
+)
+$config = $configCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 $dataRoot = Join-Path $env:LOCALAPPDATA 'AI-CS\ChannelAgent'
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\AI-CS\ChannelAgent'
 
@@ -39,7 +45,7 @@ foreach ($process in $processes) {
 $stopAiCs = Join-Path $aiCsRoot 'scripts\windows\stop_ai_customer_service.ps1'
 if (
     (Test-Path -LiteralPath $stopAiCs -PathType Leaf) -and
-    (Test-Path -LiteralPath $config -PathType Leaf)
+    $config -and (Test-Path -LiteralPath $config -PathType Leaf)
 ) {
     & $stopAiCs -ConfigPath $config
 }

@@ -25,10 +25,16 @@ try {
     . (Join-Path $repositoryRoot 'scripts\windows\common_ai_customer_service.ps1')
     New-Item -ItemType Directory -Force -Path $temporaryRoot | Out-Null
 
-    $canonicalRepository = Join-Path $temporaryRoot 'AI-CS'
+    $canonicalRepository = Join-Path $temporaryRoot 'portable-clone-with-any-name'
     $scriptRoot = Join-Path $canonicalRepository 'scripts\windows'
     $formalConfigDirectory = Join-Path $canonicalRepository '.runtime\phase-e\config'
-    New-Item -ItemType Directory -Force -Path $scriptRoot, $formalConfigDirectory | Out-Null
+    New-Item -ItemType Directory -Force -Path `
+        $scriptRoot, $formalConfigDirectory, `
+        (Join-Path $canonicalRepository 'backend'), `
+        (Join-Path $canonicalRepository 'platform_backend'), `
+        (Join-Path $canonicalRepository 'frontend'), `
+        (Join-Path $canonicalRepository 'contracts') | Out-Null
+    Set-Content -LiteralPath (Join-Path $scriptRoot 'common_ai_customer_service.ps1') -Value '# sentinel' -Encoding UTF8
     $legacyConfig = Join-Path $scriptRoot 'config.local.ps1'
     $formalConfig = Join-Path $formalConfigDirectory 'green-standard.local.ps1'
     Set-Content -LiteralPath $formalConfig -Value '@{}' -Encoding UTF8

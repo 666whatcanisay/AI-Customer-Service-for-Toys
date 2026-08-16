@@ -1,0 +1,40 @@
+{
+  "pilot_contract_version": "1.0",
+  "agent": {
+    "config_version": "1.0",
+    "node_id": "pdd-pilot-node-windows-001",
+    "node_name": "PDD Single Store Pilot Node",
+    "agent_version": "1.0.0",
+    "server": {
+      "server_url": "http://127.0.0.1:18021",
+      "agent_token_reference": "secret-ref://ai-cs/pilot/gateway-hmac"
+    },
+    "browser": {
+      "chrome_path": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+      "profile_root": "C:/AI-CS/ChannelAgent/profiles"
+    },
+    "channel": {
+      "platform": "pdd",
+      "credential_reference": "credential-ref://pdd/pilot/manual-browser-session",
+      "store_binding": null
+    },
+    "safety": {
+      "runtime_mode": "PILOT",
+      "dry_run": true,
+      "kill_switch": true
+    }
+  },
+  "gateway_client_id": "channel-engine",
+  "gateway_key_id": "pilot-env-v1",
+  "browser_profile_id": "pdd-pilot-single-store-001",
+  "merchant_chat_url": "https://mms.pinduoduo.com/chat-merchant/index.html",
+  "selector_contract_id": "pdd:merchant_chat:v1",
+  "selector_activation_requested": false,
+  "inbound_transport_mode": "DISABLED",
+  "inbound_transport_name": null,
+  "outbound_transport_enabled": false,
+  "customer_message_read_enabled": false,
+  "automatic_login": false,
+  "auto_reply": false,
+  "manual_approval": true
+}

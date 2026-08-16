@@ -2,13 +2,18 @@
 param(
     [string]$InstallRoot = (Join-Path $PSScriptRoot '..\dist\windows-client-v2\AI-CS-Channel-Agent'),
     [string]$DataRoot = (Join-Path $env:LOCALAPPDATA 'AI-CS\ChannelAgent'),
-    [string]$FrontendBuild = 'C:\Users\EDY\Documents\Codex\2026-07-21\AI-CS\frontend\dist-agent'
+    [string]$FrontendBuild
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.IO.Compression
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'windows\Resolve-AiCsRepositoryRoot.ps1')
+$aiCsRoot = Resolve-AiCsRepositoryRoot $repoRoot
+if ([string]::IsNullOrWhiteSpace($FrontendBuild)) {
+    $FrontendBuild = Join-Path $aiCsRoot 'frontend\dist-agent'
+}
 $InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
 $DataRoot = [IO.Path]::GetFullPath($DataRoot)
 $FrontendBuild = [IO.Path]::GetFullPath($FrontendBuild)

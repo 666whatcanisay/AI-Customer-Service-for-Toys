@@ -10,7 +10,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-if (-not $AiCsRoot) { $AiCsRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot '..\AI-CS')) }
+. (Join-Path $PSScriptRoot 'Resolve-AiCsRepositoryRoot.ps1')
+$AiCsRoot = Resolve-AiCsRepositoryRoot $repoRoot $AiCsRoot
 if (-not (Test-Path -LiteralPath (Join-Path $AiCsRoot 'scripts\windows\start_lan_ai_customer_service.ps1') -PathType Leaf)) {
     throw "未找到 AI-CS 主机目录：$AiCsRoot"
 }

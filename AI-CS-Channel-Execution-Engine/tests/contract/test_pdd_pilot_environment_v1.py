@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
@@ -192,7 +193,10 @@ class _StoreIdentityReader:
 
 
 def test_deployment_environment_config_is_reference_only_and_unbound() -> None:
-    config = load_pilot_environment_config("deploy/pdd-pilot-environment.json")
+    project_root = Path(__file__).resolve().parents[2]
+    config = load_pilot_environment_config(
+        project_root / "deploy" / "pdd-pilot-environment.example.json"
+    )
 
     assert config.agent.safety.runtime_mode is AgentEnvironment.PILOT
     assert config.agent.channel.store_binding is None

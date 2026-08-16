@@ -19,9 +19,18 @@ function Assert-AiCsCanonicalRuntimeSource(
 ) {
     if (-not $RequireCanonicalRoot) { return }
     $repositoryRoot = [IO.Path]::GetFullPath([string]$Config.RepositoryRoot)
-    $repositoryName = Split-Path -Leaf $repositoryRoot
-    if (-not [string]::Equals($repositoryName, 'AI-CS', [StringComparison]::OrdinalIgnoreCase)) {
-        throw '检测到旧项目路径，请使用迁移后的AI-CS目录。'
+
+    $requiredRepositoryEntries = @(
+        'backend',
+        'platform_backend',
+        'frontend',
+        'contracts',
+        'scripts\windows\common_ai_customer_service.ps1'
+    )
+    foreach ($relativePath in $requiredRepositoryEntries) {
+        if (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot $relativePath))) {
+            throw "Runtime配置的RepositoryRoot不是有效AI-CS源码根目录：$repositoryRoot"
+        }
     }
 
     $entryRepositoryRoot = if ([string]::IsNullOrWhiteSpace($EntryRepositoryRootOverride)) {
@@ -29,8 +38,10 @@ function Assert-AiCsCanonicalRuntimeSource(
     } else {
         [IO.Path]::GetFullPath($EntryRepositoryRootOverride)
     }
-    if (-not [string]::Equals((Split-Path -Leaf $entryRepositoryRoot), 'AI-CS', [StringComparison]::OrdinalIgnoreCase)) {
-        throw "检测到旧项目路径，请使用迁移后的AI-CS目录：$entryRepositoryRoot"
+    foreach ($relativePath in $requiredRepositoryEntries) {
+        if (-not (Test-Path -LiteralPath (Join-Path $entryRepositoryRoot $relativePath))) {
+            throw "当前入口不是有效AI-CS源码根目录：$entryRepositoryRoot"
+        }
     }
     if (-not [string]::Equals($repositoryRoot, $entryRepositoryRoot, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Runtime配置的RepositoryRoot不是当前AI-CS目录：$repositoryRoot"

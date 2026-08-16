@@ -2,7 +2,8 @@
 param([string]$AiCsRoot)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-if (-not $AiCsRoot) { $AiCsRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot '..\AI-CS')) }
+. (Join-Path $PSScriptRoot 'Resolve-AiCsRepositoryRoot.ps1')
+$AiCsRoot = Resolve-AiCsRepositoryRoot $repoRoot $AiCsRoot
 $statePath = Join-Path $repoRoot '.runtime\channel-agent-lan-host\host-state.json'
 if (Test-Path -LiteralPath $statePath -PathType Leaf) {
     $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
