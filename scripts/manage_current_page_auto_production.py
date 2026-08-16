@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -146,6 +147,36 @@ def _status_path(data_root: Path) -> Path:
     return data_root / "runtime" / "current-page-production-supervisor.json"
 
 
+def _owner_path(data_root: Path) -> Path:
+    return data_root / "runtime" / "current-page-production-supervisor.owner"
+
+
+def _pid_running(process_id: int) -> bool:
+    if process_id <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        process = ctypes.windll.kernel32.OpenProcess(0x1000, False, process_id)
+        if not process:
+            return False
+        ctypes.windll.kernel32.CloseHandle(process)
+        return True
+    try:
+        os.kill(process_id, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _lock_owner_pid(data_root: Path) -> int:
+    try:
+        process_id = int(_owner_path(data_root).read_text(encoding="ascii").strip())
+    except (OSError, UnicodeError, ValueError):
+        return 0
+    return process_id if _pid_running(process_id) else 0
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -248,6 +279,13 @@ def _start(data_root: Path) -> dict[str, Any]:
     existing = _fresh_supervisor_status(data_root)
     if existing is not None:
         return {"started": True, "already_running": True, "status": existing}
+    existing_process_id = _lock_owner_pid(data_root)
+    if existing_process_id:
+        return {
+            "started": True,
+            "already_running": True,
+            "process_id": existing_process_id,
+        }
     config_path = _config_path(data_root)
     if not config_path.is_file():
         raise RuntimeError("CURRENT_PAGE_PRODUCTION_NOT_INSTALLED")
@@ -288,8 +326,24 @@ def _start(data_root: Path) -> dict[str, Any]:
     finally:
         stdout.close()
         stderr.close()
-    atomic_write_bytes(_pid_path(data_root), str(process.pid).encode("ascii"))
-    return {"started": True, "already_running": False, "process_id": process.pid}
+    deadline = time.monotonic() + 5.0
+    owner_process_id = 0
+    while time.monotonic() < deadline:
+        owner_process_id = _lock_owner_pid(data_root)
+        if owner_process_id:
+            break
+        if process.poll() is not None:
+            raise RuntimeError("CURRENT_PAGE_PRODUCTION_START_FAILED")
+        time.sleep(0.1)
+    effective_process_id = owner_process_id or process.pid
+    atomic_write_bytes(
+        _pid_path(data_root), str(effective_process_id).encode("ascii")
+    )
+    return {
+        "started": True,
+        "already_running": False,
+        "process_id": effective_process_id,
+    }
 
 
 def _stop(data_root: Path) -> dict[str, Any]:
@@ -305,6 +359,8 @@ def _stop(data_root: Path) -> dict[str, Any]:
             capture_output=True,
         )
     path.unlink(missing_ok=True)
+    _status_path(data_root).unlink(missing_ok=True)
+    _owner_path(data_root).unlink(missing_ok=True)
     return {"stopped": True, "process_id": process_id or None}
 
 

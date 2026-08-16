@@ -97,6 +97,19 @@ def test_installation_rejects_agent_navigation(tmp_path: Path) -> None:
         CurrentPageProductionSupervisor(candidate).validate_installation()
 
 
+def test_supervisor_runtime_lock_rejects_a_second_owner(tmp_path: Path) -> None:
+    first = CurrentPageProductionSupervisor(config(tmp_path))
+    second = CurrentPageProductionSupervisor(config(tmp_path))
+
+    with first._single_instance_lock():
+        with pytest.raises(
+            RuntimeError,
+            match="CURRENT_PAGE_PRODUCTION_SUPERVISOR_ALREADY_RUNNING",
+        ):
+            with second._single_instance_lock():
+                pass
+
+
 def test_runtime_stays_before_bridge_until_current_page_is_ready(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

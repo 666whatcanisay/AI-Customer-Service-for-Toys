@@ -9,10 +9,11 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -149,15 +150,68 @@ class CurrentPageProductionSupervisor:
     def run_forever(self) -> None:
         self.validate_installation()
         self.config.status_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._single_instance_lock():
+            try:
+                while True:
+                    self.run_once()
+                    time.sleep(max(self.poll_seconds, 0.25))
+            except KeyboardInterrupt:
+                self._publish_status(
+                    component_health=self._component_health(),
+                    supervisor_state="STOPPED",
+                )
+
+    @contextmanager
+    def _single_instance_lock(self) -> Iterator[None]:
+        """Prevent two supervisors from owning the same desktop runtime."""
+
+        lock_path = (
+            self.config.data_root
+            / "runtime"
+            / "current-page-production-supervisor.lock"
+        )
+        owner_path = (
+            self.config.data_root
+            / "runtime"
+            / "current-page-production-supervisor.owner"
+        )
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = lock_path.open("a+b")
+        if lock_path.stat().st_size == 0:
+            handle.write(b"0")
+            handle.flush()
+        handle.seek(0)
         try:
-            while True:
-                self.run_once()
-                time.sleep(max(self.poll_seconds, 0.25))
-        except KeyboardInterrupt:
-            self._publish_status(
-                component_health=self._component_health(),
-                supervisor_state="STOPPED",
-            )
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            handle.close()
+            raise RuntimeError(
+                "CURRENT_PAGE_PRODUCTION_SUPERVISOR_ALREADY_RUNNING"
+            ) from exc
+        try:
+            atomic_write_bytes(owner_path, str(os.getpid()).encode("ascii"))
+            yield
+        finally:
+            try:
+                owner_path.unlink(missing_ok=True)
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
 
     def run_once(self) -> dict[str, Any]:
         self._reap_children()
