@@ -1,0 +1,2714 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-06T02:05:48.498673+00:00",
+  "release": "0.1.0rc1",
+  "release_tag": "channel-engine-v0.1.0rc1",
+  "protected_anchor": "b2c64d54987f1f066a02de8e9e667d5cc0f9857c",
+  "gateway_contract": {
+    "version": "1.0",
+    "canonical_sha256": "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5",
+    "unchanged": true
+  },
+  "classification": {
+    "must_enter_rc": 368,
+    "staging_candidate": 351,
+    "must_ignore": 87,
+    "must_delete": 0,
+    "local_generated_present": 4
+  },
+  "policy": {
+    "included": [
+      "source",
+      "tests",
+      "necessary Markdown/CSV documentation",
+      "release and validation tools",
+      "safe example/staging configuration",
+      "Gateway Contract schema"
+    ],
+    "package_excluded": [
+      "fake",
+      "sandbox",
+      "discovery",
+      "experimental",
+      "pdd",
+      "pilot",
+      "mock-server",
+      "channel-send-implementation"
+    ],
+    "ignored": [
+      "runtime",
+      "evidence",
+      "logs",
+      "cache",
+      "local data",
+      "generated HTML",
+      "report renderer manifests",
+      "deferred local pilot configuration",
+      "secret material"
+    ],
+    "deletion": "No unknown file is deleted; known generated local files remain ignored."
+  },
+  "repository_allowlist": [
+    ".gitattributes",
+    ".gitignore",
+    "README.md",
+    "deploy/staging/deployment-manifest.json",
+    "deploy/staging/runtime-config.json",
+    "deploy/windows-agent-rc/agent.example.json",
+    "docs/AI-CS-Channel-Adapter-Framework-Foundation-V1.md",
+    "docs/AI-CS-Channel-Agent-Dashboard-V1.md",
+    "docs/AI-CS-Channel-Agent-Deployment-Hardening-Report-V1.md",
+    "docs/AI-CS-Channel-Agent-First-Launch-Experience-V1.md",
+    "docs/AI-CS-Channel-Agent-First-Launch-Runbook-V1.md",
+    "docs/AI-CS-Channel-Agent-Foundation-V1.md",
+    "docs/AI-CS-Channel-Agent-Source-Baseline-Report-V1.md",
+    "docs/AI-CS-Channel-Agent-Windows-RC-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Adapter-Layer-Foundation-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Console-CN-Productization-V1.1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Execution-Runtime-Foundation-V1.md",
+    "docs/AI-CS-Channel-Engine-Foundation-V1-Report.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Client-Foundation-V1.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Client-Integration-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Contract-V1.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Integration-Sandbox-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Sandbox-Integration-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Integration-Validation-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Mock-E2E-Validation-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Observability-Console-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Operations-Console-UI-Foundation-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-RC1-Release-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Real-Gateway-Adapter-Foundation-V1.md",
+    "docs/AI-CS-Channel-Engine-Runtime-Reliability-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Sandbox-Adapter-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Session-Runtime-V1-Completion-Report.md",
+    "docs/AI-CS-Controlled-Integration-E2E-Report-V1.md",
+    "docs/AI-CS-PDD-Adapter-Discovery-Framework-V1.md",
+    "docs/AI-CS-PDD-Adapter-Observe-Mode-V1-Completion-Report.md",
+    "docs/AI-CS-PDD-Adapter-Prototype-Foundation-V1-Completion-Report.md",
+    "docs/AI-CS-PDD-Channel-Adapter-Architecture-Design-V1.md",
+    "docs/AI-CS-PDD-Controlled-Activation-Plan-V1.md",
+    "docs/AI-CS-PDD-Controlled-Activation-Runbook-V1.md",
+    "docs/AI-CS-PDD-Human-Approval-Execution-Sandbox-V1-Completion-Report.md",
+    "docs/AI-CS-PDD-Message-Observation-Framework-V1.md",
+    "docs/AI-CS-PDD-Production-Activation-Governance-V1.md",
+    "docs/AI-CS-PDD-Single-Store-Pilot-Live-Report-V1.md",
+    "docs/AI-CS-PDD-Single-Store-Pilot-Runtime-V1.md",
+    "docs/AI-CS-Production-Gateway-Contract-V1.md",
+    "docs/AI-CS-Real-Channel-Adapter-Framework-Design-V1.md",
+    "docs/Channel-Engine-Production-Control-Plane-V1.md",
+    "docs/Channel-Engine-Production-Runtime-Readiness-V1.md",
+    "docs/Channel-Engine-Staging-Environment-Foundation-V1.md",
+    "docs/Channel-Engine-Staging-Operations-Runbook-V1.md",
+    "docs/PDD-Browser-Adapter-Architecture-Design-V1.md",
+    "docs/PDD-Browser-Observation-Foundation-V1.md",
+    "docs/PDD-Browser-Runtime-Foundation-V1.md",
+    "docs/PDD-Channel-Adapter-Observation-Foundation-V1.md",
+    "docs/PDD-Controlled-Execution-Foundation-V1.md",
+    "docs/PDD-Controlled-Send-Transport-Foundation-V1.md",
+    "docs/PDD-Pilot-Environment-Integration-Report-V1.md",
+    "docs/PDD-Production-Adapter-Readiness-Report-V1.md",
+    "docs/PDD-Production-Safety-Gate-Foundation-V1.md",
+    "docs/PDD-Single-Store-Pilot-First-Launch-Runbook-V1.md",
+    "docs/PDD-WebSocket-Transport-Foundation-V1.md",
+    "docs/architecture.md",
+    "docs/baseline/AI-CS-Channel-Agent-Source-Baseline-V1-Asset-Inventory.csv",
+    "docs/releases/CHANGELOG-RC1.md",
+    "docs/releases/RC1-Deployment-Guide.md",
+    "docs/releases/RC1-Release-Checklist.md",
+    "docs/releases/RC1-Release-Notes.md",
+    "docs/releases/RC1-Rollback-Guide.md",
+    "docs/releases/RC1-Source-Allowlist.json",
+    "packaging/windows-agent/production-composition.json",
+    "pyproject.toml",
+    "requirements-rc1.lock",
+    "schemas/ai-cs-channel-engine-gateway-contract-v1.schema.json",
+    "scripts/build_rc1_source_allowlist.py",
+    "scripts/build_windows_agent_rc.ps1",
+    "scripts/check_pdd_controlled_activation.py",
+    "scripts/check_pdd_production_activation_governance.py",
+    "scripts/export_rc1_candidate_diff.py",
+    "scripts/prepare_pdd_pilot_environment.py",
+    "scripts/run_pdd_observe_browser.py",
+    "scripts/support/run_ai_cs_gateway_validation_server.py",
+    "scripts/validate_ai_cs_channel_engine_integration_v1.py",
+    "scripts/verify_channel_engine_rc1.py",
+    "scripts/verify_pilot_gateway.py",
+    "scripts/windows/start_ai_cs_agent.bat",
+    "src/ai_cs_agent/__init__.py",
+    "src/ai_cs_agent/__main__.py",
+    "src/ai_cs_agent/adapter.py",
+    "src/ai_cs_agent/browser.py",
+    "src/ai_cs_agent/cli.py",
+    "src/ai_cs_agent/config.py",
+    "src/ai_cs_agent/execution.py",
+    "src/ai_cs_agent/gateway.py",
+    "src/ai_cs_agent/models.py",
+    "src/ai_cs_agent/observability.py",
+    "src/ai_cs_agent/runtime.py",
+    "src/ai_cs_agent/security.py",
+    "src/ai_cs_agent/session.py",
+    "src/ai_cs_agent/state.py",
+    "src/channel_engine/__init__.py",
+    "src/channel_engine/agent/__init__.py",
+    "src/channel_engine/agent/api.py",
+    "src/channel_engine/agent/config.py",
+    "src/channel_engine/agent/dashboard.py",
+    "src/channel_engine/agent/dashboard_ui.py",
+    "src/channel_engine/agent/first_launch.py",
+    "src/channel_engine/agent/first_launch_ui.py",
+    "src/channel_engine/agent/models.py",
+    "src/channel_engine/agent/runtime.py",
+    "src/channel_engine/app.py",
+    "src/channel_engine/browser/__init__.py",
+    "src/channel_engine/browser/adapter.py",
+    "src/channel_engine/browser/cdp_readonly.py",
+    "src/channel_engine/browser/models.py",
+    "src/channel_engine/browser/observation_store.py",
+    "src/channel_engine/browser/observer.py",
+    "src/channel_engine/browser/outbound.py",
+    "src/channel_engine/browser/ports.py",
+    "src/channel_engine/browser/runtime.py",
+    "src/channel_engine/browser/selectors.py",
+    "src/channel_engine/browser/session.py",
+    "src/channel_engine/channel/__init__.py",
+    "src/channel_engine/channel/adapter_foundation.py",
+    "src/channel_engine/channel/execution_boundary.py",
+    "src/channel_engine/channel/fake.py",
+    "src/channel_engine/channel/fake_pdd.py",
+    "src/channel_engine/channel/fake_platform.py",
+    "src/channel_engine/channel/lifecycle.py",
+    "src/channel_engine/channel/pdd_controlled.py",
+    "src/channel_engine/channel/pdd_discovery.py",
+    "src/channel_engine/channel/pdd_observation.py",
+    "src/channel_engine/channel/pdd_production.py",
+    "src/channel_engine/channel/pdd_safety.py",
+    "src/channel_engine/channel/pdd_send.py",
+    "src/channel_engine/channel/pdd_websocket.py",
+    "src/channel_engine/channel/pdd_websocket_store.py",
+    "src/channel_engine/channel/platform.py",
+    "src/channel_engine/channel/protocol.py",
+    "src/channel_engine/channel/registry.py",
+    "src/channel_engine/channel/sandbox.py",
+    "src/channel_engine/config.py",
+    "src/channel_engine/control/__init__.py",
+    "src/channel_engine/control/gate.py",
+    "src/channel_engine/control/health.py",
+    "src/channel_engine/control/models.py",
+    "src/channel_engine/control/repository.py",
+    "src/channel_engine/control/service.py",
+    "src/channel_engine/conversation/__init__.py",
+    "src/channel_engine/conversation/service.py",
+    "src/channel_engine/environment/__init__.py",
+    "src/channel_engine/environment/deployment.py",
+    "src/channel_engine/environment/models.py",
+    "src/channel_engine/environment/safety.py",
+    "src/channel_engine/execution/__init__.py",
+    "src/channel_engine/execution/coordinator.py",
+    "src/channel_engine/execution/fake_executor.py",
+    "src/channel_engine/execution/ownership.py",
+    "src/channel_engine/execution/pdd_sandbox.py",
+    "src/channel_engine/execution/queue.py",
+    "src/channel_engine/execution/receipt.py",
+    "src/channel_engine/execution/recovery.py",
+    "src/channel_engine/execution/worker.py",
+    "src/channel_engine/gateway/__init__.py",
+    "src/channel_engine/gateway/auth.py",
+    "src/channel_engine/gateway/client.py",
+    "src/channel_engine/gateway/contract.py",
+    "src/channel_engine/gateway/edge.py",
+    "src/channel_engine/gateway/fake.py",
+    "src/channel_engine/gateway/http.py",
+    "src/channel_engine/gateway/integration.py",
+    "src/channel_engine/gateway/mock_server.py",
+    "src/channel_engine/gateway/protocol.py",
+    "src/channel_engine/gateway/sandbox.py",
+    "src/channel_engine/gateway/scope.py",
+    "src/channel_engine/models/__init__.py",
+    "src/channel_engine/models/entities.py",
+    "src/channel_engine/models/enums.py",
+    "src/channel_engine/models/state_machine.py",
+    "src/channel_engine/monitor/__init__.py",
+    "src/channel_engine/monitor/health.py",
+    "src/channel_engine/observability/__init__.py",
+    "src/channel_engine/observability/actions.py",
+    "src/channel_engine/observability/api.py",
+    "src/channel_engine/observability/bridge.py",
+    "src/channel_engine/observability/models.py",
+    "src/channel_engine/observability/repository.py",
+    "src/channel_engine/observability/service.py",
+    "src/channel_engine/observability/ui.py",
+    "src/channel_engine/outbox/__init__.py",
+    "src/channel_engine/outbox/publisher.py",
+    "src/channel_engine/pdd_adapter/__init__.py",
+    "src/channel_engine/pdd_adapter/_base.py",
+    "src/channel_engine/pdd_adapter/activation.py",
+    "src/channel_engine/pdd_adapter/browser/__init__.py",
+    "src/channel_engine/pdd_adapter/browser/boundary.py",
+    "src/channel_engine/pdd_adapter/discovery/__init__.py",
+    "src/channel_engine/pdd_adapter/fake.py",
+    "src/channel_engine/pdd_adapter/governance.py",
+    "src/channel_engine/pdd_adapter/mapper/__init__.py",
+    "src/channel_engine/pdd_adapter/mapper/mapping.py",
+    "src/channel_engine/pdd_adapter/message/__init__.py",
+    "src/channel_engine/pdd_adapter/message/models.py",
+    "src/channel_engine/pdd_adapter/message_observation.py",
+    "src/channel_engine/pdd_adapter/observation_mode.py",
+    "src/channel_engine/pdd_adapter/observe.py",
+    "src/channel_engine/pdd_adapter/readiness.py",
+    "src/channel_engine/pdd_adapter/runtime_status.py",
+    "src/channel_engine/pdd_adapter/selector/__init__.py",
+    "src/channel_engine/pdd_adapter/selector/contract.py",
+    "src/channel_engine/pdd_adapter/session/__init__.py",
+    "src/channel_engine/pdd_adapter/session/runtime.py",
+    "src/channel_engine/pilot/__init__.py",
+    "src/channel_engine/pilot/api.py",
+    "src/channel_engine/pilot/approval.py",
+    "src/channel_engine/pilot/browser.py",
+    "src/channel_engine/pilot/config.py",
+    "src/channel_engine/pilot/environment.py",
+    "src/channel_engine/pilot/live.py",
+    "src/channel_engine/pilot/models.py",
+    "src/channel_engine/pilot/persistence.py",
+    "src/channel_engine/pilot/runtime.py",
+    "src/channel_engine/policy/__init__.py",
+    "src/channel_engine/policy/approval.py",
+    "src/channel_engine/reliability/__init__.py",
+    "src/channel_engine/reliability/api.py",
+    "src/channel_engine/reliability/browser.py",
+    "src/channel_engine/reliability/heartbeat.py",
+    "src/channel_engine/reliability/manager.py",
+    "src/channel_engine/reliability/models.py",
+    "src/channel_engine/reliability/persistence.py",
+    "src/channel_engine/reliability/recovery.py",
+    "src/channel_engine/security/__init__.py",
+    "src/channel_engine/security/pdd.py",
+    "src/channel_engine/security/rbac.py",
+    "src/channel_engine/session/__init__.py",
+    "src/channel_engine/session/api.py",
+    "src/channel_engine/session/credential.py",
+    "src/channel_engine/session/delivery.py",
+    "src/channel_engine/session/heartbeat.py",
+    "src/channel_engine/session/manager.py",
+    "src/channel_engine/session/models.py",
+    "src/channel_engine/session/persistence.py",
+    "src/channel_engine/session/state_machine.py",
+    "src/channel_engine/storage/__init__.py",
+    "src/channel_engine/storage/database.py",
+    "src/channel_engine/storage/orm.py",
+    "src/channel_engine/storage/repository.py",
+    "src/channel_engine/storage/unit_of_work.py",
+    "src/channel_engine/storage/versioning.py",
+    "tests/api/test_app.py",
+    "tests/api/test_channel_adapter_foundation_api.py",
+    "tests/api/test_channel_agent_api.py",
+    "tests/api/test_channel_agent_dashboard.py",
+    "tests/api/test_channel_agent_first_launch_api.py",
+    "tests/api/test_channel_session_runtime_api.py",
+    "tests/api/test_observability_api.py",
+    "tests/api/test_operations_console_actions.py",
+    "tests/api/test_operations_console_ui.py",
+    "tests/api/test_pdd_runtime_status_api_v1.py",
+    "tests/api/test_runtime_reliability_api.py",
+    "tests/conftest.py",
+    "tests/contract/test_ai_cs_gateway_integration_v1.py",
+    "tests/contract/test_control_plane_v1.py",
+    "tests/contract/test_gateway_contract_v1.py",
+    "tests/contract/test_gateway_edge_contract_v1.py",
+    "tests/contract/test_gateway_sandbox_contract_v1.py",
+    "tests/contract/test_pdd_browser_adapter_design_v1.py",
+    "tests/contract/test_pdd_browser_observation_v1.py",
+    "tests/contract/test_pdd_controlled_activation_v1.py",
+    "tests/contract/test_pdd_controlled_execution_v1.py",
+    "tests/contract/test_pdd_observation_adapter_v1.py",
+    "tests/contract/test_pdd_observation_mode_contract_v1.py",
+    "tests/contract/test_pdd_pilot_environment_v1.py",
+    "tests/contract/test_pdd_production_activation_governance_contract_v1.py",
+    "tests/contract/test_pdd_production_adapter_preparation_v1.py",
+    "tests/contract/test_pdd_production_readiness_recheck_v1.py",
+    "tests/contract/test_pdd_production_safety_gate_v1.py",
+    "tests/contract/test_pdd_send_transport_v1.py",
+    "tests/contract/test_pdd_single_store_pilot_v1.py",
+    "tests/contract/test_pdd_websocket_transport_v1.py",
+    "tests/contract/test_real_channel_adapter_v1.py",
+    "tests/contract/test_staging_environment_v1.py",
+    "tests/e2e/test_channel_sandbox_e2e.py",
+    "tests/e2e/test_controlled_ai_cs_integration.py",
+    "tests/e2e/test_mock_e2e_validation.py",
+    "tests/integration/test_ai_cs_channel_engine_cross_repo_validation_v1.py",
+    "tests/integration/test_ai_cs_gateway_flow.py",
+    "tests/integration/test_ai_cs_gateway_integration_runtime_v1.py",
+    "tests/integration/test_channel_adapter_flow.py",
+    "tests/integration/test_channel_adapter_foundation_flow.py",
+    "tests/integration/test_channel_adapter_runtime_recovery.py",
+    "tests/integration/test_channel_sandbox_recovery.py",
+    "tests/integration/test_channel_session_heartbeat_scheduler.py",
+    "tests/integration/test_channel_session_multi_store.py",
+    "tests/integration/test_control_plane_runtime.py",
+    "tests/integration/test_execution_runtime.py",
+    "tests/integration/test_foundation_flow.py",
+    "tests/integration/test_gateway_edge_sandbox_v1.py",
+    "tests/integration/test_gateway_sandbox_failures_v1.py",
+    "tests/integration/test_gateway_sandbox_integration_v1.py",
+    "tests/integration/test_observability_console.py",
+    "tests/integration/test_pdd_adapter_discovery_safety.py",
+    "tests/integration/test_pdd_controlled_activation_cli_v1.py",
+    "tests/integration/test_pdd_controlled_execution.py",
+    "tests/integration/test_pdd_cursor_reliability_v1.py",
+    "tests/integration/test_pdd_human_approval_execution_sandbox_v1.py",
+    "tests/integration/test_pdd_message_observation_v1.py",
+    "tests/integration/test_pdd_observation_ai_flow.py",
+    "tests/integration/test_pdd_observation_mode_v1.py",
+    "tests/integration/test_pdd_observe_mode_runtime.py",
+    "tests/integration/test_pdd_production_governance_cli_v1.py",
+    "tests/integration/test_pdd_production_preparation.py",
+    "tests/integration/test_pdd_production_safety_gate.py",
+    "tests/integration/test_pdd_send_transport_execution.py",
+    "tests/integration/test_pdd_single_store_pilot.py",
+    "tests/integration/test_production_runtime_readiness.py",
+    "tests/integration/test_real_gateway_adapter.py",
+    "tests/integration/test_runtime_reliability_flow.py",
+    "tests/integration/test_runtime_schema_upgrade.py",
+    "tests/integration/test_storage.py",
+    "tests/pdd_adapter/__init__.py",
+    "tests/pdd_adapter/helpers.py",
+    "tests/pdd_adapter/test_domain_mapping.py",
+    "tests/pdd_adapter/test_fake_pdd_integration.py",
+    "tests/pdd_adapter/test_selector_contract.py",
+    "tests/pdd_adapter/test_session_runtime.py",
+    "tests/pdd_controlled_support.py",
+    "tests/pdd_governance_support.py",
+    "tests/pdd_production_support.py",
+    "tests/release/test_channel_engine_rc1_release_lock.py",
+    "tests/release/test_channel_engine_rc1_source_allowlist.py",
+    "tests/security/test_gateway_edge_security_v1.py",
+    "tests/security/test_pdd_approval_execution_sandbox_security_v1.py",
+    "tests/security/test_pdd_controlled_activation_security_v1.py",
+    "tests/security/test_pdd_message_observation_security_v1.py",
+    "tests/security/test_pdd_observation_mode_security_v1.py",
+    "tests/security/test_pdd_production_activation_governance_security_v1.py",
+    "tests/security/test_pdd_production_blocker_security_v1.py",
+    "tests/support/ai_cs_gateway_server_harness.py",
+    "tests/unit/test_ai_cs_gateway_client.py",
+    "tests/unit/test_ai_cs_gateway_integration_client.py",
+    "tests/unit/test_browser_boundary.py",
+    "tests/unit/test_channel_adapter_foundation_v1.py",
+    "tests/unit/test_channel_adapter_framework.py",
+    "tests/unit/test_channel_agent_first_launch.py",
+    "tests/unit/test_channel_agent_foundation.py",
+    "tests/unit/test_channel_sandbox_adapter.py",
+    "tests/unit/test_channel_session_credential_safety.py",
+    "tests/unit/test_channel_session_runtime.py",
+    "tests/unit/test_gateway_and_channel.py",
+    "tests/unit/test_models.py",
+    "tests/unit/test_observability.py",
+    "tests/unit/test_operations_console_assets.py",
+    "tests/unit/test_pdd_adapter_discovery.py",
+    "tests/unit/test_pdd_approval_execution_sandbox.py",
+    "tests/unit/test_pdd_controlled_activation_preparation_v1.py",
+    "tests/unit/test_pdd_message_observation.py",
+    "tests/unit/test_pdd_observe_cdp_readonly.py",
+    "tests/unit/test_pdd_production_activation_governance_v1.py",
+    "tests/unit/test_pdd_runtime_status_v1.py",
+    "tests/unit/test_policy.py",
+    "tests/unit/test_real_browser_runtime.py",
+    "tests/unit/test_real_gateway_http_adapter.py",
+    "tests/unit/test_runtime_reliability.py",
+    "tests/unit/test_state_machines.py",
+    "tests/windows_agent/test_windows_agent_deployment_hardening.py",
+    "tests/windows_agent/test_windows_agent_gateway_and_package.py",
+    "tests/windows_agent/test_windows_agent_runtime.py"
+  ],
+  "staging_allowlist": [
+    ".gitignore",
+    "README.md",
+    "deploy/staging/deployment-manifest.json",
+    "deploy/staging/runtime-config.json",
+    "deploy/windows-agent-rc/agent.example.json",
+    "docs/AI-CS-Channel-Adapter-Framework-Foundation-V1.md",
+    "docs/AI-CS-Channel-Agent-Dashboard-V1.md",
+    "docs/AI-CS-Channel-Agent-Deployment-Hardening-Report-V1.md",
+    "docs/AI-CS-Channel-Agent-First-Launch-Experience-V1.md",
+    "docs/AI-CS-Channel-Agent-First-Launch-Runbook-V1.md",
+    "docs/AI-CS-Channel-Agent-Foundation-V1.md",
+    "docs/AI-CS-Channel-Agent-Source-Baseline-Report-V1.md",
+    "docs/AI-CS-Channel-Agent-Windows-RC-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Adapter-Layer-Foundation-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Console-CN-Productization-V1.1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Execution-Runtime-Foundation-V1.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Client-Foundation-V1.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Client-Integration-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Contract-V1.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Integration-Sandbox-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Gateway-Sandbox-Integration-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Integration-Validation-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Mock-E2E-Validation-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Observability-Console-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Operations-Console-UI-Foundation-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-RC1-Release-Report-V1.md",
+    "docs/AI-CS-Channel-Engine-Real-Gateway-Adapter-Foundation-V1.md",
+    "docs/AI-CS-Channel-Engine-Runtime-Reliability-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Sandbox-Adapter-V1-Completion-Report.md",
+    "docs/AI-CS-Channel-Engine-Session-Runtime-V1-Completion-Report.md",
+    "docs/AI-CS-Controlled-Integration-E2E-Report-V1.md",
+    "docs/AI-CS-PDD-Adapter-Discovery-Framework-V1.md",
+    "docs/AI-CS-PDD-Adapter-Observe-Mode-V1-Completion-Report.md",
+    "docs/AI-CS-PDD-Adapter-Prototype-Foundation-V1-Completion-Report.md",
+    "docs/AI-CS-PDD-Channel-Adapter-Architecture-Design-V1.md",
+    "docs/AI-CS-PDD-Controlled-Activation-Plan-V1.md",
+    "docs/AI-CS-PDD-Controlled-Activation-Runbook-V1.md",
+    "docs/AI-CS-PDD-Human-Approval-Execution-Sandbox-V1-Completion-Report.md",
+    "docs/AI-CS-PDD-Message-Observation-Framework-V1.md",
+    "docs/AI-CS-PDD-Production-Activation-Governance-V1.md",
+    "docs/AI-CS-PDD-Single-Store-Pilot-Live-Report-V1.md",
+    "docs/AI-CS-PDD-Single-Store-Pilot-Runtime-V1.md",
+    "docs/AI-CS-Production-Gateway-Contract-V1.md",
+    "docs/AI-CS-Real-Channel-Adapter-Framework-Design-V1.md",
+    "docs/Channel-Engine-Production-Control-Plane-V1.md",
+    "docs/Channel-Engine-Production-Runtime-Readiness-V1.md",
+    "docs/Channel-Engine-Staging-Environment-Foundation-V1.md",
+    "docs/Channel-Engine-Staging-Operations-Runbook-V1.md",
+    "docs/PDD-Browser-Adapter-Architecture-Design-V1.md",
+    "docs/PDD-Browser-Observation-Foundation-V1.md",
+    "docs/PDD-Browser-Runtime-Foundation-V1.md",
+    "docs/PDD-Channel-Adapter-Observation-Foundation-V1.md",
+    "docs/PDD-Controlled-Execution-Foundation-V1.md",
+    "docs/PDD-Controlled-Send-Transport-Foundation-V1.md",
+    "docs/PDD-Pilot-Environment-Integration-Report-V1.md",
+    "docs/PDD-Production-Adapter-Readiness-Report-V1.md",
+    "docs/PDD-Production-Safety-Gate-Foundation-V1.md",
+    "docs/PDD-Single-Store-Pilot-First-Launch-Runbook-V1.md",
+    "docs/PDD-WebSocket-Transport-Foundation-V1.md",
+    "docs/baseline/AI-CS-Channel-Agent-Source-Baseline-V1-Asset-Inventory.csv",
+    "docs/releases/CHANGELOG-RC1.md",
+    "docs/releases/RC1-Deployment-Guide.md",
+    "docs/releases/RC1-Release-Checklist.md",
+    "docs/releases/RC1-Release-Notes.md",
+    "docs/releases/RC1-Rollback-Guide.md",
+    "docs/releases/RC1-Source-Allowlist.json",
+    "packaging/windows-agent/production-composition.json",
+    "pyproject.toml",
+    "requirements-rc1.lock",
+    "schemas/ai-cs-channel-engine-gateway-contract-v1.schema.json",
+    "scripts/build_rc1_source_allowlist.py",
+    "scripts/build_windows_agent_rc.ps1",
+    "scripts/check_pdd_controlled_activation.py",
+    "scripts/check_pdd_production_activation_governance.py",
+    "scripts/export_rc1_candidate_diff.py",
+    "scripts/prepare_pdd_pilot_environment.py",
+    "scripts/run_pdd_observe_browser.py",
+    "scripts/support/run_ai_cs_gateway_validation_server.py",
+    "scripts/validate_ai_cs_channel_engine_integration_v1.py",
+    "scripts/verify_channel_engine_rc1.py",
+    "scripts/verify_pilot_gateway.py",
+    "scripts/windows/start_ai_cs_agent.bat",
+    "src/ai_cs_agent/__init__.py",
+    "src/ai_cs_agent/__main__.py",
+    "src/ai_cs_agent/adapter.py",
+    "src/ai_cs_agent/browser.py",
+    "src/ai_cs_agent/cli.py",
+    "src/ai_cs_agent/config.py",
+    "src/ai_cs_agent/execution.py",
+    "src/ai_cs_agent/gateway.py",
+    "src/ai_cs_agent/models.py",
+    "src/ai_cs_agent/observability.py",
+    "src/ai_cs_agent/runtime.py",
+    "src/ai_cs_agent/security.py",
+    "src/ai_cs_agent/session.py",
+    "src/ai_cs_agent/state.py",
+    "src/channel_engine/__init__.py",
+    "src/channel_engine/agent/__init__.py",
+    "src/channel_engine/agent/api.py",
+    "src/channel_engine/agent/config.py",
+    "src/channel_engine/agent/dashboard.py",
+    "src/channel_engine/agent/dashboard_ui.py",
+    "src/channel_engine/agent/first_launch.py",
+    "src/channel_engine/agent/first_launch_ui.py",
+    "src/channel_engine/agent/models.py",
+    "src/channel_engine/agent/runtime.py",
+    "src/channel_engine/app.py",
+    "src/channel_engine/browser/__init__.py",
+    "src/channel_engine/browser/adapter.py",
+    "src/channel_engine/browser/cdp_readonly.py",
+    "src/channel_engine/browser/models.py",
+    "src/channel_engine/browser/observation_store.py",
+    "src/channel_engine/browser/observer.py",
+    "src/channel_engine/browser/outbound.py",
+    "src/channel_engine/browser/runtime.py",
+    "src/channel_engine/browser/selectors.py",
+    "src/channel_engine/browser/session.py",
+    "src/channel_engine/channel/__init__.py",
+    "src/channel_engine/channel/adapter_foundation.py",
+    "src/channel_engine/channel/execution_boundary.py",
+    "src/channel_engine/channel/fake.py",
+    "src/channel_engine/channel/fake_pdd.py",
+    "src/channel_engine/channel/fake_platform.py",
+    "src/channel_engine/channel/lifecycle.py",
+    "src/channel_engine/channel/pdd_controlled.py",
+    "src/channel_engine/channel/pdd_discovery.py",
+    "src/channel_engine/channel/pdd_observation.py",
+    "src/channel_engine/channel/pdd_production.py",
+    "src/channel_engine/channel/pdd_safety.py",
+    "src/channel_engine/channel/pdd_send.py",
+    "src/channel_engine/channel/pdd_websocket.py",
+    "src/channel_engine/channel/pdd_websocket_store.py",
+    "src/channel_engine/channel/platform.py",
+    "src/channel_engine/channel/protocol.py",
+    "src/channel_engine/channel/registry.py",
+    "src/channel_engine/channel/sandbox.py",
+    "src/channel_engine/config.py",
+    "src/channel_engine/control/__init__.py",
+    "src/channel_engine/control/gate.py",
+    "src/channel_engine/control/health.py",
+    "src/channel_engine/control/models.py",
+    "src/channel_engine/control/repository.py",
+    "src/channel_engine/control/service.py",
+    "src/channel_engine/conversation/service.py",
+    "src/channel_engine/environment/__init__.py",
+    "src/channel_engine/environment/deployment.py",
+    "src/channel_engine/environment/models.py",
+    "src/channel_engine/environment/safety.py",
+    "src/channel_engine/execution/__init__.py",
+    "src/channel_engine/execution/coordinator.py",
+    "src/channel_engine/execution/fake_executor.py",
+    "src/channel_engine/execution/ownership.py",
+    "src/channel_engine/execution/pdd_sandbox.py",
+    "src/channel_engine/execution/queue.py",
+    "src/channel_engine/execution/receipt.py",
+    "src/channel_engine/execution/recovery.py",
+    "src/channel_engine/execution/worker.py",
+    "src/channel_engine/gateway/__init__.py",
+    "src/channel_engine/gateway/auth.py",
+    "src/channel_engine/gateway/client.py",
+    "src/channel_engine/gateway/contract.py",
+    "src/channel_engine/gateway/edge.py",
+    "src/channel_engine/gateway/fake.py",
+    "src/channel_engine/gateway/http.py",
+    "src/channel_engine/gateway/integration.py",
+    "src/channel_engine/gateway/mock_server.py",
+    "src/channel_engine/gateway/protocol.py",
+    "src/channel_engine/gateway/sandbox.py",
+    "src/channel_engine/gateway/scope.py",
+    "src/channel_engine/models/entities.py",
+    "src/channel_engine/models/enums.py",
+    "src/channel_engine/monitor/health.py",
+    "src/channel_engine/observability/__init__.py",
+    "src/channel_engine/observability/actions.py",
+    "src/channel_engine/observability/api.py",
+    "src/channel_engine/observability/bridge.py",
+    "src/channel_engine/observability/models.py",
+    "src/channel_engine/observability/repository.py",
+    "src/channel_engine/observability/service.py",
+    "src/channel_engine/observability/ui.py",
+    "src/channel_engine/outbox/__init__.py",
+    "src/channel_engine/outbox/publisher.py",
+    "src/channel_engine/pdd_adapter/__init__.py",
+    "src/channel_engine/pdd_adapter/_base.py",
+    "src/channel_engine/pdd_adapter/activation.py",
+    "src/channel_engine/pdd_adapter/browser/__init__.py",
+    "src/channel_engine/pdd_adapter/browser/boundary.py",
+    "src/channel_engine/pdd_adapter/discovery/__init__.py",
+    "src/channel_engine/pdd_adapter/fake.py",
+    "src/channel_engine/pdd_adapter/governance.py",
+    "src/channel_engine/pdd_adapter/mapper/__init__.py",
+    "src/channel_engine/pdd_adapter/mapper/mapping.py",
+    "src/channel_engine/pdd_adapter/message/__init__.py",
+    "src/channel_engine/pdd_adapter/message/models.py",
+    "src/channel_engine/pdd_adapter/message_observation.py",
+    "src/channel_engine/pdd_adapter/observation_mode.py",
+    "src/channel_engine/pdd_adapter/observe.py",
+    "src/channel_engine/pdd_adapter/readiness.py",
+    "src/channel_engine/pdd_adapter/runtime_status.py",
+    "src/channel_engine/pdd_adapter/selector/__init__.py",
+    "src/channel_engine/pdd_adapter/selector/contract.py",
+    "src/channel_engine/pdd_adapter/session/__init__.py",
+    "src/channel_engine/pdd_adapter/session/runtime.py",
+    "src/channel_engine/pilot/__init__.py",
+    "src/channel_engine/pilot/api.py",
+    "src/channel_engine/pilot/approval.py",
+    "src/channel_engine/pilot/browser.py",
+    "src/channel_engine/pilot/config.py",
+    "src/channel_engine/pilot/environment.py",
+    "src/channel_engine/pilot/live.py",
+    "src/channel_engine/pilot/models.py",
+    "src/channel_engine/pilot/persistence.py",
+    "src/channel_engine/pilot/runtime.py",
+    "src/channel_engine/reliability/__init__.py",
+    "src/channel_engine/reliability/api.py",
+    "src/channel_engine/reliability/browser.py",
+    "src/channel_engine/reliability/heartbeat.py",
+    "src/channel_engine/reliability/manager.py",
+    "src/channel_engine/reliability/models.py",
+    "src/channel_engine/reliability/persistence.py",
+    "src/channel_engine/reliability/recovery.py",
+    "src/channel_engine/security/__init__.py",
+    "src/channel_engine/security/pdd.py",
+    "src/channel_engine/security/rbac.py",
+    "src/channel_engine/session/__init__.py",
+    "src/channel_engine/session/api.py",
+    "src/channel_engine/session/credential.py",
+    "src/channel_engine/session/delivery.py",
+    "src/channel_engine/session/heartbeat.py",
+    "src/channel_engine/session/manager.py",
+    "src/channel_engine/session/models.py",
+    "src/channel_engine/session/persistence.py",
+    "src/channel_engine/session/state_machine.py",
+    "src/channel_engine/storage/__init__.py",
+    "src/channel_engine/storage/database.py",
+    "src/channel_engine/storage/orm.py",
+    "src/channel_engine/storage/repository.py",
+    "src/channel_engine/storage/versioning.py",
+    "tests/api/test_app.py",
+    "tests/api/test_channel_adapter_foundation_api.py",
+    "tests/api/test_channel_agent_api.py",
+    "tests/api/test_channel_agent_dashboard.py",
+    "tests/api/test_channel_agent_first_launch_api.py",
+    "tests/api/test_channel_session_runtime_api.py",
+    "tests/api/test_observability_api.py",
+    "tests/api/test_operations_console_actions.py",
+    "tests/api/test_operations_console_ui.py",
+    "tests/api/test_pdd_runtime_status_api_v1.py",
+    "tests/api/test_runtime_reliability_api.py",
+    "tests/contract/test_ai_cs_gateway_integration_v1.py",
+    "tests/contract/test_control_plane_v1.py",
+    "tests/contract/test_gateway_contract_v1.py",
+    "tests/contract/test_gateway_edge_contract_v1.py",
+    "tests/contract/test_gateway_sandbox_contract_v1.py",
+    "tests/contract/test_pdd_browser_adapter_design_v1.py",
+    "tests/contract/test_pdd_browser_observation_v1.py",
+    "tests/contract/test_pdd_controlled_activation_v1.py",
+    "tests/contract/test_pdd_controlled_execution_v1.py",
+    "tests/contract/test_pdd_observation_adapter_v1.py",
+    "tests/contract/test_pdd_observation_mode_contract_v1.py",
+    "tests/contract/test_pdd_pilot_environment_v1.py",
+    "tests/contract/test_pdd_production_activation_governance_contract_v1.py",
+    "tests/contract/test_pdd_production_adapter_preparation_v1.py",
+    "tests/contract/test_pdd_production_readiness_recheck_v1.py",
+    "tests/contract/test_pdd_production_safety_gate_v1.py",
+    "tests/contract/test_pdd_send_transport_v1.py",
+    "tests/contract/test_pdd_single_store_pilot_v1.py",
+    "tests/contract/test_pdd_websocket_transport_v1.py",
+    "tests/contract/test_real_channel_adapter_v1.py",
+    "tests/contract/test_staging_environment_v1.py",
+    "tests/e2e/test_channel_sandbox_e2e.py",
+    "tests/e2e/test_controlled_ai_cs_integration.py",
+    "tests/e2e/test_mock_e2e_validation.py",
+    "tests/integration/test_ai_cs_channel_engine_cross_repo_validation_v1.py",
+    "tests/integration/test_ai_cs_gateway_flow.py",
+    "tests/integration/test_ai_cs_gateway_integration_runtime_v1.py",
+    "tests/integration/test_channel_adapter_flow.py",
+    "tests/integration/test_channel_adapter_foundation_flow.py",
+    "tests/integration/test_channel_adapter_runtime_recovery.py",
+    "tests/integration/test_channel_sandbox_recovery.py",
+    "tests/integration/test_channel_session_heartbeat_scheduler.py",
+    "tests/integration/test_channel_session_multi_store.py",
+    "tests/integration/test_control_plane_runtime.py",
+    "tests/integration/test_execution_runtime.py",
+    "tests/integration/test_foundation_flow.py",
+    "tests/integration/test_gateway_edge_sandbox_v1.py",
+    "tests/integration/test_gateway_sandbox_failures_v1.py",
+    "tests/integration/test_gateway_sandbox_integration_v1.py",
+    "tests/integration/test_observability_console.py",
+    "tests/integration/test_pdd_adapter_discovery_safety.py",
+    "tests/integration/test_pdd_controlled_activation_cli_v1.py",
+    "tests/integration/test_pdd_controlled_execution.py",
+    "tests/integration/test_pdd_cursor_reliability_v1.py",
+    "tests/integration/test_pdd_human_approval_execution_sandbox_v1.py",
+    "tests/integration/test_pdd_message_observation_v1.py",
+    "tests/integration/test_pdd_observation_ai_flow.py",
+    "tests/integration/test_pdd_observation_mode_v1.py",
+    "tests/integration/test_pdd_observe_mode_runtime.py",
+    "tests/integration/test_pdd_production_governance_cli_v1.py",
+    "tests/integration/test_pdd_production_preparation.py",
+    "tests/integration/test_pdd_production_safety_gate.py",
+    "tests/integration/test_pdd_send_transport_execution.py",
+    "tests/integration/test_pdd_single_store_pilot.py",
+    "tests/integration/test_production_runtime_readiness.py",
+    "tests/integration/test_real_gateway_adapter.py",
+    "tests/integration/test_runtime_reliability_flow.py",
+    "tests/integration/test_runtime_schema_upgrade.py",
+    "tests/pdd_adapter/__init__.py",
+    "tests/pdd_adapter/helpers.py",
+    "tests/pdd_adapter/test_domain_mapping.py",
+    "tests/pdd_adapter/test_fake_pdd_integration.py",
+    "tests/pdd_adapter/test_selector_contract.py",
+    "tests/pdd_adapter/test_session_runtime.py",
+    "tests/pdd_controlled_support.py",
+    "tests/pdd_governance_support.py",
+    "tests/pdd_production_support.py",
+    "tests/release/test_channel_engine_rc1_release_lock.py",
+    "tests/release/test_channel_engine_rc1_source_allowlist.py",
+    "tests/security/test_gateway_edge_security_v1.py",
+    "tests/security/test_pdd_approval_execution_sandbox_security_v1.py",
+    "tests/security/test_pdd_controlled_activation_security_v1.py",
+    "tests/security/test_pdd_message_observation_security_v1.py",
+    "tests/security/test_pdd_observation_mode_security_v1.py",
+    "tests/security/test_pdd_production_activation_governance_security_v1.py",
+    "tests/security/test_pdd_production_blocker_security_v1.py",
+    "tests/support/ai_cs_gateway_server_harness.py",
+    "tests/unit/test_ai_cs_gateway_client.py",
+    "tests/unit/test_ai_cs_gateway_integration_client.py",
+    "tests/unit/test_channel_adapter_foundation_v1.py",
+    "tests/unit/test_channel_adapter_framework.py",
+    "tests/unit/test_channel_agent_first_launch.py",
+    "tests/unit/test_channel_agent_foundation.py",
+    "tests/unit/test_channel_sandbox_adapter.py",
+    "tests/unit/test_channel_session_credential_safety.py",
+    "tests/unit/test_channel_session_runtime.py",
+    "tests/unit/test_gateway_and_channel.py",
+    "tests/unit/test_observability.py",
+    "tests/unit/test_operations_console_assets.py",
+    "tests/unit/test_pdd_adapter_discovery.py",
+    "tests/unit/test_pdd_approval_execution_sandbox.py",
+    "tests/unit/test_pdd_controlled_activation_preparation_v1.py",
+    "tests/unit/test_pdd_message_observation.py",
+    "tests/unit/test_pdd_observe_cdp_readonly.py",
+    "tests/unit/test_pdd_production_activation_governance_v1.py",
+    "tests/unit/test_pdd_runtime_status_v1.py",
+    "tests/unit/test_real_browser_runtime.py",
+    "tests/unit/test_real_gateway_http_adapter.py",
+    "tests/unit/test_runtime_reliability.py",
+    "tests/windows_agent/test_windows_agent_deployment_hardening.py",
+    "tests/windows_agent/test_windows_agent_gateway_and_package.py",
+    "tests/windows_agent/test_windows_agent_runtime.py"
+  ],
+  "excluded_worktree_files": [
+    "deploy/channel-agent.example.json",
+    "deploy/pdd-pilot-ai-cs-gateway.json",
+    "deploy/pdd-pilot-environment.json",
+    "deploy/pdd-single-store-pilot.example.json",
+    "docs/AI-CS-Channel-Agent-Deployment-Hardening-Report-V1.html",
+    "docs/AI-CS-Channel-Agent-Windows-RC-Report-V1.html",
+    "docs/AI-CS-Channel-Engine-Gateway-Integration-Sandbox-V1-Completion-Report.html",
+    "docs/AI-CS-Channel-Engine-Integration-Validation-Report-V1.html",
+    "docs/AI-CS-Channel-Engine-RC1-Release-Report-V1.html",
+    "docs/AI-CS-PDD-Adapter-Observe-Mode-V1-Completion-Report.html",
+    "docs/AI-CS-PDD-Adapter-Production-Readiness-Review-V1.html",
+    "docs/AI-CS-PDD-Controlled-Activation-Plan-V1.html",
+    "docs/AI-CS-PDD-Human-Approval-Execution-Sandbox-V1-Completion-Report.html",
+    "docs/AI-CS-PDD-Message-Observation-Framework-V1.html",
+    "docs/AI-CS-PDD-Production-Activation-Governance-V1.html",
+    "docs/AI-CS-PDD-Production-Blocker-Resolution-V1.html",
+    "docs/reports/ai-cs-channel-engine-integration-validation-v1/artifact.json",
+    "docs/reports/channel-engine-rc1-release-v1/artifact.json",
+    "docs/reports/gateway-integration-sandbox-v1/artifact.json",
+    "docs/reports/pdd-controlled-activation-v1/artifact.json",
+    "docs/reports/pdd-human-approval-execution-sandbox-v1/artifact.json",
+    "docs/reports/pdd-message-observation-v1/artifact.json",
+    "docs/reports/pdd-observation-mode-v1/artifact.json",
+    "docs/reports/pdd-production-activation-governance-v1/artifact.json",
+    "docs/reports/pdd-production-blocker-resolution-v1/artifact.json",
+    "docs/reports/pdd-production-readiness-review-v1/artifact.json",
+    "docs/reports/windows-agent-deployment-hardening-v1/artifact.json",
+    "docs/reports/windows-agent-rc-v1/artifact.json",
+    "evidence/AI-CS-Agent-Windows-RC-V1-validation-chart.sql",
+    "evidence/AI-CS-Agent-Windows-RC-V1-validation.json",
+    "evidence/AI-CS-Controlled-Integration-E2E-Evidence-V1.json",
+    "evidence/PDD-Browser-Adapter-Discovery-Evidence-V1.json",
+    "evidence/PDD-Pilot-Environment-Readiness-Evidence-V1.json",
+    "evidence/PDD-Single-Store-Pilot-Live-Preflight-Evidence-V1.json",
+    "evidence/PDD-Single-Store-Pilot-Validation-Evidence-V1.json",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/contract-verification.sql",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/cross-repo-validation.json",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/regression-results.json",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/regression-results.sql",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/report-qa.json",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/security-scan.json",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/summary-metrics.sql",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/trace-mapping.sql",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/validation-cases.sql",
+    "evidence/ai-cs-channel-engine-integration-validation-v1/validation-coverage.sql",
+    "evidence/channel-engine-rc1-source-freeze/cached-diff-summary.json",
+    "evidence/channel-engine-rc1-source-freeze/git-diff-cached.patch",
+    "evidence/channel-engine-rc1/gate-results.sql",
+    "evidence/channel-engine-rc1/regression-results.json",
+    "evidence/channel-engine-rc1/regression-results.sql",
+    "evidence/channel-engine-rc1/release-assets.sql",
+    "evidence/channel-engine-rc1/release-checks.sql",
+    "evidence/channel-engine-rc1/release-gate.json",
+    "evidence/channel-engine-rc1/report-qa.json",
+    "evidence/channel-engine-rc1/security-audit.json",
+    "evidence/channel-engine-rc1/summary-metrics.sql",
+    "evidence/gateway-integration-sandbox-v1/validation-chart.sql",
+    "evidence/gateway-integration-sandbox-v1/validation-results.json",
+    "evidence/operations-console-cn-v1.1-approvals.png",
+    "evidence/operations-console-cn-v1.1-overview.png",
+    "evidence/operations-console-cn-v1.1-trace.png",
+    "evidence/operations-console-ui-v1-approvals.png",
+    "evidence/operations-console-ui-v1-overview.png",
+    "evidence/pdd-controlled-activation-v1/specialized-test-layers.sql",
+    "evidence/pdd-controlled-activation-v1/validation-evidence.json",
+    "evidence/pdd-human-approval-execution-sandbox-v1/validation-chart.sql",
+    "evidence/pdd-human-approval-execution-sandbox-v1/validation-results.json",
+    "evidence/pdd-message-observation-v1/validation-chart.sql",
+    "evidence/pdd-message-observation-v1/validation-results.json",
+    "evidence/pdd-observation-mode-v1/validation-chart.sql",
+    "evidence/pdd-observation-mode-v1/validation-results.json",
+    "evidence/pdd-production-activation-governance-v1/activation-state-transitions.sql",
+    "evidence/pdd-production-activation-governance-v1/architecture-audit.sql",
+    "evidence/pdd-production-activation-governance-v1/current-gate-open-conditions.sql",
+    "evidence/pdd-production-activation-governance-v1/current-governance-evidence.json",
+    "evidence/pdd-production-activation-governance-v1/report-delivery-receipt.json",
+    "evidence/pdd-production-activation-governance-v1/summary-metrics.sql",
+    "evidence/pdd-production-activation-governance-v1/synthetic-drill-results.sql",
+    "evidence/pdd-production-activation-governance-v1/synthetic-drill-summary.json",
+    "evidence/pdd-production-activation-governance-v1/validation-evidence.json",
+    "evidence/pdd-production-activation-governance-v1/validation-results.sql",
+    "evidence/pdd-production-blocker-resolution-v1/gate-results.sql",
+    "evidence/pdd-production-blocker-resolution-v1/resolution-evidence.json",
+    "evidence/pdd-production-readiness-review-v1/gate-distribution.sql",
+    "evidence/pdd-production-readiness-review-v1/review-evidence.json",
+    "evidence/windows-agent-deployment-hardening-v1/validation-chart.sql",
+    "evidence/windows-agent-deployment-hardening-v1/validation-results.json"
+  ],
+  "local_generated_present": [
+    ".runtime",
+    ".pytest_cache",
+    ".coverage",
+    "dist"
+  ],
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "e20422f3e410e28e61185c8712db474289b3755fdaf86837a606388a6692c6cd",
+      "size": 65
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "33e5475ac683e2e286e167c460fffbd4d7cf76f8bf1f9861efb2e7c0153bea56",
+      "size": 462
+    },
+    {
+      "path": "README.md",
+      "sha256": "642dfaa7b0bb228961ca8290985d8318f83a24cdc2b832bcb7fd76f6233e5756",
+      "size": 1743
+    },
+    {
+      "path": "deploy/staging/deployment-manifest.json",
+      "sha256": "4ca62ef032a993b05e7a660b72d45a65ded5876ef8de032dd939a361f6f0d664",
+      "size": 1361
+    },
+    {
+      "path": "deploy/staging/runtime-config.json",
+      "sha256": "8c29ff83cd597e841646e5a06d168938d736e40557663fe938b43828347d8560",
+      "size": 946
+    },
+    {
+      "path": "deploy/windows-agent-rc/agent.example.json",
+      "sha256": "8000415fd649663e92a340c61f336e45dc0a4908bedf7b5d0e389608d11beb25",
+      "size": 611
+    },
+    {
+      "path": "docs/AI-CS-Channel-Adapter-Framework-Foundation-V1.md",
+      "sha256": "38bfa319b1d6cc48cec1846b5ad3f1f1cc2c8a6ccf89ef6fba4c5f401f186607",
+      "size": 10786
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-Dashboard-V1.md",
+      "sha256": "ebcb1ed6b671fcd9121c610e0cf2fd1d2cbaa9ab62f209f1b72ca33e3be339ce",
+      "size": 4315
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-Deployment-Hardening-Report-V1.md",
+      "sha256": "62f18cf96f33543ad9a2d50fbd8d675b92d2935b515f8275d1c87324a0ab3adf",
+      "size": 5938
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-First-Launch-Experience-V1.md",
+      "sha256": "d48ab113e9171c62281f50f62b7f0b7d72a2284e64ce0e0752d8029f8aadf74e",
+      "size": 7400
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-First-Launch-Runbook-V1.md",
+      "sha256": "6945e757b3d59f2c3d30bdc264d0a1a5feb613801e12485876d3dbce39848d36",
+      "size": 3598
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-Foundation-V1.md",
+      "sha256": "ac4a3f7c2408eeaf271647e0c3db1beb265921a42d887e782d3b100227f44a53",
+      "size": 10342
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-Source-Baseline-Report-V1.md",
+      "sha256": "d35789c862ef699124d8d08404a9b5e301ae610665e023ba005bf8600a057c31",
+      "size": 17250
+    },
+    {
+      "path": "docs/AI-CS-Channel-Agent-Windows-RC-Report-V1.md",
+      "sha256": "395df578718d9df526d793cdc0ac1b03c6407bc01453f63b82edeba09d58ecf6",
+      "size": 12934
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Adapter-Layer-Foundation-V1-Completion-Report.md",
+      "sha256": "dc07b3dca34fa10ca4bfe73b547e6e333cf36bdb8484de7839ebcf71b2892ea0",
+      "size": 12077
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Console-CN-Productization-V1.1-Completion-Report.md",
+      "sha256": "b03db3fd271ffaf97e5f823456c7a0ec12bcdc09716d68dcd99316f45c44575a",
+      "size": 7914
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Execution-Runtime-Foundation-V1.md",
+      "sha256": "0c50ae2b03879ed48d0ee98e344f3e21d631ad603812f6b621748a9c00d026b7",
+      "size": 13929
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Foundation-V1-Report.md",
+      "sha256": "b46c7ac584d21e7373cb1e1ecccf023708ea209a94ad8868aa518a795a00c950",
+      "size": 6672
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Gateway-Client-Foundation-V1.md",
+      "sha256": "649fb05a22ed1d9b650cb403b1d6093ce83894e4bd47a97f42a1035a36bab65b",
+      "size": 11188
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Gateway-Client-Integration-V1-Completion-Report.md",
+      "sha256": "1ecbd016c3faee3b259252f34f25f91caedfc7ede9989538299b42ac46ef3045",
+      "size": 9337
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Gateway-Contract-V1.md",
+      "sha256": "93fa891836b5a820ea64a1ab66cbc1500dfe87844ba110a73bd962d1b6646a3f",
+      "size": 745
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Gateway-Integration-Sandbox-V1-Completion-Report.md",
+      "sha256": "e88bd4f148810ecb70f4822cd0873c7ed027ba28633ab6cc82f2483ddb3056b7",
+      "size": 7431
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Gateway-Sandbox-Integration-V1-Completion-Report.md",
+      "sha256": "eaae8ed9e492547e9ffd9ac399628f1fec31f278d92a421ade41b542cd966ee3",
+      "size": 10312
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Integration-Validation-Report-V1.md",
+      "sha256": "b5ca67bdbe5eb9c94cdb1e7971044e1660c7bc41de93c5bf10594f4586bc7808",
+      "size": 6557
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Mock-E2E-Validation-Report-V1.md",
+      "sha256": "5ad812560679e8599694b2a956fe6b7c8b12be379a0a7394d2addf62be47d31d",
+      "size": 10244
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Observability-Console-V1-Completion-Report.md",
+      "sha256": "6a79806414790ad2cf55fe525965890a010029c379c71e6c801f235e56a434a8",
+      "size": 10629
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Operations-Console-UI-Foundation-V1-Completion-Report.md",
+      "sha256": "23887722c1d8737025ac30927b4b39e8d4c0b0ac34c0b9d9f990a49e279a5e62",
+      "size": 7781
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-RC1-Release-Report-V1.md",
+      "sha256": "5a010e2d76a502c12eba9d28bc881f945ec8d27c31ebb94facf6ef4c4ae11ef6",
+      "size": 6714
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Real-Gateway-Adapter-Foundation-V1.md",
+      "sha256": "8e66ee94f0882879a87b6902fe2bd8e19bb738cd6c60e2fb4e4b0f87481d4589",
+      "size": 10331
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Runtime-Reliability-V1-Completion-Report.md",
+      "sha256": "dab08e30ff60a5e86b5696abc1ceb8e654f6521eafb84dc573c410755b36332e",
+      "size": 11925
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Sandbox-Adapter-V1-Completion-Report.md",
+      "sha256": "a5b073cad2d9d7ec9e98dc4bfd3b155530e71eb46b7e913b697bd433072fe0c0",
+      "size": 8903
+    },
+    {
+      "path": "docs/AI-CS-Channel-Engine-Session-Runtime-V1-Completion-Report.md",
+      "sha256": "8a9bd8688a09ead62f6ff0c8dd950536fcda56e7f93dacfe8a45c0aecb8fcf1c",
+      "size": 10587
+    },
+    {
+      "path": "docs/AI-CS-Controlled-Integration-E2E-Report-V1.md",
+      "sha256": "fe9fb98962a4b2c241b8e89fa2d3ff5160bcef448342c9c393c0a540220a69d6",
+      "size": 8415
+    },
+    {
+      "path": "docs/AI-CS-PDD-Adapter-Discovery-Framework-V1.md",
+      "sha256": "667185e8c7486e679c91fb13f20dd87389516e12d4b369741f2d39c84078c8bf",
+      "size": 10775
+    },
+    {
+      "path": "docs/AI-CS-PDD-Adapter-Observe-Mode-V1-Completion-Report.md",
+      "sha256": "e1054023abaa676eacc2e6f5338827e4f2430bc1c25c9820a431a4202674fc6c",
+      "size": 6978
+    },
+    {
+      "path": "docs/AI-CS-PDD-Adapter-Prototype-Foundation-V1-Completion-Report.md",
+      "sha256": "077c7fdd2ec6d3a3559dadb098f3a6c870013fe2f3e9fac6bbb17a869e099e4d",
+      "size": 10447
+    },
+    {
+      "path": "docs/AI-CS-PDD-Channel-Adapter-Architecture-Design-V1.md",
+      "sha256": "586212ec74b5e8695a49aad62e27da60affdde3102f014ac21ed00463b93700a",
+      "size": 28097
+    },
+    {
+      "path": "docs/AI-CS-PDD-Controlled-Activation-Plan-V1.md",
+      "sha256": "b9f20086eae5b80b7176723706308e23a314a169348e9986253c19410d3985e3",
+      "size": 8216
+    },
+    {
+      "path": "docs/AI-CS-PDD-Controlled-Activation-Runbook-V1.md",
+      "sha256": "50d40ce1544534e6e33898f2552943c5a4fecdc2eb8f833c33a0a0a7618403c4",
+      "size": 5457
+    },
+    {
+      "path": "docs/AI-CS-PDD-Human-Approval-Execution-Sandbox-V1-Completion-Report.md",
+      "sha256": "1d0e4cd709dbedd19d323ab1ed1db01ec66c9fe6a62ce95617dc100e049a542e",
+      "size": 9782
+    },
+    {
+      "path": "docs/AI-CS-PDD-Message-Observation-Framework-V1.md",
+      "sha256": "6045aa4ea4a2f97883ae379f59a48f6e618c7c23cbef1cb5ce278ee69e0fdfac",
+      "size": 8162
+    },
+    {
+      "path": "docs/AI-CS-PDD-Production-Activation-Governance-V1.md",
+      "sha256": "106fd11ad7782464fc12ecec3cceb0bd1852c5124b78a3197c6c089fb8ba819e",
+      "size": 9565
+    },
+    {
+      "path": "docs/AI-CS-PDD-Single-Store-Pilot-Live-Report-V1.md",
+      "sha256": "d5ac1ee8eb06f6d129b932b46fe89add284fe401403c7bbf75f7bb4cec51f75f",
+      "size": 8966
+    },
+    {
+      "path": "docs/AI-CS-PDD-Single-Store-Pilot-Runtime-V1.md",
+      "sha256": "1139914b51b5ba67d9c64bbedaa0f1f0244f1feed20fcccef392d9d4a5ae4bc7",
+      "size": 11911
+    },
+    {
+      "path": "docs/AI-CS-Production-Gateway-Contract-V1.md",
+      "sha256": "a0eb76918b5be7c3f197bd82a96d7bd45fd9b4d61985b3866b156d9eab84a7d9",
+      "size": 9583
+    },
+    {
+      "path": "docs/AI-CS-Real-Channel-Adapter-Framework-Design-V1.md",
+      "sha256": "6e303d11209ff01cda06c8e7665c06108c2b3eb9d5f10b804359d0ef518f127b",
+      "size": 13994
+    },
+    {
+      "path": "docs/Channel-Engine-Production-Control-Plane-V1.md",
+      "sha256": "da04cf13d43da11316895454648927ec4f05ba7b5a9f16b6598a39d3528c31e7",
+      "size": 13480
+    },
+    {
+      "path": "docs/Channel-Engine-Production-Runtime-Readiness-V1.md",
+      "sha256": "0a46675a2d70694c41237716f8201598a052e1c9ff27a167ad91f748638cd539",
+      "size": 7665
+    },
+    {
+      "path": "docs/Channel-Engine-Staging-Environment-Foundation-V1.md",
+      "sha256": "c48b3afc474db737dbf46a476a823e645f9503ec38df6576405fb015438adc7e",
+      "size": 5473
+    },
+    {
+      "path": "docs/Channel-Engine-Staging-Operations-Runbook-V1.md",
+      "sha256": "605b7c76d93a6d27951733fc5e07ef7158a3ba73d4b9e8bbd3ff55299f3b3895",
+      "size": 5859
+    },
+    {
+      "path": "docs/PDD-Browser-Adapter-Architecture-Design-V1.md",
+      "sha256": "814747e109db591c3314d465e8198532e6c273bd28e9258010bd94b55365d73d",
+      "size": 14068
+    },
+    {
+      "path": "docs/PDD-Browser-Observation-Foundation-V1.md",
+      "sha256": "89e29ec8809c509587ee2e561fcabc1be2e046b69484d2c5a643de7fa177f8c3",
+      "size": 11458
+    },
+    {
+      "path": "docs/PDD-Browser-Runtime-Foundation-V1.md",
+      "sha256": "7b2046941ee63e0fc3412341aa8b7f90a108d0ff777a7ebe519d41d3e13eb33a",
+      "size": 10581
+    },
+    {
+      "path": "docs/PDD-Channel-Adapter-Observation-Foundation-V1.md",
+      "sha256": "d6790c65eadcb37fe31212d457f114030d139889512082b267be696c98986192",
+      "size": 11814
+    },
+    {
+      "path": "docs/PDD-Controlled-Execution-Foundation-V1.md",
+      "sha256": "1387905222c6208833309489a554f82c102e4db9213cd03ea782180abaaaf2b1",
+      "size": 13710
+    },
+    {
+      "path": "docs/PDD-Controlled-Send-Transport-Foundation-V1.md",
+      "sha256": "ad9ce1d7aefaefd9f813ce9090b9a8af3626dda9651e623768d4204153d84626",
+      "size": 12544
+    },
+    {
+      "path": "docs/PDD-Pilot-Environment-Integration-Report-V1.md",
+      "sha256": "f11cda1e37e96a64dea713204c81c28385941cac907bb211e2286d774f08a7c0",
+      "size": 6694
+    },
+    {
+      "path": "docs/PDD-Production-Adapter-Readiness-Report-V1.md",
+      "sha256": "ab012384db61fac1d37787938e856caa34d9e117744f7b81f3cc768449fed3bf",
+      "size": 19654
+    },
+    {
+      "path": "docs/PDD-Production-Safety-Gate-Foundation-V1.md",
+      "sha256": "88e0cefb8ae28fc26f8f7ca34c90769f566250858d51d67c28045dc3fbdae3e0",
+      "size": 13962
+    },
+    {
+      "path": "docs/PDD-Single-Store-Pilot-First-Launch-Runbook-V1.md",
+      "sha256": "ad8d181010e2c015470499c1094fd5e3b2f592646935d76ab61699cd70085dfc",
+      "size": 5694
+    },
+    {
+      "path": "docs/PDD-WebSocket-Transport-Foundation-V1.md",
+      "sha256": "f130b2cd0d1cdaeef76c4a6ebe7f4809950568faeccde3a9fb4166e3a7b9d806",
+      "size": 10357
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "00576e5679690bd1fc540a7c8b2bae36e7a4b48987ec413b9903339d9ac53ac7",
+      "size": 1675
+    },
+    {
+      "path": "docs/baseline/AI-CS-Channel-Agent-Source-Baseline-V1-Asset-Inventory.csv",
+      "sha256": "6b6d2fdc8192ab6a61d70a82b43eb89ab8b3817cda5f9e298335fc812a40f589",
+      "size": 51358
+    },
+    {
+      "path": "docs/releases/CHANGELOG-RC1.md",
+      "sha256": "3e9bd47a92a89f7476de607e47e24adc0e978ed9fd28b45c171ac40638d248b8",
+      "size": 1211
+    },
+    {
+      "path": "docs/releases/RC1-Deployment-Guide.md",
+      "sha256": "5c4a4d9c2a42863cfc1f06b52097cbab68fadcd8a4ba7800ad745d1b44cd8937",
+      "size": 2193
+    },
+    {
+      "path": "docs/releases/RC1-Release-Checklist.md",
+      "sha256": "ae0ba3634dac78ac55d5b775b358ecbefc7ba38e90a5642c37c3019c3c3f531b",
+      "size": 2409
+    },
+    {
+      "path": "docs/releases/RC1-Release-Notes.md",
+      "sha256": "1ae5cf715bc9c8919c52c77f2a2f21f6fd24cffca642694a5debcf8176b81160",
+      "size": 1592
+    },
+    {
+      "path": "docs/releases/RC1-Rollback-Guide.md",
+      "sha256": "095fbf44a3a9d913b5e6189911a815d2b1c4be5c9cbd1b1c2e6c4361f3276c5e",
+      "size": 1739
+    },
+    {
+      "path": "docs/releases/RC1-Source-Allowlist.json",
+      "sha256": null,
+      "size": null
+    },
+    {
+      "path": "packaging/windows-agent/production-composition.json",
+      "sha256": "ee7898df603f3f43a57ad7775c493c37acc0ec28b288cf3423975ec68c2c3da3",
+      "size": 1107
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "9352994be1751e9e884d8d01723210e0f4a54eaa0ee700c99189c0cc6c9c3237",
+      "size": 907
+    },
+    {
+      "path": "requirements-rc1.lock",
+      "sha256": "21688dcc6496b2cc1f60361510d3fb8a1233513ceaa3622e7cfbe790aad523ff",
+      "size": 602
+    },
+    {
+      "path": "schemas/ai-cs-channel-engine-gateway-contract-v1.schema.json",
+      "sha256": "fef35afb67dcd5027d7aa59ff35e5b6035a4130c5c1957ab41d4397d5fa67b80",
+      "size": 16001
+    },
+    {
+      "path": "scripts/build_rc1_source_allowlist.py",
+      "sha256": "35b75149ac3b2c441712b680b8b057df64c3aacb52537dd1fe39024d2759fd58",
+      "size": 7893
+    },
+    {
+      "path": "scripts/build_windows_agent_rc.ps1",
+      "sha256": "d4c42b9924740032a8b07940b0f34d475a721ae6c1e973e6a05d15bd3e0bd262",
+      "size": 7067
+    },
+    {
+      "path": "scripts/check_pdd_controlled_activation.py",
+      "sha256": "71e141e9cceba7ec30a90156756adf27ef7ae754fa35139ec144022e559a0007",
+      "size": 2177
+    },
+    {
+      "path": "scripts/check_pdd_production_activation_governance.py",
+      "sha256": "f113b09c4c05366fddc4b156d8932bf79814a0ea1973a399de0c63029fa15951",
+      "size": 4834
+    },
+    {
+      "path": "scripts/export_rc1_candidate_diff.py",
+      "sha256": "ed137227c678f18efaa98b96d912e673e25bec2eb7771493ca1a46b8728ffc2b",
+      "size": 2955
+    },
+    {
+      "path": "scripts/prepare_pdd_pilot_environment.py",
+      "sha256": "3231dead2175f9ba1dd250d5afa743ca0a0e9951a381b1e096ca4dc889262228",
+      "size": 2635
+    },
+    {
+      "path": "scripts/run_pdd_observe_browser.py",
+      "sha256": "5f9d7b53acc8022282e3b8a54e029024e9135a4839b2d0f360ab43d832784a67",
+      "size": 2954
+    },
+    {
+      "path": "scripts/support/run_ai_cs_gateway_validation_server.py",
+      "sha256": "3e6a25c9743f5b6b49d691dd39d818dde4c66f45cbaf9d31be043a2cdc7490cd",
+      "size": 3974
+    },
+    {
+      "path": "scripts/validate_ai_cs_channel_engine_integration_v1.py",
+      "sha256": "8c538ee767d66e7376a3bc772322976ed7ddc437b33e88987d45f695574b3306",
+      "size": 26434
+    },
+    {
+      "path": "scripts/verify_channel_engine_rc1.py",
+      "sha256": "65dd58dc7f9d085e0f028e66c7abb8abf514ac93bdeef4610b1b8cc7b2f3990b",
+      "size": 11375
+    },
+    {
+      "path": "scripts/verify_pilot_gateway.py",
+      "sha256": "5b78775bbdea68edc6ba48434d7966085fa9b2b5c30275973b870a312c1969a2",
+      "size": 5651
+    },
+    {
+      "path": "scripts/windows/start_ai_cs_agent.bat",
+      "sha256": "5e1ef3ce1d099b00979fb206acf094507a161bc4e9909ccd73f3bc0345007744",
+      "size": 1506
+    },
+    {
+      "path": "src/ai_cs_agent/__init__.py",
+      "sha256": "c287970ce52eab67dbfbbc0e2afb32670d2d74cc231dbbd87f88ed4d5eea431d",
+      "size": 291
+    },
+    {
+      "path": "src/ai_cs_agent/__main__.py",
+      "sha256": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "size": 48
+    },
+    {
+      "path": "src/ai_cs_agent/adapter.py",
+      "sha256": "b603bd3984e35394ffb65fa1617a8c0cd39e0f7d85ee1778211b97d4aa4283af",
+      "size": 1108
+    },
+    {
+      "path": "src/ai_cs_agent/browser.py",
+      "sha256": "a96983cf027a4b959c1082bdab42c84cdfab1a3dea86fe2fa14c0d6b47e63730",
+      "size": 5220
+    },
+    {
+      "path": "src/ai_cs_agent/cli.py",
+      "sha256": "659d09b9daf0b395c1cad808aaab2dc95fdc9e58f74cdf3fadaaa1a8424feafc",
+      "size": 10980
+    },
+    {
+      "path": "src/ai_cs_agent/config.py",
+      "sha256": "19ffb185c71c03fd5180d3871150397db9a6fe085029f10e0c8415d48e4bf63c",
+      "size": 7797
+    },
+    {
+      "path": "src/ai_cs_agent/execution.py",
+      "sha256": "92af0446559cc6eaafed0316346cdae2303b15e540000bedc75f5dcb4c7b2b71",
+      "size": 5472
+    },
+    {
+      "path": "src/ai_cs_agent/gateway.py",
+      "sha256": "799f21f5ed2e69c2d7ab6c4de82b7c71003dd88a3965b3f36d78c922a505011b",
+      "size": 15476
+    },
+    {
+      "path": "src/ai_cs_agent/models.py",
+      "sha256": "761766844aaa56b6757074951d09facf438f89f87213d5a2ad708b90a0d1bcb0",
+      "size": 4255
+    },
+    {
+      "path": "src/ai_cs_agent/observability.py",
+      "sha256": "99bc0d5ced403e8516d0e76ce65b2531dc47c226918f3a34687a8981e5f5f3ec",
+      "size": 2345
+    },
+    {
+      "path": "src/ai_cs_agent/runtime.py",
+      "sha256": "d66e179a0788d7129850f1732dad09985b2b42f698a4080d252c27b26fbba9b1",
+      "size": 15400
+    },
+    {
+      "path": "src/ai_cs_agent/security.py",
+      "sha256": "b9a03a2650fd0d06ef0957bcebd843a5441050e6e1ecafe87b28d607af976f0e",
+      "size": 4354
+    },
+    {
+      "path": "src/ai_cs_agent/session.py",
+      "sha256": "58cb55095453337107dd989a5c16a413a737d2c50e03ea32b21ccc96e3ceed2c",
+      "size": 1785
+    },
+    {
+      "path": "src/ai_cs_agent/state.py",
+      "sha256": "4ca4114ec85690bb471fa2bfebb99a3c960a136a0288aa6fc398ead652038a93",
+      "size": 2179
+    },
+    {
+      "path": "src/channel_engine/__init__.py",
+      "sha256": "66e1404adbddf6be59f5e3be0804bb1aee8b51b0b140af4cbc4b9b4b77719c66",
+      "size": 75
+    },
+    {
+      "path": "src/channel_engine/agent/__init__.py",
+      "sha256": "fe22ba9ed6ae3136b1bb32a59e43182f56835db16a725d6d6aa3382af6ffbd28",
+      "size": 5017
+    },
+    {
+      "path": "src/channel_engine/agent/api.py",
+      "sha256": "353aad41cb3b2ccf25cf4dde42ac69dec919c54997ae0356aaa04f220474cfd6",
+      "size": 5359
+    },
+    {
+      "path": "src/channel_engine/agent/config.py",
+      "sha256": "96c5ef72d1d662dc7e49a499b7e8cc32e3a2563d1715eeefe86458bef0b8113d",
+      "size": 6910
+    },
+    {
+      "path": "src/channel_engine/agent/dashboard.py",
+      "sha256": "1958855a4f5fb76b04eba2b8b454703e42b673a0311cef491acf683cfcd5ff6c",
+      "size": 10480
+    },
+    {
+      "path": "src/channel_engine/agent/dashboard_ui.py",
+      "sha256": "e32a01346ee97b0f6f6731d39a73fd6efabe01be78ec1e0c6c646a5ea198dbe8",
+      "size": 14833
+    },
+    {
+      "path": "src/channel_engine/agent/first_launch.py",
+      "sha256": "7bfbfa56e68d947a4fc09a4b6561fb8b2a839e9634f21538d5dc63f334b6dc17",
+      "size": 39281
+    },
+    {
+      "path": "src/channel_engine/agent/first_launch_ui.py",
+      "sha256": "a446e30832076d95c0ed8a276f328eb62049c581c365c834c082ef0032896d38",
+      "size": 16548
+    },
+    {
+      "path": "src/channel_engine/agent/models.py",
+      "sha256": "464ba3d093b6a6906711be48c5d21f03f23b4277c32c407423514dd65efff1a3",
+      "size": 4824
+    },
+    {
+      "path": "src/channel_engine/agent/runtime.py",
+      "sha256": "5d55aeacf5d0f2c190d571d2f06bee9969725d6e25c2833a75782945b4cd0e23",
+      "size": 24744
+    },
+    {
+      "path": "src/channel_engine/app.py",
+      "sha256": "7bd77199169b43820061b796959d504c5710fef4d9b4dd09ded70def6cdf2354",
+      "size": 28235
+    },
+    {
+      "path": "src/channel_engine/browser/__init__.py",
+      "sha256": "e77350295800b4ac4897f9e6ef6d96e51a8818319bec392f4e6973172528fbc6",
+      "size": 7085
+    },
+    {
+      "path": "src/channel_engine/browser/adapter.py",
+      "sha256": "aa9186a90d576e4c4e6fd856fed898c0bf67b837f907219d54b75ff4f8bf78fe",
+      "size": 3412
+    },
+    {
+      "path": "src/channel_engine/browser/cdp_readonly.py",
+      "sha256": "38d0cab283a3e59a9284e4fdee7845f4f98585e7a2fb92a48fb2f72cc83afd02",
+      "size": 25541
+    },
+    {
+      "path": "src/channel_engine/browser/models.py",
+      "sha256": "4aad0185829ac66ae8c55d333532345fa3749e6a99e65d6a745bdcd5609f25e6",
+      "size": 4503
+    },
+    {
+      "path": "src/channel_engine/browser/observation_store.py",
+      "sha256": "da3e078c63176f0ccfae85b59918b2400fcec556e64431f0ad01fdf7d6cf21cf",
+      "size": 10093
+    },
+    {
+      "path": "src/channel_engine/browser/observer.py",
+      "sha256": "21ded340c24358cd68918508fc1ccc271854873e881db1bd9449186fcfc3f1ce",
+      "size": 49855
+    },
+    {
+      "path": "src/channel_engine/browser/outbound.py",
+      "sha256": "db209751281bc99c87132661a4f5a34a4978b5c0fd7da501240eccf890ee1cd2",
+      "size": 12683
+    },
+    {
+      "path": "src/channel_engine/browser/ports.py",
+      "sha256": "9ce299402bd9d6e47227a7756db9e21316bb758de58346852af0c4e0afefc02b",
+      "size": 969
+    },
+    {
+      "path": "src/channel_engine/browser/runtime.py",
+      "sha256": "0d304399c0d42d993c52308913439da7f32b05a2d90f5115a79d1e4f527e0d54",
+      "size": 31857
+    },
+    {
+      "path": "src/channel_engine/browser/selectors.py",
+      "sha256": "cd97c847bf30fa2add0fbee0d3677cc0aed7e889f9f7273404a0bba95e334b75",
+      "size": 15111
+    },
+    {
+      "path": "src/channel_engine/browser/session.py",
+      "sha256": "36d8155266b51b22e3c62827d58634c0f3956fe241c546aac50c0b11917045b7",
+      "size": 13887
+    },
+    {
+      "path": "src/channel_engine/channel/__init__.py",
+      "sha256": "6997e0e44c54eb65c85253bc8ba6a52008a03d3570ae176ecf1bb6a055ef5f0c",
+      "size": 13155
+    },
+    {
+      "path": "src/channel_engine/channel/adapter_foundation.py",
+      "sha256": "3b0f838e1ea1737af6b10e98a5049a4801bb0e54c0b1a34729fdb62e262a648e",
+      "size": 26980
+    },
+    {
+      "path": "src/channel_engine/channel/execution_boundary.py",
+      "sha256": "d927b6487bcb4724422927bfac006e17379f59c4251d07ee654891c72768b2cb",
+      "size": 7137
+    },
+    {
+      "path": "src/channel_engine/channel/fake.py",
+      "sha256": "fef3768056b756b8d0d2ece70fee94f44cb36648b183787ea4b0624f64e01bf2",
+      "size": 1246
+    },
+    {
+      "path": "src/channel_engine/channel/fake_pdd.py",
+      "sha256": "bb7b85845eacfadd41c7615077e86a7fa7d804f677b5f5bbc79cdc3fb05c016b",
+      "size": 8068
+    },
+    {
+      "path": "src/channel_engine/channel/fake_platform.py",
+      "sha256": "47d0f18f046dc83a9b46c79708ce05527664012c7f708cd9339bc8daba625d6a",
+      "size": 10730
+    },
+    {
+      "path": "src/channel_engine/channel/lifecycle.py",
+      "sha256": "969fe1c0065f83c297b06df2ed4ead367a0479501b3c32fd824a8634e2d7c7a7",
+      "size": 13976
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_controlled.py",
+      "sha256": "34b699dbe78b03cb7606a81c9669e518d550afea0d668dbf5b50f743a59b54cf",
+      "size": 17756
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_discovery.py",
+      "sha256": "580542b72818303be836d34a9cc8d02c0f3358182b92d1f710517b6c57c30a32",
+      "size": 20274
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_observation.py",
+      "sha256": "067a186995668e86a03bef27eb465e71a9f488f35ca77226ea13cc79bfd7c64c",
+      "size": 15826
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_production.py",
+      "sha256": "a3b1e133312ed77cd2e20494e3868f55ddeea02c494001062c9ee493b146a4a4",
+      "size": 62280
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_safety.py",
+      "sha256": "4c54d12a822c8f5a3fb031e46b81a3c9fbff99b4c3d4c25811b0a0ddfa7f3cf5",
+      "size": 45763
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_send.py",
+      "sha256": "6685b126366d24d229749ba77d39455164c218b1e4fc32eef7d24e6ff5ff151e",
+      "size": 38998
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_websocket.py",
+      "sha256": "40bbd9e43f17c8ae48b4dc86a0c7fffe86dc5985bf33eb04ce51449173959419",
+      "size": 36058
+    },
+    {
+      "path": "src/channel_engine/channel/pdd_websocket_store.py",
+      "sha256": "b627b331da6520b8573b3ae272e8574fd01c4e2ebf32873dcc02ce0d04e0d623",
+      "size": 16155
+    },
+    {
+      "path": "src/channel_engine/channel/platform.py",
+      "sha256": "9416449537a15ff0b03acbd86690cff3fa0d92f02dd94f39b3861cc91e89f30c",
+      "size": 3188
+    },
+    {
+      "path": "src/channel_engine/channel/protocol.py",
+      "sha256": "d2341d1640c89b0e3a3118290d1a350d8671a335d1a93b0ec1d6e6cf80ef9df3",
+      "size": 5231
+    },
+    {
+      "path": "src/channel_engine/channel/registry.py",
+      "sha256": "f375f5230fa586838121d4f8254aa104ea8d16b5f5ef388d26dccef1488d718f",
+      "size": 2235
+    },
+    {
+      "path": "src/channel_engine/channel/sandbox.py",
+      "sha256": "c81e023d59b7a1a8ccd0fd447829a10cc67cfd2c8af49ee94c86d5f028392895",
+      "size": 21022
+    },
+    {
+      "path": "src/channel_engine/config.py",
+      "sha256": "e0bce3868b0732cf20d4d87f479c1d6e03153e5b6ba07a444a3aa2749c216682",
+      "size": 2787
+    },
+    {
+      "path": "src/channel_engine/control/__init__.py",
+      "sha256": "c341ae33a926fe9d677ce0ce70020dd676336bc7c5629ae643a077c7a93a1f0d",
+      "size": 556
+    },
+    {
+      "path": "src/channel_engine/control/gate.py",
+      "sha256": "39f66dbaefaa7919eb83754819d9556204d010bb4ed312faafb5b42e76732f87",
+      "size": 2089
+    },
+    {
+      "path": "src/channel_engine/control/health.py",
+      "sha256": "3e1a7ebf22a60d80709e8000b5d7df1dd1f457c8c0dc6fbf303bf8f6a6032abb",
+      "size": 8366
+    },
+    {
+      "path": "src/channel_engine/control/models.py",
+      "sha256": "c00649fe015defbe09fc71327d5c6ca1d4e7ed66fac3ea481852f4e98dfe4cf2",
+      "size": 8468
+    },
+    {
+      "path": "src/channel_engine/control/repository.py",
+      "sha256": "b153262ed159224cc1cdba1f744ecc4a1d075479c1a61c28d13ff43c7f1d39b5",
+      "size": 14633
+    },
+    {
+      "path": "src/channel_engine/control/service.py",
+      "sha256": "1f20944080c97c84a173c56bca70f9301175ae18d1d2363eded883b8e4fff8cb",
+      "size": 8859
+    },
+    {
+      "path": "src/channel_engine/conversation/__init__.py",
+      "sha256": "28918511dd554e91c807b67e52ca472c4018f8ec54c3cca9bcb286a64037eba8",
+      "size": 106
+    },
+    {
+      "path": "src/channel_engine/conversation/service.py",
+      "sha256": "d8eed4419a9f74e3eb62c6f15960b1ce4adcb4ead69b4926d7d628922323b076",
+      "size": 11124
+    },
+    {
+      "path": "src/channel_engine/environment/__init__.py",
+      "sha256": "6c40ecdc157d37eb4f18dbf8877da65c90ebe7297d7db3b2a7a6e93c9b4eac8f",
+      "size": 968
+    },
+    {
+      "path": "src/channel_engine/environment/deployment.py",
+      "sha256": "314fba178594a8c7e6a4f79e8af48b14466d3992578f37921f501b355e6e60f4",
+      "size": 3138
+    },
+    {
+      "path": "src/channel_engine/environment/models.py",
+      "sha256": "c57af993b022a9b2fd37ea4fba19228b8023aa3ac3cd8e77e6f4e2314c9767dd",
+      "size": 13337
+    },
+    {
+      "path": "src/channel_engine/environment/safety.py",
+      "sha256": "537cdea9a7022d5432ffd130446903c27f5521f981a181d4f9fb69b93cc86763",
+      "size": 2652
+    },
+    {
+      "path": "src/channel_engine/execution/__init__.py",
+      "sha256": "fbdc0b69616326272cc828587ccd018345a45ac675e2b71c632eb381b74569f0",
+      "size": 1841
+    },
+    {
+      "path": "src/channel_engine/execution/coordinator.py",
+      "sha256": "cc70d754f4abf291d473656728ce55af405bc9b8b29e19bb00d3e7a0868804d5",
+      "size": 6919
+    },
+    {
+      "path": "src/channel_engine/execution/fake_executor.py",
+      "sha256": "c10dcba231fb442d94b0529c68fb30edf2a39b6aeee6ef7300f0e0bbe8eac62d",
+      "size": 4885
+    },
+    {
+      "path": "src/channel_engine/execution/ownership.py",
+      "sha256": "9b0cfd5a85365c3a3543b0abd303c9d98582d760e8e39da26e3354cfdeb1858f",
+      "size": 2717
+    },
+    {
+      "path": "src/channel_engine/execution/pdd_sandbox.py",
+      "sha256": "4730e57b5db6d90b4501e2b69ca0ddf5b1faca1ef6d9426b05883bfbac3bb4f1",
+      "size": 16268
+    },
+    {
+      "path": "src/channel_engine/execution/queue.py",
+      "sha256": "3b4e141d9beec98b057f67764897a426dfb1e29e23d1f155354357780ea6cc11",
+      "size": 4359
+    },
+    {
+      "path": "src/channel_engine/execution/receipt.py",
+      "sha256": "007e5181e9e4d064d333448381526874fb3e610e0f37608cc97c027f4bd446f8",
+      "size": 2203
+    },
+    {
+      "path": "src/channel_engine/execution/recovery.py",
+      "sha256": "fc48d0e544b04258561a3256f344e31382877c9c25aca6837121e69491586f9c",
+      "size": 5668
+    },
+    {
+      "path": "src/channel_engine/execution/worker.py",
+      "sha256": "4a145467714ef26b67817f6b6b1d907e1920f0aefada37f81a7bfb56b364c8ef",
+      "size": 10879
+    },
+    {
+      "path": "src/channel_engine/gateway/__init__.py",
+      "sha256": "3fb217df0a8e7190137b45a988d9a7de38d9bbde9e242399cf3dc8a42ea1a937",
+      "size": 3419
+    },
+    {
+      "path": "src/channel_engine/gateway/auth.py",
+      "sha256": "0beae0c1d2693d9a07f87ed672ce4134b545e8c24bbe012ea23b8831f800ba55",
+      "size": 9458
+    },
+    {
+      "path": "src/channel_engine/gateway/client.py",
+      "sha256": "fe1bcb6d9f312007ead5eb288e94c7a59ecd7b0b9a74ab703eeb31c1713a99a2",
+      "size": 15168
+    },
+    {
+      "path": "src/channel_engine/gateway/contract.py",
+      "sha256": "df99c0b07ef754df90fec8ed3a4fa70d1547e3fb1dc97d725bf942525bfe4bbb",
+      "size": 14174
+    },
+    {
+      "path": "src/channel_engine/gateway/edge.py",
+      "sha256": "20b76657c7d40e020b1ac1b148c8f9e15f3fc769780a28f661520a0b1096143e",
+      "size": 10320
+    },
+    {
+      "path": "src/channel_engine/gateway/fake.py",
+      "sha256": "41dc839cd8d5004904fae84f11a68bc3c523cc1bf6ea988b1fab30943b1fb8d4",
+      "size": 2408
+    },
+    {
+      "path": "src/channel_engine/gateway/http.py",
+      "sha256": "bf75e5a147a2ba25836cb285b4eab52611da7ae36a70bcf1d447ae20bf7989ae",
+      "size": 9885
+    },
+    {
+      "path": "src/channel_engine/gateway/integration.py",
+      "sha256": "2d6bdabab982e4c826d962bad553926f2b321fa70a4551812778c2d267ea65b1",
+      "size": 23857
+    },
+    {
+      "path": "src/channel_engine/gateway/mock_server.py",
+      "sha256": "ebcebc99d2e000cef51b26d8897551f3ec1372dd7104e55319506b08e2dd6551",
+      "size": 17834
+    },
+    {
+      "path": "src/channel_engine/gateway/protocol.py",
+      "sha256": "68c9b1caa969cd86d54df2596d882a2db6adb1cd9e3803c796f62fb80b1b383e",
+      "size": 465
+    },
+    {
+      "path": "src/channel_engine/gateway/sandbox.py",
+      "sha256": "a1a3a0d6fc30fbf4e3071f54a8740526985f6885c505c94591b41c953d246e0b",
+      "size": 34062
+    },
+    {
+      "path": "src/channel_engine/gateway/scope.py",
+      "sha256": "4ff82ad581fa18c7c7bc11578a1c3ab9577191b362ea7e61c0788d59c021bba5",
+      "size": 1498
+    },
+    {
+      "path": "src/channel_engine/models/__init__.py",
+      "sha256": "22768c2a4eca1689ce4b68ef5fac1742bdf69775cec322b8043cd2d1c63e6e09",
+      "size": 1040
+    },
+    {
+      "path": "src/channel_engine/models/entities.py",
+      "sha256": "6f038e8f47d9a49d43b0b2a79a42cf00c7519de26c98f1ead2c106520436a93c",
+      "size": 3347
+    },
+    {
+      "path": "src/channel_engine/models/enums.py",
+      "sha256": "7e0ebf6be75359dde5ca5b4b4830699f20f19272e3a1d8554e42e7a263dabe9f",
+      "size": 1622
+    },
+    {
+      "path": "src/channel_engine/models/state_machine.py",
+      "sha256": "dac7b464c5eb4211a53d4e7c149718ecb3b946e1920032f63b15d273c3f2707b",
+      "size": 2989
+    },
+    {
+      "path": "src/channel_engine/monitor/__init__.py",
+      "sha256": "e0ca817bd1cc01dc81b655f510d51c38299af718f63c998a0523a16e053811a5",
+      "size": 101
+    },
+    {
+      "path": "src/channel_engine/monitor/health.py",
+      "sha256": "b4540d8c2cdefa1b0b582f7001d0c7adaed48b1de5eb97719b80aa1d2bed813d",
+      "size": 1336
+    },
+    {
+      "path": "src/channel_engine/observability/__init__.py",
+      "sha256": "c1e0404f1fd6349be0ba8da6dfc15b875113335a3b8a414c68b1828cb7bef59c",
+      "size": 1057
+    },
+    {
+      "path": "src/channel_engine/observability/actions.py",
+      "sha256": "0804766dd56d3b7ca7659185cbbd931141d253d845133290b945f5ad15535b1a",
+      "size": 2999
+    },
+    {
+      "path": "src/channel_engine/observability/api.py",
+      "sha256": "0f560ecc6067aaa5ad6a03c3ba494911c02676c63344d386eef70e8c3ef4e57d",
+      "size": 6549
+    },
+    {
+      "path": "src/channel_engine/observability/bridge.py",
+      "sha256": "722558d39e154409a037acd99abbe50482dbf547cf704da0eb3ad0acbb01e093",
+      "size": 3411
+    },
+    {
+      "path": "src/channel_engine/observability/models.py",
+      "sha256": "d12394a024881b70d6d9c508822158798f0eae3bc82895e3e51b74fe9a61185e",
+      "size": 9739
+    },
+    {
+      "path": "src/channel_engine/observability/repository.py",
+      "sha256": "752a514fc2fe28dba0af66b06f01c354e143c24ff516aec0e23faeeb07440d79",
+      "size": 14260
+    },
+    {
+      "path": "src/channel_engine/observability/service.py",
+      "sha256": "60599ec00ed9d08781e6777063fbee3c54d6097403c7ffce5e7211dd56670451",
+      "size": 12444
+    },
+    {
+      "path": "src/channel_engine/observability/ui.py",
+      "sha256": "63e94a64612dd42a1a3334edba60d4261d5fe33988a246158f209547fecf292d",
+      "size": 68951
+    },
+    {
+      "path": "src/channel_engine/outbox/__init__.py",
+      "sha256": "5911b53e42d0ac7d100c734259c18bdb29a9de7b4c2b682fde90ea4a42d00456",
+      "size": 370
+    },
+    {
+      "path": "src/channel_engine/outbox/publisher.py",
+      "sha256": "9fc8c1807a3dc7a9a5cf65e9749463b28c50269f94e3d05ded1efc639b4ebac8",
+      "size": 8302
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/__init__.py",
+      "sha256": "44748a2024135fa661c7db0f38bce532fc3ac3bfaa99d595eb55c485907b8e4a",
+      "size": 10927
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/_base.py",
+      "sha256": "aeebc4e1981474cbaf0ebbe70323ae5f38b27b6ea28098d748f721dda9935b1c",
+      "size": 467
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/activation.py",
+      "sha256": "9d3784c376dc800dd306674debb112681160abcf23c0405c9580505a4524b80e",
+      "size": 27996
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/browser/__init__.py",
+      "sha256": "59c4a05c00a2d5db11c7f0092069854e3f35f2c1f954331475cf6ec88327f60b",
+      "size": 421
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/browser/boundary.py",
+      "sha256": "e8589cf60b5b2dd50273d3d3fa04c0d988fae97528d31e0171e9159e971a7347",
+      "size": 6234
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/discovery/__init__.py",
+      "sha256": "e0a10a9647df5362f5d22aaf66a383d7b7e91a46fad93d3ba08dffcd7d8f1068",
+      "size": 738
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/fake.py",
+      "sha256": "6b8f3de82c7870d88ed60ad255f42703a9b33dd3b10ec381367c25ecd85ec678",
+      "size": 8738
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/governance.py",
+      "sha256": "20406d42bf644be62afc6febda493de349fcef53fff604384719179bac14f056",
+      "size": 40489
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/mapper/__init__.py",
+      "sha256": "84db095edcaee1b4544960c683ae6f888c37772cab1e2d706cda028cfd89330e",
+      "size": 430
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/mapper/mapping.py",
+      "sha256": "94a6868eb85f630967c970013889fe49bce364e2dfca8acadf37c59d8b3bee77",
+      "size": 5330
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/message/__init__.py",
+      "sha256": "43619baeeb8581f1c40b10426981608d970062904da7a159fccbde914ed2b9a9",
+      "size": 287
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/message/models.py",
+      "sha256": "fbf00f2d8d7da0d98dc48395f6fdc0d9bbe1dcfc5437d167202b49f7a116ae09",
+      "size": 3194
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/message_observation.py",
+      "sha256": "03ac62f1d9e27957bc49112dc43180dbca83660fa2aba027c17c2a2c354b6250",
+      "size": 33287
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/observation_mode.py",
+      "sha256": "a06e96a28894455295b41449d32856974375a7da8706c1774bb0edc55764811e",
+      "size": 19145
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/observe.py",
+      "sha256": "3af70da9f853a504cddb3273770af3e6de72f93aa60d618596730f259c3c1f81",
+      "size": 16310
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/readiness.py",
+      "sha256": "de071b641db411ee6718c5f654309ac68ec53c7a49a44f1fbd7eb09b5476864a",
+      "size": 5652
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/runtime_status.py",
+      "sha256": "f61b3223c832bf23e8ec9f3b0ef7a2d3b58b72ab68b017b88eef7f61903a9b6d",
+      "size": 9513
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/selector/__init__.py",
+      "sha256": "2657b3176851f2f452fe8e415d5dffa9405436331f4923665a63822bb8c810cd",
+      "size": 791
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/selector/contract.py",
+      "sha256": "6e0a88b08bf17ea90ed0624e837a2f8c11fea1529dd83c607004cf31379d55cf",
+      "size": 10448
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/session/__init__.py",
+      "sha256": "547b5e1af22a70213e83e77f648963e8ebee400ea8c03762e98f2f846586b114",
+      "size": 238
+    },
+    {
+      "path": "src/channel_engine/pdd_adapter/session/runtime.py",
+      "sha256": "c672b63236cea9df1c4e3881a361dc52d1254e81897efa233095cd74fc9beb1b",
+      "size": 4842
+    },
+    {
+      "path": "src/channel_engine/pilot/__init__.py",
+      "sha256": "feb7c79c6658b32ae500dfc1885a6dc65fc45d19c5495cf530b436142d7e9777",
+      "size": 4784
+    },
+    {
+      "path": "src/channel_engine/pilot/api.py",
+      "sha256": "d3ef169e908b15838e6ccce1a97a7387085cf0a09090a48f1a98b758b006ab66",
+      "size": 11407
+    },
+    {
+      "path": "src/channel_engine/pilot/approval.py",
+      "sha256": "1681f03217f7d74cf2359c05097ae701f1b772ec4af997667ab84267f7fe1b88",
+      "size": 5195
+    },
+    {
+      "path": "src/channel_engine/pilot/browser.py",
+      "sha256": "2297ee1b4ab9e764d3f779eaf8c86e0fc4680dd904ff2bea4deb42141ae2d865",
+      "size": 6337
+    },
+    {
+      "path": "src/channel_engine/pilot/config.py",
+      "sha256": "d032ca4b56e65646fe01789d81899325629c4bb34d4a50bb3fcc4a5d072f1c61",
+      "size": 1323
+    },
+    {
+      "path": "src/channel_engine/pilot/environment.py",
+      "sha256": "9442095f74c12d3fef573597cfbd30f82f0ca02e225fda1eace62ed5a2f6d13c",
+      "size": 17147
+    },
+    {
+      "path": "src/channel_engine/pilot/live.py",
+      "sha256": "9384db4f98cc842e00272b6adb4367c1b34c74fae63443630e9c8a5b9100edca",
+      "size": 19278
+    },
+    {
+      "path": "src/channel_engine/pilot/models.py",
+      "sha256": "9299ad087f6a3fda90d1155234d1b8277ef0abeaacd40b66761e0eb24c7b2e47",
+      "size": 8412
+    },
+    {
+      "path": "src/channel_engine/pilot/persistence.py",
+      "sha256": "2f617b437fb0ca7143c5c022e2f703c16fc532b705394a5c8c9101de7c919266",
+      "size": 9476
+    },
+    {
+      "path": "src/channel_engine/pilot/runtime.py",
+      "sha256": "ba5b34f4e3d8f72bb9871fec6c12b71753c9632e725939d0acd172db2a8052d5",
+      "size": 36946
+    },
+    {
+      "path": "src/channel_engine/policy/__init__.py",
+      "sha256": "8e7f1d8884304e38c00e84f6b78b7e4d8c3db8c6b709199b0bddb9a6430c287d",
+      "size": 105
+    },
+    {
+      "path": "src/channel_engine/policy/approval.py",
+      "sha256": "97c5038888a2d81d38a1d4492c8695ed517e6e7bb3b71d74692636f2fcb10ee3",
+      "size": 916
+    },
+    {
+      "path": "src/channel_engine/reliability/__init__.py",
+      "sha256": "2bcdb93c84884348b2c97591f5b38dff0bd13e5716b5eab61979b8bac9c510e0",
+      "size": 1725
+    },
+    {
+      "path": "src/channel_engine/reliability/api.py",
+      "sha256": "58291e4a03254e3600973ecf029282418e83d6305725f83ea00fd815143af889",
+      "size": 1926
+    },
+    {
+      "path": "src/channel_engine/reliability/browser.py",
+      "sha256": "553fa96335b5f7630ed4bae1b41e809c7daa357acac72162369a51115d03c33c",
+      "size": 3383
+    },
+    {
+      "path": "src/channel_engine/reliability/heartbeat.py",
+      "sha256": "4d0e252a3f825abcce629d4fe9c4def478ef3252ee78eab8c0ece3e0424de580",
+      "size": 5547
+    },
+    {
+      "path": "src/channel_engine/reliability/manager.py",
+      "sha256": "bb759d72f6e071e67954f0251b5ed14a100dc265ef0a8ac1fbf993e930456c02",
+      "size": 10556
+    },
+    {
+      "path": "src/channel_engine/reliability/models.py",
+      "sha256": "b0841c90488b42a8c29cf7266b35ddab613a1589f38350330625d79e8652617d",
+      "size": 4817
+    },
+    {
+      "path": "src/channel_engine/reliability/persistence.py",
+      "sha256": "a6bd5dfed35f06d0675626c7206e05ec12f51738e60b01d7b5ec33ccfbf03c0b",
+      "size": 16173
+    },
+    {
+      "path": "src/channel_engine/reliability/recovery.py",
+      "sha256": "7a02f91ac7bb8774d013b3216ef03d436ad28b77dd49cefcc046722f2e40f8dd",
+      "size": 3666
+    },
+    {
+      "path": "src/channel_engine/security/__init__.py",
+      "sha256": "9a7bd21c284dc9f9e2bfe9459bfdc1244855cda9ee39ad945cdc9564880825ab",
+      "size": 551
+    },
+    {
+      "path": "src/channel_engine/security/pdd.py",
+      "sha256": "1ff193e7ceac7e46ab0a02e5c36a062940706d5da0db1bbdd0798a9d2416572b",
+      "size": 1339
+    },
+    {
+      "path": "src/channel_engine/security/rbac.py",
+      "sha256": "20e25d6e29e7e7a9e1a8031e966a2e3e306f5225f9b58a8a7c0ded399c86ca25",
+      "size": 3697
+    },
+    {
+      "path": "src/channel_engine/session/__init__.py",
+      "sha256": "43a7b0cda810a136a23fd4f228b685c0a5c14e68144162dc44ea4e9ae1aa3290",
+      "size": 2191
+    },
+    {
+      "path": "src/channel_engine/session/api.py",
+      "sha256": "68ad63e20c2b9827621bb89c83d0855943c4bd485cf65dc9b125640ba32e58be",
+      "size": 1216
+    },
+    {
+      "path": "src/channel_engine/session/credential.py",
+      "sha256": "5945318e5262f6e403bd067d77c916fcff85689c70ee574bb9483005a272cceb",
+      "size": 5138
+    },
+    {
+      "path": "src/channel_engine/session/delivery.py",
+      "sha256": "225188ff59a8e7d4b96e5931521e27aed9696df3cce99cb86e599e5b4219c9a8",
+      "size": 14419
+    },
+    {
+      "path": "src/channel_engine/session/heartbeat.py",
+      "sha256": "315104591dfb1f0b004a506575464aa51c1c4091723cf1e9cdbdf5ca2694cd82",
+      "size": 7893
+    },
+    {
+      "path": "src/channel_engine/session/manager.py",
+      "sha256": "5501af1eba62d3927606aa89f4e9d754caa7b12bca8b372ce852f033ddf9f22d",
+      "size": 22027
+    },
+    {
+      "path": "src/channel_engine/session/models.py",
+      "sha256": "0902da0eba088954d4cd01b7796b5b8d67713ba253b25d51c4ceea021230ec0d",
+      "size": 6381
+    },
+    {
+      "path": "src/channel_engine/session/persistence.py",
+      "sha256": "3dce4a61b39a10edaffef39284f8b44e0463d9cbdd2494d77a8324afe029f0b6",
+      "size": 13737
+    },
+    {
+      "path": "src/channel_engine/session/state_machine.py",
+      "sha256": "2c8b7e8d809370725405b933a59903cfb97c04aa016e5fc5c52ff01e4353bd56",
+      "size": 3803
+    },
+    {
+      "path": "src/channel_engine/storage/__init__.py",
+      "sha256": "35ae03b6dec44c10c38652e048e8989e4b75cb559f0faf10a8fea77f0a480faa",
+      "size": 715
+    },
+    {
+      "path": "src/channel_engine/storage/database.py",
+      "sha256": "68484fedb95713de4e87eb773433129df5691b94bdb2f0027bf78fc8b01360c0",
+      "size": 4268
+    },
+    {
+      "path": "src/channel_engine/storage/orm.py",
+      "sha256": "709ce64b4fe905855bf7ce993f7be31457e6297194dd6c510626caba5b7c4937",
+      "size": 35285
+    },
+    {
+      "path": "src/channel_engine/storage/repository.py",
+      "sha256": "6cacd1ccb1236af2202fff3827bc105cf34f7ee37558c92be896759715842332",
+      "size": 27740
+    },
+    {
+      "path": "src/channel_engine/storage/unit_of_work.py",
+      "sha256": "b9de8037032023e8f8f5e204e5318cbb4d4bb49ead9e30b3cfbb81b796001d7d",
+      "size": 1199
+    },
+    {
+      "path": "src/channel_engine/storage/versioning.py",
+      "sha256": "db14a0cf237312f33caf2a3cdc614f7d260e5d0512edd251b56527ee590eae89",
+      "size": 2484
+    },
+    {
+      "path": "tests/api/test_app.py",
+      "sha256": "9ab6e9a88f16fe260b4d315c8d5c52c382ff4e5221521cbd776697d17fc3d9f9",
+      "size": 4824
+    },
+    {
+      "path": "tests/api/test_channel_adapter_foundation_api.py",
+      "sha256": "73072f459eb05f33233f7bae7e26b3edd8f953ea01036e4e18df65001fc280a9",
+      "size": 1495
+    },
+    {
+      "path": "tests/api/test_channel_agent_api.py",
+      "sha256": "ba9f414d6ee3d077e8c0f84cd418c8f721a991d7308525389eff26b7132bd0aa",
+      "size": 5531
+    },
+    {
+      "path": "tests/api/test_channel_agent_dashboard.py",
+      "sha256": "619710a00e73a325c0fc4d5c321b254682b629caa05e3662149081e264c10c5b",
+      "size": 7471
+    },
+    {
+      "path": "tests/api/test_channel_agent_first_launch_api.py",
+      "sha256": "27e285eed3616d0548d9c7dd886de1a1d023001a867ed7b332a3b83ff9521841",
+      "size": 6084
+    },
+    {
+      "path": "tests/api/test_channel_session_runtime_api.py",
+      "sha256": "9c4446ea179834a622615533507969b4fd845bc74c40c9eab78622ba5502b6fb",
+      "size": 1973
+    },
+    {
+      "path": "tests/api/test_observability_api.py",
+      "sha256": "34f959b977ab25da80b83301145952379de6a96567eace02ad0f217477c7ff0c",
+      "size": 4274
+    },
+    {
+      "path": "tests/api/test_operations_console_actions.py",
+      "sha256": "294d9ef7b0aa2e96d3a43a2f6d8a660b57b4b5f14768b9afc9010798474fa6e8",
+      "size": 4034
+    },
+    {
+      "path": "tests/api/test_operations_console_ui.py",
+      "sha256": "9eb34f9e7d55564a1566583316f60f6469686f68396ac56f22c01bd358f24177",
+      "size": 3186
+    },
+    {
+      "path": "tests/api/test_pdd_runtime_status_api_v1.py",
+      "sha256": "e2b01e8217701544031796b5c688405d1f5901bd588b067facb4b0f00e42a63b",
+      "size": 1045
+    },
+    {
+      "path": "tests/api/test_runtime_reliability_api.py",
+      "sha256": "4a7387c1b82291ee26cc26e3a299907bb8a2f255dc1cf7d9394e7affaf8e7691",
+      "size": 3779
+    },
+    {
+      "path": "tests/conftest.py",
+      "sha256": "3a87f84e5f393385e20fec187abf32fd2844597db3ca3a0dcce89ad4b8477bfc",
+      "size": 921
+    },
+    {
+      "path": "tests/contract/test_ai_cs_gateway_integration_v1.py",
+      "sha256": "31f721c5f4fc168cb3f78adbc0a14ce8839bca5084a022aed2f3588c58b84698",
+      "size": 4699
+    },
+    {
+      "path": "tests/contract/test_control_plane_v1.py",
+      "sha256": "5033dcee2c5df005b5996790937851c456b972b2167035f7be2c1a6b30d257bb",
+      "size": 6302
+    },
+    {
+      "path": "tests/contract/test_gateway_contract_v1.py",
+      "sha256": "40cf6819c8cdc9996b7cfcf08a6ec154ec1043b471d93aeae0d1d41084cc1e55",
+      "size": 10496
+    },
+    {
+      "path": "tests/contract/test_gateway_edge_contract_v1.py",
+      "sha256": "1d759a02cffa938aa91c4efeda5c946ff5faa38e02a3c849a0be5faa195a4634",
+      "size": 2972
+    },
+    {
+      "path": "tests/contract/test_gateway_sandbox_contract_v1.py",
+      "sha256": "39aec49da2f6967b92cfe7d4bd39b869144fce88ec945bcd0c1c653338ad5022",
+      "size": 7853
+    },
+    {
+      "path": "tests/contract/test_pdd_browser_adapter_design_v1.py",
+      "sha256": "1043dd44a6d798d637308575668f926928b8ddf2ff372f5102db03e2caf1c373",
+      "size": 11004
+    },
+    {
+      "path": "tests/contract/test_pdd_browser_observation_v1.py",
+      "sha256": "db1f966595bf3593f58307897b1bb482d95847350fb55f156838119b52e8ad41",
+      "size": 12536
+    },
+    {
+      "path": "tests/contract/test_pdd_controlled_activation_v1.py",
+      "sha256": "8326311d84fca0d4b71deb974a4951204afda332645349502d4cbb050f9c3d57",
+      "size": 1960
+    },
+    {
+      "path": "tests/contract/test_pdd_controlled_execution_v1.py",
+      "sha256": "82c91632918aca089ded15ecda90fdf8a6e0d1610aa799c72ca675c53d83f75f",
+      "size": 5276
+    },
+    {
+      "path": "tests/contract/test_pdd_observation_adapter_v1.py",
+      "sha256": "f4eeecd7a66c8a6b33f7415082e49c67954c2686ae937b19ee3a691383f64769",
+      "size": 8994
+    },
+    {
+      "path": "tests/contract/test_pdd_observation_mode_contract_v1.py",
+      "sha256": "02d160dec17e385c88027cc016518b84a18aaca647850a2585efb973eebefae4",
+      "size": 1964
+    },
+    {
+      "path": "tests/contract/test_pdd_pilot_environment_v1.py",
+      "sha256": "0ce88157a3bcd49141231bc76310d2cb20c5a1a25df4ad1c84d3d9a6ab4fab7e",
+      "size": 10090
+    },
+    {
+      "path": "tests/contract/test_pdd_production_activation_governance_contract_v1.py",
+      "sha256": "2e81f415454af654f989807d5383a5364f58102e55e4a8e6c0a4fa0535d03fe8",
+      "size": 1452
+    },
+    {
+      "path": "tests/contract/test_pdd_production_adapter_preparation_v1.py",
+      "sha256": "86e511e2238ee031c9fe45e436295a6455ab1e368e79275f5f90f5954e2806cd",
+      "size": 9495
+    },
+    {
+      "path": "tests/contract/test_pdd_production_readiness_recheck_v1.py",
+      "sha256": "58b8a7ab5d2d58e5f4a355d943ab23aa553d51ef58ba2aeb38fd39f62eb43837",
+      "size": 5512
+    },
+    {
+      "path": "tests/contract/test_pdd_production_safety_gate_v1.py",
+      "sha256": "c99e57e93bb8cb0c40ab90f6911802d26664bc91677a2932beeab20badcbf1b9",
+      "size": 15865
+    },
+    {
+      "path": "tests/contract/test_pdd_send_transport_v1.py",
+      "sha256": "ad01d19be748e4f37063196866e4ea02f6dfec22ccc9acf2baeae31801fa18be",
+      "size": 10002
+    },
+    {
+      "path": "tests/contract/test_pdd_single_store_pilot_v1.py",
+      "sha256": "36019d7534a5bb4ab2cf6f89497bfde77d0d282ebac6fdb483564a4182dd9e4c",
+      "size": 3687
+    },
+    {
+      "path": "tests/contract/test_pdd_websocket_transport_v1.py",
+      "sha256": "0c32a175ec5ea52c70c70ae4d8d04612b20f5c22b08a04d4075bff226e508dc2",
+      "size": 11277
+    },
+    {
+      "path": "tests/contract/test_real_channel_adapter_v1.py",
+      "sha256": "7d4f9720debd364a0c9892a9bf8cbb0878662b5a8d74bddbd8199045d9b3d2c0",
+      "size": 12794
+    },
+    {
+      "path": "tests/contract/test_staging_environment_v1.py",
+      "sha256": "93f55866a0c10e26dfcfc405b3790cb35ecd89e2f608aa9dfb1bb1e8fdbd58a4",
+      "size": 9995
+    },
+    {
+      "path": "tests/e2e/test_channel_sandbox_e2e.py",
+      "sha256": "775e1af10106439793c04a440452c98ae74ca37a6c7fb37e1316aa69e6d95168",
+      "size": 6754
+    },
+    {
+      "path": "tests/e2e/test_controlled_ai_cs_integration.py",
+      "sha256": "349c2c8af86f32a60910cd52e636adf3a832ad3076c2791e2e86a76ef8144feb",
+      "size": 19629
+    },
+    {
+      "path": "tests/e2e/test_mock_e2e_validation.py",
+      "sha256": "34c3e3c424ade7e29715bc624490dad5f4d6b4c342cc9c0e24234d47eccf7052",
+      "size": 18787
+    },
+    {
+      "path": "tests/integration/test_ai_cs_channel_engine_cross_repo_validation_v1.py",
+      "sha256": "b83c31222dd3a1d6a65f31c4209daa618b44add575561ee74f2a4d00001003ef",
+      "size": 2245
+    },
+    {
+      "path": "tests/integration/test_ai_cs_gateway_flow.py",
+      "sha256": "9316e56f045f93c6952baf17bc5522efb4a8c13b1fc3a6380ed25028d3232e85",
+      "size": 4990
+    },
+    {
+      "path": "tests/integration/test_ai_cs_gateway_integration_runtime_v1.py",
+      "sha256": "0f72b2c6b17a790b9e0903002606f6a5a384e2a96ba3610cd8b576acf4fc696c",
+      "size": 5551
+    },
+    {
+      "path": "tests/integration/test_channel_adapter_flow.py",
+      "sha256": "77f41e911e975d663874455cb1c90c567b4656d133607f58405af15dc886ef21",
+      "size": 1425
+    },
+    {
+      "path": "tests/integration/test_channel_adapter_foundation_flow.py",
+      "sha256": "496cbd0e19f5064dfaf2577002bc110415b6680823baca58529226789047fc24",
+      "size": 2176
+    },
+    {
+      "path": "tests/integration/test_channel_adapter_runtime_recovery.py",
+      "sha256": "97a914a522b9559a2f6d2c5c8b5f97c7dd0eb5a137e2dad591b65489091a9419",
+      "size": 2116
+    },
+    {
+      "path": "tests/integration/test_channel_sandbox_recovery.py",
+      "sha256": "e97f53fdebd6c33dd096069268175e7198628463bc1081103cb2091a3441e518",
+      "size": 7798
+    },
+    {
+      "path": "tests/integration/test_channel_session_heartbeat_scheduler.py",
+      "sha256": "0f4800e36649c23f24b227ba36f798323b3174ffa0421d758ba842a0a7939ef2",
+      "size": 2747
+    },
+    {
+      "path": "tests/integration/test_channel_session_multi_store.py",
+      "sha256": "cc363338ae34ce191e0b8e8f34f5117b034b5b17c85f72349e7f4aed0abb8f01",
+      "size": 9751
+    },
+    {
+      "path": "tests/integration/test_control_plane_runtime.py",
+      "sha256": "10beeba82e5b23ac8d2a08f278f1fbcbb9ca064c4c8d614dda21f9435e2ab60e",
+      "size": 10330
+    },
+    {
+      "path": "tests/integration/test_execution_runtime.py",
+      "sha256": "810f8470e58809238ebd02ce9d1e3424bdd9cb6fba579e06bfab90263ed348ad",
+      "size": 16921
+    },
+    {
+      "path": "tests/integration/test_foundation_flow.py",
+      "sha256": "9cdc74bf306def261a48aca3f6f20673f2ba2bd858652f55155d0fc727f27336",
+      "size": 5776
+    },
+    {
+      "path": "tests/integration/test_gateway_edge_sandbox_v1.py",
+      "sha256": "8d7a382e9a4ab46fa6836c41b21cf341c27ce8fef2634d7ff166381609a7021e",
+      "size": 12766
+    },
+    {
+      "path": "tests/integration/test_gateway_sandbox_failures_v1.py",
+      "sha256": "441a7eefc8faa82d210ce027dca5ce31ad98c3ceca2bb13b050059f4561f0356",
+      "size": 6771
+    },
+    {
+      "path": "tests/integration/test_gateway_sandbox_integration_v1.py",
+      "sha256": "55270ba6ae86232d078858ecb2640b870f2386d3af1ee4be0260d25e42399fe0",
+      "size": 9074
+    },
+    {
+      "path": "tests/integration/test_observability_console.py",
+      "sha256": "940e44e1193d6d178f91409f06c6d8eedd9277d6ce182f45b913c1f9104511e1",
+      "size": 6575
+    },
+    {
+      "path": "tests/integration/test_pdd_adapter_discovery_safety.py",
+      "sha256": "0c689aa031123caf2aa18a9059afef2f024e29e497270b43cf4f7fadbfa04c3f",
+      "size": 3646
+    },
+    {
+      "path": "tests/integration/test_pdd_controlled_activation_cli_v1.py",
+      "sha256": "3c6ed2be28b2357cdb863c9fb6b6564548fe589d0c68ea5c72c6c08b9f664763",
+      "size": 1615
+    },
+    {
+      "path": "tests/integration/test_pdd_controlled_execution.py",
+      "sha256": "fbc5580581a0642b83f59c90be3bc796f8be6c276e446c377854931b6d4b2319",
+      "size": 10945
+    },
+    {
+      "path": "tests/integration/test_pdd_cursor_reliability_v1.py",
+      "sha256": "02e9b54f82de10edcf558a4963a7125db716899b9b33c24a37495adb0773973c",
+      "size": 7883
+    },
+    {
+      "path": "tests/integration/test_pdd_human_approval_execution_sandbox_v1.py",
+      "sha256": "ae032b3bf683b9b51d10d32e09634a2f6270d3252fe7b44c5fd01af051b0ff05",
+      "size": 10282
+    },
+    {
+      "path": "tests/integration/test_pdd_message_observation_v1.py",
+      "sha256": "2131ef71604f5a1539246c6d5c52e920cfa9fe4482071cfc5c4b4bd2ed8920d1",
+      "size": 7934
+    },
+    {
+      "path": "tests/integration/test_pdd_observation_ai_flow.py",
+      "sha256": "ec4311a2f28e434d9bf3dc4f087098d83e3dfe11a971be7fbd30262a23c3fedc",
+      "size": 3106
+    },
+    {
+      "path": "tests/integration/test_pdd_observation_mode_v1.py",
+      "sha256": "2a2953603503f562de2f43114657e69d768c92fd15f70db6d1fbf18a91560ef8",
+      "size": 10009
+    },
+    {
+      "path": "tests/integration/test_pdd_observe_mode_runtime.py",
+      "sha256": "90ed3f5f76286c57faff9047f146a2f2e63561d63948ce0f33ba02c80cb80038",
+      "size": 9982
+    },
+    {
+      "path": "tests/integration/test_pdd_production_governance_cli_v1.py",
+      "sha256": "24b6881140c0b8e719b74bcbe076edc2491c7e8f7a7c99d7635fa3df71ffb648",
+      "size": 3746
+    },
+    {
+      "path": "tests/integration/test_pdd_production_preparation.py",
+      "sha256": "a09cc7eb070c0a93dccc8208e692543141182b479a31f5450ea8aba2f4b1a249",
+      "size": 9046
+    },
+    {
+      "path": "tests/integration/test_pdd_production_safety_gate.py",
+      "sha256": "8a200bd5b4245c2cdf5dd384ef6ddfd9ffa08a4c27923da1b728d8697909e65e",
+      "size": 9962
+    },
+    {
+      "path": "tests/integration/test_pdd_send_transport_execution.py",
+      "sha256": "31707b408379585569fa8df187720be93a5d1239a86801f9176ac0111b04a28b",
+      "size": 5172
+    },
+    {
+      "path": "tests/integration/test_pdd_single_store_pilot.py",
+      "sha256": "376f597558b83f435a81bec626511ea7a276418d9109173e16ed6b16b4783950",
+      "size": 19019
+    },
+    {
+      "path": "tests/integration/test_production_runtime_readiness.py",
+      "sha256": "c52c473a7ca9b4b5b59411f172510baa62c8aad5a12ce97294c32e39853aaa8b",
+      "size": 10552
+    },
+    {
+      "path": "tests/integration/test_real_gateway_adapter.py",
+      "sha256": "fd99cd5bc856b9919c35a5c088fcd5b6b9180590852e41a62ba0c76ee4abcfbf",
+      "size": 4958
+    },
+    {
+      "path": "tests/integration/test_runtime_reliability_flow.py",
+      "sha256": "7826599ff9079331e7c458e4e341e5fe51e9391b2e4596c2266e5f198dcbdec3",
+      "size": 2028
+    },
+    {
+      "path": "tests/integration/test_runtime_schema_upgrade.py",
+      "sha256": "d28539a25f36a94ce7793d14c237365e4725fc9376be27235003d6de7c5da1f2",
+      "size": 2481
+    },
+    {
+      "path": "tests/integration/test_storage.py",
+      "sha256": "a7b5d241bb1cccb823546c179ece9a3fb51708c3064fa3c4aa200b29c9b45297",
+      "size": 1516
+    },
+    {
+      "path": "tests/pdd_adapter/__init__.py",
+      "sha256": "788387415aa2165ad427779bb801e5b245e9236cabc728293ded280c3fd6b1df",
+      "size": 43
+    },
+    {
+      "path": "tests/pdd_adapter/helpers.py",
+      "sha256": "6f8bdee1bcbec61660dd356f014a42270067630ec3c03fe5248bcf53fa4ef5e1",
+      "size": 2861
+    },
+    {
+      "path": "tests/pdd_adapter/test_domain_mapping.py",
+      "sha256": "02b2a80af16fe5f522bb9081e4c00956e909e83ddeb4a02325d05b7c9b2fa21b",
+      "size": 3434
+    },
+    {
+      "path": "tests/pdd_adapter/test_fake_pdd_integration.py",
+      "sha256": "eefff35626c3c63615eb9a5e4dc3f097a038350edbdecb8d0471601b6378aae1",
+      "size": 4377
+    },
+    {
+      "path": "tests/pdd_adapter/test_selector_contract.py",
+      "sha256": "d8b3a0ed9f29bcbf96de97ed6d3783befa52c3e3fae2a8dde3c0c05dba9b9025",
+      "size": 1699
+    },
+    {
+      "path": "tests/pdd_adapter/test_session_runtime.py",
+      "sha256": "053853fe727eb365b17a4e9e6d3832a22629ff727f371c5a6473f5234e204578",
+      "size": 2610
+    },
+    {
+      "path": "tests/pdd_controlled_support.py",
+      "sha256": "a6652a2ac822e3edb7fbea8b57e598422a3ad08983c5f82f6e6c0825041004e9",
+      "size": 2320
+    },
+    {
+      "path": "tests/pdd_governance_support.py",
+      "sha256": "a242aaf17c15248b3d0e173799d04bff899a366d915aec012dd88c749e25cc6d",
+      "size": 8859
+    },
+    {
+      "path": "tests/pdd_production_support.py",
+      "sha256": "b4d6d025714609781988429b50b042a97cecaf2f6d599d986c1832bc6dde4c48",
+      "size": 2855
+    },
+    {
+      "path": "tests/release/test_channel_engine_rc1_release_lock.py",
+      "sha256": "b27f259b1c742021aef9ebc88925a6848221999ecbc49e4a87503754b8f45b4c",
+      "size": 3282
+    },
+    {
+      "path": "tests/release/test_channel_engine_rc1_source_allowlist.py",
+      "sha256": "34c3973e7d192f12ad5136da320d53b648fe7f5cbe448b49349b0adfb64f8f48",
+      "size": 1855
+    },
+    {
+      "path": "tests/security/test_gateway_edge_security_v1.py",
+      "sha256": "6fa9e7918e748f7f49ad9da8d1aed2444e360ba5f4959859c4837d5ea82d21ea",
+      "size": 1672
+    },
+    {
+      "path": "tests/security/test_pdd_approval_execution_sandbox_security_v1.py",
+      "sha256": "89ca74fc3760d88dd817cfc7e1324d9e7ac5d86141b1bba426ef4a9398ceca8e",
+      "size": 1254
+    },
+    {
+      "path": "tests/security/test_pdd_controlled_activation_security_v1.py",
+      "sha256": "3582096bb1515508172a7d0ca38f879ab11b66670c246bae82eec3ba0ab4ed12",
+      "size": 1198
+    },
+    {
+      "path": "tests/security/test_pdd_message_observation_security_v1.py",
+      "sha256": "01c439cce6e76c40535ea715ff64441576695e70d21d8861c9844b4daafd2591",
+      "size": 1917
+    },
+    {
+      "path": "tests/security/test_pdd_observation_mode_security_v1.py",
+      "sha256": "5ad6be03a4ef700319bd25ee15360ab05c9460522edc722207217f89afb5ae7d",
+      "size": 2541
+    },
+    {
+      "path": "tests/security/test_pdd_production_activation_governance_security_v1.py",
+      "sha256": "b4798a020c09da1869b7472ece9b20e7651d2fe7bc187ef9d616a939a9e9f58e",
+      "size": 1508
+    },
+    {
+      "path": "tests/security/test_pdd_production_blocker_security_v1.py",
+      "sha256": "663ae0297e93f74c1611550a66bd1e6a8db7de44c278edd5bf47e69919197af4",
+      "size": 6963
+    },
+    {
+      "path": "tests/support/ai_cs_gateway_server_harness.py",
+      "sha256": "156bf12472748dcc70443724627a88e1c452a12e721b06f86f20a8097d5fbd66",
+      "size": 2709
+    },
+    {
+      "path": "tests/unit/test_ai_cs_gateway_client.py",
+      "sha256": "8ad0f23aea4bd5f61f95d5fc2bb7e9f8d72e76ac115f41521946be10e90e8fb7",
+      "size": 20148
+    },
+    {
+      "path": "tests/unit/test_ai_cs_gateway_integration_client.py",
+      "sha256": "3a245e6b563520844738d97a8ce1a6997cbcdb9b6d67ec096aec951a1fddcc06",
+      "size": 12051
+    },
+    {
+      "path": "tests/unit/test_browser_boundary.py",
+      "sha256": "bdea7f31a3d4030d06a816ef34f4b40cb9155ef0aaa3f2a58756b557ac5f338a",
+      "size": 439
+    },
+    {
+      "path": "tests/unit/test_channel_adapter_foundation_v1.py",
+      "sha256": "ae8ec6321932b3fe15051c7b60449f336f266d501fe8a5d1dd1a1cbf53233154",
+      "size": 7282
+    },
+    {
+      "path": "tests/unit/test_channel_adapter_framework.py",
+      "sha256": "eddd41bdd5522fb3d8932deaf004315e5e9a13f6a4f0ad39dd487a99120340e8",
+      "size": 7602
+    },
+    {
+      "path": "tests/unit/test_channel_agent_first_launch.py",
+      "sha256": "bc1a50fca78fe3e34cefaafc1582b48f8525bfcdbe0514cecb001aae33ff2244",
+      "size": 12243
+    },
+    {
+      "path": "tests/unit/test_channel_agent_foundation.py",
+      "sha256": "c2fd6844acafe1c7e9eaca152d5515b8260d23ad3a43f22b0ef9c29117b4ddf0",
+      "size": 8694
+    },
+    {
+      "path": "tests/unit/test_channel_sandbox_adapter.py",
+      "sha256": "273fa93574b48392e748231563f7bc8c7a54d545d8f588fdb22b19957e29014e",
+      "size": 5223
+    },
+    {
+      "path": "tests/unit/test_channel_session_credential_safety.py",
+      "sha256": "3d9d7b8c299b0dab8a69902ea4e0d625b26fe6194b6e47ef888e5751d6331646",
+      "size": 2066
+    },
+    {
+      "path": "tests/unit/test_channel_session_runtime.py",
+      "sha256": "6256c18c53fb97e5a8c7fd4b900e2d647c2dfe3788758dc9ff62136ca8854c13",
+      "size": 10540
+    },
+    {
+      "path": "tests/unit/test_gateway_and_channel.py",
+      "sha256": "55fd07964b3ac24654f9b899c2a5800fbaa1bc6bb03fe7f5b159b823be2ee8d6",
+      "size": 1913
+    },
+    {
+      "path": "tests/unit/test_models.py",
+      "sha256": "611551ec68c0710a1ab8c4a2662938eca0b7709385965447fc690cffe118bfb0",
+      "size": 1779
+    },
+    {
+      "path": "tests/unit/test_observability.py",
+      "sha256": "5d30c2a1e565bd912feeecd7968ab70da53c877ea6660161d9b700e63104b3b1",
+      "size": 1555
+    },
+    {
+      "path": "tests/unit/test_operations_console_assets.py",
+      "sha256": "9a25a4feaf57eda55d5a76ee524999198cf90d58b12280926d1ecdee80050e4d",
+      "size": 3111
+    },
+    {
+      "path": "tests/unit/test_pdd_adapter_discovery.py",
+      "sha256": "137768b92a381b53ac199ef4765590064064137e94e1e26d2f15aed170cb5554",
+      "size": 8380
+    },
+    {
+      "path": "tests/unit/test_pdd_approval_execution_sandbox.py",
+      "sha256": "e7283f1bae1c856b36ff15faaa8776dd241e453e0663005b5838f75d2ffeec56",
+      "size": 1603
+    },
+    {
+      "path": "tests/unit/test_pdd_controlled_activation_preparation_v1.py",
+      "sha256": "d7b0e235acc34c17c94a91f0d61ba99e604e291598126a744465f4cff1f79c0a",
+      "size": 13987
+    },
+    {
+      "path": "tests/unit/test_pdd_message_observation.py",
+      "sha256": "befd4c9c2097f40b26aa8d1f3d1ef4f6f1937e97a902b0739985c05b61dbea78",
+      "size": 2402
+    },
+    {
+      "path": "tests/unit/test_pdd_observe_cdp_readonly.py",
+      "sha256": "b66c3ef61f649e470fec4ecd809d7d99b10b16c3bb23e93a8f307e5a116d3339",
+      "size": 8569
+    },
+    {
+      "path": "tests/unit/test_pdd_production_activation_governance_v1.py",
+      "sha256": "8313a894d09e5db00ea89fcb5a57ab46db16b7d33060d4a72b67e4107db7b3c7",
+      "size": 11186
+    },
+    {
+      "path": "tests/unit/test_pdd_runtime_status_v1.py",
+      "sha256": "7b238b5f3f9ee2732852a9558e8957a4b69b2a1368681ecae0799640c96b25b3",
+      "size": 3125
+    },
+    {
+      "path": "tests/unit/test_policy.py",
+      "sha256": "21dfc088a046cf3712ecd0699e3c1c3db0f65f16eb956d7c24456a9953641592",
+      "size": 1551
+    },
+    {
+      "path": "tests/unit/test_real_browser_runtime.py",
+      "sha256": "5d48988d1057a833afe5f924859a4ab4a1aeef1b78606a9aa239955d2ae18908",
+      "size": 13597
+    },
+    {
+      "path": "tests/unit/test_real_gateway_http_adapter.py",
+      "sha256": "82b16ea46119c470c7000b8e5161096b6dfd247a1dc58e86a12dd09c646b97ca",
+      "size": 16667
+    },
+    {
+      "path": "tests/unit/test_runtime_reliability.py",
+      "sha256": "83c87f8e3d339b84b849f51286c88ea2cd61856c80b735c82e69ebd643580ee2",
+      "size": 9631
+    },
+    {
+      "path": "tests/unit/test_state_machines.py",
+      "sha256": "6a3cecad9de5ae82524053711291daa192649b9daf307fe2ac9904527fca3795",
+      "size": 2788
+    },
+    {
+      "path": "tests/windows_agent/test_windows_agent_deployment_hardening.py",
+      "sha256": "772f1d0ab7e8af26eb283a623da54018c829b7250139e187a8e153bb599b8b58",
+      "size": 6496
+    },
+    {
+      "path": "tests/windows_agent/test_windows_agent_gateway_and_package.py",
+      "sha256": "b8dd3b1ef80a710227322957de2d4bc0129bd9734575586865e9f037058e08aa",
+      "size": 7265
+    },
+    {
+      "path": "tests/windows_agent/test_windows_agent_runtime.py",
+      "sha256": "17c2a7ca92623759e45de9204f60430272a0d53940283305c454efd2617d1d0f",
+      "size": 9835
+    }
+  ],
+  "contains_secret_material": false,
+  "contains_customer_data": false,
+  "real_send_enabled": false
+}

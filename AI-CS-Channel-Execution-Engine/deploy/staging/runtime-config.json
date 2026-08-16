@@ -1,0 +1,37 @@
+{
+  "runtime": {
+    "profile_version": "1.0",
+    "profile": "staging",
+    "gateway_endpoint": "https://ai-cs.staging.invalid",
+    "adapter_mode": "OBSERVATION_ONLY",
+    "credential_reference": {
+      "provider": "secret-manager",
+      "credential_id": "channel-engine-staging-pdd-observer",
+      "version": "v1",
+      "account_ref": "staging-synthetic-account"
+    },
+    "policy_profile": "staging-observation.v1",
+    "allowlist": {
+      "account_refs": [
+        "staging-synthetic-account"
+      ],
+      "conversation_ids": [
+        "staging-synthetic-conversation-001"
+      ],
+      "allowed_actions": [
+        "OBSERVE_MESSAGE",
+        "REQUEST_DECISION",
+        "SIMULATE_SEND_MESSAGE"
+      ],
+      "blocked_actions": [
+        "SEND_MESSAGE",
+        "AUTOMATIC_REPLY",
+        "REFUND",
+        "MODIFY_ORDER",
+        "PAYMENT"
+      ]
+    },
+    "production_enabled": false,
+    "automatic_send_enabled": false
+  }
+}

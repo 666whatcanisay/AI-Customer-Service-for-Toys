@@ -1,0 +1,311 @@
+{
+  "schema": "ai-cs.recorded-pdd-evaluation.v1",
+  "source_origin": "RECORDED_PDD_20260814",
+  "source_document_sha256": "267A15BD54208388CBFA01718052E16F400AEF4D2DA1B68BE5F30531BBBE3D24",
+  "observations": [
+    {
+      "provider_observation_version": "1.0",
+      "provider_id": "recorded-pdd-20260814",
+      "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000001",
+      "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72",
+      "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226",
+      "platform_store_id": null,
+      "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-001",
+      "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000001",
+      "external_message_id": "recorded-msg-001",
+      "source_cursor": "recorded-pdd-20260814:001",
+      "source_sequence": 1,
+      "content": "车长52吗",
+      "timestamp": "2026-08-14T14:27:49Z",
+      "captured_at": "2026-08-14T14:27:50Z",
+      "product": {"product_id": "972030445746", "product_name": "脱敏积木商品-A", "sku_id": null, "sku_name": null, "attributes": {}},
+      "order": {},
+      "page_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "selector_evidence_hash": null,
+      "privacy_filtered": true,
+      "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000002", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-002", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000002",
+      "external_message_id": "recorded-msg-002", "source_cursor": "recorded-pdd-20260814:002", "source_sequence": 1,
+      "content": "这个尺寸是多大的", "timestamp": "2026-08-14T13:51:23Z", "captured_at": "2026-08-14T13:51:24Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000003", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-003", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000003",
+      "external_message_id": "recorded-msg-003", "source_cursor": "recorded-pdd-20260814:003", "source_sequence": 1,
+      "content": "有拼好的实物图吗", "timestamp": "2026-08-14T13:55:36Z", "captured_at": "2026-08-14T13:55:37Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000004", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-004", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000004",
+      "external_message_id": "recorded-msg-004", "source_cursor": "recorded-pdd-20260814:004", "source_sequence": 1,
+      "content": "货柜礼盒是什么", "timestamp": "2026-08-14T13:24:38Z", "captured_at": "2026-08-14T13:24:39Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000005", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-005", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000005",
+      "external_message_id": "recorded-msg-005", "source_cursor": "recorded-pdd-20260814:005", "source_sequence": 1,
+      "content": "哪里发货", "timestamp": "2026-08-14T12:02:00Z", "captured_at": "2026-08-14T12:02:01Z",
+      "product": {"product_id": "984350540183", "product_name": "脱敏积木商品-C", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000006", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-006", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000006",
+      "external_message_id": "recorded-msg-006", "source_cursor": "recorded-pdd-20260814:006", "source_sequence": 1,
+      "content": "多少块的", "timestamp": "2026-08-14T11:03:00Z", "captured_at": "2026-08-14T11:03:01Z",
+      "product": {"product_id": "970504176629", "product_name": "脱敏积木商品-D", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000007", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-007", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000007",
+      "external_message_id": "recorded-msg-007", "source_cursor": "recorded-pdd-20260814:007", "source_sequence": 1,
+      "content": "有多少粒", "timestamp": "2026-08-14T10:19:00Z", "captured_at": "2026-08-14T10:19:01Z",
+      "product": {"product_id": "970504176629", "product_name": "脱敏积木商品-D", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000008", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-008", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000008",
+      "external_message_id": "recorded-msg-008", "source_cursor": "recorded-pdd-20260814:008", "source_sequence": 1,
+      "content": "多少颗粒", "timestamp": "2026-08-14T09:00:00Z", "captured_at": "2026-08-14T09:00:01Z",
+      "product": {"product_id": "970504176629", "product_name": "脱敏积木商品-D", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000009", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-009", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000009",
+      "external_message_id": "recorded-msg-009", "source_cursor": "recorded-pdd-20260814:009", "source_sequence": 1,
+      "content": "长度和宽度是多少", "timestamp": "2026-08-13T21:41:04Z", "captured_at": "2026-08-13T21:41:05Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:000000000000000000000000000000000000000000000000000000000000000a", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-010", "customer_reference": "sha256:e00000000000000000000000000000000000000000000000000000000000000a",
+      "external_message_id": "recorded-msg-010", "source_cursor": "recorded-pdd-20260814:010", "source_sequence": 1,
+      "content": "多少颗粒", "timestamp": "2026-08-13T21:16:07Z", "captured_at": "2026-08-13T21:16:08Z",
+      "product": {"product_id": "972030445746", "product_name": "脱敏积木商品-A", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:000000000000000000000000000000000000000000000000000000000000000b", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-011", "customer_reference": "sha256:e00000000000000000000000000000000000000000000000000000000000000b",
+      "external_message_id": "recorded-msg-011", "source_cursor": "recorded-pdd-20260814:011", "source_sequence": 1,
+      "content": "多大", "timestamp": "2026-08-13T20:30:26Z", "captured_at": "2026-08-13T20:30:27Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:000000000000000000000000000000000000000000000000000000000000000c", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-012", "customer_reference": "sha256:e00000000000000000000000000000000000000000000000000000000000000c",
+      "external_message_id": "recorded-msg-012", "source_cursor": "recorded-pdd-20260814:012", "source_sequence": 1,
+      "content": "尺寸", "timestamp": "2026-08-13T21:27:21Z", "captured_at": "2026-08-13T21:27:22Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:000000000000000000000000000000000000000000000000000000000000000d", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-013", "customer_reference": "sha256:e00000000000000000000000000000000000000000000000000000000000000d",
+      "external_message_id": "recorded-msg-013", "source_cursor": "recorded-pdd-20260814:013", "source_sequence": 1,
+      "content": "1:1复刻吗", "timestamp": "2026-08-13T20:02:48Z", "captured_at": "2026-08-13T20:02:49Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:000000000000000000000000000000000000000000000000000000000000000e", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-014", "customer_reference": "sha256:e00000000000000000000000000000000000000000000000000000000000000e",
+      "external_message_id": "recorded-msg-014", "source_cursor": "recorded-pdd-20260814:014", "source_sequence": 1,
+      "content": "多少粒", "timestamp": "2026-08-13T18:14:18Z", "captured_at": "2026-08-13T18:14:19Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:000000000000000000000000000000000000000000000000000000000000000f", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-015", "customer_reference": "sha256:e00000000000000000000000000000000000000000000000000000000000000f",
+      "external_message_id": "recorded-msg-015", "source_cursor": "recorded-pdd-20260814:015", "source_sequence": 1,
+      "content": "请问一下长宽高", "timestamp": "2026-08-13T16:16:05Z", "captured_at": "2026-08-13T16:16:06Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    },
+    {
+      "provider_observation_version": "1.0", "provider_id": "recorded-pdd-20260814", "provider_kind": "RECORDED_REPLAY",
+      "trace_id": "trace:0000000000000000000000000000000000000000000000000000000000000010", "platform": "PDD",
+      "catalog_tenant_id": "c-tenant-6639df2982014226be2f5164ba642a72", "catalog_platform": "pdd",
+      "store_id": "c-store-6639df2982014226", "platform_store_id": null, "store_name": "玩具乐园积木店",
+      "conversation_id": "recorded-conversation-016", "customer_reference": "sha256:e000000000000000000000000000000000000000000000000000000000000010",
+      "external_message_id": "recorded-msg-016", "source_cursor": "recorded-pdd-20260814:016", "source_sequence": 1,
+      "content": "比例是几比几的", "timestamp": "2026-08-13T16:24:33Z", "captured_at": "2026-08-13T16:24:34Z",
+      "product": {"product_id": "982904528556", "product_name": "脱敏积木商品-B", "sku_id": null, "sku_name": null, "attributes": {}}, "order": {},
+      "page_fingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "selector_evidence_hash": null,
+      "privacy_filtered": true, "visible_history": []
+    }
+  ],
+  "evaluation_references": [
+    {
+      "case_id": "RPD-001", "external_message_id": "recorded-msg-001", "macro_group": "SIZE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "972030445746", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image1.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "估测40cm左右", "expected_fact_groups": [["40cm", "40厘米"]], "forbidden_cross_product_facts": ["20cm", "20厘米"]
+    },
+    {
+      "case_id": "RPD-002", "external_message_id": "recorded-msg-002", "macro_group": "SIZE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image2.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "这款商品的尺寸大约是20cm左右", "expected_fact_groups": [["20cm", "20厘米"]], "forbidden_cross_product_facts": ["40cm", "40厘米"]
+    },
+    {
+      "case_id": "RPD-003", "external_message_id": "recorded-msg-003", "macro_group": "IMAGE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image3.png", "verification_method": "SAME_PRODUCT_CARD", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "详情页面都是产品实拍展示，您可以看下", "expected_fact_groups": [["详情页", "详情页面"], ["实拍"]], "forbidden_cross_product_facts": []
+    },
+    {
+      "case_id": "RPD-004", "external_message_id": "recorded-msg-004", "macro_group": "PACKAGING",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image4.png", "verification_method": "SAME_PRODUCT_CARD", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "彩盒", "expected_fact_groups": [["彩盒"]], "forbidden_cross_product_facts": ["礼袋"]
+    },
+    {
+      "case_id": "RPD-005", "external_message_id": "recorded-msg-005", "macro_group": "SHIPPING",
+      "store_id": "c-store-6639df2982014226", "product_ref": "984350540183", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image5.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "我们是从广东省汕头市发货的", "expected_fact_groups": [["广东汕头", "广东省汕头市", "汕头"]], "forbidden_cross_product_facts": []
+    },
+    {
+      "case_id": "RPD-006", "external_message_id": "recorded-msg-006", "macro_group": "PARTICLE_COUNT",
+      "store_id": "c-store-6639df2982014226", "product_ref": "970504176629", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image6.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "估测1000多颗粒左右", "expected_fact_groups": [["1000"]], "forbidden_cross_product_facts": ["500", "600"]
+    },
+    {
+      "case_id": "RPD-007", "external_message_id": "recorded-msg-007", "macro_group": "PARTICLE_COUNT",
+      "store_id": "c-store-6639df2982014226", "product_ref": "970504176629", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image7.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "估测1000多颗粒左右", "expected_fact_groups": [["1000"]], "forbidden_cross_product_facts": ["500", "600"]
+    },
+    {
+      "case_id": "RPD-008", "external_message_id": "recorded-msg-008", "macro_group": "PARTICLE_COUNT",
+      "store_id": "c-store-6639df2982014226", "product_ref": "970504176629", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image8.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "估测1000多颗粒左右", "expected_fact_groups": [["1000"]], "forbidden_cross_product_facts": ["500", "600"]
+    },
+    {
+      "case_id": "RPD-009", "external_message_id": "recorded-msg-009", "macro_group": "SIZE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image9.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "长度大约20cm左右，宽度5cm左右", "expected_fact_groups": [["20cm", "20厘米"], ["5cm", "5厘米"]], "forbidden_cross_product_facts": ["40cm", "40厘米"]
+    },
+    {
+      "case_id": "RPD-010", "external_message_id": "recorded-msg-010", "macro_group": "PARTICLE_COUNT",
+      "store_id": "c-store-6639df2982014226", "product_ref": "972030445746", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image10.png", "verification_method": "TITLE_MATCH_WITH_IMAGE1_EXACT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "估测600左右零件", "expected_fact_groups": [["600"]], "forbidden_cross_product_facts": ["500", "1000"]
+    },
+    {
+      "case_id": "RPD-011", "external_message_id": "recorded-msg-011", "macro_group": "SIZE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image11.png", "verification_method": "EXACT_PRODUCT_ID", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "这款积木的尺寸大约是20cm左右", "expected_fact_groups": [["20cm", "20厘米"]], "forbidden_cross_product_facts": ["40cm", "40厘米"]
+    },
+    {
+      "case_id": "RPD-012", "external_message_id": "recorded-msg-012", "macro_group": "SIZE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image12.png", "verification_method": "SAME_PRODUCT_CARD", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "拼好后估测尺寸在20cm左右", "expected_fact_groups": [["20cm", "20厘米"]], "forbidden_cross_product_facts": ["40cm", "40厘米"]
+    },
+    {
+      "case_id": "RPD-013", "external_message_id": "recorded-msg-013", "macro_group": "SCALE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image13.png", "verification_method": "SAME_CONVERSATION_AS_IMAGE11_EXACT_ID", "product_card_visible": false, "sku_visible": false},
+      "operator_answer": "这款是1:20比例，20cm左右", "expected_fact_groups": [["1:20", "1比20"], ["20cm", "20厘米"]], "forbidden_cross_product_facts": ["1:1"]
+    },
+    {
+      "case_id": "RPD-014", "external_message_id": "recorded-msg-014", "macro_group": "PARTICLE_COUNT",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image14.png", "verification_method": "SAME_PRODUCT_CARD", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "估测有500多颗粒左右", "expected_fact_groups": [["500"]], "forbidden_cross_product_facts": ["600", "1000"]
+    },
+    {
+      "case_id": "RPD-015", "external_message_id": "recorded-msg-015", "macro_group": "SIZE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image16.png", "verification_method": "SAME_PRODUCT_CARD", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "长约20cm，宽5cm，高5cm", "expected_fact_groups": [["20cm", "20厘米"], ["5cm", "5厘米"]], "forbidden_cross_product_facts": ["40cm", "40厘米"]
+    },
+    {
+      "case_id": "RPD-016", "external_message_id": "recorded-msg-016", "macro_group": "SCALE",
+      "store_id": "c-store-6639df2982014226", "product_ref": "982904528556", "sku_ref": null, "scope_requirement": "PRODUCT_ONLY",
+      "scope_evidence": {"status": "VERIFIED", "source_locator": "DOCX:image16.png", "verification_method": "SAME_PRODUCT_CARD", "product_card_visible": true, "sku_visible": false},
+      "operator_answer": "这款积木的比例是1:20", "expected_fact_groups": [["1:20", "1比20"]], "forbidden_cross_product_facts": ["1:1"]
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "schema_version": "rc5-release-bom.v4",
+  "generated_at": "2026-08-13T19:35:00+08:00",
+  "release_name": "AI-CS RC5 P0 Closeout Candidate",
+  "scope": "OFFLINE_RC5_PLUS_REAL_PDD_PAGE_DISCOVERY_NO_REAL_SEND",
+  "status": {
+    "RC5_OFFLINE_STABILITY_READY": "PASS",
+    "CURRENT_GREEN_UI_HUMAN_ACCEPTANCE": "PASS",
+    "RC5_FINAL_READY": "PASS",
+    "AI_CS_PRODUCTION_READY": "BLOCKED"
+  },
+  "source": {
+    "identity_semantics": "IMPLEMENTATION_FREEZE_IS_SEPARATE_FROM_EVIDENCE_DOCS_COMMIT",
+    "engine": {
+      "branch": "codex/rc5-offline-stability",
+      "implementation_commit": "71fc4eb9eb754001e4264736200f64f8340371f3",
+      "implementation_tree": "d07d30b929532385a59976beb25361c58344f94d",
+      "production_tree_sha256": "54c1ca84fdc73dbef04dd3ef2ff753d9a3796139cb72381bd75cebde3a3c9fd2",
+      "evidence_commit_resolution": "git log -1 -- docs/production/rc5-final/rc5-release-bom.json"
+    },
+    "ai_cs": {
+      "branch": "codex/rc5-offline-stability",
+      "implementation_commit": "4d3be2ac3958697d42271439a41557dea784246d",
+      "implementation_tree": "7fa80f2ac4bc7953bc137c844a083892caead1e9",
+      "production_tree_sha256": "6c3de527bd9950976007390d730518aae2d09a66c389d2bf736c7f3c9e4ea517"
+    }
+  },
+  "components": {
+    "channel_agent": "2.0.0rc5",
+    "channel_engine": "0.2.0rc3",
+    "agent_control_protocol": "2.1",
+    "ai_cs_gateway": "ai-cs-gateway.v1",
+    "gateway_wire": "1.0",
+    "gateway_canonical_sha256": "e5ac64a82d2a7ccd19d3ece9bcc076242b55b6c205c85626786e8b1b7478f4b5",
+    "ai_cs_contracts": "0.14.0",
+    "platform_backend": "1.0.0",
+    "assistant_frontend": "1.0.0",
+    "admin_frontend": "1.0.0"
+  },
+  "database": {
+    "source_migration_head": "0019_runtime_database_identity_v1",
+    "platform_runtime_revision": "0019_runtime_database_identity_v1",
+    "channel_engine_storage_version": "1.0",
+    "ordinary_startup": "VALIDATE_ONLY_NO_MIGRATION_NO_TEST_KNOWLEDGE_INIT"
+  },
+  "candidate_artifacts": {
+    "package_root": "dist/windows-client-v2/rc5-p0-closeout/AI-CS-Channel-Agent",
+    "archive": "dist/windows-client-v2/rc5-p0-closeout/AI-CS-Channel-Agent-2.0.0rc5-windows-x64.zip",
+    "exe_sha256": "a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d",
+    "pyz_sha256": "4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93",
+    "manifest_sha256": "819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7",
+    "zip_sha256": "9e67800add464d72a2bf3624ad6ec3c86b17fc58706b2b32fc59d7bec602f826",
+    "manifest_file_count": 1161,
+    "forbidden_entries": 0,
+    "production_composition_sha256": "15512232a68cf2e77f31f7d9ff18a0af6e45bbcebb61de2f1b856d1ea8f3405f",
+    "assistant_ui_assets_sha256": "78203d85f9539bb51c9901a7a20cd1d074dfe28bce1a960362217d38f84a31a7"
+  },
+  "installed_runtime": {
+    "version": "2.0.0rc5",
+    "matches_current_candidate": true,
+    "source_matches_package": true,
+    "package_matches_installed": true,
+    "installed_identity_matches_source": true,
+    "exe_sha256": "a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d",
+    "pyz_sha256": "4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93",
+    "manifest_sha256": "819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7",
+    "identity_preserved": true,
+    "device_binding_preserved": true,
+    "profile_replaced": false,
+    "pdd_session_exported": false,
+    "real_send_enabled": false
+  },
+  "verification": {
+    "last_stage_full_gate": "PASS_REUSED_FOR_UNCHANGED_CORE",
+    "channel_engine": "797 PASS; 1 explicit real Edge smoke NOT_IN_SCOPE",
+    "ai_cs_backend": "153 PASS; 3 explicit real local E2E NOT_IN_SCOPE",
+    "platform_backend": "181 PASS",
+    "contracts": "16 PASS",
+    "assistant_frontend": "216 PASS; typecheck PASS",
+    "admin_frontend": "92 PASS; typecheck PASS",
+    "backend_blackbox": "35/35 PASS",
+    "windows_isolated_deployment": "13/13 PASS",
+    "p0_package_change_gate": "23/23 PASS",
+    "pdd_adapter_offline_change_gate": "39 PASS earlier; 37/37 PASS final selected recheck",
+    "production_architecture_software_rc": "PASS",
+    "production_selector_evidence": "BLOCKED_EXPECTED_REAL_PDD_ADAPTER_NOT_VERIFIED",
+    "real_pdd_page_structure_discovery": "PASS",
+    "real_pdd_observer_started_by_closeout": false,
+    "real_pdd_write_operations": 0
+  },
+  "pdd_gates": {
+    "REAL_PDD_LOGIN_READY": "NOT_VERIFIED",
+    "REAL_PDD_STORE_READY": "NOT_VERIFIED",
+    "REAL_PDD_PAGE_STRUCTURE_DISCOVERY": "PASS",
+    "REAL_PDD_ADAPTER_READY": "NOT_VERIFIED",
+    "REAL_PDD_READ_READY": "NOT_VERIFIED",
+    "REAL_PDD_ORDER_CONTEXT_READY": "NOT_VERIFIED",
+    "REAL_PDD_AI_READY": "NOT_VERIFIED",
+    "REAL_PDD_CONFIRM_READY": "NOT_VERIFIED",
+    "REAL_PDD_SEND_READY": "NOT_VERIFIED",
+    "REAL_PDD_AUTO_SEND_READY": "NOT_IN_SCOPE"
+  },
+  "commercial_release": {
+    "unsigned_controlled_rc": true,
+    "release_tag_created": false,
+    "pushed": false,
+    "code_signing": "NOT_IN_SCOPE",
+    "enterprise_certificate": "NOT_IN_SCOPE",
+    "windows_service": "NOT_IN_SCOPE"
+  }
+}

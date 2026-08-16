@@ -1,0 +1,50 @@
+{
+  "manifest_version": "1.0",
+  "name": "channel-engine-staging-v1",
+  "runtime_config_path": "./runtime-config.json",
+  "dependencies": [
+    {
+      "name": "channel-engine-runtime-store",
+      "dependency_type": "runtime-store",
+      "required": true,
+      "endpoint_reference": "database-ref://channel-engine-staging"
+    },
+    {
+      "name": "ai-cs-staging-gateway",
+      "dependency_type": "ai-cs-gateway",
+      "required": true,
+      "endpoint_reference": "https://ai-cs.staging.invalid",
+      "health_endpoint": "/gateway/v1/health"
+    },
+    {
+      "name": "staging-credential-broker",
+      "dependency_type": "credential-provider",
+      "required": true,
+      "endpoint_reference": "credential-ref://channel-engine-staging-pdd-observer"
+    }
+  ],
+  "health": {
+    "liveness": "/health",
+    "aggregate_readiness": "/control/v1/health",
+    "control_status": "/control/v1/status"
+  },
+  "startup_order": [
+    "runtime-store",
+    "control-plane",
+    "ai-cs-gateway-health",
+    "channel-engine-api",
+    "execution-worker",
+    "outbox-publisher"
+  ],
+  "shutdown_order": [
+    "outbox-publisher",
+    "execution-worker",
+    "channel-engine-api",
+    "ai-cs-gateway-health",
+    "control-plane",
+    "runtime-store"
+  ],
+  "production_deployment_enabled": false,
+  "real_channel_enabled": false,
+  "automatic_send_enabled": false
+}

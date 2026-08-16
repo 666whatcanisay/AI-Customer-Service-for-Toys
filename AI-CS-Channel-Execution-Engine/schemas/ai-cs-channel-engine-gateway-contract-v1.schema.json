@@ -1,0 +1,623 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-cs:channel-engine:gateway-contract:v1",
+  "title": "AI-CS Channel Engine Gateway Contract V1",
+  "description": "Production Gateway Contract V1 for DecisionRequest, DecisionResponse, ErrorEnvelope, authenticated GatewayHealth and normalized HMAC metadata.",
+  "$defs": {
+    "AuthenticationMetadata": {
+      "additionalProperties": false,
+      "description": "Normalized representation of the frozen HMAC request headers.",
+      "properties": {
+        "contract_version": {
+          "const": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "scheme": {
+          "const": "HMAC-SHA256",
+          "title": "Scheme",
+          "type": "string"
+        },
+        "client_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Client Id",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "nonce": {
+          "maxLength": 86,
+          "minLength": 22,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Nonce",
+          "type": "string"
+        },
+        "content_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[A-Za-z0-9_-]{43}$",
+          "title": "Signature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "scheme",
+        "client_id",
+        "key_id",
+        "timestamp",
+        "nonce",
+        "content_sha256",
+        "signature"
+      ],
+      "title": "AuthenticationMetadata",
+      "type": "object"
+    },
+    "DecisionAction": {
+      "enum": [
+        "SUGGEST_REPLY",
+        "NO_ACTION"
+      ],
+      "title": "DecisionAction",
+      "type": "string"
+    },
+    "DecisionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "correlation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "conversation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "message_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "customer_message": {
+          "maxLength": 8000,
+          "minLength": 1,
+          "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
+          "title": "Customer Message",
+          "type": "string"
+        },
+        "context": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Context",
+          "type": "object"
+        },
+        "requested_at": {
+          "format": "date-time",
+          "title": "Requested At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "request_id",
+        "idempotency_key",
+        "correlation_id",
+        "conversation_id",
+        "message_id",
+        "customer_message",
+        "requested_at"
+      ],
+      "title": "DecisionRequest",
+      "type": "object"
+    },
+    "DecisionResponse": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "SUGGEST_REPLY"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "proposed_content": {
+                "maxLength": 8000,
+                "minLength": 1,
+                "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "NO_ACTION"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "proposed_content": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "correlation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "decision_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/DecisionAction"
+        },
+        "proposed_content": {
+          "anyOf": [
+            {
+              "maxLength": 8000,
+              "minLength": 1,
+              "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposed Content"
+        },
+        "requires_approval": {
+          "const": true,
+          "title": "Requires Approval",
+          "type": "boolean"
+        },
+        "risk_level": {
+          "$ref": "#/$defs/GatewayRiskLevel"
+        },
+        "gateway_version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Gateway Version",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "decided_at": {
+          "format": "date-time",
+          "title": "Decided At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "request_id",
+        "idempotency_key",
+        "correlation_id",
+        "decision_id",
+        "action",
+        "proposed_content",
+        "requires_approval",
+        "risk_level",
+        "gateway_version",
+        "decided_at"
+      ],
+      "title": "DecisionResponse",
+      "type": "object"
+    },
+    "ErrorEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/GatewayError"
+        }
+      },
+      "required": [
+        "contract_version",
+        "error"
+      ],
+      "title": "ErrorEnvelope",
+      "type": "object"
+    },
+    "GatewayError": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "retryable": {
+                "const": false
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "error_code": {
+                "enum": [
+                  "DEADLINE_EXCEEDED",
+                  "IDEMPOTENCY_IN_PROGRESS",
+                  "INTERNAL_ERROR",
+                  "RATE_LIMITED",
+                  "SERVICE_UNAVAILABLE"
+                ]
+              }
+            },
+            "required": [
+              "error_code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retryable": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "retryable": {
+                "const": false
+              }
+            },
+            "required": [
+              "retryable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retry_after_seconds": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "error_code": {
+                "const": "RATE_LIMITED"
+              }
+            },
+            "required": [
+              "error_code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retry_after_seconds": {
+                "maximum": 3600,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "retry_after_seconds"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "error_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Error Id",
+          "type": "string"
+        },
+        "error_code": {
+          "$ref": "#/$defs/GatewayErrorCode"
+        },
+        "message": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "retry_after_seconds": {
+          "anyOf": [
+            {
+              "maximum": 3600,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Seconds"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Request Id"
+        },
+        "correlation_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Correlation Id"
+        },
+        "details": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Details",
+          "type": "object"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_id",
+        "error_code",
+        "message",
+        "retryable",
+        "request_id",
+        "correlation_id",
+        "occurred_at"
+      ],
+      "title": "GatewayError",
+      "type": "object"
+    },
+    "GatewayErrorCode": {
+      "enum": [
+        "INVALID_REQUEST",
+        "AUTHENTICATION_REQUIRED",
+        "AUTHENTICATION_FAILED",
+        "AUTHORIZATION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "METHOD_NOT_ALLOWED",
+        "UNSUPPORTED_CONTRACT_VERSION",
+        "IDEMPOTENCY_IN_PROGRESS",
+        "IDEMPOTENCY_CONFLICT",
+        "PAYLOAD_TOO_LARGE",
+        "UNSUPPORTED_MEDIA_TYPE",
+        "SCHEMA_VALIDATION_FAILED",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "DEADLINE_EXCEEDED"
+      ],
+      "title": "GatewayErrorCode",
+      "type": "string"
+    },
+    "GatewayHealth": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/GatewayHealthStatus"
+        },
+        "service": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Service",
+          "type": "string"
+        },
+        "contract_version": {
+          "const": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version"
+        },
+        "capabilities": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "reachable": {
+          "title": "Reachable",
+          "type": "boolean"
+        },
+        "real_ai_cs_connected": {
+          "title": "Real Ai Cs Connected",
+          "type": "boolean"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Details",
+          "type": "object"
+        }
+      },
+      "required": [
+        "status",
+        "service",
+        "contract_version",
+        "version",
+        "capabilities",
+        "reachable",
+        "real_ai_cs_connected",
+        "timestamp",
+        "details"
+      ],
+      "title": "GatewayHealth",
+      "type": "object"
+    },
+    "GatewayHealthStatus": {
+      "enum": [
+        "HEALTHY",
+        "UNHEALTHY"
+      ],
+      "title": "GatewayHealthStatus",
+      "type": "string"
+    },
+    "GatewayRiskLevel": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "GatewayRiskLevel",
+      "type": "string"
+    },
+    "JsonValue": {}
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/DecisionRequest"
+    },
+    {
+      "$ref": "#/$defs/DecisionResponse"
+    },
+    {
+      "$ref": "#/$defs/ErrorEnvelope"
+    },
+    {
+      "$ref": "#/$defs/GatewayHealth"
+    },
+    {
+      "$ref": "#/$defs/AuthenticationMetadata"
+    }
+  ]
+}

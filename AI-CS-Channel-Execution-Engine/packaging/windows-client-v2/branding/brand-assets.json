@@ -1,0 +1,17 @@
+{
+  "schema_version": "channel-agent-brand-assets.v1",
+  "brand_version": "1.0",
+  "product_version": "2.0.0rc5",
+  "source_file": "channel-agent-avatar-source-v1.png",
+  "source_sha256": "1e945d9f3a2411cd250a4b02441344057c114b7de044613722f6777160a24c58",
+  "source_width": 1254,
+  "source_height": 1254,
+  "crop_inset_ratio": 0.056,
+  "icon_sizes": [16, 20, 24, 32, 48, 64, 128, 256],
+  "tray_status_colors": {
+    "normal": "#22c55e",
+    "warning": "#f59e0b",
+    "error": "#ef4444",
+    "offline": "#94a3b8"
+  }
+}

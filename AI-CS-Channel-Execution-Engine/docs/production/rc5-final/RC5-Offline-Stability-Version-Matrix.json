@@ -1,0 +1,90 @@
+{
+  "schema": "rc5-offline-stability-version-matrix.v4",
+  "generated_at": "2026-08-13T19:35:00+08:00",
+  "scope": "OFFLINE_RC5_PLUS_REAL_PDD_PAGE_DISCOVERY",
+  "source": {
+    "identity_semantics": "FROZEN_IMPLEMENTATION_COMMITS_PLUS_EVIDENCE_COMMIT_RESOLVED_FROM_GIT",
+    "engine_implementation_commit": "71fc4eb9eb754001e4264736200f64f8340371f3",
+    "engine_implementation_tree": "d07d30b929532385a59976beb25361c58344f94d",
+    "engine_evidence_commit_resolution": "git log -1 -- docs/production/rc5-final/RC5-Offline-Stability-Version-Matrix.json",
+    "ai_cs_implementation_commit": "4d3be2ac3958697d42271439a41557dea784246d",
+    "ai_cs_implementation_tree": "7fa80f2ac4bc7953bc137c844a083892caead1e9",
+    "engine_version": "0.2.0rc3",
+    "agent_version": "2.0.0rc5",
+    "ai_cs_contracts": "0.14.0",
+    "platform_migration_head": "0019_runtime_database_identity_v1",
+    "channel_engine_storage_version": "1.0"
+  },
+  "candidate_package": {
+    "path": "dist/windows-client-v2/rc5-p0-closeout/AI-CS-Channel-Agent-2.0.0rc5-windows-x64.zip",
+    "archive_sha256": "9e67800add464d72a2bf3624ad6ec3c86b17fc58706b2b32fc59d7bec602f826",
+    "manifest_sha256": "819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7",
+    "executable_sha256": "a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d",
+    "pyz_sha256": "4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93",
+    "file_count": 1161,
+    "production_composition": "PASS",
+    "forbidden_entries": 0
+  },
+  "installed_runtime": {
+    "version": "2.0.0rc5",
+    "matches_current_candidate": true,
+    "installed_executable_sha256": "a7e443ab2c4b2b179bae38cde11b24a2e2a7e706b29ec6ab54978d32a814817d",
+    "installed_pyz_sha256": "4b4832aebef801b91110483c7a1bf2e58a25571db906863918033209a6117f93",
+    "installed_manifest_sha256": "819c8bcb359196c313a48b5fc4d0ae27596e8fe78bebdba6e3003a0be3f167b7",
+    "identity_status": "REGISTERED",
+    "binding_revision": 2,
+    "profile_replaced": false,
+    "real_send_enabled": false,
+    "pdd_browser_running": false,
+    "pdd_observer_runtime_status": "WAITING_IDENTITY_NOT_SCANNING"
+  },
+  "verification": {
+    "stage_full_gate": "PASS_REUSED_FOR_UNCHANGED_CORE",
+    "engine": "797 PASS, 1 NOT_IN_SCOPE",
+    "ai_cs_backend": "153 PASS, 3 NOT_IN_SCOPE",
+    "platform": "181 PASS",
+    "contracts": "16 PASS",
+    "assistant_ui": "216 PASS + typecheck PASS",
+    "admin_ui": "92 PASS + typecheck PASS",
+    "backend_blackbox": "35/35 PASS",
+    "windows_deployment": "13/13 PASS",
+    "p0_package_change_gate": "23/23 PASS",
+    "pdd_adapter_offline_change_gate": "39 PASS earlier; 37/37 PASS final selected recheck",
+    "production_architecture_software_rc": "PASS",
+    "production_selector_evidence": "BLOCKED_EXPECTED_REAL_PDD_ADAPTER_NOT_VERIFIED",
+    "real_execution_attempts": 0,
+    "real_sends": 0,
+    "real_receipts": 0
+  },
+  "database_and_startup": {
+    "platform_migration_head": "0019_runtime_database_identity_v1",
+    "channel_engine_storage_version": "1.0",
+    "ordinary_startup_migration_policy": "VALIDATE_ONLY",
+    "migration_entry_policy": "CONTROLLED_MIGRATION_ONLY",
+    "ordinary_startup_test_knowledge_policy": "EXPLICIT_BOOTSTRAP_ONLY"
+  },
+  "gate_contract": {
+    "status_enum": ["PASS", "NOT_VERIFIED", "BLOCKED", "NOT_IN_SCOPE"],
+    "dependencies": [
+      "REAL_PDD_ADAPTER_READY->REAL_PDD_READ_READY",
+      "REAL_PDD_READ_READY->REAL_PDD_AI_READY",
+      "REAL_PDD_AI_READY->REAL_PDD_CONFIRM_READY",
+      "REAL_PDD_CONFIRM_READY->REAL_PDD_SEND_READY"
+    ],
+    "legacy_derived_inputs": "DEPRECATED_IGNORED_PARSE_ONLY"
+  },
+  "gates": {
+    "RC5_OFFLINE_STABILITY_READY": "PASS",
+    "REAL_PDD_ADAPTER_READY": "NOT_VERIFIED",
+    "REAL_PDD_READ_READY": "NOT_VERIFIED",
+    "REAL_PDD_AI_READY": "NOT_VERIFIED",
+    "REAL_PDD_CONFIRM_READY": "NOT_VERIFIED",
+    "REAL_PDD_SEND_READY": "NOT_VERIFIED",
+    "REAL_PDD_AUTO_SEND_READY": "NOT_IN_SCOPE"
+  },
+  "derived": {
+    "ai_cs_production_ready": false,
+    "may_enter_read_only_pilot": null,
+    "real_send_enabled": false
+  }
+}

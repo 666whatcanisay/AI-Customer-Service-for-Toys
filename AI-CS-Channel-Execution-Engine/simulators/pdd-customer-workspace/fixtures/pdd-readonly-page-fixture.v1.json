@@ -1,0 +1,69 @@
+{
+  "schema_version": "pdd-readonly-page-fixture.v1",
+  "fixture_id": "synthetic-three-message-customer-question-v1",
+  "source": "SYNTHETIC_SANITIZED",
+  "sanitized": true,
+  "captured_at": "2026-08-11T09:00:00+08:00",
+  "page_fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "selector_contract_version": "pdd-replay.v1",
+  "role_map": {
+    "customer": "CUSTOMER",
+    "merchant": "OPERATOR",
+    "assistant": "BOT",
+    "system": "SYSTEM"
+  },
+  "scan": {
+    "fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "conversations": [
+      {
+        "conversation_id": "offline-conversation-001",
+        "customer_reference": "synthetic-customer-a17",
+        "unread_count": "3",
+        "last_activity": "2026-08-11T09:00:02+08:00",
+        "latest_sequence": "3"
+      }
+    ]
+  },
+  "capture": {
+    "fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "active_conversation_id": "offline-conversation-001",
+    "customer_reference": "synthetic-customer-a17",
+    "store_name": "离线演练店铺",
+    "product": {
+      "product_id": "synthetic-product-001",
+      "product_name": "合成积木飞机",
+      "sku_id": "synthetic-sku-blue",
+      "sku_name": "蓝色标准版"
+    },
+    "order": {
+      "order_reference": "synthetic-order-reference-001",
+      "order_status": "SHIPPED",
+      "logistics_status": "IN_TRANSIT",
+      "aftersales_status": "NOT_OPENED"
+    },
+    "messages": [
+      {
+        "message_id": "offline-message-001",
+        "role": "customer",
+        "content": "你好，我买的积木飞机模型",
+        "timestamp": "2026-08-11T09:00:00+08:00",
+        "sequence": "1"
+      },
+      {
+        "message_id": "offline-message-002",
+        "role": "customer",
+        "content": "收到后发现少了一个零件",
+        "timestamp": "2026-08-11T09:00:01+08:00",
+        "sequence": "2"
+      },
+      {
+        "message_id": "offline-message-003",
+        "role": "customer",
+        "content": "请问应该怎么补发？",
+        "timestamp": "2026-08-11T09:00:02+08:00",
+        "sequence": "3"
+      }
+    ]
+  },
+  "pdd_network_requests": 0
+}

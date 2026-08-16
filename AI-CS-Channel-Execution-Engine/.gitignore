@@ -1,0 +1,26 @@
+.venv/
+.runtime/
+__pycache__/
+*.py[cod]
+*.sqlite
+*.sqlite3
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.env
+*.log
+.codex-remote-attachments/
+
+# Generated validation/report artifacts are not RC source inputs.
+evidence/
+docs/*.html
+docs/reports/
+
+# Local/deferred pilot manifests are not part of the Channel Engine RC1 baseline.
+deploy/channel-agent.example.json
+deploy/pdd-pilot-ai-cs-gateway.json
+deploy/pdd-pilot-environment.json
+deploy/pdd-single-store-pilot.example.json

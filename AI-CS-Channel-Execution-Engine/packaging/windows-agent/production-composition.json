@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "release": "AI-CS-Agent 1.0.0-rc.2",
+  "protected_anchor": "b2c64d54987f1f066a02de8e9e667d5cc0f9857c",
+  "source_allowlist": [
+    "src/ai_cs_agent/__init__.py",
+    "src/ai_cs_agent/__main__.py",
+    "src/ai_cs_agent/adapter.py",
+    "src/ai_cs_agent/browser.py",
+    "src/ai_cs_agent/cli.py",
+    "src/ai_cs_agent/config.py",
+    "src/ai_cs_agent/execution.py",
+    "src/ai_cs_agent/gateway.py",
+    "src/ai_cs_agent/models.py",
+    "src/ai_cs_agent/observability.py",
+    "src/ai_cs_agent/runtime.py",
+    "src/ai_cs_agent/security.py",
+    "src/ai_cs_agent/session.py",
+    "src/ai_cs_agent/state.py"
+  ],
+  "contract_allowlist": [
+    "schemas/ai-cs-channel-engine-gateway-contract-v1.schema.json"
+  ],
+  "components": [
+    "agent-runtime",
+    "session-runtime",
+    "browser-runtime",
+    "adapter-framework",
+    "gateway-client",
+    "execution-boundary",
+    "receipt-ledger",
+    "observability"
+  ],
+  "excluded": [
+    "fake",
+    "sandbox",
+    "discovery",
+    "experimental",
+    "pdd",
+    "pilot",
+    "mock-server",
+    "channel-send-implementation"
+  ]
+}

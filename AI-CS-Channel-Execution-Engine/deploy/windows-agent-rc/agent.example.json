@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "agent": {
+    "agent_id": "agent-001",
+    "device_id": "windows-node-001",
+    "customer_service_identity": "operator",
+    "runtime_mode": "STAGING"
+  },
+  "server": {
+    "address": "http://127.0.0.1:18021",
+    "client_id": "channel-agent",
+    "key_id": "windows-rc-key",
+    "credential_reference": "wincred://AI-CS-Agent/Gateway/windows-rc-key",
+    "timeout_seconds": 5.0
+  },
+  "browser": {
+    "chrome_path": null,
+    "profile_directory": "runtime/browser-profile"
+  },
+  "safety": {
+    "kill_switch": true,
+    "manual_approval": true,
+    "auto_reply": false
+  }
+}
