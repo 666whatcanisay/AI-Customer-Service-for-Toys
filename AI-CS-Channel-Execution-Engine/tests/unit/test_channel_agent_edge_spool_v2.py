@@ -110,6 +110,31 @@ def test_short_lived_payload_is_not_stored_as_plaintext_and_expires(tmp_path: Pa
     assert spool.purge_expired() == 1
 
 
+def test_expired_cursor_anchor_scrubs_payload_without_losing_cursor(tmp_path: Path) -> None:
+    now = datetime(2026, 8, 8, 8, 0, tzinfo=UTC)
+    current = [now]
+    database = tmp_path / "edge.db"
+    spool = DurableEdgeSpool(database, _TestProtector(), clock=lambda: current[0])
+    observation = _observation(now)
+    spool.persist(observation)
+    spool.acknowledge(
+        observation_id=observation.observation_id,
+        payload_digest=observation.payload_digest,
+        cursor="cursor-7",
+    )
+
+    current[0] = now + timedelta(minutes=31)
+    assert spool.purge_expired() == 1
+    assert spool.cursor(observation.store_id) == "cursor-7"
+    with sqlite3.connect(database) as connection:
+        payload = connection.execute(
+            "SELECT payload_ciphertext FROM edge_observations WHERE observation_id = ?",
+            (observation.observation_id,),
+        ).fetchone()[0]
+    assert bytes(payload) == b""
+    assert spool.purge_expired() == 0
+
+
 def test_retention_cannot_exceed_edge_policy(tmp_path: Path) -> None:
     now = datetime(2026, 8, 8, 8, 0, tzinfo=UTC)
     spool = DurableEdgeSpool(tmp_path / "edge.db", _TestProtector(), clock=lambda: now)

@@ -370,12 +370,41 @@ class DurableEdgeSpool:
 
     def purge_expired(self) -> int:
         with self._lock, self._connect() as connection:
+            # The latest ACKed observation is the durable foreign-key anchor
+            # for both store and conversation cursors.  Deleting that row
+            # would either fail with an IntegrityError or destroy the cursor.
+            # Remove its short-lived customer payload instead, then delete all
+            # expired rows that are not cursor anchors.
+            scrubbed = connection.execute(
+                """
+                UPDATE edge_observations
+                SET payload_ciphertext = X''
+                WHERE expires_at <= ?
+                  AND length(payload_ciphertext) > 0
+                  AND observation_id IN (
+                      SELECT observation_id FROM edge_cursors
+                      UNION
+                      SELECT observation_id FROM edge_conversation_cursors
+                      WHERE observation_id IS NOT NULL
+                  )
+                """,
+                (self._clock().astimezone(UTC).isoformat(),),
+            )
             cursor = connection.execute(
-                "DELETE FROM edge_observations WHERE expires_at <= ?",
+                """
+                DELETE FROM edge_observations
+                WHERE expires_at <= ?
+                  AND observation_id NOT IN (
+                      SELECT observation_id FROM edge_cursors
+                      UNION
+                      SELECT observation_id FROM edge_conversation_cursors
+                      WHERE observation_id IS NOT NULL
+                  )
+                """,
                 (self._clock().astimezone(UTC).isoformat(),),
             )
             connection.commit()
-            return int(cursor.rowcount)
+            return int(scrubbed.rowcount) + int(cursor.rowcount)
 
     def _initialize(self) -> None:
         with self._connect() as connection:

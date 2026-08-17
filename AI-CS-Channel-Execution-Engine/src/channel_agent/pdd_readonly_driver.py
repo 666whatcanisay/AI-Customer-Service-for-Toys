@@ -7,6 +7,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import RLock
+from time import sleep
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
@@ -271,11 +272,25 @@ def build_replay_observer_evidence(
     )
 
 
+class _PDDReadExpressionReturnedNoValue(PDDReadOnlyDriverError):
+    """Transient CDP result used only to drive one bounded read retry."""
+
+
 class ReadOnlyCDPEvaluator:
     """Executes a fixed, generated DOM read expression over loopback CDP only."""
 
-    def __init__(self, *, timeout_seconds: float = 2.0) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_seconds: float = 2.0,
+        transient_attempts: int = 3,
+        transient_retry_delay_seconds: float = 0.075,
+    ) -> None:
         self._timeout = max(0.2, min(timeout_seconds, 10.0))
+        self._transient_attempts = max(1, min(transient_attempts, 4))
+        self._transient_retry_delay = max(
+            0.01, min(transient_retry_delay_seconds, 0.25)
+        )
         self._sequence = 0
         self._lock = RLock()
 
@@ -283,8 +298,33 @@ class ReadOnlyCDPEvaluator:
         if not expression or len(expression.encode("utf-8")) > 262_144:
             raise PDDReadOnlyDriverError("PDD read expression is invalid")
         with self._lock:
-            self._sequence += 1
-            command_id = self._sequence
+            last_error: PDDReadOnlyDriverError | None = None
+            for attempt in range(self._transient_attempts):
+                try:
+                    return self._evaluate_once(target, expression)
+                except _PDDReadExpressionReturnedNoValue as exc:
+                    # PDD replaces parts of the active chat DOM while a new
+                    # message is being inserted.  CDP can briefly report an
+                    # undefined result for the otherwise read-only expression.
+                    # Re-open the loopback channel once; no page action or
+                    # navigation is performed by this recovery path.
+                    last_error = exc
+                    if attempt + 1 < self._transient_attempts:
+                        # The PDD unread countdown re-renders on a one-second
+                        # cadence.  An immediate retry can stay phase-locked to
+                        # the same missing-active-marker window, so shift the
+                        # next read by a short, bounded interval.
+                        sleep(self._transient_retry_delay * (attempt + 1))
+            assert last_error is not None
+            raise PDDReadOnlyDriverError(
+                "PDD read expression returned no value after a transient retry"
+            ) from last_error
+
+    def _evaluate_once(self, target: PDDCDPPageTarget, expression: str) -> object:
+        # A fresh websocket is opened for every evaluation, so the CDP command
+        # identifier is connection-local as well.  Keeping it at 1 avoids
+        # carrying state from a closed browser channel into the next read.
+        command_id = 1
         command = json.dumps(
             {
                 "id": command_id,
@@ -320,7 +360,9 @@ class ReadOnlyCDPEvaluator:
                 result = response.get("result")
                 remote = result.get("result") if isinstance(result, dict) else None
                 if not isinstance(remote, dict) or "value" not in remote:
-                    raise PDDReadOnlyDriverError("PDD read expression returned no value")
+                    raise _PDDReadExpressionReturnedNoValue(
+                        "PDD read expression returned no value"
+                    )
                 return remote["value"]
         except PDDReadOnlyDriverError:
             raise
@@ -433,10 +475,14 @@ class LivePDDPageReadPort:
         operation: Literal["SCAN", "CAPTURE"],
         expression: str,
     ) -> object:
-        del operation
         target = self._target()
         self.pdd_network_requests += 1
-        return self._evaluator.evaluate(target, expression)
+        try:
+            return self._evaluator.evaluate(target, expression)
+        except PDDReadOnlyDriverError as exc:
+            raise PDDReadOnlyDriverError(
+                f"PDD {operation.lower()} read failed: {exc}"
+            ) from exc
 
     def _target(self) -> PDDCDPPageTarget:
         target = self._resolver.resolve(self._profile_path)
@@ -728,6 +774,25 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     return rf"""
 (() => {{
   const cfg = {config_json};
+  const stableConversationId = (value) => {{
+    const text = String(value || '').trim();
+    const match = text.match(/^(\d{{8,20}})(?:\D|$)/);
+    return match ? match[1] : text;
+  }};
+  const selectedConversationFromPageState = () => {{
+    // PDD temporarily removes or duplicates the list-row `active` class when
+    // an inbound message moves the selected conversation between projections.
+    // The already-open middle panel remains bound to Vuex selectingChatUid.
+    // Reading that one identity is a read-only fallback: it performs no click,
+    // scrolling, focus change, navigation, storage or network operation.
+    const container = document.querySelector('#msgListContainer');
+    const panel = container && container.closest('.middle-panel');
+    const vm = panel && panel.__vue__;
+    const value = vm && vm.$store && vm.$store.state
+      && vm.$store.state.l && vm.$store.state.l.selectingChatUid;
+    const stable = stableConversationId(value);
+    return /^\d{{8,20}}$/.test(stable) ? stable : null;
+  }};
   const one = (root, name) => {{
     const b = cfg.selectors[name];
     if (!b) return null;
@@ -744,10 +809,36 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
       typeof candidate.getClientRects !== 'function' || candidate.getClientRects().length > 0
     );
     const bounded = rendered.length ? rendered : nodes;
-    if (bounded.length > b.maximum_matches || (b.required && bounded.length === 0)) throw new Error('selector boundary');
+    const read = (node) => String(b.attribute ? (node.getAttribute(b.attribute) || '') : (node.textContent || '')).trim();
+    const selectedConversationId = name === 'active_conversation_id'
+      ? selectedConversationFromPageState()
+      : null;
+    if (bounded.length > b.maximum_matches) {{
+      // A new inbound message can make PDD render two copies of the selected
+      // conversation row during its list transition.  Treat those copies as
+      // one target only when their verified identity attribute is identical.
+      // Conflicting identities still fail closed, and no click/navigation is
+      // introduced by this read-only compatibility rule.
+      if (name !== 'active_conversation_id') throw new Error('selector boundary');
+      const identities = Array.from(new Set(
+        bounded.map(read).filter(Boolean).map(stableConversationId)
+      ));
+      if (selectedConversationId && identities.includes(selectedConversationId))
+        return selectedConversationId;
+      if (identities.length !== 1) throw new Error('selector boundary');
+      return identities[0];
+    }}
+    if (bounded.length === 0 && selectedConversationId)
+      return selectedConversationId;
+    if (b.required && bounded.length === 0) throw new Error('selector boundary');
     const node = bounded[0];
     if (!node) return null;
-    return String(b.attribute ? (node.getAttribute(b.attribute) || '') : (node.textContent || '')).trim();
+    const value = read(node);
+    if (
+      selectedConversationId
+      && stableConversationId(value) !== selectedConversationId
+    ) throw new Error('selector boundary');
+    return value;
   }};
   const fingerprintSource = {{path: location.pathname, probes: cfg.probes.map((probe) => {{
     const nodes = Array.from(document.querySelectorAll(probe.selector));
@@ -779,7 +870,7 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     const item = cfg.selectors.conversation_item;
     const rows = Array.from(document.querySelectorAll(item.selector));
     if (rows.length > item.maximum_matches) throw new Error('conversation boundary');
-    return {{fingerprint, conversations: rows.map((row) => {{
+    const conversations = rows.map((row) => {{
       const conversationId = one(row,'conversation_id');
       const lastActivity = one(row,'last_activity');
       const rawSequence = one(row,'latest_sequence');
@@ -796,7 +887,37 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
         latest_message_id: latestMessageId,
         attention: one(row,'conversation_attention')
       }};
-    }})}};
+    }});
+    // PDD can keep the open conversation only in its `already replied` or
+    // `all conversations` projection while the visible reply list no longer
+    // contains that row.  Reading the current message panel must not depend on
+    // navigation or on which list projection is visible.  Add one synthetic
+    // summary only when all active projections agree on the same stable PDD
+    // conversation id and the current panel exposes a real message watermark.
+    const activeConversationId = one(document,'active_conversation_id');
+    const activeAlreadyListed = conversations.some((item) =>
+      stableConversationId(item.conversation_id) === stableConversationId(activeConversationId)
+    );
+    if (activeConversationId && !activeAlreadyListed) {{
+      const messageBinding = cfg.selectors.message_item;
+      const activeMessages = Array.from(document.querySelectorAll(messageBinding.selector));
+      if (activeMessages.length > messageBinding.maximum_matches) throw new Error('message boundary');
+      const tail = activeMessages.length ? activeMessages[activeMessages.length - 1] : null;
+      const rawSequence = tail ? one(tail,'message_sequence') : null;
+      const messageId = tail ? one(tail,'message_id') : null;
+      if (tail && messageId) {{
+        conversations.push({{
+          conversation_id: stableConversationId(activeConversationId),
+          customer_reference: null,
+          unread_count: null,
+          last_activity: messageId,
+          latest_sequence: sequenceLike(rawSequence) ? rawSequence : null,
+          latest_message_id: messageId,
+          attention: null
+        }});
+      }}
+    }}
+    return {{fingerprint, conversations}};
   }}
   const item = cfg.selectors.message_item;
   const rows = Array.from(document.querySelectorAll(item.selector));

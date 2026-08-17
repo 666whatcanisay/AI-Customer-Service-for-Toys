@@ -37,6 +37,7 @@ from channel_agent.client import (
 from channel_agent.config import AgentConfigError, load_agent_config
 from channel_agent.contract import AgentRuntimeStatus
 from channel_agent.retention import TransientBusinessDataPolicy
+from channel_agent.operator_control import request_operator_pause
 from channel_agent.diagnostics import ChannelAgentOperationsCenter, OperationsCenterError
 from channel_agent.assistant_events import AssistantEventJournal
 
@@ -1201,6 +1202,7 @@ class DesktopAssistantServer:
         }
 
     def request_safe_stop(self) -> None:
+        request_operator_pause(self.data_root)
         path = self.data_root / "runtime" / "stop.request"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("stop\n", encoding="ascii")

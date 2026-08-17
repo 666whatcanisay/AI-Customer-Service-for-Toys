@@ -174,6 +174,26 @@ def test_inactive_unread_conversation_requires_human_selection(tmp_path):
     assert diagnostics[0][0] == "CONVERSATION_REQUIRES_HUMAN_SELECTION"
 
 
+def test_no_navigation_mode_silently_skips_inactive_rows(tmp_path):
+    first = summary("visible", unread=1)
+    second = summary("not-visible", unread=2)
+    forwarded = []
+    diagnostics = []
+    driver = ManualCurrentConversationDriver(
+        [first, second],
+        {
+            "visible": snapshot("visible", [message(1, "CUSTOMER")]),
+            "not-visible": PDDConversationNotActive("not selected"),
+        },
+    )
+
+    result = observer(tmp_path, driver, forwarded, diagnostics).scan_once()
+
+    assert result.observations_forwarded == 1
+    assert result.manual_review_required == 0
+    assert diagnostics == []
+
+
 def test_unknown_startup_unread_state_is_never_silently_baselined(tmp_path):
     item = summary("conversation-1", unread=None)
     diagnostics = []

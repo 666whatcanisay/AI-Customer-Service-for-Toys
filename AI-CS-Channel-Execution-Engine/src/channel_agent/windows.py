@@ -315,7 +315,7 @@ class WindowsAgentHost:
         pdd_poll_error: dict[str, str | None] = {"code": None}
 
         def record_observer_error(code: str) -> None:
-            observer_error["code"] = code[:120]
+            observer_error["code"] = code[:120] or None
 
         def reported_observer_error() -> str | None:
             return observer_error["code"] or pdd_poll_error["code"]
@@ -956,9 +956,13 @@ class WindowsAgentHost:
         runner = PDDObserverRunner(
             observer,
             error_sink=error_sink,
+            recovery_sink=lambda: error_sink(""),
             session_event_sink=error_sink,
-            maximum_session_seconds=30 * 60,
-            warning_seconds=25 * 60,
+            # The packaged current-page production workflow is intended to
+            # remain available for a full working day.  Keep a bounded safety
+            # session, but do not interrupt message capture every 30 minutes.
+            maximum_session_seconds=12 * 60 * 60,
+            warning_seconds=11 * 60 * 60,
         )
         assistant_events = (
             AssistantEventPoller(

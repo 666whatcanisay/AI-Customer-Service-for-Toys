@@ -36,6 +36,7 @@ from .pdd_login import (
     PDDLoginState,
 )
 from .onboarding import ChannelAgentOnboardingService, OnboardingWebServer
+from .operator_control import clear_operator_pause, request_operator_pause
 from .windows import (
     WINDOWS_CLIENT_VERSION,
     WindowsAgentHost,
@@ -182,6 +183,7 @@ def _start(host: WindowsAgentHost, wait_seconds: float) -> int:
     except WindowsStateError:
         previous = WindowsClientState()
     if previous.pid and _process_exists(previous.pid):
+        clear_operator_pause(host.data_root)
         print("Channel Agent 已在运行。")
         return 0
     try:
@@ -189,6 +191,7 @@ def _start(host: WindowsAgentHost, wait_seconds: float) -> int:
     except AgentConfigError:
         print("启动失败：Channel Agent 配置无效。", file=sys.stderr)
         return 1
+    clear_operator_pause(host.data_root)
     host.stop_request.unlink(missing_ok=True)
     command = _self_command() + [
         "run",
@@ -256,6 +259,7 @@ def _start(host: WindowsAgentHost, wait_seconds: float) -> int:
 
 
 def _stop(host: WindowsAgentHost, wait_seconds: float) -> int:
+    request_operator_pause(host.data_root)
     try:
         state = host.state_store.load()
     except WindowsStateError:

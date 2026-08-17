@@ -87,6 +87,17 @@ if ($RequireRuntime) {
             $failures.Add("Runtime dependency missing: $relativePath")
         }
     }
+    $enginePython = Join-Path $root 'AI-CS-Channel-Execution-Engine\.venv\Scripts\python.exe'
+    if (Test-Path -LiteralPath $enginePython -PathType Leaf) {
+        try {
+            & $enginePython -c "import channel_agent, fastapi, httpx, pydantic, sqlalchemy, uvicorn" 2>$null
+            if ($LASTEXITCODE -ne 0) { throw 'AI-CE Python packages are incomplete' }
+            Write-Host '[PASS] AI-CE Python runtime imports' -ForegroundColor Green
+        } catch {
+            $failures.Add('AI-CE Python packages are incomplete; run Bootstrap-PortableProject.ps1')
+            Write-Host '[FAIL] AI-CE Python runtime imports' -ForegroundColor Red
+        }
+    }
     $configPath = Join-Path $root '.runtime\phase-e\config\green-standard.local.ps1'
     if (Test-Path -LiteralPath $configPath -PathType Leaf) {
         try {

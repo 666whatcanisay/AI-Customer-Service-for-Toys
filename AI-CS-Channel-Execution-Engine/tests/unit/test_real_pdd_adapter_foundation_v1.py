@@ -351,6 +351,34 @@ def test_observer_session_warns_then_stops_before_another_scan() -> None:
     assert runner._session_event(30.0) == "PDD_OBSERVER_SESSION_LIMIT_REACHED"
 
 
+def test_observer_clears_transient_error_after_next_successful_scan() -> None:
+    errors: list[str] = []
+    recoveries: list[str] = []
+
+    class FlakyObserver:
+        calls = 0
+        runner: PDDObserverRunner
+
+        def scan_once(self) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary PDD redraw")
+            self.runner._stop.set()
+
+    observer = FlakyObserver()
+    runner = PDDObserverRunner(
+        observer,
+        error_sink=errors.append,
+        recovery_sink=lambda: recoveries.append("RECOVERED"),
+    )
+    observer.runner = runner
+
+    runner._run()
+
+    assert errors == ["PDD_OBSERVER_RUNTIMEERROR"]
+    assert recoveries == ["RECOVERED"]
+
+
 def test_session_limit_requires_explicit_restart_and_recovers_pending() -> None:
     class Runner:
         running = False
@@ -391,6 +419,41 @@ def test_session_limit_requires_explicit_restart_and_recovers_pending() -> None:
     assert component.observing is True
     assert runner.starts == 1
     assert forwarder.recovered == 1
+
+
+def test_session_restart_does_not_block_on_stale_pending_recovery() -> None:
+    class Runner:
+        running = False
+        stop_reason = "PDD_OBSERVER_SESSION_LIMIT_REACHED"
+        starts = 0
+
+        def start(self) -> None:
+            self.running = True
+            self.stop_reason = None
+            self.starts += 1
+
+        def stop(self, timeout: float = 5.0) -> None:
+            del timeout
+            self.running = False
+
+    class Forwarder:
+        def recover_pending(self) -> int:
+            raise RuntimeError("already accepted by Host")
+
+    errors: list[str] = []
+    runner = Runner()
+    component = ObserveOnlyRuntimeComponent(
+        forwarder=Forwarder(),
+        observer=runner,
+        assistant_events=SimpleNamespace(start=lambda: None, stop=lambda timeout=5: None),
+        error_sink=errors.append,
+    )
+    component._started = True
+
+    assert component.restart_observer(page_ready=True) is True
+    assert component.observing is True
+    assert runner.starts == 1
+    assert errors == ["OBSERVATION_RECOVERY_RUNTIMEERROR"]
 
 
 def test_missing_page_sequence_uses_durable_message_id_monotonic_mapping(tmp_path) -> None:
