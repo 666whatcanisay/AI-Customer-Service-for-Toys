@@ -363,6 +363,13 @@ class PDDMessageObserver:
                             )
                         raise
                 else:
+                    if getattr(self._driver, "navigation_enabled", None) is False:
+                        # Current-page mode intentionally never selects another
+                        # conversation.  Inactive list rows are expected and
+                        # must not poison the Agent health state as a failure.
+                        # The already-open conversation is still captured and
+                        # forwarded by its matching summary in this same scan.
+                        continue
                     manual += 1
                     self._diagnostic(
                         "CONVERSATION_REQUIRES_HUMAN_SELECTION",
