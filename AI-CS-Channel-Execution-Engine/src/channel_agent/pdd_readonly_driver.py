@@ -271,11 +271,16 @@ def build_replay_observer_evidence(
     )
 
 
+class _PDDReadExpressionReturnedNoValue(PDDReadOnlyDriverError):
+    """Transient CDP result used only to drive one bounded read retry."""
+
+
 class ReadOnlyCDPEvaluator:
     """Executes a fixed, generated DOM read expression over loopback CDP only."""
 
-    def __init__(self, *, timeout_seconds: float = 2.0) -> None:
+    def __init__(self, *, timeout_seconds: float = 2.0, transient_attempts: int = 2) -> None:
         self._timeout = max(0.2, min(timeout_seconds, 10.0))
+        self._transient_attempts = max(1, min(transient_attempts, 3))
         self._sequence = 0
         self._lock = RLock()
 
@@ -283,8 +288,27 @@ class ReadOnlyCDPEvaluator:
         if not expression or len(expression.encode("utf-8")) > 262_144:
             raise PDDReadOnlyDriverError("PDD read expression is invalid")
         with self._lock:
-            self._sequence += 1
-            command_id = self._sequence
+            last_error: PDDReadOnlyDriverError | None = None
+            for _attempt in range(self._transient_attempts):
+                try:
+                    return self._evaluate_once(target, expression)
+                except _PDDReadExpressionReturnedNoValue as exc:
+                    # PDD replaces parts of the active chat DOM while a new
+                    # message is being inserted.  CDP can briefly report an
+                    # undefined result for the otherwise read-only expression.
+                    # Re-open the loopback channel once; no page action or
+                    # navigation is performed by this recovery path.
+                    last_error = exc
+            assert last_error is not None
+            raise PDDReadOnlyDriverError(
+                "PDD read expression returned no value after a transient retry"
+            ) from last_error
+
+    def _evaluate_once(self, target: PDDCDPPageTarget, expression: str) -> object:
+        # A fresh websocket is opened for every evaluation, so the CDP command
+        # identifier is connection-local as well.  Keeping it at 1 avoids
+        # carrying state from a closed browser channel into the next read.
+        command_id = 1
         command = json.dumps(
             {
                 "id": command_id,
@@ -320,7 +344,9 @@ class ReadOnlyCDPEvaluator:
                 result = response.get("result")
                 remote = result.get("result") if isinstance(result, dict) else None
                 if not isinstance(remote, dict) or "value" not in remote:
-                    raise PDDReadOnlyDriverError("PDD read expression returned no value")
+                    raise _PDDReadExpressionReturnedNoValue(
+                        "PDD read expression returned no value"
+                    )
                 return remote["value"]
         except PDDReadOnlyDriverError:
             raise
@@ -433,10 +459,14 @@ class LivePDDPageReadPort:
         operation: Literal["SCAN", "CAPTURE"],
         expression: str,
     ) -> object:
-        del operation
         target = self._target()
         self.pdd_network_requests += 1
-        return self._evaluator.evaluate(target, expression)
+        try:
+            return self._evaluator.evaluate(target, expression)
+        except PDDReadOnlyDriverError as exc:
+            raise PDDReadOnlyDriverError(
+                f"PDD {operation.lower()} read failed: {exc}"
+            ) from exc
 
     def _target(self) -> PDDCDPPageTarget:
         target = self._resolver.resolve(self._profile_path)
