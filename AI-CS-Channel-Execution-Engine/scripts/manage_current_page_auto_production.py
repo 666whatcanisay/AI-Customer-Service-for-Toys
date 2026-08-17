@@ -10,14 +10,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = ROOT / "src"
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
+
 if os.name == "nt":
     import winreg
 
 from channel_agent.binding import atomic_write_bytes
 from channel_agent.current_page_production import CurrentPageProductionConfig
-
-ROOT = Path(__file__).resolve().parents[1]
-
 
 def _is_ai_cs_root(path: Path) -> bool:
     required = (

@@ -6,10 +6,15 @@ $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $python = Join-Path $repoRoot '.venv\Scripts\python.exe'
 $manager = Join-Path $repoRoot 'scripts\manage_current_page_auto_production.py'
 $statusPath = Join-Path $env:LOCALAPPDATA 'AI-CS\ChannelAgent\runtime\current-page-production-supervisor.json'
+$operatorPausePath = Join-Path $env:LOCALAPPDATA 'AI-CS\ChannelAgent\runtime\operator-safe-stop.request'
 
 if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
     throw "Python runtime is missing: $python"
 }
+
+# This script is an explicit operator start. Resume a prior Safe Stop before
+# starting (or reusing) the long-running supervisor.
+Remove-Item -LiteralPath $operatorPausePath -Force -ErrorAction SilentlyContinue
 
 & $python $manager start | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'Production supervisor failed to start.' }
