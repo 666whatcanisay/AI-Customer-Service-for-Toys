@@ -351,6 +351,34 @@ def test_observer_session_warns_then_stops_before_another_scan() -> None:
     assert runner._session_event(30.0) == "PDD_OBSERVER_SESSION_LIMIT_REACHED"
 
 
+def test_observer_clears_transient_error_after_next_successful_scan() -> None:
+    errors: list[str] = []
+    recoveries: list[str] = []
+
+    class FlakyObserver:
+        calls = 0
+        runner: PDDObserverRunner
+
+        def scan_once(self) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary PDD redraw")
+            self.runner._stop.set()
+
+    observer = FlakyObserver()
+    runner = PDDObserverRunner(
+        observer,
+        error_sink=errors.append,
+        recovery_sink=lambda: recoveries.append("RECOVERED"),
+    )
+    observer.runner = runner
+
+    runner._run()
+
+    assert errors == ["PDD_OBSERVER_RUNTIMEERROR"]
+    assert recoveries == ["RECOVERED"]
+
+
 def test_session_limit_requires_explicit_restart_and_recovers_pending() -> None:
     class Runner:
         running = False

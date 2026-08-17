@@ -698,6 +698,7 @@ class PDDObserverRunner:
         *,
         interval_seconds: float = 1.0,
         error_sink: Callable[[str], None] | None = None,
+        recovery_sink: Callable[[], None] | None = None,
         session_event_sink: Callable[[str], None] | None = None,
         maximum_session_seconds: float = 30 * 60,
         warning_seconds: float = 25 * 60,
@@ -710,6 +711,7 @@ class PDDObserverRunner:
         self._observer = observer
         self._interval = max(0.25, min(interval_seconds, 10.0))
         self._error_sink = error_sink or (lambda _code: None)
+        self._recovery_sink = recovery_sink or (lambda: None)
         self._session_event_sink = session_event_sink or (lambda _code: None)
         self._maximum_session_seconds = maximum_session_seconds
         self._warning_seconds = warning_seconds
@@ -719,6 +721,7 @@ class PDDObserverRunner:
         self._session_started_at: float | None = None
         self._warning_emitted = False
         self._stop_reason: str | None = None
+        self._transient_error_active = False
 
     @property
     def running(self) -> bool:
@@ -761,6 +764,9 @@ class PDDObserverRunner:
                 self._session_event_sink(session_event)
             try:
                 self._observer.scan_once()
+                if self._transient_error_active:
+                    self._recovery_sink()
+                    self._transient_error_active = False
             except PDDObserverFatalError as exc:
                 code = f"PDD_OBSERVER_FATAL_{type(exc).__name__.upper()}"[:120]
                 self._error_sink(code)
@@ -769,6 +775,7 @@ class PDDObserverRunner:
             except Exception as exc:
                 code = f"PDD_OBSERVER_{type(exc).__name__.upper()}"[:120]
                 self._error_sink(code)
+                self._transient_error_active = True
             self._stop.wait(self._interval)
 
     def _session_event(self, now: float) -> str | None:
