@@ -779,6 +779,20 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     const match = text.match(/^(\d{{8,20}})(?:\D|$)/);
     return match ? match[1] : text;
   }};
+  const selectedConversationFromPageState = () => {{
+    // PDD temporarily removes or duplicates the list-row `active` class when
+    // an inbound message moves the selected conversation between projections.
+    // The already-open middle panel remains bound to Vuex selectingChatUid.
+    // Reading that one identity is a read-only fallback: it performs no click,
+    // scrolling, focus change, navigation, storage or network operation.
+    const container = document.querySelector('#msgListContainer');
+    const panel = container && container.closest('.middle-panel');
+    const vm = panel && panel.__vue__;
+    const value = vm && vm.$store && vm.$store.state
+      && vm.$store.state.l && vm.$store.state.l.selectingChatUid;
+    const stable = stableConversationId(value);
+    return /^\d{{8,20}}$/.test(stable) ? stable : null;
+  }};
   const one = (root, name) => {{
     const b = cfg.selectors[name];
     if (!b) return null;
@@ -796,6 +810,9 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     );
     const bounded = rendered.length ? rendered : nodes;
     const read = (node) => String(b.attribute ? (node.getAttribute(b.attribute) || '') : (node.textContent || '')).trim();
+    const selectedConversationId = name === 'active_conversation_id'
+      ? selectedConversationFromPageState()
+      : null;
     if (bounded.length > b.maximum_matches) {{
       // A new inbound message can make PDD render two copies of the selected
       // conversation row during its list transition.  Treat those copies as
@@ -806,13 +823,22 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
       const identities = Array.from(new Set(
         bounded.map(read).filter(Boolean).map(stableConversationId)
       ));
+      if (selectedConversationId && identities.includes(selectedConversationId))
+        return selectedConversationId;
       if (identities.length !== 1) throw new Error('selector boundary');
       return identities[0];
     }}
+    if (bounded.length === 0 && selectedConversationId)
+      return selectedConversationId;
     if (b.required && bounded.length === 0) throw new Error('selector boundary');
     const node = bounded[0];
     if (!node) return null;
-    return read(node);
+    const value = read(node);
+    if (
+      selectedConversationId
+      && stableConversationId(value) !== selectedConversationId
+    ) throw new Error('selector boundary');
+    return value;
   }};
   const fingerprintSource = {{path: location.pathname, probes: cfg.probes.map((probe) => {{
     const nodes = Array.from(document.querySelectorAll(probe.selector));

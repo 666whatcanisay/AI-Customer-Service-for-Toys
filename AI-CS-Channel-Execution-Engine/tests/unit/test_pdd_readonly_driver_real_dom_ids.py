@@ -172,6 +172,21 @@ def test_selector_reader_collapses_active_projection_suffixes_to_one_stable_id()
     assert "return identities[0]" in expression
 
 
+def test_selector_reader_uses_read_only_page_selection_during_pdd_row_transition() -> None:
+    expression = _read_expression(
+        '{"selectors":{},"probes":[],"path":"/chat-merchant/index.html"}',
+        capture=True,
+    )
+
+    assert "selectedConversationFromPageState" in expression
+    assert "vm.$store.state.l.selectingChatUid" in expression
+    assert "identities.includes(selectedConversationId)" in expression
+    assert "bounded.length === 0 && selectedConversationId" in expression
+    assert "stableConversationId(value) !== selectedConversationId" in expression
+    assert "dispatchMouseEvent" not in expression
+    assert ".click()" not in expression
+
+
 def test_scan_synthesizes_current_panel_when_active_row_is_not_in_visible_list() -> None:
     expression = _read_expression(
         '{"selectors":{},"probes":[],"path":"/chat-merchant/index.html"}',
