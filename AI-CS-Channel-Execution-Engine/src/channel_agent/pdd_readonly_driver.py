@@ -744,10 +744,22 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
       typeof candidate.getClientRects !== 'function' || candidate.getClientRects().length > 0
     );
     const bounded = rendered.length ? rendered : nodes;
-    if (bounded.length > b.maximum_matches || (b.required && bounded.length === 0)) throw new Error('selector boundary');
+    const read = (node) => String(b.attribute ? (node.getAttribute(b.attribute) || '') : (node.textContent || '')).trim();
+    if (bounded.length > b.maximum_matches) {{
+      // A new inbound message can make PDD render two copies of the selected
+      // conversation row during its list transition.  Treat those copies as
+      // one target only when their verified identity attribute is identical.
+      // Conflicting identities still fail closed, and no click/navigation is
+      // introduced by this read-only compatibility rule.
+      if (name !== 'active_conversation_id') throw new Error('selector boundary');
+      const identities = Array.from(new Set(bounded.map(read).filter(Boolean)));
+      if (identities.length !== 1) throw new Error('selector boundary');
+      return identities[0];
+    }}
+    if (b.required && bounded.length === 0) throw new Error('selector boundary');
     const node = bounded[0];
     if (!node) return null;
-    return String(b.attribute ? (node.getAttribute(b.attribute) || '') : (node.textContent || '')).trim();
+    return read(node);
   }};
   const fingerprintSource = {{path: location.pathname, probes: cfg.probes.map((probe) => {{
     const nodes = Array.from(document.querySelectorAll(probe.selector));
