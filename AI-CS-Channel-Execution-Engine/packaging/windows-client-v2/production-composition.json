@@ -17,6 +17,7 @@
     "src/channel_agent/onboarding.py",
     "src/channel_agent/diagnostics.py",
     "src/channel_agent/retention.py",
+    "src/channel_agent/operator_control.py",
     "src/channel_agent/runtime.py",
     "src/channel_agent/desktop.py",
     "src/channel_agent/assistant_events.py",
