@@ -397,6 +397,9 @@ def test_safe_stop_endpoint_only_writes_stop_marker_after_same_origin_post(
         with opener.open(request, timeout=2) as response:  # noqa: S310
             assert response.status == 202
         assert (tmp_path / "runtime" / "stop.request").read_text(encoding="ascii") == "stop\n"
+        assert (
+            tmp_path / "runtime" / "operator-safe-stop.request"
+        ).read_text(encoding="ascii") == "pause\n"
     finally:
         server.stop()
 

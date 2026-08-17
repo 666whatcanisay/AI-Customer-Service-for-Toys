@@ -22,6 +22,7 @@ from .controlled_auto_runtime import (
     ControlledAutoRuntimeError,
     ControlledAutoRuntimeStateStore,
 )
+from .operator_control import operator_pause_requested
 
 CURRENT_PAGE_SCOPE = "CURRENT_ACTIVE_CONVERSATION_ONLY"
 
@@ -215,6 +216,16 @@ class CurrentPageProductionSupervisor:
 
     def run_once(self) -> dict[str, Any]:
         self._reap_children()
+        if operator_pause_requested(self.config.data_root):
+            # A human safe stop is different from a crash. Keep the
+            # supervisor available for the next explicit start, but remove
+            # effective AUTO ownership and never relaunch the Agent.
+            self._stop_child("runner")
+            self._stop_child("bridge")
+            return self._publish_status(
+                component_health=self._component_health(),
+                supervisor_state="PAUSED_BY_OPERATOR",
+            )
         health = self._component_health()
 
         if not health["agent"]:

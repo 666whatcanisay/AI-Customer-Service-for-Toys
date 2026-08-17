@@ -12,6 +12,7 @@ import pytest
 
 import channel_agent.binding as binding_module
 import channel_agent.windows as windows_module
+import channel_agent.windows_app as windows_app
 from channel_agent.client import AgentConnectionError
 from channel_agent.config import ChannelAgentConfig
 from channel_agent.contract import (
@@ -168,6 +169,18 @@ def test_autostart_enable_status_disable_is_credential_free(tmp_path: Path) -> N
         assert forbidden not in content.casefold()
     manager.disable()
     assert manager.enabled is False
+
+
+def test_explicit_stop_persists_operator_pause_for_supervisor(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    config_path = write_config(data_root / "config" / "agent.json")
+    host = WindowsAgentHost(config_path, data_root)
+    host.state_store.save(WindowsClientState())
+
+    assert windows_app._stop(host, 0.1) == 0
+    assert (
+        data_root / "runtime" / "operator-safe-stop.request"
+    ).read_text(encoding="ascii") == "pause\n"
 
 
 def test_windows_state_store_retries_transient_replace_conflict(

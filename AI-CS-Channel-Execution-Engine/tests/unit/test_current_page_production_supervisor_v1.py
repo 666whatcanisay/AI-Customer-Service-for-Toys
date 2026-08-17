@@ -144,6 +144,39 @@ def test_runtime_stays_before_bridge_until_current_page_is_ready(
     assert result["automatic_navigation_enabled"] is False
 
 
+def test_operator_safe_stop_pauses_without_restarting_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate = config(tmp_path)
+    supervisor = CurrentPageProductionSupervisor(candidate)
+    started: list[str] = []
+    marker = candidate.data_root / "runtime" / "operator-safe-stop.request"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("pause\n", encoding="ascii")
+    health = {
+        "agent": False,
+        "ai_gateway": True,
+        "ai_platform": True,
+        "host": True,
+        "bridge": True,
+        "runner": True,
+    }
+    monkeypatch.setattr(supervisor, "_component_health", lambda: health)
+    monkeypatch.setattr(supervisor, "_start_agent", lambda: started.append("agent"))
+    monkeypatch.setattr(supervisor, "_start_ai_cs", lambda: started.append("ai-cs"))
+    monkeypatch.setattr(supervisor, "_start_host", lambda: started.append("host"))
+    monkeypatch.setattr(supervisor, "_start_bridge", lambda: started.append("bridge"))
+    monkeypatch.setattr(supervisor, "_start_runner", lambda: started.append("runner"))
+    monkeypatch.setattr(
+        supervisor, "_stop_child", lambda name: started.append(f"stop:{name}")
+    )
+
+    result = supervisor.run_once()
+
+    assert started == ["stop:runner", "stop:bridge"]
+    assert result["supervisor_state"] == "PAUSED_BY_OPERATOR"
+
+
 def test_bridge_and_runner_commands_use_one_existing_send_chain(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
