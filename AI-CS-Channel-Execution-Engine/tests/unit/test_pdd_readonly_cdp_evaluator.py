@@ -76,6 +76,7 @@ def test_transient_missing_value_reopens_channel_once(
         _Connection({"result": {"result": {"value": {"messages": 1}}}}),
     ]
     used: list[_Connection] = []
+    delays: list[float] = []
 
     def connect(*_args: object, **_kwargs: object) -> _Connection:
         connection = created.pop(0)
@@ -85,6 +86,9 @@ def test_transient_missing_value_reopens_channel_once(
     monkeypatch.setattr(
         "channel_agent.pdd_readonly_driver.websocket.create_connection", connect
     )
+    monkeypatch.setattr(
+        "channel_agent.pdd_readonly_driver.sleep", lambda value: delays.append(value)
+    )
 
     result = ReadOnlyCDPEvaluator(transient_attempts=2).evaluate(
         _target(), "({messages: 1})"
@@ -93,6 +97,7 @@ def test_transient_missing_value_reopens_channel_once(
     assert result == {"messages": 1}
     assert [connection.commands[0]["id"] for connection in used] == [1, 1]
     assert all(connection.closed for connection in used)
+    assert delays == [0.075]
 
 
 def test_repeated_missing_value_still_fails_closed(
@@ -106,6 +111,7 @@ def test_repeated_missing_value_still_fails_closed(
         "channel_agent.pdd_readonly_driver.websocket.create_connection",
         lambda *_args, **_kwargs: created.pop(0),
     )
+    monkeypatch.setattr("channel_agent.pdd_readonly_driver.sleep", lambda _value: None)
 
     with pytest.raises(PDDReadOnlyDriverError, match="transient retry"):
         ReadOnlyCDPEvaluator(transient_attempts=2).evaluate(_target(), "void 0")

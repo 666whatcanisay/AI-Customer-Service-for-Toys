@@ -7,6 +7,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import RLock
+from time import sleep
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
@@ -278,9 +279,18 @@ class _PDDReadExpressionReturnedNoValue(PDDReadOnlyDriverError):
 class ReadOnlyCDPEvaluator:
     """Executes a fixed, generated DOM read expression over loopback CDP only."""
 
-    def __init__(self, *, timeout_seconds: float = 2.0, transient_attempts: int = 2) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_seconds: float = 2.0,
+        transient_attempts: int = 3,
+        transient_retry_delay_seconds: float = 0.075,
+    ) -> None:
         self._timeout = max(0.2, min(timeout_seconds, 10.0))
-        self._transient_attempts = max(1, min(transient_attempts, 3))
+        self._transient_attempts = max(1, min(transient_attempts, 4))
+        self._transient_retry_delay = max(
+            0.01, min(transient_retry_delay_seconds, 0.25)
+        )
         self._sequence = 0
         self._lock = RLock()
 
@@ -289,7 +299,7 @@ class ReadOnlyCDPEvaluator:
             raise PDDReadOnlyDriverError("PDD read expression is invalid")
         with self._lock:
             last_error: PDDReadOnlyDriverError | None = None
-            for _attempt in range(self._transient_attempts):
+            for attempt in range(self._transient_attempts):
                 try:
                     return self._evaluate_once(target, expression)
                 except _PDDReadExpressionReturnedNoValue as exc:
@@ -299,6 +309,12 @@ class ReadOnlyCDPEvaluator:
                     # Re-open the loopback channel once; no page action or
                     # navigation is performed by this recovery path.
                     last_error = exc
+                    if attempt + 1 < self._transient_attempts:
+                        # The PDD unread countdown re-renders on a one-second
+                        # cadence.  An immediate retry can stay phase-locked to
+                        # the same missing-active-marker window, so shift the
+                        # next read by a short, bounded interval.
+                        sleep(self._transient_retry_delay * (attempt + 1))
             assert last_error is not None
             raise PDDReadOnlyDriverError(
                 "PDD read expression returned no value after a transient retry"
