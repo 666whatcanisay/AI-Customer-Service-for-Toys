@@ -170,7 +170,17 @@ class ObserveOnlyRuntimeComponent:
             self._observing = True
             return False
         if self.stage.allows(ObservationStage.HOST_INGEST):
-            self.forwarder.recover_pending()
+            # A stale pending row may already have been accepted by Host while
+            # the local ACK update lost a race with shutdown.  Recovery is
+            # best-effort here, exactly as it is during initial start: an
+            # idempotency/constraint conflict must not prevent a fresh
+            # read-only observation session from starting.
+            try:
+                self.forwarder.recover_pending()
+            except Exception as exc:
+                self.error_sink(
+                    ("OBSERVATION_RECOVERY_" + type(exc).__name__.upper())[:120]
+                )
         self.observer.start()
         self._observing = True
         return True
