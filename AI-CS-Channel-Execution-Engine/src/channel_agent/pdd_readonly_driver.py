@@ -774,6 +774,11 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     return rf"""
 (() => {{
   const cfg = {config_json};
+  const stableConversationId = (value) => {{
+    const text = String(value || '').trim();
+    const match = text.match(/^(\d{{8,20}})(?:\D|$)/);
+    return match ? match[1] : text;
+  }};
   const one = (root, name) => {{
     const b = cfg.selectors[name];
     if (!b) return null;
@@ -798,7 +803,9 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
       // Conflicting identities still fail closed, and no click/navigation is
       // introduced by this read-only compatibility rule.
       if (name !== 'active_conversation_id') throw new Error('selector boundary');
-      const identities = Array.from(new Set(bounded.map(read).filter(Boolean)));
+      const identities = Array.from(new Set(
+        bounded.map(read).filter(Boolean).map(stableConversationId)
+      ));
       if (identities.length !== 1) throw new Error('selector boundary');
       return identities[0];
     }}
@@ -837,7 +844,7 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
     const item = cfg.selectors.conversation_item;
     const rows = Array.from(document.querySelectorAll(item.selector));
     if (rows.length > item.maximum_matches) throw new Error('conversation boundary');
-    return {{fingerprint, conversations: rows.map((row) => {{
+    const conversations = rows.map((row) => {{
       const conversationId = one(row,'conversation_id');
       const lastActivity = one(row,'last_activity');
       const rawSequence = one(row,'latest_sequence');
@@ -854,7 +861,37 @@ def _read_expression(config_json: str, *, capture: bool) -> str:
         latest_message_id: latestMessageId,
         attention: one(row,'conversation_attention')
       }};
-    }})}};
+    }});
+    // PDD can keep the open conversation only in its `already replied` or
+    // `all conversations` projection while the visible reply list no longer
+    // contains that row.  Reading the current message panel must not depend on
+    // navigation or on which list projection is visible.  Add one synthetic
+    // summary only when all active projections agree on the same stable PDD
+    // conversation id and the current panel exposes a real message watermark.
+    const activeConversationId = one(document,'active_conversation_id');
+    const activeAlreadyListed = conversations.some((item) =>
+      stableConversationId(item.conversation_id) === stableConversationId(activeConversationId)
+    );
+    if (activeConversationId && !activeAlreadyListed) {{
+      const messageBinding = cfg.selectors.message_item;
+      const activeMessages = Array.from(document.querySelectorAll(messageBinding.selector));
+      if (activeMessages.length > messageBinding.maximum_matches) throw new Error('message boundary');
+      const tail = activeMessages.length ? activeMessages[activeMessages.length - 1] : null;
+      const rawSequence = tail ? one(tail,'message_sequence') : null;
+      const messageId = tail ? one(tail,'message_id') : null;
+      if (tail && messageId) {{
+        conversations.push({{
+          conversation_id: stableConversationId(activeConversationId),
+          customer_reference: null,
+          unread_count: null,
+          last_activity: messageId,
+          latest_sequence: sequenceLike(rawSequence) ? rawSequence : null,
+          latest_message_id: messageId,
+          attention: null
+        }});
+      }}
+    }}
+    return {{fingerprint, conversations}};
   }}
   const item = cfg.selectors.message_item;
   const rows = Array.from(document.querySelectorAll(item.selector));

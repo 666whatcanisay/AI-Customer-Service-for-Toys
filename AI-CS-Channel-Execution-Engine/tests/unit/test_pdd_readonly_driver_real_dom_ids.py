@@ -159,16 +159,30 @@ def test_selector_reader_ignores_only_non_rendered_transition_duplicates() -> No
     assert "bounded.length > b.maximum_matches" in expression
 
 
-def test_selector_reader_collapses_only_identical_active_transition_ids() -> None:
+def test_selector_reader_collapses_active_projection_suffixes_to_one_stable_id() -> None:
     expression = _read_expression(
         '{"selectors":{},"probes":[],"path":"/chat-merchant/index.html"}',
         capture=True,
     )
 
     assert "name !== 'active_conversation_id'" in expression
-    assert "new Set(bounded.map(read).filter(Boolean))" in expression
+    assert "map(stableConversationId)" in expression
+    assert "text.match(/^(\\d{8,20})(?:\\D|$)/)" in expression
     assert "identities.length !== 1" in expression
     assert "return identities[0]" in expression
+
+
+def test_scan_synthesizes_current_panel_when_active_row_is_not_in_visible_list() -> None:
+    expression = _read_expression(
+        '{"selectors":{},"probes":[],"path":"/chat-merchant/index.html"}',
+        capture=False,
+    )
+
+    assert "const activeAlreadyListed = conversations.some" in expression
+    assert "stableConversationId(item.conversation_id)" in expression
+    assert "activeMessages[activeMessages.length - 1]" in expression
+    assert "conversation_id: stableConversationId(activeConversationId)" in expression
+    assert "last_activity: messageId" in expression
 
 
 def test_capture_prefers_latest_verified_product_card_vue_identity() -> None:
